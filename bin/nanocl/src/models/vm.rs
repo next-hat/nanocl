@@ -7,7 +7,10 @@ use nanocld_client::stubs::vm_spec::{
   VmSpecPartial, VmDisk, VmHostConfig, VmSpecUpdate,
 };
 
-use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts, VmImageArg};
+use super::{
+  DisplayFormat, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
+  VmImageArg,
+};
 
 /// `nanocl vm` available commands
 #[derive(Clone, Subcommand)]
@@ -27,7 +30,7 @@ pub enum VmCommand {
   /// Inspect a vm
   Inspect(VmInspectOpts),
   /// Start a vm
-  Start(VmNamesOpts),
+  Start(GenericStartOpts),
   /// Stop a vm
   Stop(VmNamesOpts),
   /// Attach to a vm

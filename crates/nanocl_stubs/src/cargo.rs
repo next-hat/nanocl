@@ -11,7 +11,7 @@ use crate::{
 
 use super::cargo_spec::CargoSpec;
 
-// Rexport some stuff from simplicity
+// Reexport some stuff from simplicity
 pub use bollard_next::exec::CreateExecOptions;
 
 /// A Cargo is a replicable container

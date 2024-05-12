@@ -1,21 +1,18 @@
 use futures::StreamExt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
-use nanocld_client::stubs::{
-  process::{ProcessLogQuery, ProcessWaitQuery},
-  system::{EventActorKind, NativeEventAction},
-};
+use nanocld_client::stubs::process::{ProcessLogQuery, ProcessWaitQuery};
 
 use crate::{
   utils,
   config::CliConfig,
   models::{
     GenericDefaultOpts, JobArg, JobCommand, JobInspectOpts, JobLogsOpts,
-    JobRow, JobStartOpts, JobWaitOpts,
+    JobRow, JobWaitOpts,
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericList, GenericRemove, GenericStart};
 
 impl GenericList for JobArg {
   type Item = JobRow;
@@ -32,6 +29,12 @@ impl GenericList for JobArg {
 }
 
 impl GenericRemove<GenericDefaultOpts, String> for JobArg {
+  fn object_name() -> &'static str {
+    "jobs"
+  }
+}
+
+impl GenericStart for JobArg {
   fn object_name() -> &'static str {
     "jobs"
   }
@@ -111,24 +114,6 @@ async fn exec_job_wait(
   Ok(())
 }
 
-/// Execute the `nanocl job start` command to start a job
-async fn exec_job_start(
-  cli_conf: &CliConfig,
-  opts: &JobStartOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let waiter = utils::process::wait_process_state(
-    &opts.name,
-    EventActorKind::Job,
-    [NativeEventAction::Start].to_vec(),
-    client,
-  )
-  .await?;
-  client.start_process("job", &opts.name, None).await?;
-  waiter.await??;
-  Ok(())
-}
-
 /// Function that execute when running `nanocl job`
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
@@ -141,6 +126,8 @@ pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
     JobCommand::Inspect(opts) => exec_job_inspect(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,
     JobCommand::Wait(opts) => exec_job_wait(cli_conf, opts).await,
-    JobCommand::Start(opts) => exec_job_start(cli_conf, opts).await,
+    JobCommand::Start(opts) => {
+      JobArg::exec_start(&cli_conf.client, opts, None).await
+    }
   }
 }

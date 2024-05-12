@@ -11,6 +11,7 @@ use nanocld_client::stubs::{
 
 use super::{
   DisplayFormat, GenericListOpts, GenericRemoveForceOpts, GenericRemoveOpts,
+  GenericStartOpts,
 };
 
 /// `nanocl cargo create` available options
@@ -260,8 +261,8 @@ pub enum CargoCommand {
   List(GenericListOpts),
   /// Create a new cargo
   Create(CargoCreateOpts),
-  /// Start a cargo by its name
-  Start(CargoStartOpts),
+  /// Start cargoes by names
+  Start(GenericStartOpts),
   /// Stop a cargo by its name
   Stop(CargoStopOpts),
   /// Restart a cargo by its name
