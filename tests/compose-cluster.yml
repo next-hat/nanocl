@@ -1,0 +1,81 @@
+volumes:
+  rust-cache:
+    name: "rust-cache"
+  nanocl-deps:
+    name: "nanocl-deps"
+
+networks:
+  system:
+    name: system
+    driver: bridge
+    external: false
+    driver_opts:
+      com.docker.network.bridge.name: nanocl.system
+
+services:
+  nmetrics:
+    container_name: nmetrics.system.c
+    image: ghcr.io/next-hat/metrsd:0.5.3
+    tty: true
+    networks:
+      - system
+    environment:
+      - LOG_LEVEL=metrsd=info
+    command:
+      - --hosts
+      - unix:///run/nanocl/metrics.sock
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.kind=cargo
+      - io.nanocl.c=nmetrics.system
+      - io.nanocl.n=system
+    volumes:
+      - //run/guest-services/nanocl:/run/nanocl
+
+  nanocld:
+    container_name: ndaemon.system.c
+    image: ghcr.io/next-hat/nanocl-dev:dev
+    tty: true
+    hostname: nanocl.internal
+    networks:
+      - system
+    ports:
+      - 8585:8585
+      - 9443:9443
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.kind=cargo
+      - io.nanocl.c=ndaemon.system
+      - io.nanocl.n=system
+    volumes:
+      - type: bind
+        source: ..
+        target: /project
+      - nanocl-deps:/project/target
+      - rust-cache:/usr/local/cargo/registry
+      - /var/run/docker.sock:/run/docker.sock
+      - //run/guest-services/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:${STATE_DIR:-${HOME}/.nanocl_dev/state}
+    command:
+      - watch
+      - -w
+      - /project/bin/nanocld/src
+      - -x
+      - |
+        run --no-default-features \
+          --features dev \
+          --bin nanocld \
+          -- \
+          --hosts unix:///run/nanocl/nanocl.sock \
+          --gid 1001 \
+          --store-addr postgresql://root:root@192.168.121.157:26257/defaultdb \
+          --hosts tcp://0.0.0.0:9443 \
+          --hostname n1.nanocl.internal \
+          --gateway 192.168.121.69 \
+          --advertise-addr 192.168.121.69:8585 \
+          --cert ./tests/server.crt \
+          --cert-key ./tests/server.key \
+          --cert-ca ./tests/ca.crt \
+          --node 192.168.121.157:8585 \
+          --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
+
