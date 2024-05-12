@@ -1,12 +1,56 @@
-use futures::StreamExt;
 use ntex::rt;
+use futures::StreamExt;
+
 use nanocl_error::io::{IoError, IoResult};
+
 use nanocld_client::{
-  stubs::system::{
-    EventActorKind, EventCondition, EventKind, NativeEventAction,
-  },
   NanocldClient,
+  stubs::{
+    generic::GenericNspQuery,
+    system::{
+      EventActorKind, EventCondition, EventKind, NativeEventAction, ObjPsStatus,
+    },
+  },
 };
+
+use crate::models::GenericProcessStatus;
+
+pub fn gen_key(name: &str, namespace: Option<String>) -> String {
+  match namespace {
+    Some(ns) => format!("{}/{}", ns, name),
+    None => name.to_owned(),
+  }
+}
+
+pub fn get_actor_kind(object_name: &str) -> EventActorKind {
+  match object_name {
+    "vms" => EventActorKind::Vm,
+    "cargoes" => EventActorKind::Cargo,
+    "jobs" => EventActorKind::Job,
+    _ => {
+      panic!("The developer trolled you with a wrong object name {object_name}")
+    }
+  }
+}
+
+pub async fn get_process_status(
+  object_name: &str,
+  name: &str,
+  namespace: Option<String>,
+  client: &NanocldClient,
+) -> IoResult<ObjPsStatus> {
+  let res = client
+    .send_get(
+      &format!("/{object_name}/{name}/inspect"),
+      Some(GenericNspQuery::new(namespace.as_deref())),
+    )
+    .await?;
+  Ok(
+    NanocldClient::res_json::<GenericProcessStatus>(res)
+      .await?
+      .status,
+  )
+}
 
 pub async fn wait_process_state(
   key: &str,

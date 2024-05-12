@@ -12,33 +12,29 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove, GenericStart};
+use super::{
+  GenericCommand, GenericCommandLs, GenericCommandRm, GenericCommandStart,
+};
 
-impl GenericList for JobArg {
-  type Item = JobRow;
-  type Args = JobArg;
-  type ApiItem = nanocld_client::stubs::job::JobSummary;
-
+impl GenericCommand for JobArg {
   fn object_name() -> &'static str {
     "jobs"
   }
+}
+
+impl GenericCommandLs for JobArg {
+  type Item = JobRow;
+  type Args = JobArg;
+  type ApiItem = nanocld_client::stubs::job::JobSummary;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for JobArg {
-  fn object_name() -> &'static str {
-    "jobs"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for JobArg {}
 
-impl GenericStart for JobArg {
-  fn object_name() -> &'static str {
-    "jobs"
-  }
-}
+impl GenericCommandStart for JobArg {}
 
 /// Execute the `nanocl job inspect` command to inspect a job
 async fn exec_job_inspect(

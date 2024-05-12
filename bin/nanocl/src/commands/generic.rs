@@ -4,7 +4,7 @@ use ntex::http::StatusCode;
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+    generic::{GenericFilter, GenericListQuery},
     system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
   },
 };
@@ -14,18 +14,20 @@ use nanocl_error::{
 };
 
 use crate::{
-  utils,
   models::{
-    GenericListOpts, GenericProcessStatus, GenericRemoveOpts, GenericStartOpts,
+    GenericListOpts, GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
   },
+  utils,
 };
 
-pub trait GenericList {
+pub trait GenericCommand {
+  fn object_name() -> &'static str;
+}
+
+pub trait GenericCommandLs: GenericCommand {
   type Item;
   type Args;
   type ApiItem;
-
-  fn object_name() -> &'static str;
 
   fn get_key(item: &Self::Item) -> String;
 
@@ -99,13 +101,11 @@ pub trait GenericList {
   }
 }
 
-pub trait GenericRemove<T, Q>
+pub trait GenericCommandRm<T, Q>: GenericCommand
 where
   T: Args + Clone,
   Q: serde::Serialize,
 {
-  fn object_name() -> &'static str;
-
   fn get_query(
     _opts: &GenericRemoveOpts<T>,
     _namespace: Option<String>,
@@ -184,9 +184,7 @@ where
   }
 }
 
-pub trait GenericStart {
-  fn object_name() -> &'static str;
-
+pub trait GenericCommandStart: GenericCommand {
   async fn exec_start(
     client: &NanocldClient,
     opts: &GenericStartOpts,
@@ -194,31 +192,19 @@ pub trait GenericStart {
   ) -> IoResult<()> {
     let object_name = Self::object_name();
     for name in &opts.names {
-      let res = client
-        .send_get(
-          &format!("/{object_name}/{name}/inspect"),
-          Some(GenericNspQuery::new(namespace.as_deref())),
-        )
-        .await?;
-      let status = NanocldClient::res_json::<GenericProcessStatus>(res)
-        .await?
-        .status;
+      let status = utils::process::get_process_status(
+        object_name,
+        name,
+        namespace.clone(),
+        client,
+      )
+      .await?;
       if status.actual == ObjPsStatusKind::Start {
-        eprintln!("{} is already started", name);
+        eprintln!("{name} is already started");
         continue;
       }
-      let key = match namespace {
-        Some(ref namespace) => format!("{name}.{namespace}"),
-        None => name.clone(),
-      };
-      let process_kind = match object_name {
-        "vms" => EventActorKind::Vm,
-        "cargoes" => EventActorKind::Cargo,
-        "jobs" => EventActorKind::Job,
-        _ => panic!(
-          "The developer trolled you with a wrong object name {object_name}"
-        ),
-      };
+      let key = utils::process::gen_key(name, namespace.clone());
+      let process_kind = utils::process::get_actor_kind(object_name);
       let waiter = utils::process::wait_process_state(
         &key,
         process_kind.clone(),
@@ -237,6 +223,53 @@ pub trait GenericStart {
         eprintln!("{err} {name}");
         continue;
       };
+      if let Err(err) = waiter.await? {
+        eprintln!("{err} {name}");
+      }
+    }
+    Ok(())
+  }
+}
+
+pub trait GenericCommandStop: GenericCommand {
+  async fn exec_stop(
+    client: &NanocldClient,
+    opts: &GenericStopOpts,
+    namespace: Option<String>,
+  ) -> IoResult<()> {
+    let object_name = Self::object_name();
+    for name in &opts.names {
+      let status = utils::process::get_process_status(
+        object_name,
+        name,
+        namespace.clone(),
+        client,
+      )
+      .await?;
+      if status.actual == ObjPsStatusKind::Stop {
+        eprintln!("{name} is already stopped");
+        continue;
+      }
+      let key = utils::process::gen_key(name, namespace.clone());
+      let process_kind = utils::process::get_actor_kind(object_name);
+      let waiter = utils::process::wait_process_state(
+        &key,
+        process_kind.clone(),
+        [NativeEventAction::Stop].to_vec(),
+        client,
+      )
+      .await?;
+      if let Err(err) = client
+        .stop_process(
+          process_kind.to_string().to_lowercase().as_str(),
+          name,
+          namespace.as_deref(),
+        )
+        .await
+      {
+        eprintln!("{err} {name}");
+        continue;
+      }
       if let Err(err) = waiter.await? {
         eprintln!("{err} {name}");
       }

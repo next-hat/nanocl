@@ -9,7 +9,7 @@ use nanocld_client::stubs::vm_spec::{
 
 use super::{
   DisplayFormat, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
-  VmImageArg,
+  GenericStopOpts, VmImageArg,
 };
 
 /// `nanocl vm` available commands
@@ -32,7 +32,7 @@ pub enum VmCommand {
   /// Start a vm
   Start(GenericStartOpts),
   /// Stop a vm
-  Stop(VmNamesOpts),
+  Stop(GenericStopOpts),
   /// Attach to a vm
   Attach {
     /// Name of the vm
@@ -40,13 +40,6 @@ pub enum VmCommand {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
-}
-
-/// Generic names options
-#[derive(Clone, Parser)]
-pub struct VmNamesOpts {
-  /// Names of the vm
-  pub names: Vec<String>,
 }
 
 /// `nanocl vm inspect` available options

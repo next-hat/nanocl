@@ -5,8 +5,10 @@ use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use nanocl_error::io::{IoResult, FromIo};
-use nanocld_client::NanocldClient;
-use nanocld_client::stubs::vm_image::VmImageCloneStream;
+use nanocld_client::{
+  NanocldClient,
+  stubs::vm_image::{VmImage, VmImageCloneStream},
+};
 
 use crate::{
   utils,
@@ -16,27 +18,25 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
 
-impl GenericList for VmImageArg {
-  type Item = VmImageRow;
-  type Args = VmImageArg;
-  type ApiItem = nanocld_client::stubs::vm_image::VmImage;
-
+impl GenericCommand for VmImageArg {
   fn object_name() -> &'static str {
     "vms/images"
   }
+}
+
+impl GenericCommandLs for VmImageArg {
+  type Item = VmImageRow;
+  type Args = VmImageArg;
+  type ApiItem = VmImage;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for VmImageArg {
-  fn object_name() -> &'static str {
-    "vms/images"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for VmImageArg {}
 
 /// Function that execute when running `nanocl vm image create`
 async fn exec_vm_image_create(

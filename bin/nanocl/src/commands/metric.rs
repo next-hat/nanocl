@@ -6,16 +6,18 @@ use crate::{
   models::{MetricArg, MetricRow, MetricCommand},
 };
 
-use super::GenericList;
+use super::{GenericCommand, GenericCommandLs};
 
-impl GenericList for MetricArg {
-  type Item = MetricRow;
-  type Args = MetricArg;
-  type ApiItem = Metric;
-
+impl GenericCommand for MetricArg {
   fn object_name() -> &'static str {
     "metrics"
   }
+}
+
+impl GenericCommandLs for MetricArg {
+  type Item = MetricRow;
+  type Args = MetricArg;
+  type ApiItem = Metric;
 
   fn get_key(item: &Self::Item) -> String {
     item.key.clone()

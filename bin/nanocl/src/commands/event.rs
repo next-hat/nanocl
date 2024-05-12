@@ -9,16 +9,18 @@ use crate::{
   models::{EventArg, EventRow, EventCommand},
 };
 
-use super::GenericList;
+use super::{GenericCommand, GenericCommandLs};
 
-impl GenericList for EventArg {
-  type Item = EventRow;
-  type Args = EventArg;
-  type ApiItem = Event;
-
+impl GenericCommand for EventArg {
   fn object_name() -> &'static str {
     "events"
   }
+}
+
+impl GenericCommandLs for EventArg {
+  type Item = EventRow;
+  type Args = EventArg;
+  type ApiItem = Event;
 
   fn get_key(item: &Self::Item) -> String {
     item.key.clone()

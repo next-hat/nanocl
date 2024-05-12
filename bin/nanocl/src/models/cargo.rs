@@ -11,7 +11,7 @@ use nanocld_client::stubs::{
 
 use super::{
   DisplayFormat, GenericListOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-  GenericStartOpts,
+  GenericStartOpts, GenericStopOpts,
 };
 
 /// `nanocl cargo create` available options
@@ -97,13 +97,6 @@ impl From<CargoRunOpts> for CargoSpecPartial {
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
-}
-
-/// `nanocl cargo stop` available options
-#[derive(Clone, Parser)]
-pub struct CargoStopOpts {
-  // List of cargo to stop
-  pub names: Vec<String>,
 }
 
 /// `nanocl cargo restart` available options
@@ -263,8 +256,8 @@ pub enum CargoCommand {
   Create(CargoCreateOpts),
   /// Start cargoes by names
   Start(GenericStartOpts),
-  /// Stop a cargo by its name
-  Stop(CargoStopOpts),
+  /// Stop cargoes by names
+  Stop(GenericStopOpts),
   /// Restart a cargo by its name
   Restart(CargoRestartOpts),
   /// Remove cargo by its name

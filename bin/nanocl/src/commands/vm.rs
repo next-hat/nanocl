@@ -31,34 +31,33 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove, GenericStart};
+use super::{
+  GenericCommand, GenericCommandLs, GenericCommandRm, GenericCommandStart,
+  GenericCommandStop,
+};
 use super::vm_image::exec_vm_image;
 
-impl GenericList for VmArg {
-  type Item = VmRow;
-  type Args = VmArg;
-  type ApiItem = nanocld_client::stubs::vm::VmSummary;
-
+impl GenericCommand for VmArg {
   fn object_name() -> &'static str {
     "vms"
   }
+}
+
+impl GenericCommandLs for VmArg {
+  type Item = VmRow;
+  type Args = VmArg;
+  type ApiItem = nanocld_client::stubs::vm::VmSummary;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for VmArg {
-  fn object_name() -> &'static str {
-    "vms"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for VmArg {}
 
-impl GenericStart for VmArg {
-  fn object_name() -> &'static str {
-    "vms"
-  }
-}
+impl GenericCommandStart for VmArg {}
+
+impl GenericCommandStop for VmArg {}
 
 async fn wait_vm_state(
   name: &str,
@@ -108,30 +107,6 @@ pub async fn exec_vm_inspect(
     .clone()
     .unwrap_or(cli_conf.user_config.display_format.clone());
   utils::print::display_format(&display, vm)?;
-  Ok(())
-}
-
-/// Function executed when running `nanocl vm stop`
-/// It will stop a virtual machine that was previously started
-pub async fn exec_vm_stop(
-  cli_conf: &CliConfig,
-  args: &VmArg,
-  names: &[String],
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  for name in names {
-    let waiter =
-      wait_vm_state(name, args, NativeEventAction::Stop, client).await?;
-    if let Err(err) = client
-      .stop_process("vm", name, args.namespace.as_deref())
-      .await
-    {
-      eprintln!("{name}: {err}");
-    }
-    if let Err(err) = waiter.await? {
-      eprintln!("{name}: {err}");
-    }
-  }
   Ok(())
 }
 
@@ -302,7 +277,14 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
       )
       .await
     }
-    VmCommand::Stop(opts) => exec_vm_stop(cli_conf, args, &opts.names).await,
+    VmCommand::Stop(opts) => {
+      VmArg::exec_stop(
+        client,
+        opts,
+        Some(args.namespace.clone().unwrap_or("global".to_owned())),
+      )
+      .await
+    }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
     VmCommand::Attach { name } => exec_vm_attach(cli_conf, args, name).await,

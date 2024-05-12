@@ -20,22 +20,27 @@ use crate::{
   config::CliConfig,
   models::{
     GenericRemoveForceOpts, GenericRemoveOpts, CargoArg, CargoCreateOpts,
-    CargoCommand, CargoRow, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-    CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
+    CargoCommand, CargoRow, CargoPatchOpts, CargoInspectOpts, CargoExecOpts,
+    CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts, CargoRunOpts,
+    CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
   },
 };
 
-use super::{GenericList, GenericRemove, GenericStart};
+use super::{
+  GenericCommand, GenericCommandLs, GenericCommandRm, GenericCommandStart,
+  GenericCommandStop,
+};
 
-impl GenericList for CargoArg {
-  type Item = CargoRow;
-  type Args = CargoArg;
-  type ApiItem = CargoSummary;
-
+impl GenericCommand for CargoArg {
   fn object_name() -> &'static str {
     "cargoes"
   }
+}
+
+impl GenericCommandLs for CargoArg {
+  type Item = CargoRow;
+  type Args = CargoArg;
+  type ApiItem = CargoSummary;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
@@ -51,11 +56,7 @@ impl GenericList for CargoArg {
   }
 }
 
-impl GenericRemove<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
-  fn object_name() -> &'static str {
-    "cargoes"
-  }
-
+impl GenericCommandRm<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
   fn get_query(
     opts: &GenericRemoveOpts<GenericRemoveForceOpts>,
     namespace: Option<String>,
@@ -70,11 +71,9 @@ impl GenericRemove<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
   }
 }
 
-impl GenericStart for CargoArg {
-  fn object_name() -> &'static str {
-    "cargoes"
-  }
-}
+impl GenericCommandStart for CargoArg {}
+
+impl GenericCommandStop for CargoArg {}
 
 async fn wait_cargo_state(
   name: &str,
@@ -104,27 +103,6 @@ async fn exec_cargo_create(
     .create_cargo(&cargo, args.namespace.as_deref())
     .await?;
   println!("{}", &item.spec.cargo_key);
-  Ok(())
-}
-
-/// Execute the `nanocl cargo stop` command to stop a cargo
-async fn exec_cargo_stop(
-  cli_conf: &CliConfig,
-  args: &CargoArg,
-  opts: &CargoStopOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  for name in &opts.names {
-    let waiter =
-      wait_cargo_state(name, args, NativeEventAction::Stop, client).await?;
-    if let Err(err) = client
-      .stop_process("cargo", name, args.namespace.as_deref())
-      .await
-    {
-      eprintln!("{name}: {err}");
-    }
-    let _ = waiter.await?;
-  }
   Ok(())
 }
 
@@ -379,7 +357,14 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
       )
       .await
     }
-    CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
+    CargoCommand::Stop(opts) => {
+      CargoArg::exec_stop(
+        &cli_conf.client,
+        opts,
+        Some(args.namespace.clone().unwrap_or("global".to_owned())),
+      )
+      .await
+    }
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
     CargoCommand::Inspect(opts) => {
       exec_cargo_inspect(cli_conf, args, opts).await

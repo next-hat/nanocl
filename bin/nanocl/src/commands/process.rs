@@ -6,16 +6,18 @@ use crate::{
   models::{ProcessRow, ProcessArg, GenericListOpts, ProcessFilter},
 };
 
-use super::GenericList;
+use super::{GenericCommand, GenericCommandLs};
 
-impl GenericList for ProcessArg {
-  type Item = ProcessRow;
-  type Args = ProcessArg;
-  type ApiItem = Process;
-
+impl GenericCommand for ProcessArg {
   fn object_name() -> &'static str {
     "processes"
   }
+}
+
+impl GenericCommandLs for ProcessArg {
+  type Item = ProcessRow;
+  type Args = ProcessArg;
+  type ApiItem = Process;
 
   fn get_key(item: &Self::Item) -> String {
     item.key.clone()

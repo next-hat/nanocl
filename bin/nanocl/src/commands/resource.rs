@@ -9,27 +9,25 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
 
-impl GenericList for ResourceArg {
-  type Item = ResourceRow;
-  type Args = ResourceArg;
-  type ApiItem = nanocld_client::stubs::resource::Resource;
-
+impl GenericCommand for ResourceArg {
   fn object_name() -> &'static str {
     "resources"
   }
+}
+
+impl GenericCommandLs for ResourceArg {
+  type Item = ResourceRow;
+  type Args = ResourceArg;
+  type ApiItem = nanocld_client::stubs::resource::Resource;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for ResourceArg {
-  fn object_name() -> &'static str {
-    "resources"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for ResourceArg {}
 
 /// Function that execute when running `nanocl resource inspect`
 async fn exec_resource_inspect(
