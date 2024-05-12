@@ -1,7 +1,10 @@
 use futures::StreamExt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
-use nanocld_client::stubs::process::{ProcessLogQuery, ProcessWaitQuery};
+use nanocld_client::stubs::{
+  process::{ProcessLogQuery, ProcessWaitQuery},
+  system::{EventActorKind, NativeEventAction},
+};
 
 use crate::{
   utils,
@@ -114,7 +117,15 @@ async fn exec_job_start(
   opts: &JobStartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter = utils::process::wait_process_state(
+    &opts.name,
+    EventActorKind::Job,
+    [NativeEventAction::Start].to_vec(),
+    client,
+  )
+  .await?;
   client.start_process("job", &opts.name, None).await?;
+  waiter.await??;
   Ok(())
 }
 
