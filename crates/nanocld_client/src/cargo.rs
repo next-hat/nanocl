@@ -305,7 +305,16 @@ mod tests {
       .stop_process("cargo", CARGO_NAME, None)
       .await
       .unwrap();
-    client.delete_cargo(CARGO_NAME, None).await.unwrap();
+    client
+      .delete_cargo(
+        CARGO_NAME,
+        Some(&CargoDeleteQuery {
+          force: Some(true),
+          ..Default::default()
+        }),
+      )
+      .await
+      .unwrap();
   }
 
   #[ntex::test]
