@@ -13,7 +13,14 @@ use futures::{
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_error::io::{IoResult, FromIo};
-use nanocld_client::stubs::process::{OutputLog, OutputKind};
+use nanocld_client::{
+  stubs::{
+    process::{OutputKind, OutputLog},
+    system::{EventActorKind, NativeEventAction},
+    vm_spec::VmSpecPartial,
+  },
+  NanocldClient,
+};
 
 use crate::{
   utils,
@@ -45,6 +52,22 @@ impl GenericRemove<GenericDefaultOpts, String> for VmArg {
   fn object_name() -> &'static str {
     "vms"
   }
+}
+
+async fn wait_vm_state(
+  name: &str,
+  args: &VmArg,
+  action: NativeEventAction,
+  client: &NanocldClient,
+) -> IoResult<rt::JoinHandle<IoResult<()>>> {
+  let waiter = utils::process::wait_process_state(
+    &format!("{}.{}", name, args.namespace.as_deref().unwrap_or("global")),
+    EventActorKind::Vm,
+    [action].to_vec(),
+    client,
+  )
+  .await?;
+  Ok(waiter)
 }
 
 /// Function executed when running `nanocl vm create`
@@ -91,10 +114,15 @@ pub async fn exec_vm_start(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
+    let waiter =
+      wait_vm_state(name, args, NativeEventAction::Start, client).await?;
     if let Err(err) = client
       .start_process("vm", name, args.namespace.as_deref())
       .await
     {
+      eprintln!("{name}: {err}");
+    }
+    if let Err(err) = waiter.await? {
       eprintln!("{name}: {err}");
     }
   }
@@ -110,10 +138,15 @@ pub async fn exec_vm_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
+    let waiter =
+      wait_vm_state(name, args, NativeEventAction::Stop, client).await?;
     if let Err(err) = client
       .stop_process("vm", name, args.namespace.as_deref())
       .await
     {
+      eprintln!("{name}: {err}");
+    }
+    if let Err(err) = waiter.await? {
       eprintln!("{name}: {err}");
     }
   }
@@ -129,11 +162,14 @@ pub async fn exec_vm_run(
   options: &VmRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let vm = options.clone().into();
+  let vm: VmSpecPartial = options.clone().into();
+  let waiter =
+    wait_vm_state(&vm.name, args, NativeEventAction::Start, client).await?;
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   client
     .start_process("vm", &vm.spec.name, args.namespace.as_deref())
     .await?;
+  waiter.await??;
   if options.attach {
     exec_vm_attach(cli_conf, args, &options.name).await?;
   }
@@ -148,10 +184,14 @@ pub async fn exec_vm_patch(
   options: &VmPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter =
+    wait_vm_state(&options.name, args, NativeEventAction::Start, client)
+      .await?;
   let vm = options.clone().into();
   client
     .patch_vm(&options.name, &vm, args.namespace.as_deref())
     .await?;
+  waiter.await??;
   Ok(())
 }
 
