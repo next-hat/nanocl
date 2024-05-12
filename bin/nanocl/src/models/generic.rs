@@ -84,3 +84,9 @@ pub struct GenericRemoveForceOpts {
 pub struct GenericStartOpts {
   pub names: Vec<String>,
 }
+
+/// Generic stop options for the stop command
+#[derive(Clone, Parser)]
+pub struct GenericStopOpts {
+  pub names: Vec<String>,
+}

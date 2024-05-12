@@ -9,27 +9,25 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
 
-impl GenericList for SecretArg {
-  type Item = SecretRow;
-  type Args = SecretArg;
-  type ApiItem = nanocld_client::stubs::secret::Secret;
-
+impl GenericCommand for SecretArg {
   fn object_name() -> &'static str {
     "secrets"
   }
+}
+
+impl GenericCommandLs for SecretArg {
+  type Item = SecretRow;
+  type Args = SecretArg;
+  type ApiItem = nanocld_client::stubs::secret::Secret;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for SecretArg {
-  fn object_name() -> &'static str {
-    "secrets"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for SecretArg {}
 
 /// Function that execute when running `nanocl secret inspect`
 async fn exec_secret_inspect(

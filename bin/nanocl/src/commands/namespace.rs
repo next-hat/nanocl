@@ -11,27 +11,25 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
 
-impl GenericList for NamespaceArg {
-  type Item = NamespaceRow;
-  type Args = NamespaceArg;
-  type ApiItem = NamespaceSummary;
-
+impl GenericCommand for NamespaceArg {
   fn object_name() -> &'static str {
     "namespaces"
   }
+}
+
+impl GenericCommandLs for NamespaceArg {
+  type Item = NamespaceRow;
+  type Args = NamespaceArg;
+  type ApiItem = NamespaceSummary;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
   }
 }
 
-impl GenericRemove<GenericDefaultOpts, String> for NamespaceArg {
-  fn object_name() -> &'static str {
-    "namespaces"
-  }
-}
+impl GenericCommandRm<GenericDefaultOpts, String> for NamespaceArg {}
 
 /// Function that execute when running `nanocl namespace create`
 async fn exec_namespace_create(

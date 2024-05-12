@@ -51,7 +51,7 @@ use crate::{
   utils,
 };
 
-use super::GenericRemove;
+use super::GenericCommandRm;
 
 /// Get Statefile from url and return a StateRef with the raw data and the format
 async fn get_from_url(

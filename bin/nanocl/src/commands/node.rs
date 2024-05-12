@@ -5,16 +5,18 @@ use crate::{
   models::{NodeArg, NodeCommand, NodeRow},
 };
 
-use super::GenericList;
+use super::{GenericCommand, GenericCommandLs};
 
-impl GenericList for NodeArg {
-  type Item = NodeRow;
-  type Args = NodeArg;
-  type ApiItem = nanocld_client::stubs::node::Node;
-
+impl GenericCommand for NodeArg {
   fn object_name() -> &'static str {
     "nodes"
   }
+}
+
+impl GenericCommandLs for NodeArg {
+  type Item = NodeRow;
+  type Args = NodeArg;
+  type ApiItem = nanocld_client::stubs::node::Node;
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
