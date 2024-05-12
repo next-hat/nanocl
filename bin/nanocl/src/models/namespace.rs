@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 
-use super::GenericListOpts;
+use super::{GenericRemoveOpts, GenericListOpts};
 
 /// `nanocl namespace` available commands
 #[derive(Clone, Subcommand)]
@@ -15,7 +15,7 @@ pub enum NamespaceCommand {
   Inspect(NamespaceOpts),
   /// Remove a namespace
   #[clap(alias("rm"))]
-  Remove(NamespaceDeleteOpts),
+  Remove(GenericRemoveOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
   List(GenericListOpts),

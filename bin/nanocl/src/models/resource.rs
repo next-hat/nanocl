@@ -4,14 +4,14 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::resource::Resource;
 
-use super::{DisplayFormat, GenericListOpts};
+use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
 pub enum ResourceCommand {
   /// Remove existing resource
   #[clap(alias("rm"))]
-  Remove(ResourceRemoveOpts),
+  Remove(GenericRemoveOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
   List(GenericListOpts),
@@ -68,16 +68,6 @@ impl From<Resource> for ResourceRow {
       updated_at: format!("{updated_at}"),
     }
   }
-}
-
-/// `nanocl resource remove` available options
-#[derive(Clone, Parser)]
-pub struct ResourceRemoveOpts {
-  /// Skip confirmation
-  #[clap(short = 'y')]
-  pub skip_confirm: bool,
-  /// The names of the resources to delete
-  pub names: Vec<String>,
 }
 
 /// `nanocl resource inspect` available options

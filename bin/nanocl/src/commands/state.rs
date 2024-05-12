@@ -1,29 +1,29 @@
 use std::{
-  collections::HashMap,
-  env::{consts, vars_os},
   fs,
-  path::{Path, PathBuf},
   time::Duration,
+  collections::HashMap,
+  path::{Path, PathBuf},
+  env::{consts, vars_os},
 };
 
-use ntex::rt;
+use url::Url;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
+use async_recursion::async_recursion;
 use futures::{
   join, StreamExt,
   stream::{FuturesOrdered, FuturesUnordered},
 };
-use async_recursion::async_recursion;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
+  ConnectOpts,
   stubs::{
     process::Process,
     statefile::{StatefileArgKind, SubState, SubStateValue},
-    system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
+    system::{EventActorKind, ObjPsStatusKind},
   },
-  ConnectOpts,
 };
 
 use nanocld_client::{
@@ -36,20 +36,22 @@ use nanocld_client::{
     vm_spec::{VmSpecPartial, VmSpecUpdate},
     resource::{ResourcePartial, ResourceUpdate},
     secret::{SecretUpdate, SecretPartial},
-    cargo::CargoDeleteQuery,
     system::NativeEventAction,
   },
 };
-use url::Url;
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    Context, DisplayFormat, StateApplyOpts, StateArg, StateCommand,
-    StateLogsOpts, StateRef, StateRemoveOpts, StateRoot,
+    CargoArg, Context, DisplayFormat, GenericDefaultOpts,
+    GenericRemoveForceOpts, GenericRemoveOpts, JobArg, ResourceArg, SecretArg,
+    StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
+    StateRemoveOpts, StateRoot, VmArg,
   },
+  utils,
 };
+
+use super::GenericRemove;
 
 /// Get Statefile from url and return a StateRef with the raw data and the format
 async fn get_from_url(
@@ -463,36 +465,6 @@ async fn render_template(
   Ok(state_ref)
 }
 
-async fn wait_process_object(
-  key: &str,
-  kind: EventActorKind,
-  action: Vec<NativeEventAction>,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let mut stream = client
-    .watch_events(Some(vec![EventCondition {
-      actor_key: Some(key.to_owned()),
-      actor_kind: Some(kind.clone()),
-      kind: vec![EventKind::Normal, EventKind::Error],
-      action,
-      ..Default::default()
-    }]))
-    .await?;
-  let fut = rt::spawn(async move {
-    while let Some(event) = stream.next().await {
-      let event = event?;
-      if event.kind == EventKind::Error {
-        return Err(IoError::interrupted(
-          "Error",
-          &event.note.unwrap_or_default(),
-        ));
-      }
-    }
-    Ok::<_, IoError>(())
-  });
-  Ok(fut)
-}
-
 #[async_recursion(?Send)]
 async fn parse_state_file_recurr(
   cli_conf: &CliConfig,
@@ -628,7 +600,7 @@ async fn state_apply(
       let token = format!("job/{}", job.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
-        let waiter = wait_process_object(
+        let waiter = utils::process::wait_process_state(
           &job.name,
           EventActorKind::Job,
           vec![NativeEventAction::Destroy],
@@ -639,7 +611,7 @@ async fn state_apply(
         waiter.await??;
       }
       client.create_job(job).await?;
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
         vec![NativeEventAction::Start],
@@ -672,7 +644,7 @@ async fn state_apply(
           }
         }
       }
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", cargo.name),
         EventActorKind::Cargo,
         vec![NativeEventAction::Start],
@@ -706,7 +678,7 @@ async fn state_apply(
           }
         }
       }
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", vm.name),
         EventActorKind::Vm,
         vec![NativeEventAction::Start],
@@ -845,98 +817,39 @@ async fn state_remove(
     None => "global",
     Some(namespace) => namespace,
   };
-  let pg_style = utils::progress::create_spinner_style("red");
+  let mut gen_rm_opts = GenericRemoveOpts::<GenericDefaultOpts> {
+    names: Vec::default(),
+    skip_confirm: true,
+    others: GenericDefaultOpts,
+  };
   if let Some(jobs) = &state_file.data.jobs {
-    for job in jobs {
-      let token = format!("job/{}", job.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_job(&job.name).await.is_ok() {
-        let waiter = wait_process_object(
-          &job.name,
-          EventActorKind::Job,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client.delete_job(&job.name).await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    gen_rm_opts.names = jobs.iter().map(|job| job.name.clone()).collect();
+    let _ = JobArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(cargoes) = &state_file.data.cargoes {
-    for cargo in cargoes {
-      let token = format!("cargo/{}", cargo.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client
-        .inspect_cargo(&cargo.name, state_file.data.namespace.as_deref())
-        .await
-        .is_ok()
-      {
-        let waiter = wait_process_object(
-          &format!("{}.{namespace}", cargo.name),
-          EventActorKind::Cargo,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client
-          .delete_cargo(
-            &cargo.name,
-            Some(&CargoDeleteQuery {
-              namespace: state_file.data.namespace.clone(),
-              force: Some(true),
-            }),
-          )
-          .await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
+      names: cargoes.iter().map(|cargo| cargo.name.clone()).collect(),
+      skip_confirm: true,
+      others: GenericRemoveForceOpts { force: true },
+    };
+    let _ = CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    for vm in vms {
-      let token = format!("vm/{}", vm.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client
-        .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
-        .await
-        .is_ok()
-      {
-        let waiter = wait_process_object(
-          &format!("{}.{namespace}", vm.name),
-          EventActorKind::Vm,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client
-          .delete_vm(&vm.name, state_file.data.namespace.as_deref())
-          .await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    gen_rm_opts.names = vms.iter().map(|vm| vm.name.clone()).collect();
+    let _ =
+      VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await;
   }
   if let Some(resources) = &state_file.data.resources {
-    for resource in resources {
-      let token = format!("resource/{}", resource.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_resource(&resource.name).await.is_ok() {
-        client.delete_resource(&resource.name).await?;
-      }
-      pg.finish();
-    }
+    gen_rm_opts.names = resources
+      .iter()
+      .map(|resource| resource.name.clone())
+      .collect();
+    let _ = ResourceArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(secrets) = &state_file.data.secrets {
-    for secret in secrets {
-      let token = format!("secret/{}", secret.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_secret(&secret.name).await.is_ok() {
-        client.delete_secret(&secret.name).await?;
-      }
-      pg.finish();
-    }
+    gen_rm_opts.names =
+      secrets.iter().map(|secret| secret.name.clone()).collect();
+    let _ = SecretArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   Ok(())
 }

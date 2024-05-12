@@ -11,12 +11,12 @@ use nanocld_client::stubs::vm_image::VmImageCloneStream;
 use crate::{
   utils,
   models::{
-    VmImageArg, VmImageCreateOpts, VmImageCommand, VmImageRow,
-    VmImageResizeOpts,
+    GenericDefaultOpts, VmImageArg, VmImageCommand, VmImageCreateOpts,
+    VmImageResizeOpts, VmImageRow,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 
 impl GenericList for VmImageArg {
   type Item = VmImageRow;
@@ -29,6 +29,12 @@ impl GenericList for VmImageArg {
 
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
+  }
+}
+
+impl GenericRemove<GenericDefaultOpts, String> for VmImageArg {
+  fn object_name() -> &'static str {
+    "vms/images"
   }
 }
 
@@ -68,17 +74,6 @@ async fn exec_vm_image_create(
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
   client.import_vm_image(&options.name, byte_stream).await?;
-  Ok(())
-}
-
-/// Function that execute when running `nanocl vm image rm`
-async fn exec_vm_image_rm(
-  client: &NanocldClient,
-  names: &[String],
-) -> IoResult<()> {
-  for name in names {
-    client.delete_vm_image(name).await?;
-  }
   Ok(())
 }
 
@@ -130,7 +125,9 @@ pub async fn exec_vm_image(
       exec_vm_image_create(client, options).await
     }
     VmImageCommand::List(opts) => VmImageArg::exec_ls(client, args, opts).await,
-    VmImageCommand::Remove { names } => exec_vm_image_rm(client, names).await,
+    VmImageCommand::Remove(opts) => {
+      VmImageArg::exec_rm(client, opts, None).await
+    }
     VmImageCommand::Clone { name, clone_name } => {
       exec_vm_image_clone(client, name, clone_name).await
     }

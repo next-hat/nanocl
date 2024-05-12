@@ -625,7 +625,7 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
       instance_failed += 1;
       continue;
     }
-    if state.running.unwrap_or_default() {
+    if state.finished_at.unwrap() == "0001-01-01T00:00:00Z" {
       instance_running += 1;
       continue;
     }

@@ -2,17 +2,20 @@ use clap::{Args, Parser};
 
 use nanocld_client::stubs::generic::GenericFilter;
 
-#[derive(Clone, Args)]
-pub struct DefaultFilter;
+/// An empty filter to use as default
+#[derive(Clone, Default, Args)]
+pub struct GenericDefaultOpts;
 
-impl From<DefaultFilter> for GenericFilter {
-  fn from(_: DefaultFilter) -> Self {
+/// A generic filter to use in the list operations
+impl From<GenericDefaultOpts> for GenericFilter {
+  fn from(_: GenericDefaultOpts) -> Self {
     Self::default()
   }
 }
 
+/// Generic list options for the list command
 #[derive(Clone, Parser)]
-pub struct GenericListOpts<T = DefaultFilter>
+pub struct GenericListOpts<T = GenericDefaultOpts>
 where
   T: Args + Clone,
 {
@@ -32,6 +35,7 @@ where
   pub others: Option<T>,
 }
 
+/// Convert the generic list options to a generic filter
 impl<T> From<GenericListOpts<T>> for GenericFilter
 where
   T: Args + Clone,
@@ -43,4 +47,26 @@ where
       ..Default::default()
     }
   }
+}
+
+/// Generic remove options for the remove command
+#[derive(Clone, Parser)]
+pub struct GenericRemoveOpts<T = GenericDefaultOpts>
+where
+  T: Args + Clone,
+{
+  /// The names of the objects to remove
+  pub names: Vec<String>,
+  #[clap(short = 'y', long)]
+  pub skip_confirm: bool,
+  /// Filters
+  #[clap(flatten)]
+  pub others: T,
+}
+
+/// Generic force options for the remove command
+#[derive(Clone, Parser)]
+pub struct GenericRemoveForceOpts {
+  #[clap(short = 'f', long)]
+  pub force: bool,
 }

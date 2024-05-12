@@ -1,12 +1,22 @@
 use clap::Args;
+use ntex::http::StatusCode;
 
 use nanocld_client::{
   NanocldClient,
-  stubs::generic::{GenericFilter, GenericListQuery},
+  stubs::{
+    generic::{GenericFilter, GenericListQuery},
+    system::{EventActorKind, NativeEventAction},
+  },
 };
-use nanocl_error::io::IoResult;
+use nanocl_error::{
+  io::{FromIo, IoResult},
+  http_client::HttpClientError,
+};
 
-use crate::{utils, models::GenericListOpts};
+use crate::{
+  utils,
+  models::{GenericRemoveOpts, GenericListOpts},
+};
 
 pub trait GenericList {
   type Item;
@@ -83,6 +93,91 @@ pub trait GenericList {
       .map(Self::Item::from)
       .collect::<Vec<Self::Item>>();
     Self::print_table(opts, rows);
+    Ok(())
+  }
+}
+
+pub trait GenericRemove<T, Q>
+where
+  T: Args + Clone,
+  Q: serde::Serialize,
+{
+  fn object_name() -> &'static str;
+
+  fn get_query(
+    _opts: &GenericRemoveOpts<T>,
+    _namespace: Option<String>,
+  ) -> Option<Q>
+  where
+    Q: serde::Serialize,
+  {
+    None
+  }
+
+  async fn exec_rm(
+    client: &NanocldClient,
+    opts: &GenericRemoveOpts<T>,
+    namespace: Option<String>,
+  ) -> IoResult<()> {
+    let object_name = Self::object_name();
+    if !opts.skip_confirm {
+      utils::dialog::confirm(&format!(
+        "Delete {object_name} {} ?",
+        opts.names.join(",")
+      ))
+      .map_err(|err| err.map_err_context(|| "Delete"))?;
+    }
+    let pg_style = utils::progress::create_spinner_style("red");
+    for name in &opts.names {
+      let token = format!("{object_name}/{}", name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      let (key, waiter_kind) = match object_name {
+        "vms" => (
+          format!("{name}.{}", namespace.clone().unwrap_or_default()),
+          Some(EventActorKind::Vm),
+        ),
+        "cargoes" => (
+          format!("{name}.{}", namespace.clone().unwrap_or_default()),
+          Some(EventActorKind::Cargo),
+        ),
+        "jobs" => (name.clone(), Some(EventActorKind::Job)),
+        _ => (name.clone(), None),
+      };
+      let waiter = match waiter_kind {
+        Some(kind) => {
+          let waiter = utils::process::wait_process_state(
+            &key,
+            kind,
+            vec![NativeEventAction::Destroy],
+            client,
+          )
+          .await?;
+          Some(waiter)
+        }
+        None => None,
+      };
+      if let Err(err) = client
+        .send_delete(
+          &format!("/{}/{name}", Self::object_name()),
+          Self::get_query(opts, namespace.clone()),
+        )
+        .await
+      {
+        if let HttpClientError::HttpError(err) = &err {
+          if err.status == StatusCode::NOT_FOUND {
+            pg.finish();
+            continue;
+          }
+        }
+        pg.finish_and_clear();
+        eprintln!("{err} {name}");
+        continue;
+      }
+      if let Some(waiter) = waiter {
+        waiter.await??;
+      }
+      pg.finish();
+    }
     Ok(())
   }
 }

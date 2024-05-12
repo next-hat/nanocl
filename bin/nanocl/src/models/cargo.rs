@@ -9,20 +9,9 @@ use nanocld_client::stubs::{
   cargo_spec::{CargoSpecUpdate, Config, CargoSpecPartial, HostConfig},
 };
 
-use super::{DisplayFormat, GenericListOpts};
-
-/// `nanocl cargo remove` available options
-#[derive(Clone, Parser)]
-pub struct CargoRemoveOpts {
-  /// Skip confirmation
-  #[clap(short = 'y')]
-  pub skip_confirm: bool,
-  /// Force delete
-  #[clap(short = 'f')]
-  pub force: bool,
-  /// List of cargo names to delete
-  pub names: Vec<String>,
-}
+use super::{
+  DisplayFormat, GenericListOpts, GenericRemoveForceOpts, GenericRemoveOpts,
+};
 
 /// `nanocl cargo create` available options
 #[derive(Clone, Parser)]
@@ -279,7 +268,7 @@ pub enum CargoCommand {
   Restart(CargoRestartOpts),
   /// Remove cargo by its name
   #[clap(alias("rm"))]
-  Remove(CargoRemoveOpts),
+  Remove(GenericRemoveOpts<GenericRemoveForceOpts>),
   /// Inspect a cargo by its name
   Inspect(CargoInspectOpts),
   /// Update a cargo by its name

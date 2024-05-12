@@ -1,17 +1,17 @@
 use nanocld_client::NanocldClient;
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::IoResult;
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    NamespaceArg, NamespaceCommand, NamespaceOpts, NamespaceRow,
-    NamespaceDeleteOpts,
+    GenericDefaultOpts, NamespaceArg, NamespaceCommand, NamespaceOpts,
+    NamespaceRow,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 
 impl GenericList for NamespaceArg {
   type Item = NamespaceRow;
@@ -27,12 +27,18 @@ impl GenericList for NamespaceArg {
   }
 }
 
+impl GenericRemove<GenericDefaultOpts, String> for NamespaceArg {
+  fn object_name() -> &'static str {
+    "namespaces"
+  }
+}
+
 /// Function that execute when running `nanocl namespace create`
 async fn exec_namespace_create(
   client: &NanocldClient,
-  options: &NamespaceOpts,
+  opts: &NamespaceOpts,
 ) -> IoResult<()> {
-  let item = client.create_namespace(&options.name).await?;
+  let item = client.create_namespace(&opts.name).await?;
   println!("{}", item.name);
   Ok(())
 }
@@ -40,28 +46,10 @@ async fn exec_namespace_create(
 /// Function that execute when running `nanocl namespace inspect`
 async fn exec_namespace_inspect(
   client: &NanocldClient,
-  options: &NamespaceOpts,
+  opts: &NamespaceOpts,
 ) -> IoResult<()> {
-  let namespace = client.inspect_namespace(&options.name).await?;
+  let namespace = client.inspect_namespace(&opts.name).await?;
   utils::print::print_yml(namespace)?;
-  Ok(())
-}
-
-/// Function that execute when running `nanocl namespace rm`
-async fn exec_namespace_rm(
-  client: &NanocldClient,
-  options: &NamespaceDeleteOpts,
-) -> IoResult<()> {
-  if !options.skip_confirm {
-    utils::dialog::confirm(&format!(
-      "Delete namespace {}?",
-      options.names.join(",")
-    ))
-    .map_err(|err| err.map_err_context(|| "Delete namespace"))?;
-  }
-  for name in &options.names {
-    client.delete_namespace(name).await?;
-  }
   Ok(())
 }
 
@@ -75,14 +63,12 @@ pub async fn exec_namespace(
     NamespaceCommand::List(opts) => {
       NamespaceArg::exec_ls(client, args, opts).await
     }
-    NamespaceCommand::Create(options) => {
-      exec_namespace_create(client, options).await
+    NamespaceCommand::Create(opts) => exec_namespace_create(client, opts).await,
+    NamespaceCommand::Inspect(opts) => {
+      exec_namespace_inspect(client, opts).await
     }
-    NamespaceCommand::Inspect(options) => {
-      exec_namespace_inspect(client, options).await
-    }
-    NamespaceCommand::Remove(options) => {
-      exec_namespace_rm(client, options).await
+    NamespaceCommand::Remove(opts) => {
+      NamespaceArg::exec_rm(client, opts, None).await
     }
   }
 }

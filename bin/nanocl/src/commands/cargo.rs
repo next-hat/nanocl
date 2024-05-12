@@ -7,25 +7,26 @@ use futures::{StreamExt, SinkExt};
 use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::IoResult;
 use nanocld_client::stubs::{
   process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
   generic::{GenericFilter, GenericListNspQuery},
   cargo::{CargoDeleteQuery, CargoSummary},
 };
 
+use crate::models::{GenericRemoveForceOpts, GenericRemoveOpts};
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
-    CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-    CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
+    CargoArg, CargoCreateOpts, CargoCommand, CargoRow, CargoStartOpts,
+    CargoStopOpts, CargoPatchOpts, CargoInspectOpts, CargoExecOpts,
+    CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts, CargoRunOpts,
+    CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 
 impl GenericList for CargoArg {
   type Item = CargoRow;
@@ -50,6 +51,25 @@ impl GenericList for CargoArg {
   }
 }
 
+impl GenericRemove<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
+  fn object_name() -> &'static str {
+    "cargoes"
+  }
+
+  fn get_query(
+    opts: &GenericRemoveOpts<GenericRemoveForceOpts>,
+    namespace: Option<String>,
+  ) -> Option<CargoDeleteQuery>
+  where
+    CargoDeleteQuery: serde::Serialize,
+  {
+    Some(CargoDeleteQuery {
+      namespace,
+      force: Some(opts.others.force),
+    })
+  }
+}
+
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
@@ -62,29 +82,6 @@ async fn exec_cargo_create(
     .create_cargo(&cargo, args.namespace.as_deref())
     .await?;
   println!("{}", &item.spec.cargo_key);
-  Ok(())
-}
-
-/// Execute the `nanocl cargo rm` command to remove a cargo
-async fn exec_cargo_rm(
-  cli_conf: &CliConfig,
-  args: &CargoArg,
-  opts: &CargoRemoveOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  if !opts.skip_confirm {
-    utils::dialog::confirm(&format!("Delete cargo  {}?", opts.names.join(",")))
-      .map_err(|err| err.map_err_context(|| "Delete cargo"))?;
-  }
-  let query = CargoDeleteQuery {
-    namespace: args.namespace.clone(),
-    force: Some(opts.force),
-  };
-  for name in &opts.names {
-    if let Err(err) = client.delete_cargo(name, Some(&query)).await {
-      eprintln!("{name}: {err}");
-    }
-  }
   Ok(())
 }
 
@@ -346,7 +343,14 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
       CargoArg::exec_ls(&cli_conf.client, args, opts).await
     }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
-    CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
+    CargoCommand::Remove(opts) => {
+      CargoArg::exec_rm(
+        &cli_conf.client,
+        opts,
+        Some(args.namespace.clone().unwrap_or("global".to_owned())),
+      )
+      .await
+    }
     CargoCommand::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
     CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,

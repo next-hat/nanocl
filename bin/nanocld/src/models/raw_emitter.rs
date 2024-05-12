@@ -127,15 +127,21 @@ impl RawEventEmitter {
     let clients = inner.lock()?.clients.clone();
     let mut new_clients = Vec::new();
     let msg = e.try_to_bytes()?;
-    for mut client in clients {
+    for client in clients {
       let _ = client.0.try_send(msg.clone());
       let conditions = client.1.clone().unwrap_or_default();
       if conditions.is_empty() {
         new_clients.push(client);
-      } else if conditions.iter().any(|c| c == e) {
-        client.2 += 1;
-      } else if client.2 != conditions.len() {
-        new_clients.push(client);
+        continue;
+      }
+      let mut client_ptr = client.clone();
+      let mut condition_meet = client_ptr.2;
+      if conditions.iter().any(|c| c == e) {
+        condition_meet += 1;
+      }
+      if condition_meet != conditions.len() {
+        client_ptr.2 = condition_meet;
+        new_clients.push(client_ptr);
       }
     }
     let inner = Arc::clone(&self.inner);

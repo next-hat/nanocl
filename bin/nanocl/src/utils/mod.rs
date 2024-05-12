@@ -8,6 +8,7 @@ pub mod context;
 pub mod hash;
 pub mod progress;
 pub mod liquid;
+pub mod process;
 
 #[cfg(test)]
 pub mod tests {

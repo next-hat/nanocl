@@ -1,15 +1,15 @@
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::IoResult;
 
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    ResourceArg, ResourceCommand, ResourceRow, ResourceRemoveOpts,
-    ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
+    GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceHistoryOpts,
+    ResourceInspectOpts, ResourceRevertOpts, ResourceRow,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 
 impl GenericList for ResourceArg {
   type Item = ResourceRow;
@@ -25,23 +25,10 @@ impl GenericList for ResourceArg {
   }
 }
 
-/// Function that execute when running `nanocl resource rm`
-async fn exec_resource_rm(
-  cli_conf: &CliConfig,
-  options: &ResourceRemoveOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  if !options.skip_confirm {
-    utils::dialog::confirm(&format!(
-      "Delete resource {}?",
-      options.names.join(",")
-    ))
-    .map_err(|err| err.map_err_context(|| "Delete resource"))?;
+impl GenericRemove<GenericDefaultOpts, String> for ResourceArg {
+  fn object_name() -> &'static str {
+    "resources"
   }
-  for name in &options.names {
-    client.delete_resource(name).await?;
-  }
-  Ok(())
 }
 
 /// Function that execute when running `nanocl resource inspect`
@@ -90,7 +77,9 @@ pub async fn exec_resource(
     ResourceCommand::List(opts) => {
       ResourceArg::exec_ls(&cli_conf.client, args, opts).await
     }
-    ResourceCommand::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
+    ResourceCommand::Remove(opts) => {
+      ResourceArg::exec_rm(&cli_conf.client, opts, None).await
+    }
     ResourceCommand::Inspect(opts) => {
       exec_resource_inspect(cli_conf, opts).await
     }

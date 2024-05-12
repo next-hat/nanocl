@@ -185,7 +185,20 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
-  state.inner.task_manager.wait_task(&task_key).await;
+  match actor.kind {
+    EventActorKind::Cargo => {
+      state.inner.task_manager.wait_task(&task_key).await;
+    }
+    EventActorKind::Vm => {
+      state.inner.task_manager.wait_task(&task_key).await;
+    }
+    EventActorKind::Job => {
+      if e.action == NativeEventAction::Destroying.to_string() {
+        state.inner.task_manager.remove_task(&task_key).await;
+      }
+    }
+    _ => {}
+  }
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => start(&key, actor, state),

@@ -6,14 +6,14 @@ use clap::{Parser, Subcommand};
 use nanocl_error::io::IoError;
 use nanocld_client::stubs::secret::{Secret, SecretPartial};
 
-use super::{DisplayFormat, GenericListOpts};
+use super::{DisplayFormat, GenericRemoveOpts, GenericListOpts};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
 pub enum SecretCommand {
   /// Remove existing secret
   #[clap(alias("rm"))]
-  Remove(SecretRemoveOpts),
+  Remove(GenericRemoveOpts),
   /// List existing secret
   #[clap(alias("ls"))]
   List(GenericListOpts),
@@ -113,16 +113,6 @@ pub struct SecretCreateOpts {
   /// Kind of secret
   #[clap(subcommand)]
   pub kind: SecretKindCreateCommand,
-}
-
-/// `nanocl secret list` available options
-#[derive(Clone, Parser)]
-pub struct SecretRemoveOpts {
-  /// Skip confirmation
-  #[clap(short = 'y')]
-  pub skip_confirm: bool,
-  /// List of secret to remove
-  pub keys: Vec<String>,
 }
 
 /// `nanocl secret inspect` available options

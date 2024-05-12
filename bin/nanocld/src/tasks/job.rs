@@ -39,6 +39,11 @@ impl ObjTaskStart for JobDb {
       .await?;
       state.emit_normal_native_action(&job, NativeEventAction::Start);
       for process in processes {
+        let _ = state
+          .inner
+          .docker_api
+          .start_container(&process.key, None::<StartContainerOptions<String>>)
+          .await;
         // We currently run a sequential order so we wait for the container to finish to start the next one.
         let mut stream = state.inner.docker_api.wait_container(
           &process.key,
@@ -46,11 +51,6 @@ impl ObjTaskStart for JobDb {
             condition: "not-running",
           }),
         );
-        let _ = state
-          .inner
-          .docker_api
-          .start_container(&process.key, None::<StartContainerOptions<String>>)
-          .await;
         while let Some(stream) = stream.next().await {
           let result = stream.map_err(HttpError::internal_server_error)?;
           if result.status_code == 0 {
@@ -73,8 +73,8 @@ impl ObjTaskDelete for JobDb {
         ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
       utils::container::delete_instances(
         &processes
-          .into_iter()
-          .map(|p| p.key)
+          .iter()
+          .map(|p| p.key.clone())
           .collect::<Vec<String>>(),
         &state,
       )
