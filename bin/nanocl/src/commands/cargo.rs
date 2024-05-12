@@ -1,29 +1,29 @@
-use std::process;
-use std::collections::HashMap;
+use std::{process, collections::HashMap};
 
-use nanocld_client::stubs::system::{EventActorKind, NativeEventAction};
 use ntex::rt;
-use futures::channel::mpsc;
-use futures::{StreamExt, SinkExt};
-use futures::stream::FuturesUnordered;
+use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::IoResult;
-use nanocld_client::stubs::{
-  process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
-  generic::{GenericFilter, GenericListNspQuery},
-  cargo::{CargoDeleteQuery, CargoSummary},
+use nanocld_client::{
+  NanocldClient,
+  stubs::{
+    cargo::{CargoDeleteQuery, CargoSummary},
+    generic::{GenericFilter, GenericListNspQuery},
+    process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
+    system::{EventActorKind, NativeEventAction},
+  },
 };
 
-use crate::models::{GenericRemoveForceOpts, GenericRemoveOpts};
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    CargoArg, CargoCreateOpts, CargoCommand, CargoRow, CargoStartOpts,
-    CargoStopOpts, CargoPatchOpts, CargoInspectOpts, CargoExecOpts,
-    CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts, CargoRunOpts,
-    CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
+    GenericRemoveForceOpts, GenericRemoveOpts, CargoArg, CargoCreateOpts,
+    CargoCommand, CargoRow, CargoStartOpts, CargoStopOpts, CargoPatchOpts,
+    CargoInspectOpts, CargoExecOpts, CargoHistoryOpts, CargoRevertOpts,
+    CargoLogsOpts, CargoRunOpts, CargoRestartOpts, CargoStatsOpts,
+    ProcessStatsRow,
   },
 };
 
@@ -71,6 +71,22 @@ impl GenericRemove<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
   }
 }
 
+async fn wait_cargo_state(
+  name: &str,
+  args: &CargoArg,
+  action: NativeEventAction,
+  client: &NanocldClient,
+) -> IoResult<rt::JoinHandle<IoResult<()>>> {
+  let waiter = utils::process::wait_process_state(
+    &format!("{}.{}", name, args.namespace.as_deref().unwrap_or("global")),
+    EventActorKind::Cargo,
+    [action].to_vec(),
+    client,
+  )
+  .await?;
+  Ok(waiter)
+}
+
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
@@ -93,9 +109,13 @@ async fn exec_cargo_start(
   opts: &CargoStartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter =
+    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
+      .await?;
   client
     .start_process("cargo", &opts.name, args.namespace.as_deref())
     .await?;
+  waiter.await??;
   Ok(())
 }
 
@@ -107,12 +127,15 @@ async fn exec_cargo_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in &opts.names {
+    let waiter =
+      wait_cargo_state(name, args, NativeEventAction::Stop, client).await?;
     if let Err(err) = client
       .stop_process("cargo", name, args.namespace.as_deref())
       .await
     {
       eprintln!("{name}: {err}");
     }
+    let _ = waiter.await?;
   }
   Ok(())
 }
@@ -139,9 +162,13 @@ async fn exec_cargo_patch(
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter =
+    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
+      .await?;
   client
     .patch_cargo(&opts.name, &opts.clone().into(), args.namespace.as_deref())
     .await?;
+  waiter.await??;
   Ok(())
 }
 
@@ -328,17 +355,9 @@ async fn exec_cargo_run(
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let waiter = utils::process::wait_process_state(
-    &format!(
-      "{}.{}",
-      opts.name,
-      args.namespace.as_deref().unwrap_or("global")
-    ),
-    EventActorKind::Cargo,
-    [NativeEventAction::Start].to_vec(),
-    &cli_conf.client,
-  )
-  .await?;
+  let waiter =
+    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
+      .await?;
   let cargo = client
     .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
