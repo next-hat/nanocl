@@ -64,20 +64,18 @@ impl TaskManager {
   }
 
   pub async fn remove_task(&self, key: &str) {
-    let key = key.to_owned();
     let mut tasks = self.tasks.lock().await;
-    let task = tasks.get(&key);
+    let task = tasks.get(key);
     if let Some(task) = task {
       task.fut.abort();
       log::debug!("Removing task: {key} {}", task.kind);
-      tasks.remove(&key);
+      tasks.remove(key);
     }
   }
 
   pub async fn get_task(&self, key: &str) -> Option<ObjTask> {
-    let key = key.to_owned();
     let tasks = self.tasks.lock().await;
-    tasks.get(&key).cloned()
+    tasks.get(key).cloned()
   }
 
   pub async fn wait_task(&self, key: &str) {

@@ -20,14 +20,13 @@ use crate::{
   config::CliConfig,
   models::{
     GenericRemoveForceOpts, GenericRemoveOpts, CargoArg, CargoCreateOpts,
-    CargoCommand, CargoRow, CargoStartOpts, CargoStopOpts, CargoPatchOpts,
-    CargoInspectOpts, CargoExecOpts, CargoHistoryOpts, CargoRevertOpts,
-    CargoLogsOpts, CargoRunOpts, CargoRestartOpts, CargoStatsOpts,
-    ProcessStatsRow,
+    CargoCommand, CargoRow, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
+    CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
+    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
   },
 };
 
-use super::{GenericList, GenericRemove};
+use super::{GenericList, GenericRemove, GenericStart};
 
 impl GenericList for CargoArg {
   type Item = CargoRow;
@@ -71,6 +70,12 @@ impl GenericRemove<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
   }
 }
 
+impl GenericStart for CargoArg {
+  fn object_name() -> &'static str {
+    "cargoes"
+  }
+}
+
 async fn wait_cargo_state(
   name: &str,
   args: &CargoArg,
@@ -99,23 +104,6 @@ async fn exec_cargo_create(
     .create_cargo(&cargo, args.namespace.as_deref())
     .await?;
   println!("{}", &item.spec.cargo_key);
-  Ok(())
-}
-
-/// Execute the `nanocl cargo start` command to start a cargo
-async fn exec_cargo_start(
-  cli_conf: &CliConfig,
-  args: &CargoArg,
-  opts: &CargoStartOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let waiter =
-    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
-      .await?;
-  client
-    .start_process("cargo", &opts.name, args.namespace.as_deref())
-    .await?;
-  waiter.await??;
   Ok(())
 }
 
@@ -383,7 +371,14 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
       )
       .await
     }
-    CargoCommand::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
+    CargoCommand::Start(opts) => {
+      CargoArg::exec_start(
+        &cli_conf.client,
+        opts,
+        Some(args.namespace.clone().unwrap_or("global".to_owned())),
+      )
+      .await
+    }
     CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
     CargoCommand::Inspect(opts) => {

@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::{job::JobSummary, process::WaitCondition};
 
-use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts};
+use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts, GenericStartOpts};
 
 /// `nanocl job wait` available options
 #[derive(Clone, Parser)]
@@ -64,14 +64,7 @@ pub enum JobCommand {
   /// Wait for a job to finish
   Wait(JobWaitOpts),
   /// Start a job
-  Start(JobStartOpts),
-}
-
-/// `nanocl job start` available options
-#[derive(Clone, Parser)]
-pub struct JobStartOpts {
-  /// Name of job to start
-  pub name: String,
+  Start(GenericStartOpts),
 }
 
 /// `nanocl job` available subcommands

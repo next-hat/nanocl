@@ -1,6 +1,7 @@
+use serde::Deserialize;
 use clap::{Args, Parser};
 
-use nanocld_client::stubs::generic::GenericFilter;
+use nanocld_client::stubs::{generic::GenericFilter, system::ObjPsStatus};
 
 /// An empty filter to use as default
 #[derive(Clone, Default, Args)]
@@ -11,6 +12,13 @@ impl From<GenericDefaultOpts> for GenericFilter {
   fn from(_: GenericDefaultOpts) -> Self {
     Self::default()
   }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct GenericProcessStatus {
+  /// Status of the cargo
+  pub status: ObjPsStatus,
 }
 
 /// Generic list options for the list command
@@ -69,4 +77,10 @@ where
 pub struct GenericRemoveForceOpts {
   #[clap(short = 'f', long)]
   pub force: bool,
+}
+
+/// Generic start options for the start command
+#[derive(Clone, Parser)]
+pub struct GenericStartOpts {
+  pub names: Vec<String>,
 }

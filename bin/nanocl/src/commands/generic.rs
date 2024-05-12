@@ -4,8 +4,8 @@ use ntex::http::StatusCode;
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    generic::{GenericFilter, GenericListQuery},
-    system::{EventActorKind, NativeEventAction},
+    generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+    system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
   },
 };
 use nanocl_error::{
@@ -15,7 +15,9 @@ use nanocl_error::{
 
 use crate::{
   utils,
-  models::{GenericRemoveOpts, GenericListOpts},
+  models::{
+    GenericListOpts, GenericProcessStatus, GenericRemoveOpts, GenericStartOpts,
+  },
 };
 
 pub trait GenericList {
@@ -177,6 +179,67 @@ where
         waiter.await??;
       }
       pg.finish();
+    }
+    Ok(())
+  }
+}
+
+pub trait GenericStart {
+  fn object_name() -> &'static str;
+
+  async fn exec_start(
+    client: &NanocldClient,
+    opts: &GenericStartOpts,
+    namespace: Option<String>,
+  ) -> IoResult<()> {
+    let object_name = Self::object_name();
+    for name in &opts.names {
+      let res = client
+        .send_get(
+          &format!("/{object_name}/{name}/inspect"),
+          Some(GenericNspQuery::new(namespace.as_deref())),
+        )
+        .await?;
+      let status = NanocldClient::res_json::<GenericProcessStatus>(res)
+        .await?
+        .status;
+      if status.actual == ObjPsStatusKind::Start {
+        eprintln!("{} is already started", name);
+        continue;
+      }
+      let key = match namespace {
+        Some(ref namespace) => format!("{name}.{namespace}"),
+        None => name.clone(),
+      };
+      let process_kind = match object_name {
+        "vms" => EventActorKind::Vm,
+        "cargoes" => EventActorKind::Cargo,
+        "jobs" => EventActorKind::Job,
+        _ => panic!(
+          "The developer trolled you with a wrong object name {object_name}"
+        ),
+      };
+      let waiter = utils::process::wait_process_state(
+        &key,
+        process_kind.clone(),
+        [NativeEventAction::Start].to_vec(),
+        client,
+      )
+      .await?;
+      if let Err(err) = client
+        .start_process(
+          process_kind.to_string().to_lowercase().as_str(),
+          name,
+          namespace.as_deref(),
+        )
+        .await
+      {
+        eprintln!("{err} {name}");
+        continue;
+      };
+      if let Err(err) = waiter.await? {
+        eprintln!("{err} {name}");
+      }
     }
     Ok(())
   }

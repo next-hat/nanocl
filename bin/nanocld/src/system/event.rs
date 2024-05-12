@@ -186,16 +186,13 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
   match actor.kind {
-    EventActorKind::Cargo => {
-      state.inner.task_manager.wait_task(&task_key).await;
+    EventActorKind::Job
+      if e.action == NativeEventAction::Destroying.to_string() =>
+    {
+      state.inner.task_manager.remove_task(&task_key).await;
     }
-    EventActorKind::Vm => {
+    EventActorKind::Cargo | EventActorKind::Vm | EventActorKind::Job => {
       state.inner.task_manager.wait_task(&task_key).await;
-    }
-    EventActorKind::Job => {
-      if e.action == NativeEventAction::Destroying.to_string() {
-        state.inner.task_manager.remove_task(&task_key).await;
-      }
     }
     _ => {}
   }

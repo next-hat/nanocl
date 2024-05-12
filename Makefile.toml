@@ -11,6 +11,10 @@ args = ["fmt"]
 command = "cargo"
 args = ["clean"]
 
+[tasks.docker-clean]
+command = "/bin/sh"
+args = ["-c", "docker rm -f $(docker ps -aq -f 'label=io.nanocl=enabled')"]
+
 # Run daemon
 [tasks.run-daemon]
 command = "cargo"
