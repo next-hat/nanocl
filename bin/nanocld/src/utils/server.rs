@@ -111,6 +111,8 @@ pub async fn gen(
 /// Server init test
 #[cfg(test)]
 mod tests {
+  use std::time::Duration;
+
   use clap::Parser;
   use nanocl_stubs::system::BinaryInfo;
   use ntex::http::{client::Connector, StatusCode};
@@ -214,10 +216,17 @@ mod tests {
       .set_private_key_file("../../tests/client.key", SslFiletype::PEM)
       .unwrap();
     let client = ntex::http::client::Client::build()
-      .connector(Connector::default().openssl(builder.build()).finish())
+      .timeout(Duration::from_secs(10))
+      .connector(
+        Connector::default()
+          .openssl(builder.build())
+          .timeout(Duration::from_secs(10))
+          .finish(),
+      )
       .finish();
     let mut res = client
       .get("https://0.0.0.0:6443/v0.14/version")
+      .timeout(Duration::from_secs(10))
       .send()
       .await
       .unwrap();
