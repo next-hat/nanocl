@@ -1,6 +1,6 @@
 use nanocl_error::{
-  http_client::{HttpClientResult, HttpClientError},
   io::IoError,
+  http_client::{HttpClientResult, HttpClientError},
 };
 
 use nanocl_stubs::{
@@ -65,6 +65,26 @@ impl NanocldClient {
       .await?;
     Self::res_json(res).await
   }
+
+  /// Inspect a metric in the system
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.inspect_metric("my-metric-key").await;
+  /// ```
+  pub async fn inspect_metric(&self, key: &str) -> HttpClientResult<Metric> {
+    let res = self
+      .send_get(
+        &format!("{}/{key}/inspect", Self::METRIC_PATH),
+        None::<String>,
+      )
+      .await?;
+    Self::res_json(res).await
+  }
 }
 
 #[cfg(test)]
@@ -93,5 +113,9 @@ mod tests {
     assert_eq!(metric.kind, "my-source.io/type");
     let metrics = client.list_metric(None).await.unwrap();
     assert!(!metrics.is_empty());
+    client
+      .inspect_metric(metrics[0].key.to_string().as_str())
+      .await
+      .unwrap();
   }
 }

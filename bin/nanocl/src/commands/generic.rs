@@ -128,12 +128,12 @@ where
     if !opts.skip_confirm {
       utils::dialog::confirm(&format!(
         "Delete {object_name} {} ?",
-        opts.names.join(",")
+        opts.keys.join(",")
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
     let pg_style = utils::progress::create_spinner_style("red");
-    for name in &opts.names {
+    for name in &opts.keys {
       let token = format!("{object_name}/{}", name);
       let pg = utils::progress::create_progress(&token, &pg_style);
       let (key, waiter_kind) = match object_name {
@@ -295,7 +295,7 @@ pub trait GenericCommandInspect: GenericCommand {
     let res = cli_conf
       .client
       .send_get(
-        &format!("/{}/{}/inspect", Self::object_name(), opts.name),
+        &format!("/{}/{}/inspect", Self::object_name(), opts.key),
         Some(GenericNspQuery::new(namespace.as_deref())),
       )
       .await?;

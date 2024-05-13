@@ -540,6 +540,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metric'
+  /metrics/{key}/inspect:
+    get:
+      tags:
+      - Metrics
+      summary: Inspect a specific metric
+      operationId: inspect_metric
+      parameters:
+      - name: key
+        in: path
+        description: Key of the metric
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about a metric
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metric'
   /namespaces:
     get:
       tags:

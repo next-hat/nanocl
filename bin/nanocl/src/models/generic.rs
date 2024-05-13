@@ -65,8 +65,8 @@ pub struct GenericRemoveOpts<T = GenericDefaultOpts>
 where
   T: Args + Clone,
 {
-  /// The names of the objects to remove
-  pub names: Vec<String>,
+  /// The keys or names of the objects to remove
+  pub keys: Vec<String>,
   #[clap(short = 'y', long)]
   pub skip_confirm: bool,
   /// Filters
@@ -99,6 +99,6 @@ pub struct GenericInspectOpts {
   /// Display format
   #[clap(long)]
   pub display: Option<DisplayFormat>,
-  /// Name of the object to inspect
-  pub name: String,
+  /// Key or Name of the object to inspect
+  pub key: String,
 }
