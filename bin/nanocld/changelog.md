@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--store-addr` options from the command line to specify the store address
+- Endpoint `GET /metrics/{key}/inspect` to get details about a metric
+- Endpoint `GET /event/{key}/inspect` to get details about an event
 
 ### Fixed
 

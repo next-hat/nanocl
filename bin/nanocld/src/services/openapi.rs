@@ -309,6 +309,7 @@ impl Modify for VersionModifier {
     // Event
     event::list_event,
     event::watch_event,
+    event::inspect_event,
   ),
   components(schemas(
     // Node

@@ -499,7 +499,6 @@ mod tests {
   #[ntex::test]
   async fn state_apply_binds() {
     assert_cli_ok!("state", "apply", "-ys", "../../tests/relative_bind.yml");
-    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
     assert!(
       Path::new("/tmp/toto")
         .canonicalize()

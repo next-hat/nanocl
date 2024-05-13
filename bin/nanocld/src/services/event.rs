@@ -35,7 +35,28 @@ pub async fn list_event(
   Ok(web::HttpResponse::Ok().json(&events))
 }
 
-/// Watch on new events using Server-Sent Events / EventSource
+/// Get detailed information about an event
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Events",
+  path = "/events/{key}/inspect",
+  params(
+    ("key" = String, Path, description = "Key of the event"),
+  ),
+  responses(
+    (status = 200, description = "Detailed information about the event", body = Event),
+  ),
+))]
+#[web::get("/events/{key}/inspect")]
+pub async fn inspect_event(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let event = EventDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&event))
+}
+
+/// Watch on new events of all peer nodes with optional condition to stop the stream
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Events",
@@ -63,16 +84,19 @@ pub async fn watch_event(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_event);
   config.service(watch_event);
+  config.service(inspect_event);
 }
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::Config;
-  use futures::{StreamExt, TryStreamExt};
   use ntex::{rt, http};
+  use futures::{StreamExt, TryStreamExt};
+  use bollard_next::container::Config;
   use nanocl_stubs::{
     cargo_spec::CargoSpecPartial,
-    system::{EventActorKind, EventCondition, EventKind, NativeEventAction},
+    system::{
+      Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
+    },
   };
 
   use crate::utils::tests::*;
@@ -81,8 +105,17 @@ mod tests {
   async fn basic() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let resp = client.get("/events").send().await.unwrap();
+    let mut resp = client.get("/events").send().await.unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
+    let events = resp.json::<Vec<Event>>().await.unwrap();
+    assert!(!events.is_empty());
+    let mut resp = client
+      .get(&format!("/events/{}/inspect", events[0].key))
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(resp.status(), http::StatusCode::OK);
+    resp.json::<Event>().await.unwrap();
   }
 
   #[ntex::test]
