@@ -36,7 +36,7 @@ pub async fn list_metric(
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
-/// Inspect a specific metric
+/// Get detailed information about a metric
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Metrics",
@@ -57,6 +57,7 @@ pub async fn inspect_metric(
   Ok(web::HttpResponse::Ok().json(&metric))
 }
 
+/// Create a new metric
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Metrics",

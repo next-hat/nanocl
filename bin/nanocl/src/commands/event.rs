@@ -9,7 +9,7 @@ use crate::{
   models::{EventArg, EventRow, EventCommand},
 };
 
-use super::{GenericCommand, GenericCommandLs};
+use super::{GenericCommand, GenericCommandInspect, GenericCommandLs};
 
 impl GenericCommand for EventArg {
   fn object_name() -> &'static str {
@@ -25,6 +25,10 @@ impl GenericCommandLs for EventArg {
   fn get_key(item: &Self::Item) -> String {
     item.key.clone()
   }
+}
+
+impl GenericCommandInspect for EventArg {
+  type ApiItem = Event;
 }
 
 /// Function that execute when running `nanocl events`
@@ -44,6 +48,9 @@ pub async fn exec_event(cli_conf: &CliConfig, args: &EventArg) -> IoResult<()> {
   match &args.command {
     EventCommand::List(opts) => {
       EventArg::exec_ls(&cli_conf.client, args, opts).await
+    }
+    EventCommand::Inspect(opts) => {
+      EventArg::exec_inspect(cli_conf, opts, None).await
     }
     EventCommand::Watch => watch_event(cli_conf).await,
   }

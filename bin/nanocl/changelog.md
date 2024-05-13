@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `inspect` `rm` `stop` `start` have been refactored to have a single interface matching all object
 
+### Added
+
+- `nanocl metric inspect` command to get details about a metric
+- `nanocl event inspect` command to get details about an event
+
 ## [0.14.0] - 2024-05-08
 
 ### Added

@@ -352,7 +352,7 @@ paths:
     post:
       tags:
       - Events
-      summary: Watch on new events using Server-Sent Events / EventSource
+      summary: Watch on new events of all peer nodes with optional condition to stop the stream
       operationId: watch_event
       requestBody:
         content:
@@ -370,6 +370,26 @@ paths:
             text/plain:
               schema:
                 type: string
+  /events/{key}/inspect:
+    get:
+      tags:
+      - Events
+      summary: Get detailed information about an event
+      operationId: inspect_event
+      parameters:
+      - name: key
+        in: path
+        description: Key of the event
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about the event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
   /exec/{id}/cargo/inspect:
     post:
       tags:
@@ -526,6 +546,7 @@ paths:
     post:
       tags:
       - Metrics
+      summary: Create a new metric
       operationId: create_metric
       requestBody:
         content:
@@ -544,7 +565,7 @@ paths:
     get:
       tags:
       - Metrics
-      summary: Inspect a specific metric
+      summary: Get detailed information about a metric
       operationId: inspect_metric
       parameters:
       - name: key

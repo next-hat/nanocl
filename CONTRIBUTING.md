@@ -13,7 +13,7 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
 * [🏃 Running](#-running)
   * [🐋 Docker Desktop](#-docker-desktop)
 * [🧪 Testing](#-testing)
-* [👌 Usefull Command](#-usefull-command)
+* [👌 Useful Command](#-useful-command)
 
 ## 📁 Project Structure
 
@@ -44,7 +44,7 @@ bin # Binaries (executable)
 ├── ndns # Source to build custom dnsmasq container image
 └── nproxy # Source to build custom nginx container image
 crates # Shared Libraries
-├── nanocl_error # Error utils used in the porject
+├── nanocl_error # Error utils used in the project
 ├── nanocl_stubs # Shared data structure mostly used as input and output of the DAEMON
 ├── nanocl_utils # A collection of utils used in the project
 └── nanocld_client # A nanocld client
@@ -120,6 +120,18 @@ Then spin up `Nanocl` services using `docker compose`.
 docker compose up
 ```
 
+This will start the following services:
+
+- `nstore` - Nanocl Store
+- `nmetrics` - Nanocl Metrics
+- `ndaemon` - Nanocl Daemon
+
+If you need to work with the proxy or the dns, you can start them with:
+
+```sh
+docker compose --profile proxy --profile dns up
+```
+
 ### 🐋 Docker Desktop
 
 > [!IMPORTANT]
@@ -143,22 +155,18 @@ Once started, a swagger should be available on [http://localhost:8585/explorer](
   <img src="./doc/swagger.png" />
 </div>
 
-Note that a _env variable_ could be passed to change the port, it is hardcoded for now.<br />
-It could be a nice and easy first issue and pull request if you would like to help :).
-
-Now you can run the CLI:
-
-- Using cargo make
+Now you can run the CLI using cargo make
 
   ```sh
   cargo make run-cli version
   ```
 
-- Using cargo
-
-  ```sh
-  cargo run --bin nanocl version
-  ```
+> [!IMPORTANT]
+> If you run into a permission deny error with `cargo make run-cli`
+> Be sure to chown your `target` directory, this error occur because it have been mounted by a docker container at first
+> ```sh
+> sudo chown $USER:$USER -R target
+> ```
 
 ## 🧪 Testing
 
@@ -205,11 +213,18 @@ sudo chown $USER:$USER -R ~/.nanocl_dev
   cargo make tests-client
   ```
 
+> [!IMPORTANT]
+> If the tests failed and you need to cleanup the state you can use the following commands:
+> ```sh
+> cargo make docker-clean
+> sudo rm -rf ~/.nanocl_dev
+> ```
+
 On test fails make sure to remove any resource or cargo still alive after tests
 
-## 👌 Usefull Command
+## 👌 Useful Command
 
-Some usefull command to know:
+Some useful command to know:
 
 - lsns - list namespaces
 
@@ -227,11 +242,6 @@ Some usefull command to know:
 
   ```sh
   docker run --rm -v $(pwd):/local openapitools/openapi-generator-cli generate -g rust -i /local/specs/v1/swagger.json -o /local/client
-  ```
-
-- Generate ssl cert from certbot
-  ```sh
-  nanocl cargo -n system exec nproxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```
 
 ## Version bumping

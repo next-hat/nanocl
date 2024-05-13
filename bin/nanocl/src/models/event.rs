@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::system::Event;
 
-use super::GenericListOpts;
+use super::{GenericInspectOpts, GenericListOpts};
 
 #[derive(Clone, Parser)]
 pub struct EventArg {
@@ -20,6 +20,8 @@ pub enum EventCommand {
   List(GenericListOpts),
   /// Watch for new events in real time
   Watch,
+  /// Inspect a specific event
+  Inspect(GenericInspectOpts),
 }
 
 #[derive(Clone, Tabled)]
@@ -44,13 +46,7 @@ impl From<Event> for EventRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      key: event
-        .key
-        .to_string()
-        .split('-')
-        .last()
-        .unwrap_or("<error>")
-        .to_string(),
+      key: event.key.to_string(),
       created_at: created_at.to_string(),
       kind: event.kind.to_string(),
       action: event.action,
