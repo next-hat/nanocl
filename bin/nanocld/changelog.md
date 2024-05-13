@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--store-addr` options from the command line to specify the store address
 
+### Fixed
+
+- Removing a job with a running process will now stop the process before removing the job
+
+### Changed
+
+- The path to inspect a resource `GET /resources/{name}` is now `GET /resources/{name}/inspect`
+
 ## [0.14.0] - 2024-05-08
 
 ### Changed

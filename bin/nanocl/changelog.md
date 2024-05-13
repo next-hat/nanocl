@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0]
+
+### Fixed
+
+- `nanocl cargo run` now correctly wait the cargo to be running before returning
+- `nanocl vm run` now correctly wait the vm to be running before returning
+- `nanocl cargo start` now correctly wait the cargo to be running before returning
+- `nanocl cargo stop` now correctly wait the cargo to be stopped before returning
+- `nanocl cargo patch` now correctly wait the cargo to be patched before returning
+- `nanocl job start` now correctly wait the job to be running before returning
+- `nanocl vm start` now correctly wait the vm to be running before returning
+- `nanocl vm stop` now correctly wait the vm to be stopped before returning
+
+### Changed
+
+- `inspect` `rm` `stop` `start` have been refactored to have a single interface matching all object
+
 ## [0.14.0] - 2024-05-08
 
 ### Added
