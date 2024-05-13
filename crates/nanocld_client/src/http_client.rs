@@ -13,7 +13,7 @@ use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
 use crate::error::is_api_error;
 
-pub const NANOCLD_DEFAULT_VERSION: &str = "0.14.0";
+pub const NANOCLD_DEFAULT_VERSION: &str = "0.15.0";
 
 #[derive(Clone, Debug)]
 pub struct ConnectOpts {
