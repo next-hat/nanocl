@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::metric::Metric;
 
-use super::GenericListOpts;
+use super::{GenericInspectOpts, GenericListOpts};
 
 #[derive(Clone, Parser)]
 pub struct MetricArg {
@@ -18,6 +18,8 @@ pub enum MetricCommand {
   /// List existing metrics
   #[clap(alias("ls"))]
   List(GenericListOpts),
+  /// Inspect a metric
+  Inspect(GenericInspectOpts),
 }
 
 #[derive(Clone, Tabled)]
@@ -41,13 +43,7 @@ impl From<Metric> for MetricRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      key: metric
-        .key
-        .to_string()
-        .split('-')
-        .last()
-        .unwrap_or("<error>")
-        .to_string(),
+      key: metric.key.to_string(),
       created_at: created_at.to_string(),
       kind: metric.kind,
       node: metric.node_name,

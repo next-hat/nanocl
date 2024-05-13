@@ -6,7 +6,7 @@ use crate::{
   models::{MetricArg, MetricRow, MetricCommand},
 };
 
-use super::{GenericCommand, GenericCommandLs};
+use super::{GenericCommand, GenericCommandInspect, GenericCommandLs};
 
 impl GenericCommand for MetricArg {
   fn object_name() -> &'static str {
@@ -24,6 +24,10 @@ impl GenericCommandLs for MetricArg {
   }
 }
 
+impl GenericCommandInspect for MetricArg {
+  type ApiItem = Metric;
+}
+
 /// Function that execute when running `nanocl metric`
 pub async fn exec_metric(
   cli_conf: &CliConfig,
@@ -32,6 +36,9 @@ pub async fn exec_metric(
   match &args.command {
     MetricCommand::List(opts) => {
       MetricArg::exec_ls(&cli_conf.client, args, opts).await
+    }
+    MetricCommand::Inspect(opts) => {
+      MetricArg::exec_inspect(cli_conf, opts, None).await
     }
   }
 }

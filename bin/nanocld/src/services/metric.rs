@@ -36,6 +36,27 @@ pub async fn list_metric(
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
+/// Inspect a specific metric
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Metrics",
+  path = "/metrics/{key}/inspect",
+  params(
+    ("key" = String, Path, description = "Key of the metric"),
+  ),
+  responses(
+    (status = 200, description = "Detailed information about a metric", body = Metric),
+  ),
+))]
+#[web::get("/metrics/{key}/inspect")]
+pub async fn inspect_metric(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let metric = MetricDb::read_by_pk(&path.1, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&metric))
+}
+
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Metrics",
@@ -63,14 +84,15 @@ pub async fn create_metric(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_metric);
   config.service(create_metric);
+  config.service(inspect_metric);
 }
 
 #[cfg(test)]
 mod tests {
   use ntex::http;
   use nanocl_stubs::{
-    metric::MetricPartial,
-    generic::{GenericFilter, GenericClause, GenericListQuery},
+    metric::{Metric, MetricPartial},
+    generic::{GenericClause, GenericFilter, GenericListQuery},
   };
 
   use crate::utils::tests::*;
@@ -97,7 +119,7 @@ mod tests {
       http::StatusCode::BAD_REQUEST,
       "reserved metric kind"
     );
-    let res = client
+    let mut res = client
       .send_post(
         ENDPOINT,
         Some(&MetricPartial {
@@ -108,11 +130,22 @@ mod tests {
         None::<String>,
       )
       .await;
+    let metric = res
+      .json::<Metric>()
+      .await
+      .expect("Expect to parse metrics from post request");
     test_status_code!(res.status(), http::StatusCode::CREATED, "create metric");
     let filter = GenericFilter::new()
       .r#where("kind", GenericClause::Eq("nanocl.io/cpu".to_owned()));
     let qs = GenericListQuery::try_from(filter).unwrap();
     let res = client.send_get(ENDPOINT, Some(&qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list metric");
+    let res = client
+      .send_get(
+        &format!("{}/{}/inspect", ENDPOINT, metric.key),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "inspect metric");
   }
 }

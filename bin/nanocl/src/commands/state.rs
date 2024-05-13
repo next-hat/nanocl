@@ -818,36 +818,36 @@ async fn state_remove(
     Some(namespace) => namespace,
   };
   let mut gen_rm_opts = GenericRemoveOpts::<GenericDefaultOpts> {
-    names: Vec::default(),
+    keys: Vec::default(),
     skip_confirm: true,
     others: GenericDefaultOpts,
   };
   if let Some(jobs) = &state_file.data.jobs {
-    gen_rm_opts.names = jobs.iter().map(|job| job.name.clone()).collect();
+    gen_rm_opts.keys = jobs.iter().map(|job| job.name.clone()).collect();
     let _ = JobArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
-      names: cargoes.iter().map(|cargo| cargo.name.clone()).collect(),
+      keys: cargoes.iter().map(|cargo| cargo.name.clone()).collect(),
       skip_confirm: true,
       others: GenericRemoveForceOpts { force: true },
     };
     let _ = CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    gen_rm_opts.names = vms.iter().map(|vm| vm.name.clone()).collect();
+    gen_rm_opts.keys = vms.iter().map(|vm| vm.name.clone()).collect();
     let _ =
       VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await;
   }
   if let Some(resources) = &state_file.data.resources {
-    gen_rm_opts.names = resources
+    gen_rm_opts.keys = resources
       .iter()
       .map(|resource| resource.name.clone())
       .collect();
     let _ = ResourceArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(secrets) = &state_file.data.secrets {
-    gen_rm_opts.names =
+    gen_rm_opts.keys =
       secrets.iter().map(|secret| secret.name.clone()).collect();
     let _ = SecretArg::exec_rm(client, &gen_rm_opts, None).await;
   }
