@@ -1,6 +1,6 @@
 [package]
 name = "nanocld"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator Daemon"
@@ -31,14 +31,14 @@ release = []
 [build-dependencies]
 clap = { version = "4.5", features = ["derive"] }
 clap_mangen = { version = "0.2" }
-nanocl_utils = { version = "0.5", features = ["build_tools"] }
-nanocl_stubs = { version = "0.14", features = ["clap"] }
+nanocl_utils = { version = "0.6", features = ["build_tools"] }
+nanocl_stubs = { version = "0.15", features = ["clap"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_error = { version = "0.3", features = [
+nanocl_error = { version = "0.4", features = [
   "io",
   "http",
   "http_client",
@@ -77,10 +77,10 @@ chrono = { version = "0.4", default-features = false, features = [
   "serde",
 ] }
 jsonschema = { version = "0.17", default-features = false }
-nanocld_client = { version = "0.14", features = ["tokio"] }
+nanocld_client = { version = "0.15", features = ["tokio"] }
 metrsd_client = "0.5"
-nanocl_stubs = { version = "0.14", features = ["serde", "clap"] }
-nanocl_utils = { version = "0.5", features = ["unix", "ntex", "logger"] }
+nanocl_stubs = { version = "0.15", features = ["serde", "clap"] }
+nanocl_utils = { version = "0.6", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 notify = "6.1"
 ntex-cors = "1.0"
