@@ -115,7 +115,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_wrong_version() {
-    let client = gen_test_system(ntex_config, "0.15").await.client;
+    let client = gen_test_system(ntex_config, "0.9999").await.client;
     let res = client.send_get("/version", None::<String>).await;
     assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     let version = res.headers().get("x-api-version");

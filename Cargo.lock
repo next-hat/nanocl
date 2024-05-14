@@ -161,9 +161,9 @@ dependencies = [
 
 [[package]]
 name = "async-channel"
-version = "2.2.1"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "136d4d23bcc79e27423727b36823d86233aad06dfea531837b038394d11e9928"
+checksum = "9f2776ead772134d55b62dd45e59a79e21612d85d0af729b8b7d3967d601a62a"
 dependencies = [
  "concurrent-queue 2.5.0",
  "event-listener 5.3.0",
@@ -191,7 +191,7 @@ version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05b1b633a2115cd122d73b955eadd9916c18c8f510ec9cd1686404c60ad1c29c"
 dependencies = [
- "async-channel 2.2.1",
+ "async-channel 2.3.0",
  "async-executor",
  "async-io 2.3.2",
  "async-lock 3.3.0",
@@ -419,7 +419,7 @@ version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "495f7104e962b7356f0aeb34247aca1fe7d2e783b346582db7f2904cb5717e88"
 dependencies = [
- "async-channel 2.2.1",
+ "async-channel 2.3.0",
  "async-lock 3.3.0",
  "async-task",
  "futures-io",
@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-recursion",
  "bollard-next",
@@ -2008,7 +2008,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_error"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bollard-next",
  "diesel",
@@ -2021,7 +2021,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2035,7 +2035,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_utils"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2053,7 +2053,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2089,7 +2089,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "bollard-next",
  "futures",
@@ -2114,7 +2114,7 @@ dependencies = [
 
 [[package]]
 name = "ncdns"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2134,7 +2134,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2158,7 +2158,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "futures-util",
  "log",
@@ -2425,7 +2425,7 @@ version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "471b8ce4b4edfd8eddcb4143ebd91022e949b96627e14436bf0beec66ecd6394"
 dependencies = [
- "async-channel 2.2.1",
+ "async-channel 2.3.0",
  "async-std",
  "futures-channel",
  "futures-core",
@@ -2442,7 +2442,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29861bbf4d3fdd3803a1eee4c294f6d06ef402c3b57b1385eaca2cf8b5d428b1"
 dependencies = [
  "async-broadcast",
- "async-channel 2.2.1",
+ "async-channel 2.3.0",
  "ctrlc",
  "log",
  "ntex-bytes",
@@ -2832,9 +2832,9 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "piper"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "668d31b1c4eba19242f2088b2bf3316b82ca31082a8335764db4e083db7485d4"
+checksum = "464db0c665917b13ebb5d453ccdec4add5658ee1adc7affc7677615356a8afaf"
 dependencies = [
  "atomic-waker",
  "fastrand 2.1.0",
@@ -4059,9 +4059,9 @@ dependencies = [
 
 [[package]]
 name = "waker-fn"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c4517f54858c779bbcbf228f4fca63d121bf85fbecb2dc578cdf4a39395690"
+checksum = "317211a0dc0ceedd78fb2ca9a44aed3d7b9b26f81870d485c07122b4350673b7"
 
 [[package]]
 name = "walkdir"
