@@ -1,16 +1,18 @@
 use std::error::Error;
 
-use nanocl_stubs::system::SslConfig;
-use ntex::rt;
-use ntex::http;
+use ntex::{rt, http};
+use nanocl_stubs::{generic::GenericListNspQuery, system::SslConfig};
 
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
 use futures::{StreamExt, TryStreamExt};
 
-use nanocl_error::io::FromIo;
-use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::{
+  io::{IoError, FromIo},
+  http::HttpError,
+  http_client::HttpClientError,
+};
+
 use crate::error::is_api_error;
 
 pub const NANOCLD_DEFAULT_VERSION: &str = "0.15.0";
@@ -214,6 +216,23 @@ impl NanocldClient {
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     Ok(res)
+  }
+
+  pub fn convert_query<Q>(
+    query: Option<&Q>,
+  ) -> Result<GenericListNspQuery, HttpClientError>
+  where
+    Q: Clone + Default + TryInto<GenericListNspQuery>,
+    Q::Error: ToString,
+  {
+    let query = query.cloned().unwrap_or_default();
+    let query = query.try_into().map_err(|err| {
+      HttpClientError::IoError(IoError::invalid_data(
+        "Query".to_owned(),
+        err.to_string(),
+      ))
+    })?;
+    Ok(query)
   }
 
   pub async fn send_post<Q, B>(

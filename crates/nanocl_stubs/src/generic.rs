@@ -137,6 +137,15 @@ pub struct GenericListNspQuery {
   pub namespace: Option<String>,
 }
 
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GenericFilterNsp {
+  pub filter: Option<GenericFilter>,
+  pub namespace: Option<String>,
+}
+
 impl GenericListNspQuery {
   pub fn new(namespace: Option<&str>) -> Self {
     Self {
@@ -148,6 +157,21 @@ impl GenericListNspQuery {
   pub fn with_namespace(mut self, namespace: Option<&str>) -> Self {
     self.namespace = namespace.map(|s| s.to_owned());
     self
+  }
+}
+
+impl TryFrom<GenericFilterNsp> for GenericListNspQuery {
+  type Error = serde_json::Error;
+
+  fn try_from(filter: GenericFilterNsp) -> Result<Self, Self::Error> {
+    let formatted_filter = match filter.filter {
+      None => None,
+      Some(filter) => Some(serde_json::to_string(&filter)?),
+    };
+    Ok(Self {
+      filter: formatted_filter,
+      namespace: filter.namespace,
+    })
   }
 }
 

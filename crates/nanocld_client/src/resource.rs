@@ -1,7 +1,6 @@
-use nanocl_error::http_client::{HttpClientResult, HttpClientError};
+use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_error::io::IoError;
-use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
+use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::resource::{
   Resource, ResourcePartial, ResourceSpec, ResourceUpdate,
 };
@@ -27,13 +26,7 @@ impl NanocldClient {
     &self,
     query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<Resource>> {
-    let query = query.cloned().unwrap_or_default();
-    let query = GenericListQuery::try_from(query).map_err(|err| {
-      HttpClientError::IoError(IoError::invalid_data(
-        "Query".to_owned(),
-        err.to_string(),
-      ))
-    })?;
+    let query = Self::convert_query(query)?;
     let res = self.send_get(Self::RESOURCE_PATH, Some(query)).await?;
     Self::res_json(res).await
   }

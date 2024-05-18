@@ -3,7 +3,7 @@ use ntex::{rt, ws, io};
 use nanocl_error::io::FromIo;
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
@@ -41,11 +41,10 @@ impl NanocldClient {
   /// ```
   pub async fn list_vm(
     &self,
-    namespace: Option<&str>,
+    query: Option<&GenericFilterNsp>,
   ) -> HttpClientResult<Vec<VmSummary>> {
-    let res = self
-      .send_get(Self::VM_PATH, Some(&GenericNspQuery::new(namespace)))
-      .await?;
+    let query = Self::convert_query(query)?;
+    let res = self.send_get(Self::VM_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 
