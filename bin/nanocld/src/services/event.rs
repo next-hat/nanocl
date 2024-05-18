@@ -1,12 +1,10 @@
 use ntex::web;
 
-use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::{
-  generic::{GenericFilter, GenericListQuery},
-  system::EventCondition,
-};
+use nanocl_error::http::HttpResult;
+use nanocl_stubs::{generic::GenericListQuery, system::EventCondition};
 
 use crate::{
+  utils,
   repositories::generic::*,
   models::{EventDb, SystemState},
 };
@@ -17,7 +15,7 @@ use crate::{
   tag = "Events",
   path = "/events",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"normal\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"normal\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of events", body = Vec<Event>),
@@ -28,9 +26,7 @@ pub async fn list_event(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
-    HttpError::bad_request(format!("Invalid query string: {err}"))
-  })?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let events = EventDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&events))
 }

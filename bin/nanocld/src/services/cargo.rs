@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
-  generic::{GenericNspQuery, GenericListNspQuery},
+  generic::{GenericNspQuery, GenericListQueryNsp},
   cargo::CargoDeleteQuery,
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
@@ -24,7 +24,7 @@ use crate::{
   tag = "Cargoes",
   path = "/cargoes",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"test\" } } } }"),
     ("namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
   ),
   responses(
@@ -34,9 +34,11 @@ use crate::{
 #[web::get("/cargoes")]
 pub async fn list_cargo(
   state: web::types::State<SystemState>,
-  qs: web::types::Query<GenericListNspQuery>,
+  qs: web::types::Query<GenericListQueryNsp>,
 ) -> HttpResult<web::HttpResponse> {
-  let cargoes = CargoDb::list(&qs, &state).await?;
+  let query = utils::query_string::parse_qs_nsp_filter(&qs)?;
+  log::debug!("got query {query:#?}");
+  let cargoes = CargoDb::list(&query, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 

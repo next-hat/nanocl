@@ -8,7 +8,7 @@ use nanocl_error::io::IoResult;
 use nanocld_client::{
   stubs::{
     cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
-    generic::{GenericFilter, GenericListNspQuery},
+    generic::{GenericFilter, GenericListQueryNsp},
     process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
     system::{EventActorKind, NativeEventAction},
   },
@@ -50,7 +50,7 @@ impl GenericCommandLs for CargoArg {
     args: &Self::Args,
     filter: &GenericFilter,
   ) -> impl serde::Serialize {
-    GenericListNspQuery::try_from(filter.clone())
+    GenericListQueryNsp::try_from(filter.clone())
       .unwrap()
       .with_namespace(args.namespace.as_deref())
   }

@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use nanocl_error::{io::IoResult, http::HttpResult};
 
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   system::ObjPsStatus,
   vm::{Vm, VmSummary},
   vm_spec::{VmSpec, VmSpecPartial},
@@ -121,12 +121,18 @@ impl VmDb {
   }
 
   /// List VMs by namespace
-  pub async fn list_by_namespace(
-    nsp: &str,
+  pub async fn list(
+    query: &GenericFilterNsp,
     pool: &Pool,
   ) -> HttpResult<Vec<VmSummary>> {
-    let namespace = NamespaceDb::read_by_pk(nsp, pool).await?;
-    let vms = VmDb::read_by_namespace(&namespace.name, pool).await?;
+    let namespace = utils::key::resolve_nsp(&query.namespace);
+    let namespace = NamespaceDb::read_by_pk(&namespace, pool).await?;
+    let filter = query
+      .filter
+      .clone()
+      .unwrap_or_default()
+      .r#where("namespace_name", GenericClause::Eq(namespace.name.clone()));
+    let vms = VmDb::transform_read_by(&filter, pool).await?;
     let mut vm_summaries = Vec::new();
     for vm in vms {
       let spec = SpecDb::read_by_pk(&vm.spec.key, pool)

@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use ntex::{rt, http};
-use nanocl_stubs::{generic::GenericListNspQuery, system::SslConfig};
+use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
 
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
@@ -220,9 +220,9 @@ impl NanocldClient {
 
   pub fn convert_query<Q>(
     query: Option<&Q>,
-  ) -> Result<GenericListNspQuery, HttpClientError>
+  ) -> Result<GenericListQueryNsp, HttpClientError>
   where
-    Q: Clone + Default + TryInto<GenericListNspQuery>,
+    Q: Clone + Default + TryInto<GenericListQueryNsp>,
     Q::Error: ToString,
   {
     let query = query.cloned().unwrap_or_default();

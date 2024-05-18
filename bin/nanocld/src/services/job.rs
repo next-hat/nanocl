@@ -1,11 +1,12 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::job::JobPartial;
+use nanocl_stubs::{generic::GenericListQuery, job::JobPartial};
 
 use crate::{
+  models::{JobDb, SystemState},
   objects::generic::*,
-  models::{SystemState, JobDb},
+  utils,
 };
 
 /// List jobs
@@ -13,6 +14,9 @@ use crate::{
   get,
   tag = "Jobs",
   path = "/jobs",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"job-example\" } } } }"),
+  ),
   responses(
     (status = 200, description = "List of jobs", body = [JobSummary]),
   ),
@@ -21,8 +25,11 @@ use crate::{
 pub async fn list_job(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let jobs = JobDb::list(&state).await?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  log::debug!("job filter {filter:#?}");
+  let jobs = JobDb::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&jobs))
 }
 

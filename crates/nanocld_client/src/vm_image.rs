@@ -52,7 +52,7 @@ impl NanocldClient {
     &self,
     query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<VmImage>> {
-    let query: nanocl_stubs::generic::GenericListNspQuery =
+    let query: nanocl_stubs::generic::GenericListQueryNsp =
       Self::convert_query(query)?;
     let res = self.send_get(Self::VM_IMAGE_PATH, Some(query)).await?;
     Self::res_json(res).await

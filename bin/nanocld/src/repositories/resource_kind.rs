@@ -12,8 +12,8 @@ use nanocl_stubs::{
 
 use crate::{
   gen_multiple, gen_where4string,
-  models::{Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
   schema::resource_kinds,
+  models::{Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
 };
 
 use super::generic::*;

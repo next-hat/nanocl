@@ -11,7 +11,7 @@ use bollard_next::{
 };
 use nanocl_stubs::{
   cargo::CargoKillOptions,
-  generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+  generic::{GenericListQuery, GenericNspQuery},
   process::{
     ProcessLogQuery, ProcessOutputLog, ProcessStats, ProcessStatsQuery,
     ProcessWaitQuery, ProcessWaitResponse,
@@ -41,9 +41,7 @@ pub async fn list_processes(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
-    HttpError::bad_request(format!("Invalid query string: {err}"))
-  })?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let processes =
     ProcessDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&processes))
