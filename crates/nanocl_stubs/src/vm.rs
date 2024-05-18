@@ -58,6 +58,8 @@ impl From<Vm> for EventActor {
 pub struct VmSummary {
   /// Name of the namespace
   pub namespace_name: String,
+  /// Status of the vm
+  pub status: ObjPsStatus,
   /// Creation date of the vm
   pub created_at: chrono::NaiveDateTime,
   /// Number of instances

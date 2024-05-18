@@ -288,10 +288,10 @@ pub struct CargoArg {
 pub struct CargoRow {
   /// Name of the cargo
   pub(crate) name: String,
-  /// Name of the namespace
-  pub(crate) namespace: String,
   /// Image of the cargo
   pub(crate) image: String,
+  /// Status of the cargo
+  pub(crate) status: String,
   /// Number of running instances
   pub(crate) instances: String,
   /// Spec version of the cargo
@@ -320,9 +320,9 @@ impl From<CargoSummary> for CargoRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: cargo.spec.name,
-      namespace: cargo.namespace_name,
       image: cargo.spec.container.image.unwrap_or_default(),
       version: cargo.spec.version,
+      status: format!("{}/{}", cargo.status.actual, cargo.status.wanted),
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

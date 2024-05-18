@@ -72,6 +72,8 @@ pub struct JobArg {
 pub struct JobRow {
   /// Name of the job
   pub name: String,
+  /// Status of the job
+  pub status: String,
   /// Total number of instances
   pub total: usize,
   /// Number of running instances
@@ -104,6 +106,7 @@ impl From<JobSummary> for JobRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: job.spec.name,
+      status: format!("{}/{}", job.spec.status.actual, job.spec.status.wanted),
       total: job.instance_total,
       running: job.instance_running,
       succeeded: job.instance_success,

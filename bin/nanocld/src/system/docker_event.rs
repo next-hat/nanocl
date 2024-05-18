@@ -9,13 +9,16 @@ use bollard_next::{
   service::{EventMessageTypeEnum, EventMessage},
 };
 use nanocl_stubs::system::{
-  EventActorKind, NativeEventAction, EventActor, EventKind, EventPartial,
+  EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
+  ObjPsStatusKind,
 };
 
 use crate::{
   vars,
   repositories::generic::*,
-  models::{ProcessDb, ProcessUpdateDb, SystemState},
+  models::{
+    CargoDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb, SystemState, VmDb,
+  },
 };
 
 /// Take actions when a docker event is received
@@ -23,6 +26,7 @@ async fn exec_docker(
   event: &EventMessage,
   state: &SystemState,
 ) -> IoResult<()> {
+  log::debug!("event::exec_docker: {event:#?}");
   let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
   if kind != EventMessageTypeEnum::CONTAINER {
     return Ok(());
@@ -59,8 +63,8 @@ async fn exec_docker(
     kind: EventKind::Normal,
     action: NativeEventAction::Destroy.to_string(),
     related: Some(EventActor {
-      key: Some(kind_key),
-      kind,
+      key: Some(kind_key.clone()),
+      kind: kind.clone(),
       attributes: None,
     }),
     reason: "state_sync".to_owned(),
@@ -76,6 +80,42 @@ async fn exec_docker(
     }),
   };
   match action {
+    "die" => {
+      match &kind {
+        EventActorKind::Cargo => {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Fail,
+            &state.inner.pool,
+          )
+          .await?;
+          let cargo =
+            CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
+          state.emit_warning_native_action(
+            &cargo,
+            NativeEventAction::Fail,
+            Some(format!("Process {name} died")),
+          );
+        }
+        EventActorKind::Vm => {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Fail,
+            &state.inner.pool,
+          )
+          .await?;
+          let vm =
+            VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
+          state.emit_warning_native_action(
+            &vm,
+            NativeEventAction::Fail,
+            Some(format!("Process {name} died")),
+          );
+        }
+        _ => {}
+      }
+      action.clone_into(&mut event.action);
+    }
     "destroy" => {
       state.spawn_emit_event(event);
       let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;

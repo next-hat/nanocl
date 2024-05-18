@@ -222,10 +222,10 @@ impl From<VmCreateOpts> for VmSpecPartial {
 pub struct VmRow {
   /// Name of the vm
   pub(crate) name: String,
-  /// Namespace of the vm
-  pub(crate) namespace: String,
   /// Disk of the vm
   pub(crate) disk: String,
+  /// Status of the vm
+  pub(crate) status: String,
   /// Number of instances
   pub(crate) instances: String,
   /// Spec version
@@ -255,9 +255,9 @@ impl From<VmSummary> for VmRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: vm.spec.name,
-      namespace: vm.namespace_name,
       disk: vm.spec.disk.image,
       version: vm.spec.version,
+      status: format!("{}/{}", vm.status.actual, vm.status.wanted),
       instances: format!("{}/{}", vm.instance_running, vm.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

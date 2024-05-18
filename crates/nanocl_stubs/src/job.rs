@@ -171,7 +171,6 @@ pub struct JobSummary {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobInspect {
-  pub status: ObjPsStatus,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded

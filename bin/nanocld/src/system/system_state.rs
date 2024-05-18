@@ -101,6 +101,48 @@ impl SystemState {
     self.inner.event_emitter_raw.subscribe(condition).await
   }
 
+  pub fn emit_action(
+    &self,
+    actor: &EventActor,
+    action: NativeEventAction,
+    kind: EventKind,
+    reason: &str,
+    note: Option<String>,
+    metadata: Option<serde_json::Value>,
+  ) {
+    let event = EventPartial {
+      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+      reporting_node: self.inner.config.hostname.clone(),
+      kind,
+      action: action.to_string(),
+      related: None,
+      reason: reason.to_owned(),
+      note,
+      metadata,
+      actor: Some(actor.clone()),
+    };
+    self.spawn_emit_event(event);
+  }
+
+  pub fn emit_warning_native_action<A>(
+    &self,
+    actor: &A,
+    action: NativeEventAction,
+    note: Option<String>,
+  ) where
+    A: Into<EventActor> + Clone,
+  {
+    let actor = actor.clone().into();
+    self.emit_action(
+      &actor,
+      action,
+      EventKind::Warning,
+      "state_sync",
+      note,
+      None,
+    );
+  }
+
   /// Emit a Error event action
   pub fn emit_error_native_action<A>(
     &self,
@@ -111,25 +153,14 @@ impl SystemState {
     A: Into<EventActor> + Clone,
   {
     let actor = actor.clone().into();
-    let event = EventPartial {
-      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: self.inner.config.hostname.clone(),
-      kind: EventKind::Error,
-      action: action.to_string(),
-      related: None,
-      reason: "state_sync".to_owned(),
-      note: match note {
-        None => Some(format!(
-          "{} {}",
-          actor.kind,
-          actor.key.clone().unwrap_or_default()
-        )),
-        Some(note) => Some(note),
-      },
-      metadata: None,
-      actor: Some(actor),
-    };
-    self.spawn_emit_event(event);
+    self.emit_action(
+      &actor,
+      action,
+      EventKind::Error,
+      "state_sync",
+      note,
+      None,
+    );
   }
 
   /// Emit a normal event action
@@ -141,22 +172,18 @@ impl SystemState {
     A: Into<EventActor> + Clone,
   {
     let actor = actor.clone().into();
-    let event = EventPartial {
-      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: self.inner.config.hostname.clone(),
-      kind: EventKind::Normal,
-      action: action.to_string(),
-      related: None,
-      reason: "state_sync".to_owned(),
-      note: Some(format!(
+    self.emit_action(
+      &actor,
+      action,
+      EventKind::Normal,
+      "state_sync",
+      Some(format!(
         "{} {}",
         actor.kind,
         actor.key.clone().unwrap_or_default()
       )),
-      metadata: None,
-      actor: Some(actor),
-    };
-    self.spawn_emit_event(event);
+      None,
+    );
   }
 
   /// Wait for the event loop to finish

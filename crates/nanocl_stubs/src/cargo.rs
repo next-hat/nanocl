@@ -71,6 +71,8 @@ impl From<Cargo> for EventActor {
 pub struct CargoSummary {
   /// Name of the namespace
   pub namespace_name: String,
+  /// Status of the cargo
+  pub status: ObjPsStatus,
   /// When the cargo was created
   pub created_at: chrono::NaiveDateTime,
   /// Number of instances

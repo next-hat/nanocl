@@ -21,9 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `inspect` `rm` `stop` `start` have been refactored to have a single interface matching all object
+- removed the namespace in the table of cargo ls and vm ls command
 
 ### Added
 
+- Status information in the table of cargo ls and vm ls command and job ls
 - `nanocl metric inspect` command to get details about a metric
 - `nanocl event inspect` command to get details about an event
 
