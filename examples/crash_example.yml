@@ -28,5 +28,6 @@ Cargoes:
     - -c
     - |
       echo "Going to crash 1"
+      exit 123
       sleep 1
       exit 432423

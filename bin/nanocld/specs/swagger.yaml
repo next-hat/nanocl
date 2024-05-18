@@ -2223,7 +2223,7 @@ components:
       type: object
       description: |-
         A CargoSummary is a summary of a cargo
-        It's the datastructure returned by the list operation
+        It's the data structure returned by the list operation
       required:
       - NamespaceName
       - CreatedAt
