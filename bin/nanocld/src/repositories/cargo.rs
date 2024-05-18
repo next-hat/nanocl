@@ -206,6 +206,7 @@ impl CargoDb {
       let (_, _, _, running) = utils::container::count_status(&processes);
       cargo_summaries.push(CargoSummary {
         created_at: cargo.created_at,
+        status: cargo.status,
         namespace_name: cargo.namespace_name,
         instance_total: processes.len(),
         instance_running: running,

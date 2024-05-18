@@ -8,6 +8,8 @@ use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::{utils, models::Pool};
 
+use super::RepositoryBase;
+
 pub trait RepositoryReadBy: super::RepositoryBase {
   type Output;
 
@@ -115,5 +117,30 @@ pub trait RepositoryReadByTransform: RepositoryReadBy {
       .into_iter()
       .map(Self::transform)
       .collect()
+  }
+}
+
+// pub trait RepositoryCountBy
+
+pub trait RepositoryCountBy: RepositoryBase {
+  // fn gen_count_query(filter: &GenericFilter)
+  //   -> diesel::dsl::Count<Self::Table>;
+
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl LoadQuery<'static, diesel::PgConnection, i64>;
+
+  async fn count_by(filter: &GenericFilter, pool: &Pool) -> IoResult<i64> {
+    let pool = Arc::clone(pool);
+    let filter = filter.clone();
+    log::trace!("{}::count_by {filter:#?}", Self::get_name());
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let count = Self::gen_count_query(&filter)
+        .get_result::<i64>(&mut conn)
+        .map_err(Self::map_err)?;
+      Ok(count)
+    })
+    .await?
   }
 }

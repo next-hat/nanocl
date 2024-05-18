@@ -126,9 +126,9 @@ impl VmDb {
     pool: &Pool,
   ) -> HttpResult<Vec<VmSummary>> {
     let namespace = NamespaceDb::read_by_pk(nsp, pool).await?;
-    let vmes = VmDb::read_by_namespace(&namespace.name, pool).await?;
+    let vms = VmDb::read_by_namespace(&namespace.name, pool).await?;
     let mut vm_summaries = Vec::new();
-    for vm in vmes {
+    for vm in vms {
       let spec = SpecDb::read_by_pk(&vm.spec.key, pool)
         .await?
         .try_to_vm_spec()?;
@@ -138,6 +138,7 @@ impl VmDb {
         utils::container::count_status(&processes);
       vm_summaries.push(VmSummary {
         created_at: vm.created_at,
+        status: vm.status,
         namespace_name: vm.namespace_name,
         instance_total: processes.len(),
         instance_running: running_instances,

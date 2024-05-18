@@ -561,6 +561,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metric'
+  /metrics/count:
+    get:
+      tags:
+      - Metrics
+      summary: Count metrics
+      operationId: count_metric
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
+      responses:
+        '200':
+          description: List of metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /metrics/{key}/inspect:
     get:
       tags:
@@ -2226,6 +2248,7 @@ components:
         It's the data structure returned by the list operation
       required:
       - NamespaceName
+      - Status
       - CreatedAt
       - InstanceTotal
       - InstanceRunning
@@ -2234,6 +2257,8 @@ components:
         NamespaceName:
           type: string
           description: Name of the namespace
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         CreatedAt:
           type: string
           format: date-time
@@ -4057,7 +4082,6 @@ components:
       type: object
       description: Detailed information about a job
       required:
-      - Status
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
@@ -4065,8 +4089,6 @@ components:
       - Spec
       - Instances
       properties:
-        Status:
-          $ref: '#/components/schemas/ObjPsStatus'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -7244,6 +7266,7 @@ components:
         It is used to list all the vms
       required:
       - NamespaceName
+      - Status
       - CreatedAt
       - InstanceTotal
       - InstanceRunning
@@ -7252,6 +7275,8 @@ components:
         NamespaceName:
           type: string
           description: Name of the namespace
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         CreatedAt:
           type: string
           format: date-time

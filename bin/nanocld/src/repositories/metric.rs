@@ -47,3 +47,26 @@ impl RepositoryReadBy for MetricDb {
     query
   }
 }
+
+impl RepositoryCountBy for MetricDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = metrics::table.into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4uuid!(query, metrics::key, key);
+    }
+    if let Some(node_name) = r#where.get("node_name") {
+      gen_where4string!(query, metrics::node_name, node_name);
+    }
+    if let Some(kind) = r#where.get("kind") {
+      log::debug!("kind: {:?}", kind);
+      gen_where4string!(query, metrics::kind, kind);
+    }
+    if let Some(data) = r#where.get("data") {
+      gen_where4json!(query, metrics::data, data);
+    }
+    query.count()
+  }
+}

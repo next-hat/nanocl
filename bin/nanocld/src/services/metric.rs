@@ -3,8 +3,8 @@ use ntex::web;
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
+  generic::{GenericCount, GenericFilter, GenericListQuery},
   metric::MetricPartial,
-  generic::{GenericFilter, GenericListQuery},
 };
 
 use crate::{
@@ -82,10 +82,35 @@ pub async fn create_metric(
   Ok(web::HttpResponse::Created().json(&metric))
 }
 
+/// Count metrics
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Metrics",
+  path = "/metrics/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"CPU\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "List of metrics", body = GenericCount),
+  ),
+))]
+#[web::get("/metrics/count")]
+pub async fn count_metric(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
+    HttpError::bad_request(format!("Invalid query string: {err}"))
+  })?;
+  let metrics = MetricDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count: metrics }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_metric);
   config.service(create_metric);
   config.service(inspect_metric);
+  config.service(count_metric);
 }
 
 #[cfg(test)]
