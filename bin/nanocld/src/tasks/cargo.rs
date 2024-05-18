@@ -97,6 +97,18 @@ impl ObjTaskUpdate for CargoDb {
         .map(|process| {
           let docker_api = state.inner.docker_api.clone();
           async move {
+            if process
+              .data
+              .state
+              .clone()
+              .unwrap_or_default()
+              .restarting
+              .unwrap_or_default()
+            {
+              docker_api
+                .stop_container(&process.name, None::<StopContainerOptions>)
+                .await?;
+            }
             let new_name = format!("tmp-{}", process.name);
             docker_api
               .rename_container(

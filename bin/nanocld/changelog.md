@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Removing a job with a running process will now stop the process before removing the job
+- Patch a restarting cargo was not working and returning an error
 
 ### Changed
 

@@ -62,7 +62,7 @@ impl From<Cargo> for EventActor {
 }
 
 /// A CargoSummary is a summary of a cargo
-/// It's the datastructure returned by the list operation
+/// It's the data structure returned by the list operation
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
