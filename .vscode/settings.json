@@ -1,6 +1,10 @@
 {
   "editor.rulers": [80],
   "editor.tabSize": 2,
+  "[liquid]": {
+    "editor.defaultFormatter": "sissel.shopify-liquid",
+    "editor.formatOnSave": false
+  },
   "editor.detectIndentation": false,
   "editor.trimAutoWhitespace": true,
   "editor.formatOnSave": true,

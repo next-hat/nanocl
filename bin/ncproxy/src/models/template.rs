@@ -1,3 +1,4 @@
+use nanocld_client::stubs::proxy::LimitReq;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoResult, IoError};
@@ -8,6 +9,7 @@ pub struct LocationTemplate {
   pub upstream_key: String,
   pub upstream_path: String,
   pub redirect: Option<String>,
+  pub limit_req: Option<LimitReq>,
   pub allowed_ips: Option<Vec<String>>,
   pub version: Option<f64>,
   pub headers: Option<Vec<String>>,

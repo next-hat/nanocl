@@ -237,6 +237,36 @@ pub struct ProxyRuleStream {
   pub target: StreamTarget,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct LimitReqZone {
+  /// The max size of the cache in megabytes
+  pub size: usize,
+  /// The max number of request per second
+  pub rate: usize,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct LimitReq {
+  /// The burst size
+  pub burst: usize,
+  /// The delay to wait before retrying
+  pub delay: Option<usize>,
+}
+
 /// Defines a proxy rule location
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -251,6 +281,8 @@ pub struct ProxyHttpLocation {
   pub path: String,
   /// The target cargo
   pub target: LocationTarget,
+  /// Setup limit request for this location
+  pub limit_req: Option<LimitReq>,
   /// Allowed ip addr
   pub allowed_ips: Option<Vec<String>>,
   /// Extras header to add
@@ -285,6 +317,12 @@ pub struct ProxyRuleHttp {
   pub domain: Option<String>,
   /// Type of private | public | internal | namespace:$namespace_name
   pub network: String,
+  /// Optional limit request zone
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub limit_req_zone: Option<LimitReqZone>,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyHttpLocation>,
   /// The ssl configuration

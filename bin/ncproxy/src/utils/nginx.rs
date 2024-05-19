@@ -180,6 +180,7 @@ pub async fn add_rule(
               };
               let location = LocationTemplate {
                 path: location.path.clone(),
+                limit_req: location.limit_req.clone(),
                 upstream_key: format!("http://{upstream_key}"),
                 redirect: None,
                 upstream_path: upstream.path.clone().unwrap_or("/".to_owned()),
@@ -200,6 +201,7 @@ pub async fn add_rule(
                 path: location.path.clone(),
                 upstream_key: format!("http://{upstream_key}"),
                 redirect: None,
+                limit_req: location.limit_req.clone(),
                 upstream_path: "/".to_owned(),
                 version: location.version,
                 allowed_ips: location.allowed_ips.clone(),
@@ -211,6 +213,7 @@ pub async fn add_rule(
               let location = LocationTemplate {
                 path: location.path.clone(),
                 upstream_key: http.url.clone(),
+                limit_req: location.limit_req.clone(),
                 version: location.version,
                 upstream_path: "/".to_owned(),
                 allowed_ips: location.allowed_ips.clone(),
@@ -222,6 +225,8 @@ pub async fn add_rule(
           }
         }
         let data = HTTP_TEMPLATE.compile(&liquid::object!({
+          "key": name,
+          "limit_req_zone": http_rule.limit_req_zone,
           "listen": listen,
           "listen_https": listen_https,
           "domain": http_rule.domain,
