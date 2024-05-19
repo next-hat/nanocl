@@ -37,7 +37,7 @@ pub trait GenericCommandLs: GenericCommand {
   fn print_table<T>(opts: &GenericListOpts<T>, rows: Vec<Self::Item>)
   where
     Self::Item: tabled::Tabled,
-    T: Args + Clone,
+    T: Args + Clone + Default,
   {
     match opts.quiet {
       true => {
@@ -56,13 +56,9 @@ pub trait GenericCommandLs: GenericCommand {
     opts: &GenericListOpts<T>,
   ) -> GenericFilter
   where
-    T: Into<GenericFilter> + Args + Clone,
+    T: Into<GenericFilter> + Args + Clone + Default,
   {
-    let mut filter = if let Some(f) = &opts.others {
-      f.clone().into()
-    } else {
-      GenericFilter::new()
-    };
+    let mut filter = opts.others.clone().unwrap_or_default().into();
     if let Some(limit) = opts.limit {
       filter = filter.limit(limit);
     }
@@ -87,7 +83,7 @@ pub trait GenericCommandLs: GenericCommand {
   where
     Self::ApiItem: serde::de::DeserializeOwned + Send + 'static,
     Self::Item: tabled::Tabled + From<Self::ApiItem>,
-    T: Into<GenericFilter> + Args + Clone,
+    T: Into<GenericFilter> + Args + Clone + Default,
   {
     let filter = Self::gen_default_filter(args, opts);
     let transform_filter = Self::transform_filter(args, &filter);

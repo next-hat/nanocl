@@ -24,10 +24,10 @@ pub struct GenericProcessStatus {
 }
 
 /// Generic list options for the list command
-#[derive(Clone, Parser)]
+#[derive(Default, Debug, Clone, Parser)]
 pub struct GenericListOpts<T = GenericDefaultOpts>
 where
-  T: Args + Clone,
+  T: Args + Clone + Default,
 {
   /// Only show keys
   #[clap(long, short)]
@@ -48,7 +48,7 @@ where
 /// Convert the generic list options to a generic filter
 impl<T> From<GenericListOpts<T>> for GenericFilter
 where
-  T: Args + Clone,
+  T: Args + Clone + Default,
 {
   fn from(opts: GenericListOpts<T>) -> Self {
     Self {

@@ -12,7 +12,7 @@ use nanocld_client::stubs::{
 pub struct ProcessArg;
 
 /// `nanocl ps` available options
-#[derive(Clone, Args)]
+#[derive(Default, Clone, Args)]
 pub struct ProcessFilter {
   /// Show all processes for the given namespace
   #[clap(long, short)]
