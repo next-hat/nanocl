@@ -59,6 +59,20 @@ impl RepositoryReadBy for JobDb {
     if let Some(metadata) = r#where.get("metadata") {
       gen_where4json!(query, jobs::metadata, metadata);
     }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
+    }
     if is_multiple {
       gen_multiple!(query, jobs::created_at, filter);
     }

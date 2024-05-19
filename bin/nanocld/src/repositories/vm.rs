@@ -10,12 +10,12 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  schema::vms,
-  gen_multiple, gen_where4string,
+  gen_multiple, gen_where4json, gen_where4string,
   models::{
     NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb, VmUpdateDb,
   },
+  schema::vms,
+  utils,
 };
 
 use super::generic::*;
@@ -58,6 +58,26 @@ impl RepositoryReadBy for VmDb {
     }
     if let Some(value) = r#where.get("namespace_name") {
       gen_where4string!(query, vms::namespace_name, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, crate::schema::specs::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, crate::schema::specs::metadata, value);
+    }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
     }
     if is_multiple {
       gen_multiple!(query, vms::created_at, filter);
