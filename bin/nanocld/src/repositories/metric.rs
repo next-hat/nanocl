@@ -61,7 +61,6 @@ impl RepositoryCountBy for MetricDb {
       gen_where4string!(query, metrics::node_name, node_name);
     }
     if let Some(kind) = r#where.get("kind") {
-      log::debug!("kind: {:?}", kind);
       gen_where4string!(query, metrics::kind, kind);
     }
     if let Some(data) = r#where.get("data") {

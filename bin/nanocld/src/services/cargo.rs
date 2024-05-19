@@ -3,9 +3,11 @@ use ntex::web;
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
-  generic::{GenericNspQuery, GenericListQueryNsp},
   cargo::CargoDeleteQuery,
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
+  generic::{
+    GenericClause, GenericCount, GenericListQueryNsp, GenericNspQuery,
+  },
 };
 
 use crate::{
@@ -253,6 +255,35 @@ pub async fn revert_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
+/// Count cargoes
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"CPU\" } } } }"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/cargoes/count")]
+pub async fn count_cargo(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQueryNsp>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = utils::query_string::parse_qs_nsp_filter(&qs)?;
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let filter = filter
+    .filter
+    .clone()
+    .unwrap_or_default()
+    .r#where("namespace_name", GenericClause::Eq(namespace));
+  let count = CargoDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -262,6 +293,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
+  config.service(count_cargo);
 }
 
 #[cfg(test)]

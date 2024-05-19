@@ -63,21 +63,17 @@ impl From<ProcessFilter> for GenericFilter {
 pub struct ProcessRow {
   #[tabled(skip)]
   pub key: String,
-  /// Namespace of the cargo or the vm
-  namespace: String,
-  /// Kind of instance cargo or vm
-  kind: String,
-  /// Name of the instance of the cargo or the vm
+  /// Name of the instance of the process
   name: String,
-  /// Image used by the cargo or the vm
+  /// Image used by the process
   image: String,
-  /// IP address of the cargo or the vm
+  /// IP address of the process
   ip: String,
   /// Node name
   node: String,
-  /// Status of the cargo or the vm
+  /// Status of the process
   status: String,
-  /// When the cargo or the vm was created
+  /// When the process was created
   #[tabled(rename = "CREATED AT")]
   created_at: String,
 }
@@ -88,7 +84,7 @@ impl From<Process> for ProcessRow {
     let container = process.data;
     let name = container.name.unwrap_or_default().replace('/', "");
     let mut names = name.split('.');
-    let name = names.next().unwrap_or(&name);
+    let _next_name = names.next().unwrap_or(&name);
     let config = container.config.unwrap_or_default();
     let kind = config
       .labels
@@ -135,11 +131,9 @@ impl From<Process> for ProcessRow {
       .to_string();
     Self {
       key: process.key,
-      node: process.node_key,
-      kind,
       name: name.to_owned(),
-      namespace: namespace.to_owned(),
       image: config.image.unwrap_or_default(),
+      node: process.node_key,
       status,
       ip: ip_addr,
       created_at,

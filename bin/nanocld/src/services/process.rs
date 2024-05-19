@@ -11,7 +11,7 @@ use bollard_next::{
 };
 use nanocl_stubs::{
   cargo::CargoKillOptions,
-  generic::{GenericListQuery, GenericNspQuery},
+  generic::{GenericCount, GenericListQuery, GenericNspQuery},
   process::{
     ProcessLogQuery, ProcessOutputLog, ProcessStats, ProcessStatsQuery,
     ProcessWaitQuery, ProcessWaitResponse,
@@ -435,6 +435,28 @@ pub async fn stats_processes(
   )
 }
 
+/// Count processes
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"global\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/processes/count")]
+pub async fn count_process(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  let count = ProcessDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_processes);
   config.service(logs_processes);
@@ -445,6 +467,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(kill_processes);
   config.service(wait_processes);
   config.service(stats_processes);
+  config.service(count_process);
 }
 
 #[cfg(test)]

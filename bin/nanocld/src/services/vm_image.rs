@@ -5,7 +5,10 @@ use futures::StreamExt;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::{generic::GenericListQuery, vm_image::VmImageResizePayload};
+use nanocl_stubs::{
+  generic::{GenericCount, GenericListQuery},
+  vm_image::VmImageResizePayload,
+};
 
 use crate::{
   utils,
@@ -215,12 +218,36 @@ pub async fn delete_vm_image(
   Ok(web::HttpResponse::Ok().into())
 }
 
+/// Count vm images
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "VmImages",
+  path = "/vms/images/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"global\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/vms/images/count")]
+pub async fn count_vm_image(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter: nanocl_stubs::generic::GenericFilter =
+    utils::query_string::parse_qs_filter(&qs)?;
+  let count = VmImageDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(import_vm_image);
   config.service(list_vm_images);
   config.service(delete_vm_image);
   config.service(snapshot_vm_image);
   config.service(clone_vm_image);
+  config.service(count_vm_image);
   config.service(resize_vm_image);
   config.service(inspect_vm_image);
 }

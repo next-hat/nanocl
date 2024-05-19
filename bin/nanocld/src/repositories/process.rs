@@ -103,6 +103,35 @@ impl RepositoryReadBy for ProcessDb {
   }
 }
 
+impl RepositoryCountBy for ProcessDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let mut query = processes::table.into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4string!(query, processes::key, value);
+    }
+    if let Some(value) = r#where.get("name") {
+      gen_where4string!(query, processes::name, value);
+    }
+    if let Some(value) = r#where.get("kind") {
+      gen_where4string!(query, processes::kind, value);
+    }
+    if let Some(value) = r#where.get("node_key") {
+      gen_where4string!(query, processes::node_key, value);
+    }
+    if let Some(value) = r#where.get("kind_key") {
+      gen_where4string!(query, processes::kind_key, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, processes::data, value);
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for ProcessDb {
   type NewOutput = Process;
 

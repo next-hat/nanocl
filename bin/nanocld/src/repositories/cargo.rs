@@ -97,6 +97,49 @@ impl RepositoryReadBy for CargoDb {
   }
 }
 
+impl RepositoryCountBy for CargoDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let mut query = cargoes::table
+      .inner_join(crate::schema::specs::table)
+      .inner_join(crate::schema::object_process_statuses::table)
+      .into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4string!(query, cargoes::key, value);
+    }
+    if let Some(value) = r#where.get("name") {
+      gen_where4string!(query, cargoes::name, value);
+    }
+    if let Some(value) = r#where.get("namespace_name") {
+      gen_where4string!(query, cargoes::namespace_name, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, crate::schema::specs::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, crate::schema::specs::metadata, value);
+    }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for CargoDb {
   type NewOutput = Cargo;
 

@@ -45,6 +45,19 @@ impl RepositoryReadBy for NodeDb {
   }
 }
 
+impl RepositoryCountBy for NodeDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = nodes::table.into_boxed();
+    if let Some(name) = r#where.get("name") {
+      gen_where4string!(query, nodes::name, name);
+    }
+    query.count()
+  }
+}
+
 impl NodeDb {
   pub async fn create_if_not_exists(
     node: &NodeDb,

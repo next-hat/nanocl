@@ -26,7 +26,6 @@ async fn exec_docker(
   event: &EventMessage,
   state: &SystemState,
 ) -> IoResult<()> {
-  log::debug!("event::exec_docker: {event:#?}");
   let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
   if kind != EventMessageTypeEnum::CONTAINER {
     return Ok(());

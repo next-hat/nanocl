@@ -229,6 +229,7 @@ impl Modify for VersionModifier {
   paths(
     // Node
     node::list_node,
+    node::count_node,
     node::node_ws,
     // System
     system::get_info,
@@ -239,17 +240,20 @@ impl Modify for VersionModifier {
     namespace::inspect_namespace,
     namespace::create_namespace,
     namespace::delete_namespace,
+    namespace::count_namespace,
     // Secret
     secret::list_secret,
     secret::inspect_secret,
     secret::create_secret,
     secret::delete_secret,
     secret::patch_secret,
+    secret::count_secret,
     // Job
     job::list_job,
     job::delete_job,
     job::inspect_job,
     job::create_job,
+    job::count_job,
     // Cargo
     cargo::list_cargo,
     cargo::inspect_cargo,
@@ -259,6 +263,7 @@ impl Modify for VersionModifier {
     cargo::patch_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
+    cargo::count_cargo,
     // Exec
     exec::create_exec_command,
     exec::start_exec_command,
@@ -283,6 +288,7 @@ impl Modify for VersionModifier {
     resource_kind::create_resource_kind,
     resource_kind::delete_resource_kind,
     resource_kind::inspect_resource_kind,
+    resource_kind::count_resource_kind,
     resource_kind::inspect_resource_kind_version,
     // Resource
     resource::list_resource,
@@ -292,6 +298,7 @@ impl Modify for VersionModifier {
     resource::put_resource,
     resource::list_resource_history,
     resource::revert_resource,
+    resource::count_resource,
     // Metric
     metric::list_metric,
     metric::create_metric,
@@ -307,10 +314,12 @@ impl Modify for VersionModifier {
     process::kill_processes,
     process::wait_processes,
     process::stats_processes,
+    process::count_process,
     // Event
     event::list_event,
     event::watch_event,
     event::inspect_event,
+    event::count_event,
   ),
   components(schemas(
     // Node

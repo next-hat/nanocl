@@ -1,12 +1,16 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::{generic::GenericListQuery, job::JobPartial};
+use nanocl_stubs::{
+  generic::{GenericCount, GenericListQuery},
+  job::JobPartial,
+};
 
 use crate::{
-  models::{JobDb, SystemState},
-  objects::generic::*,
   utils,
+  objects::generic::*,
+  repositories::generic::*,
+  models::{JobDb, SystemState},
 };
 
 /// List jobs
@@ -96,11 +100,34 @@ pub async fn inspect_job(
   Ok(web::HttpResponse::Ok().json(&job))
 }
 
+/// Count jobs
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Jobs",
+  path = "/jobs/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"key\": { \"eq\": \"job-example\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/jobs/count")]
+pub async fn count_job(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  let count = JobDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_job);
   config.service(create_job);
   config.service(delete_job);
   config.service(inspect_job);
+  config.service(count_job);
 }
 
 #[cfg(test)]

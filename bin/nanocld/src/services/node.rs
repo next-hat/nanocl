@@ -10,7 +10,7 @@ use futures::future::ready;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::generic::GenericListQuery;
+use nanocl_stubs::generic::{GenericCount, GenericListQuery};
 
 use crate::{
   utils,
@@ -40,6 +40,28 @@ pub async fn list_node(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
+/// Count nodes
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Nodes",
+  path = "/nodes/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"test\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "List of nodes", body = [Node]),
+  ),
+))]
+#[web::get("/nodes/count")]
+pub async fn count_node(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  let count = NodeDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 async fn node_ws_service(
   (sink, state): (ws::WsSink, web::types::State<SystemState>),
 ) -> Result<
@@ -54,7 +76,7 @@ async fn node_ws_service(
   let _ = sink
     .send(ws::Message::Text(ByteString::from(message)))
     .await;
-  // handler service for incoming websockets frames
+  // handler service for incoming web sockets frames
   let service = fn_service(move |frame| {
     let item = match frame {
       ws::Frame::Ping(msg) => {
@@ -104,6 +126,7 @@ pub async fn node_ws(
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_node);
+  config.service(count_node);
   config.service(web::resource("/nodes/ws").route(web::get().to(node_ws)));
 }
 
