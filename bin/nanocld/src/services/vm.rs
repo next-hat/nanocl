@@ -16,7 +16,9 @@ use nanocl_error::{
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::{
-  generic::{GenericListQueryNsp, GenericNspQuery},
+  generic::{
+    GenericClause, GenericCount, GenericListQueryNsp, GenericNspQuery,
+  },
   process::OutputLog,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
 };
@@ -24,6 +26,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   objects::generic::*,
+  repositories::generic::*,
   models::{
     SystemState, WsConState, SpecDb, VmDb, VmObjCreateIn, VmObjPatchIn,
   },
@@ -325,11 +328,39 @@ pub async fn vm_attach(
   .await
 }
 
+/// Count vm images
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Vms",
+  path = "/vms/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"global\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/vms/count")]
+pub async fn count_vm(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQueryNsp>,
+) -> HttpResult<web::HttpResponse> {
+  let query = utils::query_string::parse_qs_nsp_filter(&qs)?;
+  let namespace = utils::key::resolve_nsp(&query.namespace);
+  let filter = query
+    .filter
+    .unwrap_or_default()
+    .r#where("namespace_name", GenericClause::Eq(namespace));
+  let count = VmDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_vm);
   config.service(create_vm);
   config.service(delete_vm);
   config.service(inspect_vm);
+  config.service(count_vm);
   config.service(list_vm_history);
   config.service(patch_vm);
   config.service(

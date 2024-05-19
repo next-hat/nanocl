@@ -6,8 +6,8 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause, GenericListQuery},
-  resource::{ResourceSpec, ResourcePartial, ResourceUpdate},
+  generic::{GenericClause, GenericCount, GenericFilter, GenericListQuery},
+  resource::{ResourcePartial, ResourceSpec, ResourceUpdate},
 };
 
 use crate::{
@@ -197,12 +197,35 @@ pub async fn revert_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
+/// Count resources
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Resources",
+  path = "/resources/count",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"global\" } } } }"),
+  ),
+  responses(
+    (status = 200, description = "Count result", body = GenericCount),
+  ),
+))]
+#[web::get("/resources/count")]
+pub async fn count_resource(
+  state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  let count = ResourceDb::count_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);
   config.service(inspect_resource);
   config.service(put_resource);
+  config.service(count_resource);
   config.service(list_resource_history);
   config.service(revert_resource);
 }

@@ -61,6 +61,32 @@ impl RepositoryReadBy for VmImageDb {
   }
 }
 
+impl RepositoryCountBy for VmImageDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = vm_images::table.into_boxed();
+    if let Some(value) = r#where.get("name") {
+      gen_where4string!(query, vm_images::name, value);
+    }
+    if let Some(value) = r#where.get("kind") {
+      gen_where4string!(query, vm_images::kind, value);
+    }
+    if let Some(value) = r#where.get("parent") {
+      gen_where4string!(query, vm_images::parent, value);
+    }
+    if let Some(value) = r#where.get("format") {
+      gen_where4string!(query, vm_images::format, value);
+    }
+    if let Some(value) = r#where.get("path") {
+      gen_where4string!(query, vm_images::path, value);
+    }
+    query.count()
+  }
+}
+
 impl VmImageDb {
   pub async fn read_by_parent(
     name: &str,

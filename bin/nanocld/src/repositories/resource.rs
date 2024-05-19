@@ -69,6 +69,31 @@ impl RepositoryReadBy for ResourceDb {
   }
 }
 
+impl RepositoryCountBy for ResourceDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let mut query = resources::table
+      .inner_join(crate::schema::specs::table)
+      .into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4string!(query, resources::key, value);
+    }
+    if let Some(value) = r#where.get("kind") {
+      gen_where4string!(query, resources::kind, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, specs::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, specs::metadata, value);
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for ResourceDb {
   type NewOutput = Resource;
 

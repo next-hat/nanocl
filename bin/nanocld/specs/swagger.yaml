@@ -98,6 +98,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cargo'
+  /cargoes/count:
+    get:
+      tags:
+      - Cargoes
+      summary: Count cargoes
+      operationId: count_cargo
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
+      - name: namespace
+        in: query
+        description: Namespace where the cargoes are
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /cargoes/{cargo_name}/exec:
     post:
       tags:
@@ -348,6 +377,28 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Event'
+  /events/count:
+    get:
+      tags:
+      - Events
+      summary: Count events
+      operationId: count_event
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /events/watch:
     post:
       tags:
@@ -490,6 +541,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
+  /jobs/count:
+    get:
+      tags:
+      - Jobs
+      summary: Count jobs
+      operationId: count_job
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "key": { "eq": "job-example" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /jobs/{name}:
     delete:
       tags:
@@ -584,10 +657,10 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
+        example: '{ "filter": { "where": { "kind": { "eq": "ncproxy.io/http" } } } }'
       responses:
         '200':
-          description: List of metrics
+          description: Count result
           content:
             application/json:
               schema:
@@ -660,6 +733,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /namespaces/count:
+    get:
+      tags:
+      - Namespaces
+      summary: Count namespaces
+      operationId: count_namespace
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /namespaces/{name}:
     delete:
       tags:
@@ -734,6 +829,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Node'
+  /nodes/count:
+    get:
+      tags:
+      - Nodes
+      summary: Count nodes
+      operationId: count_node
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
+      responses:
+        '200':
+          description: List of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
   /nodes/ws:
     get:
       tags:
@@ -767,6 +886,28 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Process'
+  /processes/count:
+    get:
+      tags:
+      - Processes
+      summary: Count processes
+      operationId: count_process
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /processes/{kind}/{name}/kill:
     post:
       tags:
@@ -1130,6 +1271,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResourceKind'
+  /resource/kinds/count:
+    get:
+      tags:
+      - ResourceKinds
+      summary: Count resource kinds
+      operationId: count_resource_kind
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /resource/kinds/{domain}/{name}:
     delete:
       tags:
@@ -1248,6 +1411,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Resource'
+  /resources/count:
+    get:
+      tags:
+      - Resources
+      summary: Count resources
+      operationId: count_resource
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /resources/{name}:
     put:
       tags:
@@ -1435,6 +1620,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /secrets/count:
+    get:
+      tags:
+      - Secrets
+      summary: Count secrets
+      operationId: count_secret
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /secrets/{key}:
     delete:
       tags:
@@ -5454,6 +5661,10 @@ components:
           description: The path
         Target:
           $ref: '#/components/schemas/LocationTarget'
+        LimitReq:
+          allOf:
+          - $ref: '#/components/schemas/LimitReq'
+          nullable: true
         AllowedIps:
           type: array
           items:
@@ -5491,6 +5702,10 @@ components:
         Network:
           type: string
           description: Type of private | public | internal | namespace:$namespace_name
+        LimitReqZone:
+          allOf:
+          - $ref: '#/components/schemas/LimitReqZone'
+          nullable: true
         Locations:
           type: array
           items:

@@ -80,6 +80,42 @@ impl RepositoryReadBy for JobDb {
   }
 }
 
+impl RepositoryCountBy for JobDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = jobs::table
+      .inner_join(crate::schema::object_process_statuses::table)
+      .into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4string!(query, jobs::key, key);
+    }
+    if let Some(data) = r#where.get("data") {
+      gen_where4json!(query, jobs::data, data);
+    }
+    if let Some(metadata) = r#where.get("metadata") {
+      gen_where4json!(query, jobs::metadata, metadata);
+    }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for JobDb {
   type NewOutput = Job;
 

@@ -55,6 +55,32 @@ impl RepositoryReadBy for EventDb {
   }
 }
 
+impl RepositoryCountBy for EventDb {
+  fn gen_count_query(
+    filter: &nanocl_stubs::generic::GenericFilter,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
+  {
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let mut query = events::table.into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4uuid!(query, events::key, value);
+    }
+    if let Some(value) = r#where.get("reporting_node") {
+      gen_where4string!(query, events::reporting_node, value);
+    }
+    if let Some(value) = r#where.get("kind") {
+      gen_where4string!(query, events::kind, value);
+    }
+    if let Some(value) = r#where.get("action") {
+      gen_where4string!(query, events::kind, value);
+    }
+    if let Some(value) = r#where.get("reason") {
+      gen_where4string!(query, events::kind, value);
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for EventDb {
   type NewOutput = Event;
 

@@ -57,6 +57,19 @@ impl RepositoryReadBy for ResourceKindDb {
   }
 }
 
+impl RepositoryCountBy for ResourceKindDb {
+  fn gen_count_query(
+    filter: &GenericFilter,
+  ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let mut query = resource_kinds::table.into_boxed();
+    if let Some(value) = r#where.get("name") {
+      gen_where4string!(query, resource_kinds::name, value);
+    }
+    query.count()
+  }
+}
+
 impl RepositoryReadByTransform for ResourceKindDb {
   type NewOutput = ResourceKind;
 
