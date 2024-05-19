@@ -1,21 +1,17 @@
-NAME
-====
+# NAME
 
 nanocl - \`nanocl vm\` available arguments
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl vm\` available arguments
 
-OPTIONS
-=======
+# OPTIONS
 
 **-n**, **\--namespace**=*NAMESPACE*
 
@@ -25,8 +21,7 @@ OPTIONS
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-run(1)
 

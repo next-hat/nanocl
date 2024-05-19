@@ -29,7 +29,7 @@ Cargoes:
         echo "generating certs"
         mkdir -p $STATE_DIR/ca $STATE_DIR/certs $STATE_DIR/data
         cockroach cert create-ca --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
-        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+        cockroach cert create-node 127.0.0.1 *.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
         cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
       fi
       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
@@ -74,7 +74,7 @@ Cargoes:
 - Name: ncproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncproxy:0.11.0-nightly
+    Image: ghcr.io/next-hat/ncproxy:0.12.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncproxy:0.11.0
     # {% endif %}
@@ -109,7 +109,7 @@ Cargoes:
 - Name: ncdns
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncdns:0.6.0-nightly
+    Image: ghcr.io/next-hat/ncdns:0.6.1-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncdns:0.6.0
     # {% endif %}
@@ -134,7 +134,7 @@ Cargoes:
 - Name: ndaemon
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nanocld:0.14.0-nightly
+    Image: ghcr.io/next-hat/nanocld:0.15.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nanocld:0.14.0
     # {% endif %}
@@ -155,6 +155,8 @@ Cargoes:
     - ${{ advertise_addr }}
     - --gid
     - "${{ gid }}"
+    - --store-addr
+    - postgresql://root:root@store.nanocl.internal:26258/defaultdb?sslmode=verify-full&sslcert=${{ state_dir }}/store/certs/client.root.crt&sslkey=${{ state_dir }}/store/certs/client.root.key&sslrootcert=${{ state_dir }}/store/certs/ca.crt
     Env:
     - NANOCL_GID=${{ gid }}
     HostConfig:

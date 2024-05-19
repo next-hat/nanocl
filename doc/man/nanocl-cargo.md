@@ -1,21 +1,17 @@
-NAME
-====
+# NAME
 
 nanocl cargo - \`nanocl cargo\` available arguments
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl cargo\` available arguments
 
-OPTIONS
-=======
+# OPTIONS
 
 **-n**, **\--namespace**=*NAMESPACE*
 
@@ -25,8 +21,7 @@ OPTIONS
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl cargo-list(1)
 
@@ -38,11 +33,11 @@ nanocl cargo-create(1)
 
 nanocl cargo-start(1)
 
-:   Start a cargo by its name
+:   Start cargoes by names
 
 nanocl cargo-stop(1)
 
-:   Stop a cargo by its name
+:   Stop cargoes by names
 
 nanocl cargo-restart(1)
 
@@ -59,10 +54,6 @@ nanocl cargo-inspect(1)
 nanocl cargo-patch(1)
 
 :   Update a cargo by its name
-
-nanocl cargo-image(1)
-
-:   Manage cargo image
 
 nanocl cargo-exec(1)
 

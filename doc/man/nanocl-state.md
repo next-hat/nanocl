@@ -1,27 +1,22 @@
-NAME
-====
+# NAME
 
 nanocl - \`nanocl state\` available arguments
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl state\` available arguments
 
-OPTIONS
-=======
+# OPTIONS
 
 **-h**, **\--help**
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-apply(1)
 

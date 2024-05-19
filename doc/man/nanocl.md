@@ -1,21 +1,17 @@
-NAME
-====
+# NAME
 
-nanocl - The Self-Sufficient Hybrid-Cloud Orchestrator CLI
+nanocl - The Self-Sufficient Orchestrator CLI
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-H**\|**\--host**\] \[**-h**\|**\--help**\]
 \[**-V**\|**\--version**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
-The Self-Sufficient Hybrid-Cloud Orchestrator CLI
+The Self-Sufficient Orchestrator CLI
 
-OPTIONS
-=======
+# OPTIONS
 
 **-H**, **\--host**=*HOST*
 
@@ -29,12 +25,15 @@ OPTIONS
 
 :   Print version
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-namespace(1)
 
 :   Manage namespaces
+
+nanocl-secret(1)
+
+:   Manage secrets
 
 nanocl-job(1)
 
@@ -52,21 +51,29 @@ nanocl-resource(1)
 
 :   Manage resources
 
-nanocl-node(1)
+nanocl-metric(1)
 
-:   Manage nodes (experimental)
-
-nanocl-events(1)
-
-:   Watch daemon events
-
-nanocl-state(1)
-
-:   Define, Run, or Remove Cargo or Virtual Machines
+:   Manage metrics
 
 nanocl-context(1)
 
 :   Manage contexts
+
+nanocl-node(1)
+
+:   Manage nodes (experimental)
+
+nanocl-state(1)
+
+:   Apply or Remove a Statefile
+
+nanocl-event(1)
+
+:   Show or watch events
+
+nanocl-ps(1)
+
+:   Show processes
 
 nanocl-info(1)
 
@@ -84,23 +91,10 @@ nanocl-uninstall(1)
 
 :   Uninstall components
 
-nanocl-upgrade(1)
-
-:   Upgrade components
-
-nanocl-ps(1)
-
-:   Show all processes managed by nanocl
-
-nanocl-secret(1)
-
-:   Manage secrets
-
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
-VERSION
-=======
+# VERSION
 
-v0.12.0
+v0.15.0

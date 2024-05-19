@@ -1,27 +1,22 @@
-NAME
-====
+# NAME
 
 nanocl-resource - \`nanocl resource\` available arguments
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl-resource** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl resource\` available arguments
 
-OPTIONS
-=======
+# OPTIONS
 
 **-h**, **\--help**
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-resource-remove(1)
 

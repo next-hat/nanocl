@@ -1,31 +1,22 @@
-NAME
-====
+# NAME
 
 nanocl - \`nanocl state apply\` available options
 
-SYNOPSIS
-========
+# SYNOPSIS
 
-**nanocl** \[**-s**\|**\--state-location**\]
-\[**-p**\|**\--force-pull**\] \[**-f**\|**\--follow**\]
+**nanocl** \[**-s**\|**\--state-location**\] \[**-f**\|**\--follow**\]
 \[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\] \[**-h**\|**\--help**\]
 \[*ARGS*\]
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl state apply\` available options
 
-OPTIONS
-=======
+# OPTIONS
 
-**-s**, **\--state-location**=*STATE\_LOCATION*
+**-s**, **\--state-location**=*STATE_LOCATION*
 
 :   Path or Url to the Statefile
-
-**-p**, **\--force-pull**
-
-:   Force pulling images even if they exist
 
 **-f**, **\--follow**
 

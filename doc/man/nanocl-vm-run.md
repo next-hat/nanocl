@@ -1,23 +1,19 @@
-NAME
-====
+# NAME
 
 nanocl - \`nanocl vm run\` available options
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\]
 \[**\--net-iface**\] \[**\--user**\] \[**\--password**\]
 \[**\--ssh-key**\] \[**\--img-size**\] \[**\--kvm**\]
 \[**-a**\|**\--attach**\] \[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl vm run\` available options
 
-OPTIONS
-=======
+# OPTIONS
 
 **\--hostname**=*HOSTNAME*
 
@@ -31,7 +27,7 @@ OPTIONS
 
 :   Memory of the vm in MB default to 512
 
-**\--net-iface**=*NET\_IFACE*
+**\--net-iface**=*NET_IFACE*
 
 :   network interface of the vm
 
@@ -43,11 +39,11 @@ OPTIONS
 
 :   Default password of the VM
 
-**\--ssh-key**=*SSH\_KEY*
+**\--ssh-key**=*SSH_KEY*
 
 :   Ssh key for the user
 
-**\--img-size**=*IMAGE\_SIZE*
+**\--img-size**=*IMAGE_SIZE*
 
 :   Size of the disk in GB
 

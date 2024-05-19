@@ -1,23 +1,19 @@
-NAME
-====
+# NAME
 
 nanocl - \`nanocl state rm\` available options
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-s**\|**\--state-location**\] \[**-y**\|**\--yes**\]
 \[**-h**\|**\--help**\] \[*ARGS*\]
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 \`nanocl state rm\` available options
 
-OPTIONS
-=======
+# OPTIONS
 
-**-s**, **\--state-location**=*STATE\_LOCATION*
+**-s**, **\--state-location**=*STATE_LOCATION*
 
 :   Path or Url to the Statefile
 
