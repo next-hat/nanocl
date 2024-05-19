@@ -3,19 +3,19 @@ use diesel::prelude::*;
 use nanocl_error::{io::IoResult, http::HttpResult};
 
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   system::ObjPsStatus,
   vm::{Vm, VmSummary},
   vm_spec::{VmSpec, VmSpecPartial},
 };
 
 use crate::{
-  utils,
-  schema::vms,
-  gen_multiple, gen_where4string,
+  gen_multiple, gen_where4json, gen_where4string,
   models::{
     NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb, VmUpdateDb,
   },
+  schema::vms,
+  utils,
 };
 
 use super::generic::*;
@@ -58,6 +58,26 @@ impl RepositoryReadBy for VmDb {
     }
     if let Some(value) = r#where.get("namespace_name") {
       gen_where4string!(query, vms::namespace_name, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, crate::schema::specs::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, crate::schema::specs::metadata, value);
+    }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
     }
     if is_multiple {
       gen_multiple!(query, vms::created_at, filter);
@@ -121,12 +141,18 @@ impl VmDb {
   }
 
   /// List VMs by namespace
-  pub async fn list_by_namespace(
-    nsp: &str,
+  pub async fn list(
+    query: &GenericFilterNsp,
     pool: &Pool,
   ) -> HttpResult<Vec<VmSummary>> {
-    let namespace = NamespaceDb::read_by_pk(nsp, pool).await?;
-    let vms = VmDb::read_by_namespace(&namespace.name, pool).await?;
+    let namespace = utils::key::resolve_nsp(&query.namespace);
+    let namespace = NamespaceDb::read_by_pk(&namespace, pool).await?;
+    let filter = query
+      .filter
+      .clone()
+      .unwrap_or_default()
+      .r#where("namespace_name", GenericClause::Eq(namespace.name.clone()));
+    let vms = VmDb::transform_read_by(&filter, pool).await?;
     let mut vm_summaries = Vec::new();
     for vm in vms {
       let spec = SpecDb::read_by_pk(&vm.spec.key, pool)

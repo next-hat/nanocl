@@ -1,7 +1,10 @@
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::namespace::{
-  Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+use nanocl_stubs::{
+  generic::GenericFilter,
+  namespace::{
+    Namespace, NamespaceInspect, NamespacePartial, NamespaceSummary,
+  },
 };
 
 use super::http_client::NanocldClient;
@@ -22,8 +25,10 @@ impl NanocldClient {
   /// ```
   pub async fn list_namespace(
     &self,
+    query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<NamespaceSummary>> {
-    let res = self.send_get(Self::NAMESPACE_PATH, None::<String>).await?;
+    let query = Self::convert_query(query)?;
+    let res = self.send_get(Self::NAMESPACE_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 
@@ -93,7 +98,7 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     });
-    client.list_namespace().await.unwrap();
+    client.list_namespace(None).await.unwrap();
     let namespace = client.create_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);
     let namespace = client.inspect_namespace(NAMESPACE).await.unwrap();

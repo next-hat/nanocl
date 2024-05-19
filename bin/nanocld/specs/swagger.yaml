@@ -55,7 +55,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "name": { "eq": "test" } } }'
+        example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       - name: namespace
         in: query
         description: Namespace where the cargoes are
@@ -338,7 +338,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "kind": { "eq": "normal" } } }'
+        example: '{ "filter": { "where": { "kind": { "eq": "normal" } } } }'
       responses:
         '200':
           description: List of events
@@ -454,6 +454,15 @@ paths:
       - Jobs
       summary: List jobs
       operationId: list_job
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "job-example" } } } }'
       responses:
         '200':
           description: List of jobs
@@ -533,7 +542,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "kind": { "eq": "CPU" } } }'
+        example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
       responses:
         '200':
           description: List of metrics
@@ -617,7 +626,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "name": { "eq": "test" } } }'
+        example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
           description: List of namespace
@@ -707,6 +716,15 @@ paths:
       - Nodes
       summary: List nodes
       operationId: list_node
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
           description: List of nodes
@@ -1076,6 +1094,15 @@ paths:
       - ResourceKinds
       summary: List resource kinds
       operationId: list_resource_kind
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
           description: List of jobs
@@ -1193,7 +1220,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "kind": { "eq": "ProxyRule" } } }'
+        example: '{ "filter": { "where": { "kind": { "eq": "ncproxy.io/rule" } } } }'
       responses:
         '200':
           description: List of resources
@@ -1374,7 +1401,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "kind": { "eq": "Env" } } }'
+        example: '{ "filter": { "where": { "kind": { "eq": "Env" } } } }'
       responses:
         '200':
           description: List of secret
@@ -1507,6 +1534,14 @@ paths:
       summary: List virtual machines
       operationId: list_vm
       parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "filter": { "where": { "name": { "eq": "my-vm" } } } }'
       - name: namespace
         in: query
         description: The namespace of the virtual machine
@@ -1563,7 +1598,7 @@ paths:
         schema:
           type: string
           nullable: true
-        example: '{ "where": { "kind": { "eq": "Env" } } }'
+        example: '{ "filter": { "where": { "name": { "eq": "my-image" } } } }'
       responses:
         '200':
           description: List of vm images

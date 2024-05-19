@@ -384,7 +384,7 @@ async fn inject_data(
 ) -> IoResult<StateRef<Statefile>> {
   let envs = generate_envs();
   let info = client.info().await?;
-  let namespaces = client.list_namespace().await?.into_iter().fold(
+  let namespaces = client.list_namespace(None).await?.into_iter().fold(
     HashMap::new(),
     |mut acc, elem| {
       acc.insert(elem.name.clone(), elem);

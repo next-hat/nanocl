@@ -10,7 +10,7 @@ use futures::future::ready;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::generic::GenericListQuery;
 
 use crate::{
   utils,
@@ -23,6 +23,9 @@ use crate::{
   get,
   tag = "Nodes",
   path = "/nodes",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"test\" } } } }"),
+  ),
   responses(
     (status = 200, description = "List of nodes", body = [Node]),
   ),
@@ -30,9 +33,10 @@ use crate::{
 #[web::get("/nodes")]
 pub async fn list_node(
   state: web::types::State<SystemState>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let items =
-    NodeDb::read_by(&GenericFilter::default(), &state.inner.pool).await?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
+  let items = NodeDb::read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

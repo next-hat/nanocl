@@ -7,7 +7,7 @@ use ntex::web;
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericListQuery},
+  generic::GenericListQuery,
   proxy::ProxySslConfig,
   secret::{SecretPartial, SecretUpdate},
 };
@@ -25,7 +25,7 @@ use crate::{
   tag = "Secrets",
   path = "/secrets",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"Env\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"Env\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of secret", body = [Secret]),
@@ -34,10 +34,9 @@ use crate::{
 #[web::get("/secrets")]
 pub async fn list_secret(
   state: web::types::State<SystemState>,
-  query: web::types::Query<GenericListQuery>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query.into_inner())
-    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let items = SecretDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }

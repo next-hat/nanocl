@@ -56,12 +56,15 @@ impl SystemState {
     self.inner.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
-          if let Err(err) = self.inner.event_emitter_raw.emit(&e) {
-            log::error!("system::run: raw emit {err}");
-          }
+          let e_ptr = e.clone();
+          let self_ptr = self.clone();
+          rt::spawn(async move {
+            if let Err(err) = self_ptr.inner.event_emitter_raw.emit(&e_ptr) {
+              log::error!("system::run: raw emit {err}");
+            }
+          });
           super::exec_event(&e, &self);
         }
-        Ok::<(), IoError>(())
       });
     });
   }

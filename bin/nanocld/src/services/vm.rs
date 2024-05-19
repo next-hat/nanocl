@@ -16,8 +16,8 @@ use nanocl_error::{
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::{
+  generic::{GenericListQueryNsp, GenericNspQuery},
   process::OutputLog,
-  generic::GenericNspQuery,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
 };
 
@@ -35,6 +35,7 @@ use crate::{
   tag = "Vms",
   path = "/vms",
   params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"my-vm\" } } } }"),
     ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
@@ -44,10 +45,10 @@ use crate::{
 #[web::get("/vms")]
 pub async fn list_vm(
   state: web::types::State<SystemState>,
-  qs: web::types::Query<GenericNspQuery>,
+  qs: web::types::Query<GenericListQueryNsp>,
 ) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let vms = VmDb::list_by_namespace(&namespace, &state.inner.pool).await?;
+  let query = utils::query_string::parse_qs_nsp_filter(&qs)?;
+  let vms = VmDb::list(&query, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 

@@ -3,9 +3,9 @@ use bollard_next::service::ContainerSummary;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::{
-  generic::GenericNspQuery,
-  cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec},
-  cargo::{Cargo, CargoSummary, CargoInspect, CargoDeleteQuery},
+  generic::{GenericFilterNsp, GenericNspQuery},
+  cargo::{Cargo, CargoDeleteQuery, CargoInspect, CargoSummary},
+  cargo_spec::{CargoSpec, CargoSpecPartial, CargoSpecUpdate},
 };
 
 use super::http_client::NanocldClient;
@@ -104,11 +104,10 @@ impl NanocldClient {
   /// ```
   pub async fn list_cargo(
     &self,
-    namespace: Option<&str>,
+    query: Option<&GenericFilterNsp>,
   ) -> HttpClientResult<Vec<CargoSummary>> {
-    let res = self
-      .send_get(Self::CARGO_PATH, Some(GenericNspQuery::new(namespace)))
-      .await?;
+    let query = Self::convert_query(query)?;
+    let res = self.send_get(Self::CARGO_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 

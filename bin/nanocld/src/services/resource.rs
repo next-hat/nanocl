@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause, GenericListQuery},
@@ -11,9 +11,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
+  models::{ResourceDb, SpecDb, SystemState},
   objects::generic::*,
   repositories::generic::*,
-  models::{SystemState, SpecDb, ResourceDb},
+  utils,
 };
 
 /// List resources
@@ -22,7 +23,7 @@ use crate::{
   tag = "Resources",
   path = "/resources",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"ProxyRule\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"ncproxy.io/rule\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of resources", body = [Resource]),
@@ -31,10 +32,9 @@ use crate::{
 #[web::get("/resources")]
 pub async fn list_resource(
   state: web::types::State<SystemState>,
-  query: web::types::Query<GenericListQuery>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query.into_inner())
-    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let items = ResourceDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }

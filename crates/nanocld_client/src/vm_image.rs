@@ -7,7 +7,10 @@ use futures::Stream;
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::vm_image::{VmImage, VmImageCloneStream, VmImageResizePayload};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  vm_image::{VmImage, VmImageCloneStream, VmImageResizePayload},
+};
 
 use crate::NanocldClient;
 
@@ -45,8 +48,13 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_vm_image().await;
   /// ```
-  pub async fn list_vm_image(&self) -> HttpClientResult<Vec<VmImage>> {
-    let res = self.send_get(Self::VM_IMAGE_PATH, None::<String>).await?;
+  pub async fn list_vm_image(
+    &self,
+    query: Option<&GenericFilter>,
+  ) -> HttpClientResult<Vec<VmImage>> {
+    let query: nanocl_stubs::generic::GenericListQueryNsp =
+      Self::convert_query(query)?;
+    let res = self.send_get(Self::VM_IMAGE_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 

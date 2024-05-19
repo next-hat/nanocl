@@ -54,6 +54,9 @@ impl RepositoryDelBy for ProcessDb {
     if let Some(value) = r#where.get("kind_key") {
       gen_where4string!(query, processes::kind_key, value);
     }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, processes::data, value);
+    }
     query
   }
 }

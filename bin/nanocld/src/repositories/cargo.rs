@@ -4,26 +4,26 @@ use diesel::prelude::*;
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use nanocl_error::{
+  http::HttpResult,
   io::{IoError, IoResult},
-  http::{HttpResult, HttpError},
 };
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause, GenericListNspQuery},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
-  cargo_spec::{CargoSpecPartial, CargoSpec},
+  cargo_spec::{CargoSpec, CargoSpecPartial},
   system::ObjPsStatus,
 };
 
 use crate::{
-  utils,
-  schema::cargoes,
-  objects::generic::*,
-  gen_multiple, gen_where4string,
+  gen_multiple, gen_where4json, gen_where4string,
   models::{
-    Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
-    ObjPsStatusDb,
+    CargoDb, CargoUpdateDb, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb,
+    SpecDb, SystemState,
   },
+  objects::generic::*,
+  schema::cargoes,
+  utils,
 };
 
 use super::generic::*;
@@ -69,6 +69,26 @@ impl RepositoryReadBy for CargoDb {
     }
     if let Some(value) = r#where.get("namespace_name") {
       gen_where4string!(query, cargoes::namespace_name, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, crate::schema::specs::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, crate::schema::specs::metadata, value);
+    }
+    if let Some(value) = r#where.get("status.wanted") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::wanted,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("status.actual") {
+      gen_where4string!(
+        query,
+        crate::schema::object_process_statuses::actual,
+        value
+      );
     }
     if is_multiple {
       gen_multiple!(query, cargoes::created_at, filter);
@@ -185,12 +205,14 @@ impl CargoDb {
 
   /// List the cargoes for the given query
   pub async fn list(
-    query: &GenericListNspQuery,
+    query: &GenericFilterNsp,
     state: &SystemState,
   ) -> HttpResult<Vec<CargoSummary>> {
     let namespace = utils::key::resolve_nsp(&query.namespace);
-    let filter = GenericFilter::try_from(query.clone())
-      .map_err(HttpError::bad_request)?
+    let filter = query
+      .filter
+      .clone()
+      .unwrap_or_default()
       .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
     NamespaceDb::read_by_pk(&namespace, &state.inner.pool).await?;
     let cargoes =

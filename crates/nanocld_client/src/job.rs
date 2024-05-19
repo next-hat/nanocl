@@ -1,6 +1,9 @@
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobSummary};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  job::{Job, JobInspect, JobPartial, JobSummary},
+};
 
 use super::http_client::NanocldClient;
 
@@ -18,8 +21,12 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_job().await;
   /// ```
-  pub async fn list_job(&self) -> HttpClientResult<Vec<JobSummary>> {
-    let res = self.send_get(Self::JOB_PATH, None::<String>).await?;
+  pub async fn list_job(
+    &self,
+    query: Option<&GenericFilter>,
+  ) -> HttpClientResult<Vec<JobSummary>> {
+    let query = Self::convert_query(query)?;
+    let res = self.send_get(Self::JOB_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 
@@ -102,7 +109,7 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     });
-    client.list_job().await.unwrap();
+    client.list_job(None).await.unwrap();
   }
 
   #[ntex::test]

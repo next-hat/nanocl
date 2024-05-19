@@ -1,15 +1,13 @@
 use ntex::web;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::{
-  generic::{GenericFilter, GenericListQuery},
-  namespace::NamespacePartial,
-};
+use nanocl_stubs::{generic::GenericListQuery, namespace::NamespacePartial};
 
 use crate::{
+  utils,
   objects::generic::*,
-  models::{SystemState, NamespaceDb},
+  models::{NamespaceDb, SystemState},
 };
 
 /// List namespaces
@@ -18,7 +16,7 @@ use crate::{
   tag = "Namespaces",
   path = "/namespaces",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"test\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of namespace", body = [NamespaceSummary]),
@@ -27,10 +25,9 @@ use crate::{
 #[web::get("/namespaces")]
 pub async fn list_namespace(
   state: web::types::State<SystemState>,
-  query: web::types::Query<GenericListQuery>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query.into_inner())
-    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let items = NamespaceDb::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }

@@ -8,8 +8,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
+  utils,
   repositories::generic::*,
-  models::{SystemState, MetricDb, MetricNodePartial},
+  models::{MetricDb, MetricNodePartial, SystemState},
 };
 
 /// Get metrics of all peer nodes
@@ -18,7 +19,7 @@ use crate::{
   tag = "Metrics",
   path = "/metrics",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"CPU\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"CPU\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of metrics", body = Vec<Metric>),
@@ -29,9 +30,7 @@ pub async fn list_metric(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
-    HttpError::bad_request(format!("Invalid query string: {err}"))
-  })?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let metrics = MetricDb::read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }

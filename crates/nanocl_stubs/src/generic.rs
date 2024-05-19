@@ -114,10 +114,10 @@ impl TryFrom<GenericListQuery> for GenericFilter {
   }
 }
 
-impl TryFrom<GenericListNspQuery> for GenericFilter {
+impl TryFrom<GenericListQueryNsp> for GenericFilter {
   type Error = serde_json::Error;
 
-  fn try_from(query: GenericListNspQuery) -> Result<Self, Self::Error> {
+  fn try_from(query: GenericListQueryNsp) -> Result<Self, Self::Error> {
     let filter = match query.filter {
       None => Self::default(),
       Some(filter) => serde_json::from_str(&filter)?,
@@ -131,13 +131,22 @@ impl TryFrom<GenericListNspQuery> for GenericFilter {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct GenericListNspQuery {
+pub struct GenericListQueryNsp {
   /// A json as string as GenericFilter
   pub filter: Option<String>,
   pub namespace: Option<String>,
 }
 
-impl GenericListNspQuery {
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GenericFilterNsp {
+  pub filter: Option<GenericFilter>,
+  pub namespace: Option<String>,
+}
+
+impl GenericListQueryNsp {
   pub fn new(namespace: Option<&str>) -> Self {
     Self {
       namespace: namespace.map(|s| s.to_owned()),
@@ -151,7 +160,37 @@ impl GenericListNspQuery {
   }
 }
 
-impl TryFrom<GenericFilter> for GenericListNspQuery {
+impl TryFrom<GenericFilterNsp> for GenericListQueryNsp {
+  type Error = serde_json::Error;
+
+  fn try_from(filter: GenericFilterNsp) -> Result<Self, Self::Error> {
+    let formatted_filter = match filter.filter {
+      None => None,
+      Some(filter) => Some(serde_json::to_string(&filter)?),
+    };
+    Ok(Self {
+      filter: formatted_filter,
+      namespace: filter.namespace,
+    })
+  }
+}
+
+impl TryFrom<GenericListQueryNsp> for GenericFilterNsp {
+  type Error = serde_json::Error;
+
+  fn try_from(query: GenericListQueryNsp) -> Result<Self, Self::Error> {
+    let filter = match query.filter {
+      None => None,
+      Some(filter) => Some(serde_json::from_str(&filter)?),
+    };
+    Ok(GenericFilterNsp {
+      filter,
+      namespace: query.namespace,
+    })
+  }
+}
+
+impl TryFrom<GenericFilter> for GenericListQueryNsp {
   type Error = serde_json::Error;
 
   fn try_from(filter: GenericFilter) -> Result<Self, Self::Error> {

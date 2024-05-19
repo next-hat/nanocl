@@ -10,6 +10,7 @@ pub mod exec;
 pub mod ctrl_client;
 pub mod server;
 pub mod container;
+pub mod query_string;
 
 #[cfg(test)]
 pub mod tests {

@@ -5,10 +5,7 @@ use futures::StreamExt;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::{
-  generic::{GenericFilter, GenericListQuery},
-  vm_image::VmImageResizePayload,
-};
+use nanocl_stubs::{generic::GenericListQuery, vm_image::VmImageResizePayload};
 
 use crate::{
   utils,
@@ -22,7 +19,7 @@ use crate::{
   tag = "VmImages",
   path = "/vms/images",
   params(
-    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"Env\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"my-image\" } } } }"),
   ),
   responses(
     (status = 200, description = "List of vm images", body = [VmImage]),
@@ -31,10 +28,9 @@ use crate::{
 #[web::get("/vms/images")]
 pub async fn list_vm_images(
   state: web::types::State<SystemState>,
-  query: web::types::Query<GenericListQuery>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query.into_inner())
-    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let filter = utils::query_string::parse_qs_filter(&qs)?;
   let images = VmImageDb::read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
