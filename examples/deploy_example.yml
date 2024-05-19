@@ -25,8 +25,14 @@ Resources:
       Rules:
         - Domain: deploy-example.com
           Network: All
+          LimitReqZone:
+            Size: 10
+            Rate: 2
           Locations:
             - Path: /
+              LimitReq:
+                Burst: 2
+                Delay: 600
               Target:
                 Key: deploy-example2.global.c
                 Port: 9000
