@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://download.next-hat.com/ressources/images/logo.png" >
+  <img width="200" height="200" src="https://download.next-hat.com/ressources/images/logo.png" >
   <h1>Nanocl</h1>
   <p>
 
