@@ -66,6 +66,7 @@ diesel = { version = "2.1", features = [
   "chrono",
   "uuid",
   "serde_json",
+  "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
 tokio = { version = "1.36", features = ["fs", "process", "io-std"] }
 tokio-util = "0.7"

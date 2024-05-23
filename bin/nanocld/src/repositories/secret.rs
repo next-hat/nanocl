@@ -37,7 +37,8 @@ impl RepositoryReadBy for SecretDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4string!(query, secrets::key, key);
@@ -57,7 +58,8 @@ impl RepositoryCountBy for SecretDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4string!(query, secrets::key, key);

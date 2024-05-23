@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use diesel::prelude::*;
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::{
   http::HttpResult,
   io::{IoError, IoResult},
@@ -56,11 +56,21 @@ impl RepositoryReadBy for CargoDb {
   where
     Self::Output: Sized,
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
+
+    // Define the AND condition part
+    let and_condition = cargoes::name
+      .eq("foo")
+      .and(cargoes::namespace_name.eq("bar"))
+      .or(cargoes::name.eq("baz"));
+
+    query = query.filter(and_condition);
+
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, cargoes::key, value);
     }
@@ -102,7 +112,8 @@ impl RepositoryCountBy for CargoDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)

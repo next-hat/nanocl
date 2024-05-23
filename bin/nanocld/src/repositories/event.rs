@@ -31,7 +31,8 @@ impl RepositoryReadBy for EventDb {
   where
     Self::Output: Sized,
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = events::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4uuid!(query, events::key, value);
@@ -60,7 +61,8 @@ impl RepositoryCountBy for EventDb {
     filter: &nanocl_stubs::generic::GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = events::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4uuid!(query, events::key, value);

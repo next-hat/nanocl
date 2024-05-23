@@ -27,7 +27,8 @@ impl RepositoryReadBy for MetricDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = metrics::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4uuid!(query, metrics::key, key);
@@ -52,7 +53,8 @@ impl RepositoryCountBy for MetricDb {
   fn gen_count_query(
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = metrics::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4uuid!(query, metrics::key, key);

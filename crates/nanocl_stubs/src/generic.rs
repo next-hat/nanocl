@@ -68,6 +68,17 @@ pub enum GenericClause {
   HasKey(String),
 }
 
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GenericWhere {
+  #[cfg_attr(feature = "serde", serde(rename = "where", flatten))]
+  pub r#where: HashMap<String, GenericClause>,
+  pub or: Option<Vec<HashMap<String, GenericClause>>>,
+  pub and: Option<Vec<HashMap<String, GenericClause>>>,
+}
+
 /// Generic filter for list operation
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -76,7 +87,7 @@ pub enum GenericClause {
 pub struct GenericFilter {
   /// Where clause
   #[cfg_attr(feature = "serde", serde(rename = "where"))]
-  pub r#where: Option<HashMap<String, GenericClause>>,
+  pub r#where: Option<GenericWhere>,
   /// Limit number of items default (100)
   pub limit: Option<usize>,
   /// Offset to navigate through items
@@ -218,12 +229,13 @@ impl GenericFilter {
 
   pub fn r#where(mut self, key: &str, clause: GenericClause) -> Self {
     if self.r#where.is_none() {
-      self.r#where = Some(HashMap::new());
+      self.r#where = Some(GenericWhere::default());
     }
     self
       .r#where
       .as_mut()
       .unwrap()
+      .r#where
       .insert(key.to_owned(), clause);
     self
   }

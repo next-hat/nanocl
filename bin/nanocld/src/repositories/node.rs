@@ -33,7 +33,8 @@ impl RepositoryReadBy for NodeDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = nodes::table.into_boxed();
     if let Some(name) = r#where.get("name") {
       gen_where4string!(query, nodes::name, name);
@@ -49,7 +50,8 @@ impl RepositoryCountBy for NodeDb {
   fn gen_count_query(
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
-    let r#where = filter.r#where.clone().unwrap_or_default();
+    let condition = filter.r#where.clone().unwrap_or_default();
+    let r#where = condition.r#where;
     let mut query = nodes::table.into_boxed();
     if let Some(name) = r#where.get("name") {
       gen_where4string!(query, nodes::name, name);
