@@ -87,3 +87,4 @@ notify = "6.1"
 ntex-cors = "1.0"
 rand = "0.8"
 openssl = { version = "0.10" }
+once_cell = "1.19.0"

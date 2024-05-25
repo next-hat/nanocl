@@ -58,37 +58,77 @@ pub use object_process_status::*;
 pub type Pool = R2D2Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 
+/// Generate a where clause for a json column
+#[macro_export]
+macro_rules! gen_and4json {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      nanocl_stubs::generic::GenericClause::Contains(val) => {
+        Box::new($query.and($column.contains(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::HasKey(val) => {
+        Box::new($query.and($column.has_key(val.clone())))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
+
 // /// Generate clause for a string column
-// #[macro_export]
-// macro_rules! gen_where4string2 {
-//   ($column: expr, $value: expr) => {
-//     match $value {
-//       nanocl_stubs::generic::GenericClause::Eq(val) => $column.eq(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Ne(val) => $column.ne(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Gt(val) => $column.gt(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Lt(val) => $column.lt(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Ge(val) => $column.ge(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Le(val) => $column.le(val.clone()),
-//       nanocl_stubs::generic::GenericClause::Like(val) => {
-//         $column.like(val.clone())
-//       }
-//       nanocl_stubs::generic::GenericClause::NotLike(val) => {
-//         $column.not_like(val.clone())
-//       }
-//       nanocl_stubs::generic::GenericClause::In(items) => {
-//         $column.eq_any(items.clone())
-//       }
-//       nanocl_stubs::generic::GenericClause::NotIn(items) => {
-//         $column.ne_all(items.clone())
-//       }
-//       nanocl_stubs::generic::GenericClause::IsNull => $column.is_null(),
-//       nanocl_stubs::generic::GenericClause::IsNotNull => $column.is_not_null(),
-//       _ => {
-//         // Ignore unsupported clause
-//       }
-//     }
-//   };
-// }
+#[macro_export]
+macro_rules! gen_and4string {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        Box::new($query.and($column.eq(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ne(val) => {
+        Box::new($query.and($column.ne(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Gt(val) => {
+        Box::new($query.and($column.gt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Lt(val) => {
+        Box::new($query.and($column.lt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ge(val) => {
+        Box::new($query.and($column.ge(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Le(val) => {
+        Box::new($query.and($column.le(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Like(val) => {
+        Box::new($query.and($column.like(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::NotLike(val) => {
+        Box::new($query.and($column.not_like(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::In(items) => {
+        Box::new($query.and($column.eq_any(items.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::NotIn(items) => {
+        Box::new($query.and($column.ne_all(items.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
 
 /// Generate a where clause for a string column
 #[macro_export]
@@ -186,7 +226,6 @@ macro_rules! gen_where4uuid {
 #[macro_export]
 macro_rules! gen_multiple {
   ($query: expr, $column: expr, $filter: expr) => {
-    $query = $query.order($column.desc());
     let limit = $filter.limit.unwrap_or(100);
     $query = $query.limit(limit as i64);
     if let Some(offset) = $filter.offset {

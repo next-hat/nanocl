@@ -76,7 +76,33 @@ pub struct GenericWhere {
   #[cfg_attr(feature = "serde", serde(flatten))]
   pub conditions: HashMap<String, GenericClause>,
   pub or: Option<Vec<HashMap<String, GenericClause>>>,
-  pub and: Option<Vec<HashMap<String, GenericClause>>>,
+}
+
+/// Generic order enum
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum GenericOrder {
+  /// Ascending
+  Asc,
+  /// Descending
+  Desc,
+}
+
+impl std::str::FromStr for GenericOrder {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "asc" => Ok(Self::Asc),
+      "desc" => Ok(Self::Desc),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "Invalid order",
+      )),
+    }
+  }
 }
 
 /// Generic filter for list operation
@@ -92,6 +118,8 @@ pub struct GenericFilter {
   pub limit: Option<usize>,
   /// Offset to navigate through items
   pub offset: Option<usize>,
+  /// Order by
+  pub order_by: Option<Vec<String>>,
 }
 
 /// Generic query string parameters for list operations

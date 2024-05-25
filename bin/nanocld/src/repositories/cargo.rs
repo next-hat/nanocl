@@ -1,4 +1,35 @@
-use diesel::prelude::*;
+use diesel::{prelude::*, sql_types::Bool};
+
+use std::{collections::HashMap, str::FromStr};
+
+use once_cell::sync::Lazy;
+
+enum ColumnType {
+  Text,
+  Json,
+}
+
+static CARGO_COLUMNS: Lazy<HashMap<&str, (ColumnType, &str)>> =
+  Lazy::new(|| {
+    HashMap::from([
+      ("key", (ColumnType::Text, "cargoes.key")),
+      ("name", (ColumnType::Text, "cargoes.name")),
+      (
+        "namespace_name",
+        (ColumnType::Text, "cargoes.namespace_name"),
+      ),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
+      (
+        "status.wanted",
+        (ColumnType::Text, "object_process_statuses.wanted"),
+      ),
+      (
+        "status.actual",
+        (ColumnType::Text, "object_process_statuses.actual"),
+      ),
+    ])
+  });
 
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::{
@@ -7,14 +38,14 @@ use nanocl_error::{
 };
 
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpec, CargoSpecPartial},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp, GenericOrder},
   system::ObjPsStatus,
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
+  gen_and4json, gen_and4string, gen_multiple, gen_where4json, gen_where4string,
   models::{
     CargoDb, CargoUpdateDb, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb,
     SpecDb, SystemState,
@@ -60,43 +91,81 @@ impl RepositoryReadBy for CargoDb {
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-
-    // Define the AND condition part
-    let and_condition = cargoes::name
-      .eq("foo")
-      .and(cargoes::namespace_name.eq("bar"))
-      .or(cargoes::name.eq("baz"));
-
-    query = query.filter(and_condition);
-
-    if let Some(value) = conditions.get("key") {
-      gen_where4string!(query, cargoes::key, value);
+    for (key, value) in conditions {
+      let Some(s_column) = CARGO_COLUMNS.get(key.as_str()) else {
+        continue;
+      };
+      match s_column.0 {
+        ColumnType::Json => {
+          let column = diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+          gen_where4json!(query, column, value);
+        }
+        ColumnType::Text => {
+          let column = diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+          gen_where4string!(query, column, value);
+        }
+      }
     }
-    if let Some(value) = conditions.get("name") {
-      gen_where4string!(query, cargoes::name, value);
+    let or = r#where.or.unwrap_or_default();
+    for or in or {
+      // litle hack to make the compiler happy and be able to use the macro
+      // the 1=1 is a dummy condition that will always be true
+      let mut or_condition: Box<dyn BoxableExpression<_, _, SqlType = Bool>> =
+        Box::new(diesel::dsl::sql::<diesel::sql_types::Bool>("1=1"));
+      for (key, value) in or {
+        let Some(s_column) = CARGO_COLUMNS.get(key.as_str()) else {
+          continue;
+        };
+        match s_column.0 {
+          ColumnType::Json => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+            or_condition = gen_and4json!(or_condition, column, value);
+          }
+          ColumnType::Text => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            or_condition = gen_and4string!(or_condition, column, value);
+          }
+        }
+      }
+      query = query.or_filter(or_condition);
     }
-    if let Some(value) = conditions.get("namespace_name") {
-      gen_where4string!(query, cargoes::namespace_name, value);
-    }
-    if let Some(value) = conditions.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
-    }
-    if let Some(value) = conditions.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
-    }
-    if let Some(value) = conditions.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = conditions.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
+    if let Some(orders) = &filter.order_by {
+      for order in orders {
+        let words: Vec<_> = order.split_whitespace().collect();
+        let column = words.first().unwrap_or(&"");
+        let order = words.get(1).unwrap_or(&"");
+        let order = GenericOrder::from_str(order).unwrap();
+        if let Some(s_column) = CARGO_COLUMNS.get(column) {
+          match s_column.0 {
+            ColumnType::Json => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Json>(s_column.1);
+              match order {
+                GenericOrder::Asc => {
+                  query = query.order(column.asc());
+                }
+                GenericOrder::Desc => {
+                  query = query.order(column.desc());
+                }
+              }
+            }
+            ColumnType::Text => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+              match order {
+                GenericOrder::Asc => {
+                  query = query.order(column.asc());
+                }
+                GenericOrder::Desc => {
+                  query = query.order(column.desc());
+                }
+              }
+            }
+          }
+        }
+      }
     }
     if is_multiple {
       gen_multiple!(query, cargoes::created_at, filter);
