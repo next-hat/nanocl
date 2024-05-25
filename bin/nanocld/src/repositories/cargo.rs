@@ -46,13 +46,13 @@ use nanocl_stubs::{
 
 use crate::{
   gen_and4json, gen_and4string, gen_multiple, gen_where4json, gen_where4string,
+  utils,
   models::{
     CargoDb, CargoUpdateDb, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb,
     SpecDb, SystemState,
   },
   objects::generic::*,
   schema::cargoes,
-  utils,
 };
 
 use super::generic::*;
