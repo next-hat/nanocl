@@ -38,7 +38,7 @@ impl SystemState {
     let (sx, rx) = mpsc::unbounded();
     let system_state = SystemState {
       inner: Arc::new(SystemStateInner {
-        pool: Arc::clone(&pool),
+        pool,
         docker_api: docker.clone(),
         config: conf.to_owned(),
         event_emitter: sx,

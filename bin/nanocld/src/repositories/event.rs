@@ -32,7 +32,7 @@ impl RepositoryReadBy for EventDb {
     Self::Output: Sized,
   {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = events::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4uuid!(query, events::key, value);
@@ -61,22 +61,22 @@ impl RepositoryCountBy for EventDb {
     filter: &nanocl_stubs::generic::GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let conditions = r#where.conditions;
     let mut query = events::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
+    if let Some(value) = conditions.get("key") {
       gen_where4uuid!(query, events::key, value);
     }
-    if let Some(value) = r#where.get("reporting_node") {
+    if let Some(value) = conditions.get("reporting_node") {
       gen_where4string!(query, events::reporting_node, value);
     }
-    if let Some(value) = r#where.get("kind") {
+    if let Some(value) = conditions.get("kind") {
       gen_where4string!(query, events::kind, value);
     }
-    if let Some(value) = r#where.get("action") {
+    if let Some(value) = conditions.get("action") {
       gen_where4string!(query, events::kind, value);
     }
-    if let Some(value) = r#where.get("reason") {
+    if let Some(value) = conditions.get("reason") {
       gen_where4string!(query, events::kind, value);
     }
     query.count()

@@ -44,7 +44,7 @@ impl RepositoryReadBy for ResourceKindDb {
     Self::Output,
   > {
         let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = resource_kinds::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
@@ -63,7 +63,7 @@ impl RepositoryCountBy for ResourceKindDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
         let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = resource_kinds::table.into_boxed();
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, resource_kinds::name, value);

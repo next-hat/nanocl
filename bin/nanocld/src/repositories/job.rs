@@ -47,7 +47,7 @@ impl RepositoryReadBy for JobDb {
     Self::Output,
   > {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = jobs::table
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
@@ -87,7 +87,7 @@ impl RepositoryCountBy for JobDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = jobs::table
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::{prelude::*, query_dsl::methods::LoadQuery};
 
 use nanocl_error::io::IoResult;
@@ -29,7 +27,7 @@ pub trait RepositoryReadBy: super::RepositoryBase {
   where
     Self::Output: Sized + Send + 'static,
   {
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let filter = filter.clone();
     log::trace!("{}::read_one_by {filter:#?}", Self::get_name());
     ntex::rt::spawn_blocking(move || {
@@ -62,7 +60,7 @@ pub trait RepositoryReadBy: super::RepositoryBase {
   where
     Self::Output: Sized + Send + 'static,
   {
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let filter = filter.clone();
     log::trace!("{}::read_by {filter:#?}", Self::get_name());
     ntex::rt::spawn_blocking(move || {
@@ -131,7 +129,7 @@ pub trait RepositoryCountBy: RepositoryBase {
   ) -> impl LoadQuery<'static, diesel::PgConnection, i64>;
 
   async fn count_by(filter: &GenericFilter, pool: &Pool) -> IoResult<i64> {
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let filter = filter.clone();
     log::trace!("{}::count_by {filter:#?}", Self::get_name());
     ntex::rt::spawn_blocking(move || {

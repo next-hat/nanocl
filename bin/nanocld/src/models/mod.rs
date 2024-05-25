@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::PgConnection;
 use diesel::r2d2::{Pool as R2D2Pool, PooledConnection, ConnectionManager};
 
@@ -57,56 +55,40 @@ pub use task_manager::*;
 mod object_process_status;
 pub use object_process_status::*;
 
-pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
+pub type Pool = R2D2Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 
-/// Generate a where clause for a string column
-#[macro_export]
-macro_rules! gen_where4string2 {
-  ($query: expr, $fn: expr, $column: expr, $value: expr) => {
-    match $value {
-      nanocl_stubs::generic::GenericClause::Eq(val) => {
-        $query = $fn($column.eq(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Ne(val) => {
-        $query = $fn($column.ne(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Gt(val) => {
-        $query = $fn($column.gt(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Lt(val) => {
-        $query = $fn($column.lt(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Ge(val) => {
-        $query = $fn($column.ge(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Le(val) => {
-        $query = $fn($column.le(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::Like(val) => {
-        $query = $fn($column.like(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::NotLike(val) => {
-        $query = $fn($column.not_like(val.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::In(items) => {
-        $query = $fn($column.eq_any(items.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::NotIn(items) => {
-        $query = $fn($column.ne_all(items.clone()));
-      }
-      nanocl_stubs::generic::GenericClause::IsNull => {
-        $query = $fn($column.is_null());
-      }
-      nanocl_stubs::generic::GenericClause::IsNotNull => {
-        $query = $fn($column.is_not_null());
-      }
-      _ => {
-        // Ignore unsupported clause
-      }
-    }
-  };
-}
+// /// Generate clause for a string column
+// #[macro_export]
+// macro_rules! gen_where4string2 {
+//   ($column: expr, $value: expr) => {
+//     match $value {
+//       nanocl_stubs::generic::GenericClause::Eq(val) => $column.eq(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Ne(val) => $column.ne(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Gt(val) => $column.gt(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Lt(val) => $column.lt(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Ge(val) => $column.ge(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Le(val) => $column.le(val.clone()),
+//       nanocl_stubs::generic::GenericClause::Like(val) => {
+//         $column.like(val.clone())
+//       }
+//       nanocl_stubs::generic::GenericClause::NotLike(val) => {
+//         $column.not_like(val.clone())
+//       }
+//       nanocl_stubs::generic::GenericClause::In(items) => {
+//         $column.eq_any(items.clone())
+//       }
+//       nanocl_stubs::generic::GenericClause::NotIn(items) => {
+//         $column.ne_all(items.clone())
+//       }
+//       nanocl_stubs::generic::GenericClause::IsNull => $column.is_null(),
+//       nanocl_stubs::generic::GenericClause::IsNotNull => $column.is_not_null(),
+//       _ => {
+//         // Ignore unsupported clause
+//       }
+//     }
+//   };
+// }
 
 /// Generate a where clause for a string column
 #[macro_export]

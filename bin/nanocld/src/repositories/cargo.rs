@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
 
 use futures_util::{StreamExt, stream::FuturesUnordered};
@@ -56,8 +54,8 @@ impl RepositoryReadBy for CargoDb {
   where
     Self::Output: Sized,
   {
-    let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let conditions = r#where.conditions;
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
@@ -71,29 +69,29 @@ impl RepositoryReadBy for CargoDb {
 
     query = query.filter(and_condition);
 
-    if let Some(value) = r#where.get("key") {
+    if let Some(value) = conditions.get("key") {
       gen_where4string!(query, cargoes::key, value);
     }
-    if let Some(value) = r#where.get("name") {
+    if let Some(value) = conditions.get("name") {
       gen_where4string!(query, cargoes::name, value);
     }
-    if let Some(value) = r#where.get("namespace_name") {
+    if let Some(value) = conditions.get("namespace_name") {
       gen_where4string!(query, cargoes::namespace_name, value);
     }
-    if let Some(value) = r#where.get("data") {
+    if let Some(value) = conditions.get("data") {
       gen_where4json!(query, crate::schema::specs::data, value);
     }
-    if let Some(value) = r#where.get("metadata") {
+    if let Some(value) = conditions.get("metadata") {
       gen_where4json!(query, crate::schema::specs::metadata, value);
     }
-    if let Some(value) = r#where.get("status.wanted") {
+    if let Some(value) = conditions.get("status.wanted") {
       gen_where4string!(
         query,
         crate::schema::object_process_statuses::wanted,
         value
       );
     }
-    if let Some(value) = r#where.get("status.actual") {
+    if let Some(value) = conditions.get("status.actual") {
       gen_where4string!(
         query,
         crate::schema::object_process_statuses::actual,
@@ -113,7 +111,7 @@ impl RepositoryCountBy for CargoDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
@@ -215,7 +213,7 @@ impl CargoDb {
   /// Count cargoes by namespace.
   pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
     let nsp = nsp.to_owned();
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let count = ntex::web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let count = cargoes::table

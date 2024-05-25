@@ -32,7 +32,7 @@ impl RepositoryDelBy for SpecDb {
     Self: diesel::associations::HasTable,
   {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = diesel::delete(specs::table).into_boxed();
     if let Some(value) = r#where.get("kind_key") {
       gen_where4string!(query, specs::kind_key, value);
@@ -60,7 +60,7 @@ impl RepositoryReadBy for SpecDb {
     Self::Output,
   > {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = specs::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4uuid!(query, specs::key, key);

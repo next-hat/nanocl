@@ -47,7 +47,7 @@ impl RepositoryReadBy for ResourceDb {
     Self::Output,
   > {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = resources::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
@@ -76,7 +76,7 @@ impl RepositoryCountBy for ResourceDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = resources::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();

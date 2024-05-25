@@ -37,8 +37,8 @@ impl RepositoryDelBy for ProcessDb {
   where
     Self: diesel::associations::HasTable,
   {
-        let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.conditions;
     let mut query = diesel::delete(processes::table).into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, processes::key, value);
@@ -77,8 +77,8 @@ impl RepositoryReadBy for ProcessDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-        let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, processes::key, value);
@@ -110,8 +110,8 @@ impl RepositoryCountBy for ProcessDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-        let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let condition = filter.r#where.to_owned().unwrap_or_default();
+    let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, processes::key, value);

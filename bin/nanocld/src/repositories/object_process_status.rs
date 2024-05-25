@@ -37,7 +37,7 @@ impl RepositoryReadBy for ObjPsStatusDb {
     Self::Output,
   > {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = object_process_statuses::table.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, object_process_statuses::key, value);

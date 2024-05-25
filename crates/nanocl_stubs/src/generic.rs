@@ -73,8 +73,8 @@ pub enum GenericClause {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericWhere {
-  #[cfg_attr(feature = "serde", serde(rename = "where", flatten))]
-  pub r#where: HashMap<String, GenericClause>,
+  #[cfg_attr(feature = "serde", serde(flatten))]
+  pub conditions: HashMap<String, GenericClause>,
   pub or: Option<Vec<HashMap<String, GenericClause>>>,
   pub and: Option<Vec<HashMap<String, GenericClause>>>,
 }
@@ -235,7 +235,7 @@ impl GenericFilter {
       .r#where
       .as_mut()
       .unwrap()
-      .r#where
+      .conditions
       .insert(key.to_owned(), clause);
     self
   }

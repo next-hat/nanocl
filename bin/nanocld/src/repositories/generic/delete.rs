@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::{prelude::*, associations::HasTable, query_dsl, query_builder};
 
 use nanocl_error::io::IoResult;
@@ -25,7 +23,7 @@ pub trait RepositoryDelByPk: super::RepositoryBase {
     >: query_builder::QueryFragment<diesel::pg::Pg> + query_builder::QueryId,
   {
     log::trace!("{}::delete_by_pk: {pk}", Self::get_name());
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let pk = pk.to_owned();
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -59,7 +57,7 @@ pub trait RepositoryDelBy: super::RepositoryBase {
     <<Self as diesel::associations::HasTable>::Table as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
   {
     log::trace!("{}::delete_by: {filter:?}", Self::get_name());
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let filter = filter.clone();
     ntex::rt::spawn_blocking(move || {
       let query = Self::gen_del_query(&filter);

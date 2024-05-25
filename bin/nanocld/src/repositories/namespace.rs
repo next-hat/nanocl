@@ -35,7 +35,7 @@ impl RepositoryReadBy for NamespaceDb {
     Self::Output,
   > {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = namespaces::table.into_boxed();
     if let Some(name) = r#where.get("name") {
       gen_where4string!(query, namespaces::name, name);
@@ -52,7 +52,7 @@ impl RepositoryCountBy for NamespaceDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
     let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = namespaces::table.into_boxed();
     if let Some(name) = r#where.get("name") {
       gen_where4string!(query, namespaces::name, name);

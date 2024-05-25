@@ -38,7 +38,7 @@ impl RepositoryReadBy for SecretDb {
     Self::Output,
   > {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4string!(query, secrets::key, key);
@@ -59,7 +59,7 @@ impl RepositoryCountBy for SecretDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
       gen_where4string!(query, secrets::key, key);

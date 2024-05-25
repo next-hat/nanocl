@@ -38,7 +38,7 @@ impl RepositoryReadBy for VmImageDb {
     Self::Output,
   > {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vm_images::name, value);
@@ -68,7 +68,7 @@ impl RepositoryCountBy for VmImageDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.r#where;
+    let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vm_images::name, value);
