@@ -2075,7 +2075,6 @@ dependencies = [
  "notify",
  "ntex",
  "ntex-cors",
- "once_cell",
  "openssl",
  "rand",
  "serde",

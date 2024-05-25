@@ -58,6 +58,11 @@ pub use object_process_status::*;
 pub type Pool = R2D2Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 
+pub enum ColumnType {
+  Text,
+  Json,
+}
+
 /// Generate a where clause for a json column
 #[macro_export]
 macro_rules! gen_and4json {
@@ -227,9 +232,95 @@ macro_rules! gen_where4uuid {
 macro_rules! gen_multiple {
   ($query: expr, $column: expr, $filter: expr) => {
     let limit = $filter.limit.unwrap_or(100);
-    $query = $query.limit(limit as i64);
-    if let Some(offset) = $filter.offset {
-      $query = $query.offset(offset as i64);
-    }
+    let offset = $filter.offset.unwrap_or(0);
+    $query = $query.limit(limit as i64).offset(offset as i64);
   };
+}
+
+#[macro_export]
+macro_rules! gen_query {
+  ($table:expr, $query:expr, $filter:expr, $columns:expr) => {{
+    let r#where = $filter.r#where.to_owned().unwrap_or_default();
+    let conditions = r#where.conditions;
+    for (key, value) in conditions {
+      if let Some(s_column) = $columns.get(key.as_str()) {
+        match s_column.0 {
+          ColumnType::Json => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+            gen_where4json!($query, column, value);
+          }
+          ColumnType::Text => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            gen_where4string!($query, column, value);
+          }
+        }
+      }
+    }
+    let or = r#where.or.unwrap_or_default();
+    for or in or {
+      let mut or_condition: Box<dyn BoxableExpression<_, _, SqlType = Bool>> =
+        Box::new(diesel::dsl::sql::<diesel::sql_types::Bool>("1=1"));
+      for (key, value) in or {
+        if let Some(s_column) = $columns.get(key.as_str()) {
+          match s_column.0 {
+            ColumnType::Json => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+              or_condition = gen_and4json!(or_condition, column, value);
+            }
+            ColumnType::Text => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+              or_condition = gen_and4string!(or_condition, column, value);
+            }
+          }
+        }
+      }
+      $query = $query.or_filter(or_condition);
+    }
+    $query
+  }};
+}
+
+#[macro_export]
+macro_rules! apply_order_by {
+  ($query:expr, $orders:expr, $columns:expr) => {{
+    for order in $orders {
+      let words: Vec<_> = order.split_whitespace().collect();
+      let column = words.first().unwrap_or(&"");
+      let order = words.get(1).unwrap_or(&"");
+      let order = GenericOrder::from_str(order).unwrap();
+      if let Some(s_column) = $columns.get(column) {
+        match s_column.0 {
+          ColumnType::Json => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Json>(s_column.1);
+            match order {
+              GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+          ColumnType::Text => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            match order {
+              GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+        }
+      }
+    }
+    $query
+  }};
 }
