@@ -45,7 +45,7 @@ impl RepositoryReadBy for VmDb {
     diesel::PgConnection,
     Self::Output,
   > {
-        let condition = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
     let r#where = condition.conditions;
     let mut query = vms::table
       .inner_join(crate::schema::specs::table)
@@ -92,7 +92,7 @@ impl RepositoryCountBy for VmDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-        let condition = filter.r#where.to_owned().unwrap_or_default();
+    let condition = filter.r#where.to_owned().unwrap_or_default();
     let r#where = condition.conditions;
     let mut query = vms::table
       .inner_join(crate::schema::specs::table)
