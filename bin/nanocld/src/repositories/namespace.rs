@@ -19,7 +19,10 @@ impl RepositoryBase for NamespaceDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
     HashMap::from([
       ("name", (ColumnType::Text, "namespaces.name")),
-      // ("created_at", (crate::models::ColumnType::Timestamp, "namespaces.created_at")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "namespaces.created_at"),
+      ),
     ])
   }
 }
@@ -48,6 +51,8 @@ impl RepositoryReadBy for NamespaceDb {
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(namespaces::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, namespaces::created_at, filter);
