@@ -44,7 +44,7 @@ impl RepositoryReadBy for NodeDb {
     Self::Output,
   > {
     let mut query = nodes::table.into_boxed();
-    let columns = NodeDb::get_columns();
+    let columns = Self::get_columns();
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
@@ -63,7 +63,7 @@ impl RepositoryCountBy for NodeDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
     let mut query = nodes::table.into_boxed();
-    let columns = NodeDb::get_columns();
+    let columns = Self::get_columns();
     gen_sql_query!(query, filter, columns).count()
   }
 }
