@@ -62,6 +62,7 @@ pub enum ColumnType {
   Text,
   Json,
   Uuid,
+  Timestamptz,
 }
 
 /// Generate a where clause for a json column
@@ -282,6 +283,7 @@ macro_rules! gen_sql_query {
               diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
             $crate::gen_sql_where4string!($query, column, value);
           }
+          _ => {}
         }
       }
     }
@@ -313,6 +315,7 @@ macro_rules! gen_sql_query {
               or_condition =
                 $crate::gen_sql_and4json!(or_condition, column, value);
             }
+            _ => {}
           }
         }
       }
@@ -360,6 +363,18 @@ macro_rules! gen_sql_order_by {
           ColumnType::Text => {
             let column =
               diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+          ColumnType::Timestamptz => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Timestamptz>(s_column.1);
             match order {
               nanocl_stubs::generic::GenericOrder::Asc => {
                 $query = $query.order(column.asc());

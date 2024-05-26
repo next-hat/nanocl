@@ -21,10 +21,18 @@ impl RepositoryBase for EventDb {
         "reporting_node",
         (ColumnType::Text, "events.reporting_node"),
       ),
+      (
+        "reporting_controller",
+        (ColumnType::Text, "events.reporting_controller"),
+      ),
       ("kind", (ColumnType::Text, "events.kind")),
+      ("note", (ColumnType::Text, "events.note")),
       ("action", (ColumnType::Text, "events.action")),
       ("reason", (ColumnType::Text, "events.reason")),
-      // ("created_at", (ColumnType::Timestamp, "events.created_at")),
+      ("actor", (ColumnType::Json, "events.actor")),
+      ("related", (ColumnType::Json, "events.related")),
+      ("metadata", (ColumnType::Json, "events.metadata")),
+      ("created_at", (ColumnType::Timestamptz, "events.created_at")),
     ])
   }
 }
@@ -54,6 +62,8 @@ impl RepositoryReadBy for EventDb {
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(events::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, events::created_at, filter);

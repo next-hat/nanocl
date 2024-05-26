@@ -160,7 +160,7 @@ mod tests {
     // Try to stop a cargo
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
     // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-yf", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-y", CARGO_NAME);
   }
 
   /// Test state file when then include other state files

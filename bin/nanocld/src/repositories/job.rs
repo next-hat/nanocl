@@ -31,6 +31,8 @@ impl RepositoryBase for JobDb {
       ("key", (ColumnType::Text, "jobs.key")),
       ("data", (ColumnType::Json, "jobs.data")),
       ("metadata", (ColumnType::Json, "jobs.metadata")),
+      ("created_at", (ColumnType::Timestamptz, "jobs.created_at")),
+      ("updated_at", (ColumnType::Timestamptz, "jobs.updated_at")),
       (
         "status.wanted",
         (ColumnType::Text, "object_process_statuses.wanted"),
@@ -73,6 +75,8 @@ impl RepositoryReadBy for JobDb {
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(jobs::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, jobs::created_at, filter);

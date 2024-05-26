@@ -35,6 +35,11 @@ impl RepositoryBase for CargoDb {
         "namespace_name",
         (ColumnType::Text, "cargoes.namespace_name"),
       ),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "cargoes.created_at"),
+      ),
+      ("updated_at", (ColumnType::Timestamptz, "specs.created_at")),
       ("data", (ColumnType::Json, "specs.data")),
       ("metadata", (ColumnType::Json, "specs.metadata")),
       (
@@ -83,6 +88,8 @@ impl RepositoryReadBy for CargoDb {
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(cargoes::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, cargoes::created_at, filter);
