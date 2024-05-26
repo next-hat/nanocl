@@ -80,7 +80,7 @@ impl RepositoryReadBy for CargoDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
-    query = gen_sql_query!(cargoes::table, query, filter, columns);
+    query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
     }
@@ -101,7 +101,7 @@ impl RepositoryCountBy for CargoDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
-    gen_sql_query!(cargoes::table, query, filter, columns).count()
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

@@ -51,9 +51,10 @@ impl RepositoryReadBy for EventDb {
   {
     let mut query = events::table.into_boxed();
     let columns = Self::get_columns();
-    let orders = filter.order_by.to_owned().unwrap_or_default();
-    query = gen_sql_query!(events, query, filter, columns);
-    query = gen_sql_order_by!(query, orders, columns);
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    }
     if is_multiple {
       gen_sql_multiple!(query, events::created_at, filter);
     }
@@ -68,7 +69,7 @@ impl RepositoryCountBy for EventDb {
   {
     let mut query = events::table.into_boxed();
     let columns = Self::get_columns();
-    gen_sql_query!(events, query, filter, columns).count()
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

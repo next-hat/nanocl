@@ -261,7 +261,7 @@ macro_rules! gen_sql_multiple {
 
 #[macro_export]
 macro_rules! gen_sql_query {
-  ($table:expr, $query:expr, $filter:expr, $columns:expr) => {{
+  ($query:expr, $filter:expr, $columns:expr) => {{
     let r#where = $filter.r#where.to_owned().unwrap_or_default();
     let conditions = r#where.conditions;
     for (key, value) in conditions {
