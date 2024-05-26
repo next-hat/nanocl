@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use futures_util::StreamExt;
@@ -24,9 +26,8 @@ use super::generic::*;
 
 impl RepositoryBase for JobDb {
   fn get_columns<'a>(
-  ) -> std::collections::HashMap<&'a str, (crate::models::ColumnType, &'a str)>
-  {
-    std::collections::HashMap::from([
+  ) -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
       ("key", (ColumnType::Text, "jobs.key")),
       ("data", (ColumnType::Json, "jobs.data")),
       ("metadata", (ColumnType::Json, "jobs.metadata")),

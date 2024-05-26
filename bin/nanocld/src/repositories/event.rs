@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
@@ -12,10 +14,8 @@ use crate::{
 use super::generic::*;
 
 impl RepositoryBase for EventDb {
-  fn get_columns<'a>(
-  ) -> std::collections::HashMap<&'a str, (crate::models::ColumnType, &'a str)>
-  {
-    std::collections::HashMap::from([
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
       ("key", (ColumnType::Uuid, "events.key")),
       (
         "reporting_node",
