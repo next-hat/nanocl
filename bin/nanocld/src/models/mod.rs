@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::PgConnection;
 use diesel::r2d2::{Pool as R2D2Pool, PooledConnection, ConnectionManager};
 
@@ -57,12 +55,91 @@ pub use task_manager::*;
 mod object_process_status;
 pub use object_process_status::*;
 
-pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
+pub type Pool = R2D2Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
+
+pub enum ColumnType {
+  Text,
+  Json,
+  Uuid,
+  Timestamptz,
+}
+
+/// Generate a where clause for a json column
+#[macro_export]
+macro_rules! gen_sql_and4json {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      nanocl_stubs::generic::GenericClause::Contains(val) => {
+        Box::new($query.and($column.contains(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::HasKey(val) => {
+        Box::new($query.and($column.has_key(val.clone())))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
+
+// /// Generate clause for a string column
+#[macro_export]
+macro_rules! gen_sql_and4string {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        Box::new($query.and($column.eq(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ne(val) => {
+        Box::new($query.and($column.ne(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Gt(val) => {
+        Box::new($query.and($column.gt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Lt(val) => {
+        Box::new($query.and($column.lt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ge(val) => {
+        Box::new($query.and($column.ge(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Le(val) => {
+        Box::new($query.and($column.le(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Like(val) => {
+        Box::new($query.and($column.like(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::NotLike(val) => {
+        Box::new($query.and($column.not_like(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::In(items) => {
+        Box::new($query.and($column.eq_any(items.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::NotIn(items) => {
+        Box::new($query.and($column.ne_all(items.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
 
 /// Generate a where clause for a string column
 #[macro_export]
-macro_rules! gen_where4string {
+macro_rules! gen_sql_where4string {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::Eq(val) => {
@@ -110,7 +187,7 @@ macro_rules! gen_where4string {
 
 /// Generate a where clause for a json column
 #[macro_export]
-macro_rules! gen_where4json {
+macro_rules! gen_sql_where4json {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::IsNull => {
@@ -133,7 +210,28 @@ macro_rules! gen_where4json {
 }
 
 #[macro_export]
-macro_rules! gen_where4uuid {
+macro_rules! gen_sql_and4uuid {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        let uuid = uuid::Uuid::parse_str(&val).unwrap_or_default();
+        Box::new($query.and($column.eq(uuid)))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! gen_sql_where4uuid {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::IsNull => {
@@ -154,13 +252,141 @@ macro_rules! gen_where4uuid {
 }
 
 #[macro_export]
-macro_rules! gen_multiple {
+macro_rules! gen_sql_multiple {
   ($query: expr, $column: expr, $filter: expr) => {
-    $query = $query.order($column.desc());
     let limit = $filter.limit.unwrap_or(100);
-    $query = $query.limit(limit as i64);
-    if let Some(offset) = $filter.offset {
-      $query = $query.offset(offset as i64);
-    }
+    let offset = $filter.offset.unwrap_or(0);
+    $query = $query.limit(limit as i64).offset(offset as i64);
   };
+}
+
+#[macro_export]
+macro_rules! gen_sql_query {
+  ($query:expr, $filter:expr, $columns:expr) => {{
+    let r#where = $filter.r#where.to_owned().unwrap_or_default();
+    let conditions = r#where.conditions;
+    for (key, value) in conditions {
+      if let Some(s_column) = $columns.get(key.as_str()) {
+        match s_column.0 {
+          ColumnType::Uuid => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+            $crate::gen_sql_where4uuid!($query, column, value);
+          }
+          ColumnType::Json => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+            $crate::gen_sql_where4json!($query, column, value);
+          }
+          ColumnType::Text => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            $crate::gen_sql_where4string!($query, column, value);
+          }
+          _ => {}
+        }
+      }
+    }
+    let or = r#where.or.unwrap_or_default();
+    for or in or {
+      // dummy condition to start with and then add the generated conditions
+      // It's kinda hacky but i didn't find a better way to do it
+      let mut or_condition: Box<
+        dyn BoxableExpression<_, _, SqlType = diesel::sql_types::Bool>,
+      > = Box::new(diesel::dsl::sql::<diesel::sql_types::Bool>("1=1"));
+      for (key, value) in or {
+        if let Some(s_column) = $columns.get(key.as_str()) {
+          match s_column.0 {
+            ColumnType::Uuid => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4uuid!(or_condition, column, value);
+            }
+            ColumnType::Text => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4string!(or_condition, column, value);
+            }
+            ColumnType::Json => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4json!(or_condition, column, value);
+            }
+            _ => {}
+          }
+        }
+      }
+      $query = $query.or_filter(or_condition);
+    }
+    $query
+  }};
+}
+
+#[macro_export]
+macro_rules! gen_sql_order_by {
+  ($query:expr, $orders:expr, $columns:expr) => {{
+    for order in $orders {
+      let words: Vec<_> = order.split_whitespace().collect();
+      let column = words.first().unwrap_or(&"");
+      let order = words.get(1).unwrap_or(&"");
+      use std::str::FromStr;
+      let order = nanocl_stubs::generic::GenericOrder::from_str(order).unwrap();
+      if let Some(s_column) = $columns.get(column) {
+        match s_column.0 {
+          ColumnType::Uuid => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+          ColumnType::Json => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Json>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+          ColumnType::Text => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+          ColumnType::Timestamptz => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Timestamptz>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
+        }
+      }
+    }
+    $query
+  }};
 }

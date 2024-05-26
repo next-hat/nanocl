@@ -1,17 +1,48 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
 use nanocl_stubs::{generic::GenericFilter, system::ObjPsStatusKind};
 
 use crate::{
-  gen_multiple, gen_where4string,
-  models::{ObjPsStatusDb, ObjPsStatusUpdate, Pool},
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, ObjPsStatusDb, ObjPsStatusUpdate, Pool},
   schema::object_process_statuses,
 };
 
 use super::generic::*;
 
-impl RepositoryBase for ObjPsStatusDb {}
+impl RepositoryBase for ObjPsStatusDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "object_process_statuses.key")),
+      (
+        "wanted",
+        (ColumnType::Text, "object_process_statuses.wanted"),
+      ),
+      (
+        "prev_wanted",
+        (ColumnType::Text, "object_process_statuses.prev_wanted"),
+      ),
+      (
+        "actual",
+        (ColumnType::Text, "object_process_statuses.actual"),
+      ),
+      (
+        "prev_actual",
+        (ColumnType::Text, "object_process_statuses.prev_actual"),
+      ),
+      (
+        "created_at",
+        (
+          ColumnType::Timestamptz,
+          "object_process_statuses.created_at",
+        ),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for ObjPsStatusDb {}
 
@@ -36,25 +67,16 @@ impl RepositoryReadBy for ObjPsStatusDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = object_process_statuses::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, object_process_statuses::key, value);
-    }
-    if let Some(value) = r#where.get("wanted") {
-      gen_where4string!(query, object_process_statuses::wanted, value);
-    }
-    if let Some(value) = r#where.get("prev_wanted") {
-      gen_where4string!(query, object_process_statuses::prev_wanted, value);
-    }
-    if let Some(value) = r#where.get("actual") {
-      gen_where4string!(query, object_process_statuses::actual, value);
-    }
-    if let Some(value) = r#where.get("prev_actual") {
-      gen_where4string!(query, object_process_statuses::prev_actual, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(object_process_statuses::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, object_process_statuses::created_at, filter);
+      gen_sql_multiple!(query, object_process_statuses::created_at, filter);
     }
     query
   }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericFilter;
@@ -5,14 +7,31 @@ use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::secret::Secret;
 
 use crate::{
-  gen_multiple, gen_where4string,
-  models::{SecretDb, SecretUpdateDb},
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, SecretDb, SecretUpdateDb},
   schema::secrets,
 };
 
 use super::generic::*;
 
-impl RepositoryBase for SecretDb {}
+impl RepositoryBase for SecretDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "secrets.key")),
+      ("kind", (ColumnType::Text, "secrets.kind")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "secrets.created_at"),
+      ),
+      (
+        "updated_at",
+        (ColumnType::Timestamptz, "secrets.updated_at"),
+      ),
+      ("data", (ColumnType::Json, "secrets.data")),
+      ("metadata", (ColumnType::Json, "secrets.metadata")),
+    ])
+  }
+}
 
 impl RepositoryCreate for SecretDb {}
 
@@ -37,16 +56,16 @@ impl RepositoryReadBy for SecretDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = secrets::table.into_boxed();
-    if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, secrets::key, key);
-    }
-    if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, secrets::kind, kind);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(secrets::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, secrets::created_at, filter);
+      gen_sql_multiple!(query, secrets::created_at, filter);
     }
     query
   }
@@ -57,15 +76,9 @@ impl RepositoryCountBy for SecretDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = secrets::table.into_boxed();
-    if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, secrets::key, key);
-    }
-    if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, secrets::kind, kind);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

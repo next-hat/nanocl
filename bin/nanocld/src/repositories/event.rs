@@ -1,15 +1,41 @@
-use crate::{
-  gen_multiple, gen_where4uuid, gen_where4string, models::EventDb,
-  schema::events,
-};
+use std::collections::HashMap;
 
 use diesel::prelude::*;
+
 use nanocl_error::io::IoResult;
 use nanocl_stubs::system::Event;
 
+use crate::{
+  gen_sql_order_by, gen_sql_multiple, gen_sql_query,
+  schema::events,
+  models::{ColumnType, EventDb},
+};
+
 use super::generic::*;
 
-impl RepositoryBase for EventDb {}
+impl RepositoryBase for EventDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Uuid, "events.key")),
+      (
+        "reporting_node",
+        (ColumnType::Text, "events.reporting_node"),
+      ),
+      (
+        "reporting_controller",
+        (ColumnType::Text, "events.reporting_controller"),
+      ),
+      ("kind", (ColumnType::Text, "events.kind")),
+      ("note", (ColumnType::Text, "events.note")),
+      ("action", (ColumnType::Text, "events.action")),
+      ("reason", (ColumnType::Text, "events.reason")),
+      ("actor", (ColumnType::Json, "events.actor")),
+      ("related", (ColumnType::Json, "events.related")),
+      ("metadata", (ColumnType::Json, "events.metadata")),
+      ("created_at", (ColumnType::Timestamptz, "events.created_at")),
+    ])
+  }
+}
 
 impl RepositoryCreate for EventDb {}
 
@@ -31,25 +57,16 @@ impl RepositoryReadBy for EventDb {
   where
     Self::Output: Sized,
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = events::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4uuid!(query, events::key, value);
-    }
-    if let Some(value) = r#where.get("reporting_node") {
-      gen_where4string!(query, events::reporting_node, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, events::kind, value);
-    }
-    if let Some(value) = r#where.get("action") {
-      gen_where4string!(query, events::kind, value);
-    }
-    if let Some(value) = r#where.get("reason") {
-      gen_where4string!(query, events::kind, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(events::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, events::created_at, filter);
+      gen_sql_multiple!(query, events::created_at, filter);
     }
     query
   }
@@ -60,24 +77,9 @@ impl RepositoryCountBy for EventDb {
     filter: &nanocl_stubs::generic::GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = events::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4uuid!(query, events::key, value);
-    }
-    if let Some(value) = r#where.get("reporting_node") {
-      gen_where4string!(query, events::reporting_node, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, events::kind, value);
-    }
-    if let Some(value) = r#where.get("action") {
-      gen_where4string!(query, events::kind, value);
-    }
-    if let Some(value) = r#where.get("reason") {
-      gen_where4string!(query, events::kind, value);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

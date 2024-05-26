@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::{prelude::*, associations::HasTable};
 
 use nanocl_error::io::{IoError, IoResult};
@@ -21,7 +19,7 @@ pub trait RepositoryCreate: super::RepositoryBase {
       <Self as diesel::Insertable<Self::Table>>::Values,
     >: diesel::query_dsl::LoadQuery<'static, diesel::pg::PgConnection, Self>,
   {
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let item = Self::from(item);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;

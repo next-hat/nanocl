@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::{
@@ -11,14 +13,25 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   schema::resource_kinds,
-  models::{Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
+  models::{ColumnType, Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
 };
 
 use super::generic::*;
 
-impl RepositoryBase for ResourceKindDb {}
+impl RepositoryBase for ResourceKindDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("name", (ColumnType::Text, "resource_kinds.name")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "resource_kinds.created_at"),
+      ),
+      ("spec_key", (ColumnType::Text, "resource_kinds.spec_key")),
+    ])
+  }
+}
 
 impl RepositoryCreate for ResourceKindDb {}
 
@@ -43,15 +56,18 @@ impl RepositoryReadBy for ResourceKindDb {
     diesel::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::name, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(resource_kinds::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, resource_kinds::created_at, filter);
+      gen_sql_multiple!(query, resource_kinds::created_at, filter);
     }
     query
   }
@@ -61,12 +77,9 @@ impl RepositoryCountBy for ResourceKindDb {
   fn gen_count_query(
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::table.into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::name, value);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 
@@ -84,7 +97,7 @@ impl ResourceKindDb {
     pool: &Pool,
   ) -> HttpResult<ResourceKindInspect> {
     let item = ResourceKindDb::transform_read_by_pk(pk, pool).await?;
-    let filter = GenericFilter::new()
+    let filter: GenericFilter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(item.name.to_owned()));
     let versions = SpecDb::read_by(&filter, pool)
       .await?

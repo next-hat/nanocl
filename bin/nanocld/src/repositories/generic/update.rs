@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use diesel::{prelude::*, associations};
 
 use nanocl_error::io::IoResult;
@@ -33,7 +31,7 @@ pub trait RepositoryUpdate: super::RepositoryBase {
       diesel::query_builder::AsQuery + diesel::query_dsl::LoadQuery<'static, diesel::pg::PgConnection, Self>,
   {
     log::trace!("{}::update_by_pk: {pk}", Self::get_name());
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let pk = pk.to_owned();
     let values = values.into();
     ntex::rt::spawn_blocking(move || {

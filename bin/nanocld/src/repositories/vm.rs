@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::{io::IoResult, http::HttpResult};
@@ -10,17 +12,37 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
-  models::{
-    NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb, VmUpdateDb,
-  },
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
   schema::vms,
-  utils,
+  models::{
+    ColumnType, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb,
+    VmUpdateDb,
+  },
 };
 
 use super::generic::*;
 
-impl RepositoryBase for VmDb {}
+impl RepositoryBase for VmDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "vms.key")),
+      ("created_at", (ColumnType::Timestamptz, "vms.created_at")),
+      ("name", (ColumnType::Text, "vms.name")),
+      ("namespace_name", (ColumnType::Text, "vms.namespace_name")),
+      ("spec_key", (ColumnType::Text, "vms.spec_key")),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
+      (
+        "status.wanted",
+        (ColumnType::Text, "object_process_statuses.wanted"),
+      ),
+      (
+        "status.actual",
+        (ColumnType::Text, "object_process_statuses.actual"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for VmDb {}
 
@@ -45,42 +67,19 @@ impl RepositoryReadBy for VmDb {
     diesel::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, vms::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vms::name, value);
-    }
-    if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, vms::namespace_name, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(vms::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, vms::created_at, filter);
+      gen_sql_multiple!(query, vms::created_at, filter);
     }
     query
   }
@@ -91,41 +90,12 @@ impl RepositoryCountBy for VmDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, vms::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vms::name, value);
-    }
-    if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, vms::namespace_name, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

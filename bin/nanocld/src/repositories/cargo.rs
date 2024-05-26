@@ -1,34 +1,58 @@
-use std::sync::Arc;
+use std::collections::HashMap;
 
 use diesel::prelude::*;
-
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::{
   http::HttpResult,
   io::{IoError, IoResult},
 };
 
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpec, CargoSpecPartial},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   system::ObjPsStatus,
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
-  models::{
-    CargoDb, CargoUpdateDb, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb,
-    SpecDb, SystemState,
-  },
-  objects::generic::*,
+  gen_sql_order_by, gen_sql_multiple, gen_sql_query, utils,
   schema::cargoes,
-  utils,
+  objects::generic::*,
+  models::{
+    CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb, Pool,
+    ProcessDb, SpecDb, SystemState,
+  },
 };
 
 use super::generic::*;
 
-impl RepositoryBase for CargoDb {}
+impl RepositoryBase for CargoDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "cargoes.key")),
+      ("name", (ColumnType::Text, "cargoes.name")),
+      (
+        "namespace_name",
+        (ColumnType::Text, "cargoes.namespace_name"),
+      ),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "cargoes.created_at"),
+      ),
+      ("updated_at", (ColumnType::Timestamptz, "specs.created_at")),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
+      (
+        "status.wanted",
+        (ColumnType::Text, "object_process_statuses.wanted"),
+      ),
+      (
+        "status.actual",
+        (ColumnType::Text, "object_process_statuses.actual"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for CargoDb {}
 
@@ -56,42 +80,19 @@ impl RepositoryReadBy for CargoDb {
   where
     Self::Output: Sized,
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, cargoes::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, cargoes::name, value);
-    }
-    if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, cargoes::namespace_name, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(cargoes::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, cargoes::created_at, filter);
+      gen_sql_multiple!(query, cargoes::created_at, filter);
     }
     query
   }
@@ -102,41 +103,12 @@ impl RepositoryCountBy for CargoDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, cargoes::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, cargoes::name, value);
-    }
-    if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, cargoes::namespace_name, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 
@@ -204,7 +176,7 @@ impl CargoDb {
   /// Count cargoes by namespace.
   pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
     let nsp = nsp.to_owned();
-    let pool = Arc::clone(pool);
+    let pool = pool.clone();
     let count = ntex::web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let count = cargoes::table

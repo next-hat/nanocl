@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
@@ -9,14 +11,26 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4uuid, gen_where4string,
-  models::{Pool, SpecDb},
   schema::specs,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, Pool, SpecDb},
 };
 
 use super::generic::*;
 
-impl RepositoryBase for SpecDb {}
+impl RepositoryBase for SpecDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Uuid, "specs.key")),
+      ("created_at", (ColumnType::Timestamptz, "specs.created_at")),
+      ("kind_name", (ColumnType::Text, "specs.kind_name")),
+      ("kind_key", (ColumnType::Text, "specs.kind_key")),
+      ("version", (ColumnType::Text, "specs.version")),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
+    ])
+  }
+}
 
 impl RepositoryCreate for SpecDb {}
 
@@ -31,15 +45,9 @@ impl RepositoryDelBy for SpecDb {
   where
     Self: diesel::associations::HasTable,
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = diesel::delete(specs::table).into_boxed();
-    if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, specs::kind_key, value);
-    }
-    if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, specs::version, value);
-    }
-    query
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns)
   }
 }
 
@@ -58,19 +66,16 @@ impl RepositoryReadBy for SpecDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = specs::table.into_boxed();
-    if let Some(key) = r#where.get("key") {
-      gen_where4uuid!(query, specs::key, key);
-    }
-    if let Some(kind_key) = r#where.get("kind_key") {
-      gen_where4string!(query, specs::kind_key, kind_key);
-    }
-    if let Some(version) = r#where.get("version") {
-      gen_where4string!(query, specs::version, version);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(specs::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, specs::created_at, filter);
+      gen_sql_multiple!(query, specs::created_at, filter);
     }
     query
   }

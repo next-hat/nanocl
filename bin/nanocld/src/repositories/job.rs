@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use futures_util::StreamExt;
@@ -13,15 +15,35 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
   schema::jobs,
-  gen_multiple, gen_where4json, gen_where4string,
-  models::{JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState},
+  models::{
+    ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState,
+  },
 };
 
 use super::generic::*;
 
-impl RepositoryBase for JobDb {}
+impl RepositoryBase for JobDb {
+  fn get_columns<'a>(
+  ) -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "jobs.key")),
+      ("data", (ColumnType::Json, "jobs.data")),
+      ("metadata", (ColumnType::Json, "jobs.metadata")),
+      ("created_at", (ColumnType::Timestamptz, "jobs.created_at")),
+      ("updated_at", (ColumnType::Timestamptz, "jobs.updated_at")),
+      (
+        "status.wanted",
+        (ColumnType::Text, "object_process_statuses.wanted"),
+      ),
+      (
+        "status.actual",
+        (ColumnType::Text, "object_process_statuses.actual"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for JobDb {}
 
@@ -46,35 +68,18 @@ impl RepositoryReadBy for JobDb {
     diesel::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = jobs::table
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, jobs::key, key);
-    }
-    if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, jobs::data, data);
-    }
-    if let Some(metadata) = r#where.get("metadata") {
-      gen_where4json!(query, jobs::metadata, metadata);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(jobs::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, jobs::created_at, filter);
+      gen_sql_multiple!(query, jobs::created_at, filter);
     }
     query
   }
@@ -85,34 +90,11 @@ impl RepositoryCountBy for JobDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = jobs::table
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
-    if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, jobs::key, key);
-    }
-    if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, jobs::data, data);
-    }
-    if let Some(metadata) = r#where.get("metadata") {
-      gen_where4json!(query, jobs::metadata, metadata);
-    }
-    if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::wanted,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
-        query,
-        crate::schema::object_process_statuses::actual,
-        value
-      );
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 
