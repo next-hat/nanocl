@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
@@ -5,14 +7,28 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::{
-  gen_sql_multiple, gen_sql_where4string,
-  models::{Pool, VmImageDb, VmImageUpdateDb},
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   schema::vm_images,
+  models::{ColumnType, Pool, VmImageDb, VmImageUpdateDb},
 };
 
 use super::generic::*;
 
-impl RepositoryBase for VmImageDb {}
+impl RepositoryBase for VmImageDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("name", (ColumnType::Text, "vm_images.name")),
+      ("kind", (ColumnType::Text, "vm_images.kind")),
+      ("parent", (ColumnType::Text, "vm_images.parent")),
+      ("format", (ColumnType::Text, "vm_images.format")),
+      ("path", (ColumnType::Text, "vm_images.path")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "vm_images.created_at"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for VmImageDb {}
 
@@ -37,23 +53,13 @@ impl RepositoryReadBy for VmImageDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_sql_where4string!(query, vm_images::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_sql_where4string!(query, vm_images::kind, value);
-    }
-    if let Some(value) = r#where.get("parent") {
-      gen_sql_where4string!(query, vm_images::parent, value);
-    }
-    if let Some(value) = r#where.get("format") {
-      gen_sql_where4string!(query, vm_images::format, value);
-    }
-    if let Some(value) = r#where.get("path") {
-      gen_sql_where4string!(query, vm_images::path, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(vm_images::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, vm_images::created_at, filter);
@@ -67,25 +73,9 @@ impl RepositoryCountBy for VmImageDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let condition = filter.r#where.clone().unwrap_or_default();
-    let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_sql_where4string!(query, vm_images::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_sql_where4string!(query, vm_images::kind, value);
-    }
-    if let Some(value) = r#where.get("parent") {
-      gen_sql_where4string!(query, vm_images::parent, value);
-    }
-    if let Some(value) = r#where.get("format") {
-      gen_sql_where4string!(query, vm_images::format, value);
-    }
-    if let Some(value) = r#where.get("path") {
-      gen_sql_where4string!(query, vm_images::path, value);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 
