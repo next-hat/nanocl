@@ -3,24 +3,26 @@ use std::collections::HashMap;
 use nanocl_error::io::{FromIo, IoResult, IoError};
 
 use bollard_next::{
+  container::{InspectContainerOptions, ListContainersOptions},
+  secret::ContainerStateStatusEnum,
   service::ContainerInspectResponse,
-  container::{ListContainersOptions, InspectContainerOptions},
 };
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter},
+  system::ObjPsStatusKind,
+  process::ProcessPartial,
   namespace::NamespacePartial,
   cargo_spec::CargoSpecPartial,
-  process::ProcessPartial,
+  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
   vars, utils,
   repositories::generic::*,
-  models::{
-    SystemState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
-    CargoObjCreateIn,
-  },
   objects::generic::ObjCreate,
+  models::{
+    CargoDb, CargoObjCreateIn, NamespaceDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    ProcessDb, ProcessUpdateDb, SystemState, VmImageDb,
+  },
 };
 
 /// Will determine if the instance is registered by nanocl
@@ -184,7 +186,30 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
             spec: new_cargo.clone(),
             version: format!("v{}", vars::VERSION),
           };
-          CargoDb::create_obj(obj, state).await?;
+          let synced_cargo = CargoDb::create_obj(obj, state).await?;
+          if let Some(status) = container.state.unwrap_or_default().status {
+            let new_status = match status {
+              ContainerStateStatusEnum::RUNNING => Some(ObjPsStatusKind::Start),
+              ContainerStateStatusEnum::RESTARTING => {
+                Some(ObjPsStatusKind::Fail)
+              }
+              ContainerStateStatusEnum::DEAD => Some(ObjPsStatusKind::Stop),
+              ContainerStateStatusEnum::EXITED => Some(ObjPsStatusKind::Stop),
+              _ => None,
+            };
+            if let Some(new_status) = new_status {
+              ObjPsStatusDb::update_pk(
+                &synced_cargo.spec.cargo_key,
+                ObjPsStatusUpdate {
+                  wanted: Some(ObjPsStatusKind::Start.to_string()),
+                  actual: Some(new_status.to_string()),
+                  ..Default::default()
+                },
+                &state.inner.pool,
+              )
+              .await?;
+            }
+          }
         }
         // If the cargo is already in our store and the config is different we update it
         Ok(cargo) => {
