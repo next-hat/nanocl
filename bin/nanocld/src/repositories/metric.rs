@@ -2,8 +2,8 @@ use diesel::prelude::*;
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4uuid, gen_where4string,
-  models::MetricDb, schema::metrics,
+  gen_sql_multiple, gen_sql_where4json, gen_sql_where4uuid,
+  gen_sql_where4string, models::MetricDb, schema::metrics,
 };
 
 use super::generic::*;
@@ -31,19 +31,19 @@ impl RepositoryReadBy for MetricDb {
     let r#where = condition.conditions;
     let mut query = metrics::table.into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4uuid!(query, metrics::key, key);
+      gen_sql_where4uuid!(query, metrics::key, key);
     }
     if let Some(node_name) = r#where.get("node_name") {
-      gen_where4string!(query, metrics::node_name, node_name);
+      gen_sql_where4string!(query, metrics::node_name, node_name);
     }
     if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, metrics::kind, kind);
+      gen_sql_where4string!(query, metrics::kind, kind);
     }
     if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, metrics::data, data);
+      gen_sql_where4json!(query, metrics::data, data);
     }
     if is_multiple {
-      gen_multiple!(query, metrics::dsl::created_at, filter);
+      gen_sql_multiple!(query, metrics::dsl::created_at, filter);
     }
     query
   }
@@ -57,16 +57,16 @@ impl RepositoryCountBy for MetricDb {
     let r#where = condition.conditions;
     let mut query = metrics::table.into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4uuid!(query, metrics::key, key);
+      gen_sql_where4uuid!(query, metrics::key, key);
     }
     if let Some(node_name) = r#where.get("node_name") {
-      gen_where4string!(query, metrics::node_name, node_name);
+      gen_sql_where4string!(query, metrics::node_name, node_name);
     }
     if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, metrics::kind, kind);
+      gen_sql_where4string!(query, metrics::kind, kind);
     }
     if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, metrics::data, data);
+      gen_sql_where4json!(query, metrics::data, data);
     }
     query.count()
   }

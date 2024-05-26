@@ -10,7 +10,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
+  gen_sql_multiple, gen_sql_where4json, gen_sql_where4string,
   models::{
     NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb, VmUpdateDb,
   },
@@ -52,36 +52,36 @@ impl RepositoryReadBy for VmDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, vms::key, value);
+      gen_sql_where4string!(query, vms::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vms::name, value);
+      gen_sql_where4string!(query, vms::name, value);
     }
     if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, vms::namespace_name, value);
+      gen_sql_where4string!(query, vms::namespace_name, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
+      gen_sql_where4json!(query, crate::schema::specs::data, value);
     }
     if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
+      gen_sql_where4json!(query, crate::schema::specs::metadata, value);
     }
     if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::wanted,
         value
       );
     }
     if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::actual,
         value
       );
     }
     if is_multiple {
-      gen_multiple!(query, vms::created_at, filter);
+      gen_sql_multiple!(query, vms::created_at, filter);
     }
     query
   }
@@ -99,29 +99,29 @@ impl RepositoryCountBy for VmDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, vms::key, value);
+      gen_sql_where4string!(query, vms::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vms::name, value);
+      gen_sql_where4string!(query, vms::name, value);
     }
     if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, vms::namespace_name, value);
+      gen_sql_where4string!(query, vms::namespace_name, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, crate::schema::specs::data, value);
+      gen_sql_where4json!(query, crate::schema::specs::data, value);
     }
     if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, crate::schema::specs::metadata, value);
+      gen_sql_where4json!(query, crate::schema::specs::metadata, value);
     }
     if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::wanted,
         value
       );
     }
     if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::actual,
         value

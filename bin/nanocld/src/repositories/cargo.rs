@@ -1,6 +1,6 @@
-use std::{str::FromStr, collections::HashMap};
+use std::collections::HashMap;
 
-use diesel::{prelude::*, sql_types::Bool};
+use diesel::prelude::*;
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::{
   http::HttpResult,
@@ -10,13 +10,12 @@ use nanocl_error::{
 use nanocl_stubs::{
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpec, CargoSpecPartial},
-  generic::{GenericClause, GenericFilter, GenericFilterNsp, GenericOrder},
+  generic::{GenericClause, GenericFilter, GenericFilterNsp},
   system::ObjPsStatus,
 };
 
 use crate::{
-  apply_order_by, gen_and4json, gen_and4string, gen_multiple, gen_query,
-  gen_where4json, gen_where4string, utils,
+  gen_sql_order_by, gen_sql_multiple, gen_sql_query, utils,
   schema::cargoes,
   objects::generic::*,
   models::{
@@ -81,12 +80,12 @@ impl RepositoryReadBy for CargoDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
-    query = gen_query!(cargoes::table, query, filter, columns);
+    query = gen_sql_query!(cargoes::table, query, filter, columns);
     if let Some(orders) = &filter.order_by {
-      query = apply_order_by!(query, orders, columns);
+      query = gen_sql_order_by!(query, orders, columns);
     }
     if is_multiple {
-      gen_multiple!(query, cargoes::created_at, filter);
+      gen_sql_multiple!(query, cargoes::created_at, filter);
     }
     query
   }
@@ -102,7 +101,7 @@ impl RepositoryCountBy for CargoDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
-    gen_query!(cargoes::table, query, filter, columns).count()
+    gen_sql_query!(cargoes::table, query, filter, columns).count()
   }
 }
 

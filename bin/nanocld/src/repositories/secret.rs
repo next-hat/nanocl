@@ -5,7 +5,7 @@ use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::secret::Secret;
 
 use crate::{
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_where4string,
   models::{SecretDb, SecretUpdateDb},
   schema::secrets,
 };
@@ -41,13 +41,13 @@ impl RepositoryReadBy for SecretDb {
     let r#where = condition.conditions;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, secrets::key, key);
+      gen_sql_where4string!(query, secrets::key, key);
     }
     if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, secrets::kind, kind);
+      gen_sql_where4string!(query, secrets::kind, kind);
     }
     if is_multiple {
-      gen_multiple!(query, secrets::created_at, filter);
+      gen_sql_multiple!(query, secrets::created_at, filter);
     }
     query
   }
@@ -62,10 +62,10 @@ impl RepositoryCountBy for SecretDb {
     let r#where = condition.conditions;
     let mut query = secrets::table.into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, secrets::key, key);
+      gen_sql_where4string!(query, secrets::key, key);
     }
     if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, secrets::kind, kind);
+      gen_sql_where4string!(query, secrets::kind, kind);
     }
     query.count()
   }

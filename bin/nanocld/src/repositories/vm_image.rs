@@ -5,7 +5,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::{
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_where4string,
   models::{Pool, VmImageDb, VmImageUpdateDb},
   schema::vm_images,
 };
@@ -41,22 +41,22 @@ impl RepositoryReadBy for VmImageDb {
     let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vm_images::name, value);
+      gen_sql_where4string!(query, vm_images::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, vm_images::kind, value);
+      gen_sql_where4string!(query, vm_images::kind, value);
     }
     if let Some(value) = r#where.get("parent") {
-      gen_where4string!(query, vm_images::parent, value);
+      gen_sql_where4string!(query, vm_images::parent, value);
     }
     if let Some(value) = r#where.get("format") {
-      gen_where4string!(query, vm_images::format, value);
+      gen_sql_where4string!(query, vm_images::format, value);
     }
     if let Some(value) = r#where.get("path") {
-      gen_where4string!(query, vm_images::path, value);
+      gen_sql_where4string!(query, vm_images::path, value);
     }
     if is_multiple {
-      gen_multiple!(query, vm_images::created_at, filter);
+      gen_sql_multiple!(query, vm_images::created_at, filter);
     }
     query
   }
@@ -71,19 +71,19 @@ impl RepositoryCountBy for VmImageDb {
     let r#where = condition.conditions;
     let mut query = vm_images::table.into_boxed();
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vm_images::name, value);
+      gen_sql_where4string!(query, vm_images::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, vm_images::kind, value);
+      gen_sql_where4string!(query, vm_images::kind, value);
     }
     if let Some(value) = r#where.get("parent") {
-      gen_where4string!(query, vm_images::parent, value);
+      gen_sql_where4string!(query, vm_images::parent, value);
     }
     if let Some(value) = r#where.get("format") {
-      gen_where4string!(query, vm_images::format, value);
+      gen_sql_where4string!(query, vm_images::format, value);
     }
     if let Some(value) = r#where.get("path") {
-      gen_where4string!(query, vm_images::path, value);
+      gen_sql_where4string!(query, vm_images::path, value);
     }
     query.count()
   }

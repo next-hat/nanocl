@@ -15,7 +15,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   schema::{specs, resources},
-  gen_multiple, gen_where4json, gen_where4string,
+  gen_sql_multiple, gen_sql_where4json, gen_sql_where4string,
   models::{Pool, ResourceDb, ResourceKindDb, ResourceUpdateDb, SpecDb},
 };
 
@@ -52,19 +52,19 @@ impl RepositoryReadBy for ResourceDb {
       .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::key, value);
+      gen_sql_where4string!(query, resources::key, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::kind, value);
+      gen_sql_where4string!(query, resources::kind, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::data, value);
+      gen_sql_where4json!(query, specs::data, value);
     }
     if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::metadata, value);
+      gen_sql_where4json!(query, specs::metadata, value);
     }
     if is_multiple {
-      gen_multiple!(query, resources::created_at, filter);
+      gen_sql_multiple!(query, resources::created_at, filter);
     }
     query
   }
@@ -81,16 +81,16 @@ impl RepositoryCountBy for ResourceDb {
       .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::key, value);
+      gen_sql_where4string!(query, resources::key, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::kind, value);
+      gen_sql_where4string!(query, resources::kind, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::data, value);
+      gen_sql_where4json!(query, specs::data, value);
     }
     if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::metadata, value);
+      gen_sql_where4json!(query, specs::metadata, value);
     }
     query.count()
   }

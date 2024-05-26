@@ -7,7 +7,7 @@ use nanocl_stubs::{generic::GenericFilter, namespace::NamespaceSummary};
 
 use crate::{
   schema::namespaces,
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_where4string,
   models::{CargoDb, NamespaceDb, ProcessDb, SystemState},
 };
 
@@ -38,10 +38,10 @@ impl RepositoryReadBy for NamespaceDb {
     let r#where = condition.conditions;
     let mut query = namespaces::table.into_boxed();
     if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, namespaces::name, name);
+      gen_sql_where4string!(query, namespaces::name, name);
     }
     if is_multiple {
-      gen_multiple!(query, namespaces::created_at, filter);
+      gen_sql_multiple!(query, namespaces::created_at, filter);
     }
     query
   }
@@ -55,7 +55,7 @@ impl RepositoryCountBy for NamespaceDb {
     let r#where = condition.conditions;
     let mut query = namespaces::table.into_boxed();
     if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, namespaces::name, name);
+      gen_sql_where4string!(query, namespaces::name, name);
     }
     query.count()
   }

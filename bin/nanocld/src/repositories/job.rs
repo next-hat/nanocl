@@ -15,7 +15,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   schema::jobs,
-  gen_multiple, gen_where4json, gen_where4string,
+  gen_sql_multiple, gen_sql_where4json, gen_sql_where4string,
   models::{JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState},
 };
 
@@ -52,30 +52,30 @@ impl RepositoryReadBy for JobDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, jobs::key, key);
+      gen_sql_where4string!(query, jobs::key, key);
     }
     if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, jobs::data, data);
+      gen_sql_where4json!(query, jobs::data, data);
     }
     if let Some(metadata) = r#where.get("metadata") {
-      gen_where4json!(query, jobs::metadata, metadata);
+      gen_sql_where4json!(query, jobs::metadata, metadata);
     }
     if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::wanted,
         value
       );
     }
     if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::actual,
         value
       );
     }
     if is_multiple {
-      gen_multiple!(query, jobs::created_at, filter);
+      gen_sql_multiple!(query, jobs::created_at, filter);
     }
     query
   }
@@ -92,23 +92,23 @@ impl RepositoryCountBy for JobDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(key) = r#where.get("key") {
-      gen_where4string!(query, jobs::key, key);
+      gen_sql_where4string!(query, jobs::key, key);
     }
     if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, jobs::data, data);
+      gen_sql_where4json!(query, jobs::data, data);
     }
     if let Some(metadata) = r#where.get("metadata") {
-      gen_where4json!(query, jobs::metadata, metadata);
+      gen_sql_where4json!(query, jobs::metadata, metadata);
     }
     if let Some(value) = r#where.get("status.wanted") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::wanted,
         value
       );
     }
     if let Some(value) = r#where.get("status.actual") {
-      gen_where4string!(
+      gen_sql_where4string!(
         query,
         crate::schema::object_process_statuses::actual,
         value

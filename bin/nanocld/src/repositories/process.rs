@@ -8,7 +8,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
+  gen_sql_multiple, gen_sql_where4json, gen_sql_where4string,
   schema::processes,
   models::{Pool, ProcessDb, ProcessUpdateDb},
 };
@@ -41,22 +41,22 @@ impl RepositoryDelBy for ProcessDb {
     let r#where = condition.conditions;
     let mut query = diesel::delete(processes::table).into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::key, value);
+      gen_sql_where4string!(query, processes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::name, value);
+      gen_sql_where4string!(query, processes::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::kind, value);
+      gen_sql_where4string!(query, processes::kind, value);
     }
     if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::node_key, value);
+      gen_sql_where4string!(query, processes::node_key, value);
     }
     if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::kind_key, value);
+      gen_sql_where4string!(query, processes::kind_key, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, processes::data, value);
+      gen_sql_where4json!(query, processes::data, value);
     }
     query
   }
@@ -81,25 +81,25 @@ impl RepositoryReadBy for ProcessDb {
     let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::key, value);
+      gen_sql_where4string!(query, processes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::name, value);
+      gen_sql_where4string!(query, processes::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::kind, value);
+      gen_sql_where4string!(query, processes::kind, value);
     }
     if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::node_key, value);
+      gen_sql_where4string!(query, processes::node_key, value);
     }
     if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::kind_key, value);
+      gen_sql_where4string!(query, processes::kind_key, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, processes::data, value);
+      gen_sql_where4json!(query, processes::data, value);
     }
     if is_multiple {
-      gen_multiple!(query, processes::created_at, filter);
+      gen_sql_multiple!(query, processes::created_at, filter);
     }
     query
   }
@@ -114,22 +114,22 @@ impl RepositoryCountBy for ProcessDb {
     let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::key, value);
+      gen_sql_where4string!(query, processes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::name, value);
+      gen_sql_where4string!(query, processes::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::kind, value);
+      gen_sql_where4string!(query, processes::kind, value);
     }
     if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::node_key, value);
+      gen_sql_where4string!(query, processes::node_key, value);
     }
     if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::kind_key, value);
+      gen_sql_where4string!(query, processes::kind_key, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, processes::data, value);
+      gen_sql_where4json!(query, processes::data, value);
     }
     query.count()
   }

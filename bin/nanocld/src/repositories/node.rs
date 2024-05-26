@@ -5,7 +5,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_where4string,
   models::{NodeDb, Pool, SystemState},
   schema::nodes,
 };
@@ -37,10 +37,10 @@ impl RepositoryReadBy for NodeDb {
     let r#where = condition.conditions;
     let mut query = nodes::table.into_boxed();
     if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, nodes::name, name);
+      gen_sql_where4string!(query, nodes::name, name);
     }
     if is_multiple {
-      gen_multiple!(query, nodes::created_at, filter);
+      gen_sql_multiple!(query, nodes::created_at, filter);
     }
     query
   }
@@ -54,7 +54,7 @@ impl RepositoryCountBy for NodeDb {
     let r#where = condition.conditions;
     let mut query = nodes::table.into_boxed();
     if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, nodes::name, name);
+      gen_sql_where4string!(query, nodes::name, name);
     }
     query.count()
   }

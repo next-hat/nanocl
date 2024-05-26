@@ -61,11 +61,12 @@ pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 pub enum ColumnType {
   Text,
   Json,
+  Uuid,
 }
 
 /// Generate a where clause for a json column
 #[macro_export]
-macro_rules! gen_and4json {
+macro_rules! gen_sql_and4json {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::IsNull => {
@@ -89,7 +90,7 @@ macro_rules! gen_and4json {
 
 // /// Generate clause for a string column
 #[macro_export]
-macro_rules! gen_and4string {
+macro_rules! gen_sql_and4string {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::Eq(val) => {
@@ -137,7 +138,7 @@ macro_rules! gen_and4string {
 
 /// Generate a where clause for a string column
 #[macro_export]
-macro_rules! gen_where4string {
+macro_rules! gen_sql_where4string {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::Eq(val) => {
@@ -185,7 +186,7 @@ macro_rules! gen_where4string {
 
 /// Generate a where clause for a json column
 #[macro_export]
-macro_rules! gen_where4json {
+macro_rules! gen_sql_where4json {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::IsNull => {
@@ -208,7 +209,28 @@ macro_rules! gen_where4json {
 }
 
 #[macro_export]
-macro_rules! gen_where4uuid {
+macro_rules! gen_sql_and4uuid {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        let uuid = uuid::Uuid::parse_str(&val).unwrap_or_default();
+        Box::new($query.and($column.eq(uuid)))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! gen_sql_where4uuid {
   ($query: expr, $column: expr, $value: expr) => {
     match $value {
       nanocl_stubs::generic::GenericClause::IsNull => {
@@ -229,7 +251,7 @@ macro_rules! gen_where4uuid {
 }
 
 #[macro_export]
-macro_rules! gen_multiple {
+macro_rules! gen_sql_multiple {
   ($query: expr, $column: expr, $filter: expr) => {
     let limit = $filter.limit.unwrap_or(100);
     let offset = $filter.offset.unwrap_or(0);
@@ -238,42 +260,58 @@ macro_rules! gen_multiple {
 }
 
 #[macro_export]
-macro_rules! gen_query {
+macro_rules! gen_sql_query {
   ($table:expr, $query:expr, $filter:expr, $columns:expr) => {{
     let r#where = $filter.r#where.to_owned().unwrap_or_default();
     let conditions = r#where.conditions;
     for (key, value) in conditions {
       if let Some(s_column) = $columns.get(key.as_str()) {
         match s_column.0 {
+          ColumnType::Uuid => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+            $crate::gen_sql_where4uuid!($query, column, value);
+          }
           ColumnType::Json => {
             let column =
               diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
-            gen_where4json!($query, column, value);
+            $crate::gen_sql_where4json!($query, column, value);
           }
           ColumnType::Text => {
             let column =
               diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
-            gen_where4string!($query, column, value);
+            $crate::gen_sql_where4string!($query, column, value);
           }
         }
       }
     }
     let or = r#where.or.unwrap_or_default();
     for or in or {
-      let mut or_condition: Box<dyn BoxableExpression<_, _, SqlType = Bool>> =
-        Box::new(diesel::dsl::sql::<diesel::sql_types::Bool>("1=1"));
+      // dummy condition to start with and then add the generated conditions
+      // It's kinda hacky but i didn't find a better way to do it
+      let mut or_condition: Box<
+        dyn BoxableExpression<_, _, SqlType = diesel::sql_types::Bool>,
+      > = Box::new(diesel::dsl::sql::<diesel::sql_types::Bool>("1=1"));
       for (key, value) in or {
         if let Some(s_column) = $columns.get(key.as_str()) {
           match s_column.0 {
-            ColumnType::Json => {
+            ColumnType::Uuid => {
               let column =
-                diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
-              or_condition = gen_and4json!(or_condition, column, value);
+                diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4uuid!(or_condition, column, value);
             }
             ColumnType::Text => {
               let column =
                 diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
-              or_condition = gen_and4string!(or_condition, column, value);
+              or_condition =
+                $crate::gen_sql_and4string!(or_condition, column, value);
+            }
+            ColumnType::Json => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Jsonb>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4json!(or_condition, column, value);
             }
           }
         }
@@ -285,23 +323,36 @@ macro_rules! gen_query {
 }
 
 #[macro_export]
-macro_rules! apply_order_by {
+macro_rules! gen_sql_order_by {
   ($query:expr, $orders:expr, $columns:expr) => {{
     for order in $orders {
       let words: Vec<_> = order.split_whitespace().collect();
       let column = words.first().unwrap_or(&"");
       let order = words.get(1).unwrap_or(&"");
-      let order = GenericOrder::from_str(order).unwrap();
+      use std::str::FromStr;
+      let order = nanocl_stubs::generic::GenericOrder::from_str(order).unwrap();
       if let Some(s_column) = $columns.get(column) {
         match s_column.0 {
+          ColumnType::Uuid => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Uuid>(s_column.1);
+            match order {
+              nanocl_stubs::generic::GenericOrder::Asc => {
+                $query = $query.order(column.asc());
+              }
+              nanocl_stubs::generic::GenericOrder::Desc => {
+                $query = $query.order(column.desc());
+              }
+            }
+          }
           ColumnType::Json => {
             let column =
               diesel::dsl::sql::<diesel::sql_types::Json>(s_column.1);
             match order {
-              GenericOrder::Asc => {
+              nanocl_stubs::generic::GenericOrder::Asc => {
                 $query = $query.order(column.asc());
               }
-              GenericOrder::Desc => {
+              nanocl_stubs::generic::GenericOrder::Desc => {
                 $query = $query.order(column.desc());
               }
             }
@@ -310,10 +361,10 @@ macro_rules! apply_order_by {
             let column =
               diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
             match order {
-              GenericOrder::Asc => {
+              nanocl_stubs::generic::GenericOrder::Asc => {
                 $query = $query.order(column.asc());
               }
-              GenericOrder::Desc => {
+              nanocl_stubs::generic::GenericOrder::Desc => {
                 $query = $query.order(column.desc());
               }
             }

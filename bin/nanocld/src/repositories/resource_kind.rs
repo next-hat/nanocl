@@ -11,7 +11,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4string,
+  gen_sql_multiple, gen_sql_where4string,
   schema::resource_kinds,
   models::{Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
 };
@@ -49,10 +49,10 @@ impl RepositoryReadBy for ResourceKindDb {
       .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::name, value);
+      gen_sql_where4string!(query, resource_kinds::name, value);
     }
     if is_multiple {
-      gen_multiple!(query, resource_kinds::created_at, filter);
+      gen_sql_multiple!(query, resource_kinds::created_at, filter);
     }
     query
   }
@@ -66,7 +66,7 @@ impl RepositoryCountBy for ResourceKindDb {
     let r#where = condition.conditions;
     let mut query = resource_kinds::table.into_boxed();
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::name, value);
+      gen_sql_where4string!(query, resource_kinds::name, value);
     }
     query.count()
   }
