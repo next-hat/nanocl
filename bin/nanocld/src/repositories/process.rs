@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
@@ -8,14 +10,29 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_sql_multiple, gen_sql_where4json, gen_sql_where4string,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, Pool, ProcessDb, ProcessUpdateDb},
   schema::processes,
-  models::{Pool, ProcessDb, ProcessUpdateDb},
 };
 
 use super::generic::*;
 
-impl RepositoryBase for ProcessDb {}
+impl RepositoryBase for ProcessDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "processes.key")),
+      ("name", (ColumnType::Text, "processes.name")),
+      ("kind", (ColumnType::Text, "processes.kind")),
+      ("node_key", (ColumnType::Text, "processes.node_key")),
+      ("kind_key", (ColumnType::Text, "processes.kind_key")),
+      ("data", (ColumnType::Json, "processes.data")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "processes.created_at"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for ProcessDb {}
 
@@ -37,28 +54,9 @@ impl RepositoryDelBy for ProcessDb {
   where
     Self: diesel::associations::HasTable,
   {
-    let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.conditions;
     let mut query = diesel::delete(processes::table).into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_sql_where4string!(query, processes::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_sql_where4string!(query, processes::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_sql_where4string!(query, processes::kind, value);
-    }
-    if let Some(value) = r#where.get("node_key") {
-      gen_sql_where4string!(query, processes::node_key, value);
-    }
-    if let Some(value) = r#where.get("kind_key") {
-      gen_sql_where4string!(query, processes::kind_key, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_sql_where4json!(query, processes::data, value);
-    }
-    query
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns)
   }
 }
 
@@ -77,26 +75,13 @@ impl RepositoryReadBy for ProcessDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_sql_where4string!(query, processes::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_sql_where4string!(query, processes::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_sql_where4string!(query, processes::kind, value);
-    }
-    if let Some(value) = r#where.get("node_key") {
-      gen_sql_where4string!(query, processes::node_key, value);
-    }
-    if let Some(value) = r#where.get("kind_key") {
-      gen_sql_where4string!(query, processes::kind_key, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_sql_where4json!(query, processes::data, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(processes::created_at.desc());
     }
     if is_multiple {
       gen_sql_multiple!(query, processes::created_at, filter);
@@ -110,28 +95,9 @@ impl RepositoryCountBy for ProcessDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let condition = filter.r#where.to_owned().unwrap_or_default();
-    let r#where = condition.conditions;
     let mut query = processes::table.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_sql_where4string!(query, processes::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_sql_where4string!(query, processes::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_sql_where4string!(query, processes::kind, value);
-    }
-    if let Some(value) = r#where.get("node_key") {
-      gen_sql_where4string!(query, processes::node_key, value);
-    }
-    if let Some(value) = r#where.get("kind_key") {
-      gen_sql_where4string!(query, processes::kind_key, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_sql_where4json!(query, processes::data, value);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 
