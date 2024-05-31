@@ -60,7 +60,7 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })?;
     let server = gen("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
     let server = gen("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
@@ -74,7 +74,7 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })?;
     let server = gen("wrong://dsadsa", &dnsmasq, &client);
     assert!(server.is_err());
     Ok(())

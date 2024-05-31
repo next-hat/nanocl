@@ -79,6 +79,33 @@ async fn exec_docker(
     }),
   };
   match action {
+    "start" => {
+      let actual_status =
+        ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
+      match (&kind, &actual_status.actual) {
+        (EventActorKind::Cargo, status)
+          if status != &ObjPsStatusKind::Start.to_string() =>
+        {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Start,
+            &state.inner.pool,
+          )
+          .await?;
+        }
+        (EventActorKind::Vm, status)
+          if status != &ObjPsStatusKind::Start.to_string() =>
+        {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Start,
+            &state.inner.pool,
+          )
+          .await?;
+        }
+        _ => {}
+      }
+    }
     "die" => {
       let actual_status =
         ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;

@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use nanocl_error::io::IoResult;
 use ntex::{rt, http};
 use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
 
@@ -61,28 +62,28 @@ impl NanocldClient {
     }
   }
 
-  pub fn connect_to(opts: &ConnectOpts) -> Self {
+  pub fn connect_to(opts: &ConnectOpts) -> IoResult<Self> {
     let url = opts.url.clone();
     let version = opts.version.clone();
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
-        NanocldClient {
+        Ok(NanocldClient {
           url: url.to_owned(),
+          ssl: opts.ssl.clone(),
           unix_socket: None,
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          ssl: opts.ssl.clone(),
-        }
+        })
       }
       url if url.starts_with("unix://") => {
         let path = url.trim_start_matches("unix://");
-        NanocldClient {
+        Ok(NanocldClient {
+          ssl: None,
           url: "http://localhost".to_owned(),
           unix_socket: Some(path.to_owned()),
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          ssl: None,
-        }
+        })
       }
-      _ => panic!("Invalid url: {}", url),
+      _ => Err(IoError::invalid_data("Invalid url", &url)),
     }
   }
 
