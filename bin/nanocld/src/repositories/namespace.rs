@@ -55,7 +55,7 @@ impl RepositoryReadBy for NamespaceDb {
       query = query.order(namespaces::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, namespaces::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

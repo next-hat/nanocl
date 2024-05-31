@@ -84,7 +84,7 @@ impl RepositoryReadBy for ProcessDb {
       query = query.order(processes::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, processes::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

@@ -92,7 +92,7 @@ impl RepositoryReadBy for CargoDb {
       query = query.order(cargoes::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, cargoes::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

@@ -76,7 +76,7 @@ impl RepositoryReadBy for ObjPsStatusDb {
       query = query.order(object_process_statuses::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, object_process_statuses::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }
