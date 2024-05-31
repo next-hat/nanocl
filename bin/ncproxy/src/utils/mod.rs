@@ -33,9 +33,9 @@ pub(crate) mod tests {
     const CARGO_NAME: &str = "ncproxy-test";
     const CARGO_IMAGE: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
     let client = NanocldClient::connect_to(&ConnectOpts {
-      url: "http://nanocl.internal:8585".into(),
+      url: "http://nanocl.internal:8585".to_owned(),
       ..Default::default()
-    });
+    })?;
     if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
       let cargo = CargoSpecPartial {
         name: CARGO_NAME.to_owned(),
@@ -56,7 +56,7 @@ pub(crate) mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })?;
     if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
       return Ok(());
     }

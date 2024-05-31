@@ -89,7 +89,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let version = client.get_version().await;
     assert!(version.is_ok());
   }
@@ -99,7 +100,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let _stream = client.watch_events(None).await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
     // let _event = stream.next().await.unwrap();
@@ -110,7 +112,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let info = client.info().await.unwrap();
     assert!(info.docker.containers.unwrap() > 0);
   }
