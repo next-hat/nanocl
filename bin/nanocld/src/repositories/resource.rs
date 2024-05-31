@@ -74,7 +74,7 @@ impl RepositoryReadBy for ResourceDb {
       query = query.order(resources::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, resources::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

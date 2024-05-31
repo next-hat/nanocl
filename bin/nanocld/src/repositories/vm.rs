@@ -79,7 +79,7 @@ impl RepositoryReadBy for VmDb {
       query = query.order(vms::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, vms::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

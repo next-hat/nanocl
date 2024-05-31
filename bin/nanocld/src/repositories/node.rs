@@ -52,7 +52,7 @@ impl RepositoryReadBy for NodeDb {
       query = query.order(nodes::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, nodes::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

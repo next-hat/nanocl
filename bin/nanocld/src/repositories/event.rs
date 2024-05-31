@@ -66,7 +66,7 @@ impl RepositoryReadBy for EventDb {
       query = query.order(events::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, events::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

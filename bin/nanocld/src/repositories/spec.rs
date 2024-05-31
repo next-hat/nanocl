@@ -75,7 +75,7 @@ impl RepositoryReadBy for SpecDb {
       query = query.order(specs::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, specs::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

@@ -51,7 +51,7 @@ impl RepositoryReadBy for MetricDb {
       query = query.order(metrics::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, metrics::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

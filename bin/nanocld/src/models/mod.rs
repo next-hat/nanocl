@@ -253,7 +253,7 @@ macro_rules! gen_sql_where4uuid {
 
 #[macro_export]
 macro_rules! gen_sql_multiple {
-  ($query: expr, $column: expr, $filter: expr) => {
+  ($query: expr, $filter: expr) => {
     let limit = $filter.limit.unwrap_or(100);
     let offset = $filter.offset.unwrap_or(0);
     $query = $query.limit(limit as i64).offset(offset as i64);

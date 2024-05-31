@@ -65,7 +65,7 @@ impl RepositoryReadBy for SecretDb {
       query = query.order(secrets::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, secrets::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }

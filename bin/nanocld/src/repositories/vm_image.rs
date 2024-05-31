@@ -62,7 +62,7 @@ impl RepositoryReadBy for VmImageDb {
       query = query.order(vm_images::created_at.desc());
     }
     if is_multiple {
-      gen_sql_multiple!(query, vm_images::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }
