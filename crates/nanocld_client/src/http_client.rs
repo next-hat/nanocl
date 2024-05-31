@@ -100,7 +100,7 @@ impl NanocldClient {
     }
   }
 
-  fn gen_client(&self) -> http::client::Client {
+  fn gen_client(&self) -> IoResult<http::client::Client> {
     let mut client = http::client::Client::build();
     if let Some(unix_socket) = &self.unix_socket {
       let unix_socket = unix_socket.clone();
@@ -128,7 +128,9 @@ impl NanocldClient {
             &ssl.cert_key.clone().unwrap(),
             SslFiletype::PEM,
           )
-          .unwrap();
+          .map_err(|err| {
+            IoError::invalid_data("Ssl private key", err.to_string().as_str())
+          })?;
         client = ntex::http::client::Client::build().connector(
           http::client::Connector::default()
             .openssl(builder.build())
@@ -136,7 +138,7 @@ impl NanocldClient {
         )
       }
     }
-    client.timeout(ntex::time::Millis::from_secs(100)).finish()
+    Ok(client.timeout(ntex::time::Millis::from_secs(100)).finish())
   }
 
   fn send_error(
@@ -155,46 +157,58 @@ impl NanocldClient {
     format!("{}/{}{}", self.url, self.version, url)
   }
 
-  fn get(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .get(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn get(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .get(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn delete(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .delete(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn delete(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .delete(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn post(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .post(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn post(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .post(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn patch(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .patch(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn patch(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .patch(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn put(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .put(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn put(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .put(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn head(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .head(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn head(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .head(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
   pub async fn send_get<Q>(
@@ -205,9 +219,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self
-      .get(url)
-      .set_connection_type(http::ConnectionType::KeepAlive);
+    let mut req = self.get(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -246,7 +258,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.post(url);
+    let mut req = self.post(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -275,7 +287,7 @@ impl NanocldClient {
     Q: serde::Serialize,
     E: Error + 'static,
   {
-    let mut req = self.post(url);
+    let mut req = self.post(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -298,7 +310,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self.delete(url);
+    let mut req = self.delete(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -320,7 +332,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.patch(url);
+    let mut req = self.patch(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -346,7 +358,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self.head(url);
+    let mut req = self.head(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -368,7 +380,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.put(url);
+    let mut req = self.put(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)

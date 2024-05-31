@@ -8,11 +8,12 @@ use bollard_next::{
   service::ContainerInspectResponse,
 };
 use nanocl_stubs::{
-  system::ObjPsStatusKind,
-  process::ProcessPartial,
-  namespace::NamespacePartial,
+  cargo::Cargo,
   cargo_spec::CargoSpecPartial,
-  generic::{GenericFilter, GenericClause},
+  generic::{GenericClause, GenericFilter},
+  namespace::NamespacePartial,
+  process::ProcessPartial,
+  system::ObjPsStatusKind,
 };
 
 use crate::{
@@ -113,6 +114,35 @@ pub async fn register_namespace(
   Ok(())
 }
 
+async fn sync_cargo_status(
+  cargo: &Cargo,
+  container: &ContainerInspectResponse,
+  state: &SystemState,
+) -> IoResult<()> {
+  if let Some(status) = container.state.clone().unwrap_or_default().status {
+    let new_status = match status {
+      ContainerStateStatusEnum::RUNNING => Some(ObjPsStatusKind::Start),
+      ContainerStateStatusEnum::RESTARTING => Some(ObjPsStatusKind::Fail),
+      ContainerStateStatusEnum::DEAD => Some(ObjPsStatusKind::Stop),
+      ContainerStateStatusEnum::EXITED => Some(ObjPsStatusKind::Stop),
+      _ => None,
+    };
+    if let Some(new_status) = new_status {
+      ObjPsStatusDb::update_pk(
+        &cargo.spec.cargo_key,
+        ObjPsStatusUpdate {
+          wanted: Some(ObjPsStatusKind::Start.to_string()),
+          actual: Some(new_status.to_string()),
+          ..Default::default()
+        },
+        &state.inner.pool,
+      )
+      .await?;
+    }
+  }
+  Ok(())
+}
+
 /// Convert existing container instances with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
@@ -187,32 +217,11 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
             version: format!("v{}", vars::VERSION),
           };
           let synced_cargo = CargoDb::create_obj(obj, state).await?;
-          if let Some(status) = container.state.unwrap_or_default().status {
-            let new_status = match status {
-              ContainerStateStatusEnum::RUNNING => Some(ObjPsStatusKind::Start),
-              ContainerStateStatusEnum::RESTARTING => {
-                Some(ObjPsStatusKind::Fail)
-              }
-              ContainerStateStatusEnum::DEAD => Some(ObjPsStatusKind::Stop),
-              ContainerStateStatusEnum::EXITED => Some(ObjPsStatusKind::Stop),
-              _ => None,
-            };
-            if let Some(new_status) = new_status {
-              ObjPsStatusDb::update_pk(
-                &synced_cargo.spec.cargo_key,
-                ObjPsStatusUpdate {
-                  wanted: Some(ObjPsStatusKind::Start.to_string()),
-                  actual: Some(new_status.to_string()),
-                  ..Default::default()
-                },
-                &state.inner.pool,
-              )
-              .await?;
-            }
-          }
+          sync_cargo_status(&synced_cargo, &container, state).await?;
         }
         // If the cargo is already in our store and the config is different we update it
         Ok(cargo) => {
+          sync_cargo_status(&cargo, &container, state).await?;
           if cargo.spec.container == config {
             continue;
           }
