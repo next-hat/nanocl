@@ -170,7 +170,9 @@ pub mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    }); // Create test server
+    })
+    .expect("Failed to create a nanocl client");
+    // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())
