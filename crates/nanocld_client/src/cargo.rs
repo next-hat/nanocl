@@ -261,7 +261,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     client.list_cargo(None).await.unwrap();
     let new_cargo = CargoSpecPartial {
       name: CARGO_NAME.into(),
@@ -321,7 +322,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let new_cargo = CargoSpecPartial {
       name: "client-test-cargodup".into(),
       container: bollard_next::container::Config {

@@ -9,8 +9,8 @@ use bollard_next::{
   service::{EventMessageTypeEnum, EventMessage},
 };
 use nanocl_stubs::system::{
-  EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
-  ObjPsStatusKind,
+  ObjPsStatusKind, EventActor, EventActorKind, EventKind, EventPartial,
+  NativeEventAction,
 };
 
 use crate::{
@@ -79,9 +79,40 @@ async fn exec_docker(
     }),
   };
   match action {
+    "start" => {
+      let actual_status =
+        ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
+      match (&kind, &actual_status.actual) {
+        (EventActorKind::Cargo, status)
+          if status != &ObjPsStatusKind::Start.to_string() =>
+        {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Start,
+            &state.inner.pool,
+          )
+          .await?;
+        }
+        (EventActorKind::Vm, status)
+          if status != &ObjPsStatusKind::Start.to_string() =>
+        {
+          ObjPsStatusDb::update_actual_status(
+            &kind_key,
+            &ObjPsStatusKind::Start,
+            &state.inner.pool,
+          )
+          .await?;
+        }
+        _ => {}
+      }
+    }
     "die" => {
-      match &kind {
-        EventActorKind::Cargo => {
+      let actual_status =
+        ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
+      match (&kind, &actual_status.wanted) {
+        (EventActorKind::Cargo, status)
+          if status != &ObjPsStatusKind::Stop.to_string() =>
+        {
           ObjPsStatusDb::update_actual_status(
             &kind_key,
             &ObjPsStatusKind::Fail,
@@ -93,10 +124,12 @@ async fn exec_docker(
           state.emit_warning_native_action(
             &cargo,
             NativeEventAction::Fail,
-            Some(format!("Process {name} died")),
+            Some(format!("Process {name}")),
           );
         }
-        EventActorKind::Vm => {
+        (EventActorKind::Vm, status)
+          if status != &ObjPsStatusKind::Stop.to_string() =>
+        {
           ObjPsStatusDb::update_actual_status(
             &kind_key,
             &ObjPsStatusKind::Fail,
@@ -108,7 +141,7 @@ async fn exec_docker(
           state.emit_warning_native_action(
             &vm,
             NativeEventAction::Fail,
-            Some(format!("Process {name} died")),
+            Some(format!("Process {name}")),
           );
         }
         _ => {}

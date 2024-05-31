@@ -219,7 +219,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let mut rx = client
       .logs_processes(
         "cargo",

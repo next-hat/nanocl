@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration, net::ToSocketAddrs};
+use std::{net::ToSocketAddrs, time::Duration};
 
 use ntex::{rt, web, time};
 use diesel::{
@@ -27,7 +27,7 @@ pub async fn create_pool(store_addr: &str) -> IoResult<Pool> {
   .map_err(|err| {
     IoError::interrupted("CockroachDB", &format!("Unable to create pool {err}"))
   })?;
-  Ok(Arc::new(pool))
+  Ok(pool)
 }
 
 /// Get connection from the connection pool for the store `cockroachdb`

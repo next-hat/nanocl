@@ -53,6 +53,12 @@ impl From<Box<IoError>> for HttpClientError {
   }
 }
 
+impl From<IoError> for HttpClientError {
+  fn from(f: IoError) -> Self {
+    Self::IoError(f)
+  }
+}
+
 impl From<HttpError> for HttpClientError {
   fn from(f: HttpError) -> Self {
     Self::HttpError(f)

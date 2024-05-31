@@ -30,9 +30,16 @@ impl ObjCreate for CargoDb {
     obj: &Self::ObjCreateIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    // test if the name of the cargo include a . in the name and throw error if true
-    if obj.spec.name.contains('.') {
-      return Err(HttpError::bad_request("Cargo name cannot contain '.'"));
+    // validate the name of a cargo to include on a-z, A-Z, 0-9, and -_
+    if !obj
+      .spec
+      .name
+      .chars()
+      .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+      return Err(HttpError::bad_request(
+        "Cargo name can only contain a-z, A-Z, 0-9, and -_",
+      ));
     }
     let key = utils::key::gen_key(&obj.namespace, &obj.spec.name);
     let new_spec =

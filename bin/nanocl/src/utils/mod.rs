@@ -19,6 +19,7 @@ pub mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })
+    .expect("Failed to create a nanocl client")
   }
 
   #[macro_export]

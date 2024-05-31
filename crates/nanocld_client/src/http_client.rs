@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use nanocl_error::io::IoResult;
 use ntex::{rt, http};
 use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
 
@@ -61,28 +62,28 @@ impl NanocldClient {
     }
   }
 
-  pub fn connect_to(opts: &ConnectOpts) -> Self {
+  pub fn connect_to(opts: &ConnectOpts) -> IoResult<Self> {
     let url = opts.url.clone();
     let version = opts.version.clone();
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
-        NanocldClient {
+        Ok(NanocldClient {
           url: url.to_owned(),
+          ssl: opts.ssl.clone(),
           unix_socket: None,
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          ssl: opts.ssl.clone(),
-        }
+        })
       }
       url if url.starts_with("unix://") => {
         let path = url.trim_start_matches("unix://");
-        NanocldClient {
+        Ok(NanocldClient {
+          ssl: None,
           url: "http://localhost".to_owned(),
           unix_socket: Some(path.to_owned()),
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          ssl: None,
-        }
+        })
       }
-      _ => panic!("Invalid url: {}", url),
+      _ => Err(IoError::invalid_data("Invalid url", &url)),
     }
   }
 
@@ -99,7 +100,7 @@ impl NanocldClient {
     }
   }
 
-  fn gen_client(&self) -> http::client::Client {
+  fn gen_client(&self) -> IoResult<http::client::Client> {
     let mut client = http::client::Client::build();
     if let Some(unix_socket) = &self.unix_socket {
       let unix_socket = unix_socket.clone();
@@ -115,19 +116,38 @@ impl NanocldClient {
     }
     #[cfg(feature = "openssl")]
     {
-      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode, SslFiletype};
+      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode};
       if let Some(ssl) = &self.ssl {
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-        builder.set_verify(SslVerifyMode::NONE);
-        builder
-          .set_certificate_file(&ssl.cert.clone().unwrap(), SslFiletype::PEM)
-          .unwrap();
-        builder
-          .set_private_key_file(
-            &ssl.cert_key.clone().unwrap(),
-            SslFiletype::PEM,
+        builder.set_verify(SslVerifyMode::PEER);
+        let cert = openssl::x509::X509::from_pem(
+          ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
+        )
+        .map_err(|err| {
+          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+        })?;
+        let cert_key = openssl::pkey::PKey::private_key_from_pem(
+          ssl
+            .cert_key
+            .clone()
+            .expect("Ssl.cert_key to be fill")
+            .as_bytes(),
+        )
+        .map_err(|err| {
+          IoError::invalid_data(
+            "Invalid ssl cert key",
+            err.to_string().as_str(),
           )
-          .unwrap();
+        })?;
+        builder.set_certificate(&cert).map_err(|err| {
+          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+        })?;
+        builder.set_private_key(&cert_key).map_err(|err| {
+          IoError::invalid_data(
+            "Invalid ssl cert key",
+            err.to_string().as_str(),
+          )
+        })?;
         client = ntex::http::client::Client::build().connector(
           http::client::Connector::default()
             .openssl(builder.build())
@@ -135,7 +155,7 @@ impl NanocldClient {
         )
       }
     }
-    client.timeout(ntex::time::Millis::from_secs(100)).finish()
+    Ok(client.timeout(ntex::time::Millis::from_secs(100)).finish())
   }
 
   fn send_error(
@@ -154,46 +174,58 @@ impl NanocldClient {
     format!("{}/{}{}", self.url, self.version, url)
   }
 
-  fn get(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .get(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn get(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .get(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn delete(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .delete(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn delete(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .delete(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn post(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .post(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn post(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .post(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn patch(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .patch(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn patch(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .patch(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn put(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .put(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn put(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .put(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
-  fn head(&self, url: &str) -> http::client::ClientRequest {
-    self
-      .gen_client()
-      .head(self.gen_url(url))
-      .header("User-Agent", "nanocld_client")
+  fn head(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+    Ok(
+      self
+        .gen_client()?
+        .head(self.gen_url(url))
+        .header("User-Agent", "nanocld_client"),
+    )
   }
 
   pub async fn send_get<Q>(
@@ -204,9 +236,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self
-      .get(url)
-      .set_connection_type(http::ConnectionType::KeepAlive);
+    let mut req = self.get(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -245,7 +275,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.post(url);
+    let mut req = self.post(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -274,7 +304,7 @@ impl NanocldClient {
     Q: serde::Serialize,
     E: Error + 'static,
   {
-    let mut req = self.post(url);
+    let mut req = self.post(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -297,7 +327,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self.delete(url);
+    let mut req = self.delete(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -319,7 +349,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.patch(url);
+    let mut req = self.patch(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -345,7 +375,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self.head(url);
+    let mut req = self.head(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -367,7 +397,7 @@ impl NanocldClient {
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.put(url);
+    let mut req = self.put(url)?;
     if let Some(query) = query {
       req = req
         .query(&query)

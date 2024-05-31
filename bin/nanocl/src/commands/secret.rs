@@ -1,5 +1,5 @@
-use bollard_next::secret::Secret;
 use nanocl_error::io::IoResult;
+use nanocld_client::stubs::secret::Secret;
 
 use crate::{
   config::CliConfig,

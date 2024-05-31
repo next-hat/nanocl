@@ -89,7 +89,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     let metric = client
       .create_metric(&MetricPartial {
         kind: "my-source.io/type".to_owned(),

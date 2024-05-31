@@ -105,7 +105,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
       name: SECRET_NAME.to_owned(),
