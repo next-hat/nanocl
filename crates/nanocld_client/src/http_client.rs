@@ -116,21 +116,38 @@ impl NanocldClient {
     }
     #[cfg(feature = "openssl")]
     {
-      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode, SslFiletype};
+      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode};
       if let Some(ssl) = &self.ssl {
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-        builder.set_verify(SslVerifyMode::NONE);
-        builder
-          .set_certificate_file(&ssl.cert.clone().unwrap(), SslFiletype::PEM)
-          .unwrap();
-        builder
-          .set_private_key_file(
-            &ssl.cert_key.clone().unwrap(),
-            SslFiletype::PEM,
+        builder.set_verify(SslVerifyMode::PEER);
+        let cert = openssl::x509::X509::from_pem(
+          ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
+        )
+        .map_err(|err| {
+          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+        })?;
+        let cert_key = openssl::pkey::PKey::private_key_from_pem(
+          ssl
+            .cert_key
+            .clone()
+            .expect("Ssl.cert_key to be fill")
+            .as_bytes(),
+        )
+        .map_err(|err| {
+          IoError::invalid_data(
+            "Invalid ssl cert key",
+            err.to_string().as_str(),
           )
-          .map_err(|err| {
-            IoError::invalid_data("Ssl private key", err.to_string().as_str())
-          })?;
+        })?;
+        builder.set_certificate(&cert).map_err(|err| {
+          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+        })?;
+        builder.set_private_key(&cert_key).map_err(|err| {
+          IoError::invalid_data(
+            "Invalid ssl cert key",
+            err.to_string().as_str(),
+          )
+        })?;
         client = ntex::http::client::Client::build().connector(
           http::client::Connector::default()
             .openssl(builder.build())
