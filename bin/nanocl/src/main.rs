@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenvy::dotenv;
 
-use nanocld_client::{ConnectOpts, NanocldClient};
+use nanocld_client::{stubs::system::SslConfig, ConnectOpts, NanocldClient};
 use nanocl_error::io::{IoError, IoResult};
 
 mod utils;
@@ -29,7 +29,6 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
     }
   }
   let endpoint = context.endpoints.get("Nanocl").unwrap();
-  #[allow(unused)]
   let mut host = cli_args.host.clone().unwrap_or(endpoint.host.clone());
   #[cfg(any(feature = "dev", feature = "test"))]
   {
@@ -40,11 +39,35 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
         .unwrap_or("http://nanocl.internal:8585".into());
     }
   }
+  let mut ssl = match &endpoint.ssl {
+    Some(ssl) => {
+      let cert = std::fs::read_to_string(ssl.cert.clone().unwrap())?;
+      let cert_key = std::fs::read_to_string(ssl.cert_key.clone().unwrap())?;
+      Some(SslConfig {
+        cert: Some(cert),
+        cert_key: Some(cert_key),
+        ..Default::default()
+      })
+    }
+    None => None,
+  };
+  if let Ok(c) = std::env::var("CERT") {
+    if let Ok(ck) = std::env::var("CERT_KEY") {
+      ssl = Some(SslConfig {
+        cert: Some(c),
+        cert_key: Some(ck),
+        ..Default::default()
+      });
+    }
+  }
+  if let Ok(h) = std::env::var("HOST") {
+    host = h;
+  }
   let client = NanocldClient::connect_to(&ConnectOpts {
     url: host.clone(),
-    ssl: endpoint.ssl.clone(),
+    ssl,
     ..Default::default()
-  });
+  })?;
   Ok(CliConfig {
     host,
     client,
@@ -160,7 +183,7 @@ mod tests {
     // Try to stop a cargo
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
     // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-yf", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-y", CARGO_NAME);
   }
 
   /// Test state file when then include other state files

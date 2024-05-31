@@ -166,11 +166,15 @@ pub mod tests {
   pub fn gen_default_test_client() -> TestClient {
     before();
     let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
-    dnsmasq.ensure().unwrap();
+    dnsmasq
+      .ensure()
+      .expect("Expect to setup minimal dnsmasq config");
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    }); // Create test server
+    })
+    .expect("Failed to create a nanocl client");
+    // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())

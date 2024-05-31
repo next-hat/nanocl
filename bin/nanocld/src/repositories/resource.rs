@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use jsonschema::{Draft, JSONSchema};
@@ -13,15 +15,30 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  schema::{specs, resources},
-  gen_multiple, gen_where4json, gen_where4string,
-  models::{Pool, ResourceDb, ResourceKindDb, ResourceUpdateDb, SpecDb},
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
+  schema::resources,
+  models::{
+    ColumnType, Pool, ResourceDb, ResourceKindDb, ResourceUpdateDb, SpecDb,
+  },
 };
 
 use super::generic::*;
 
-impl RepositoryBase for ResourceDb {}
+impl RepositoryBase for ResourceDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("key", (ColumnType::Text, "resources.key")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "resources.created_at"),
+      ),
+      ("kind", (ColumnType::Text, "resources.kind")),
+      ("spec_key", (ColumnType::Text, "resources.spec_key")),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
+    ])
+  }
+}
 
 impl RepositoryCreate for ResourceDb {}
 
@@ -46,24 +63,18 @@ impl RepositoryReadBy for ResourceDb {
     diesel::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::key, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::kind, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::metadata, value);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(resources::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, resources::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }
@@ -74,23 +85,11 @@ impl RepositoryCountBy for ResourceDb {
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::key, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::kind, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::metadata, value);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

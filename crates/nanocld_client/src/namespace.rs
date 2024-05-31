@@ -97,7 +97,8 @@ mod tests {
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })
+    .expect("Failed to create a nanocl client");
     client.list_namespace(None).await.unwrap();
     let namespace = client.create_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);

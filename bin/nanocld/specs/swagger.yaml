@@ -3643,10 +3643,8 @@ components:
       description: Generic filter for list operation
       properties:
         where:
-          type: object
-          description: Where clause
-          additionalProperties:
-            $ref: '#/components/schemas/GenericClause'
+          allOf:
+          - $ref: '#/components/schemas/GenericWhere'
           nullable: true
         limit:
           type: integer
@@ -3658,6 +3656,12 @@ components:
           description: Offset to navigate through items
           nullable: true
           minimum: 0
+        order_by:
+          type: array
+          items:
+            type: string
+          description: Order by
+          nullable: true
     GenericResources:
       type: object
       properties:
@@ -3688,6 +3692,18 @@ components:
         Value:
           type: string
           nullable: true
+    GenericWhere:
+      type: object
+      properties:
+        or:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              $ref: '#/components/schemas/GenericClause'
+          nullable: true
+      additionalProperties:
+        $ref: '#/components/schemas/GenericClause'
     GraphDriverData:
       type: object
       description: Information about the storage driver used to store the container's and image's filesystem.

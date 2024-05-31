@@ -244,7 +244,7 @@ fn gen_client(
         url,
         version: Some(version.into()),
         ..Default::default()
-      })
+      })?
     }
     api_version if state_ref.data.api_version.starts_with('v') => {
       NanocldClient::connect_to(&ConnectOpts {
@@ -257,7 +257,7 @@ fn gen_client(
           .ssl
           .clone(),
         version: Some(api_version.clone()),
-      })
+      })?
     }
     _ => {
       let mut paths = state_ref
@@ -278,7 +278,7 @@ fn gen_client(
         url,
         version: Some(version.into()),
         ..Default::default()
-      })
+      })?
     }
   };
   Ok(client)

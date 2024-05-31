@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://download.next-hat.com/ressources/images/logo.png" >
+  <img width="200" height="200" src="https://download.next-hat.com/ressources/images/logo.png" >
   <h1>Nanocl</h1>
   <p>
 
@@ -35,7 +35,7 @@
 `Nanocl` is all about easing your container and VM management with Rust-powered platform.
 With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.
 We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean.
-**_Join us and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
+**_Join our [discord][discord] and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
 
 ## 📙 Table of Contents
 

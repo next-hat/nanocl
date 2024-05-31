@@ -1,4 +1,4 @@
-use std::{sync::Arc, process::Stdio};
+use std::process::Stdio;
 
 use ntex::{rt, web, util::Bytes, channel::mpsc::Receiver};
 use tokio::{fs, io::AsyncReadExt, process::Command};
@@ -147,7 +147,7 @@ pub async fn clone(
   let name = name.to_owned();
   let image = image.clone();
   let daemon_conf = state.inner.config.clone();
-  let pool = Arc::clone(&state.inner.pool);
+  let pool = state.inner.pool.clone();
   rt::spawn(async move {
     let img_path = image.path.clone();
     let base_path =
