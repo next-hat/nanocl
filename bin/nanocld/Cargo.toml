@@ -59,13 +59,14 @@ clap = { version = "4.5", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "1.8", features = ["serde", "v4"] }
-ntex = { version = "1.2", features = ["tokio", "openssl"] }
+ntex = { version = "2", features = ["tokio", "openssl"] }
 diesel = { version = "2.1", features = [
   "postgres",
   "r2d2",
   "chrono",
   "uuid",
   "serde_json",
+  "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
 tokio = { version = "1.36", features = ["fs", "process", "io-std"] }
 tokio-util = "0.7"
@@ -83,6 +84,6 @@ nanocl_stubs = { version = "0.15", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.6", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 notify = "6.1"
-ntex-cors = "1.0"
+ntex-cors = "2"
 rand = "0.8"
 openssl = { version = "0.10" }

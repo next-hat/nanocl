@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use bollard_next::network::InspectNetworkOptions;
@@ -6,14 +8,24 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{generic::GenericFilter, namespace::NamespaceSummary};
 
 use crate::{
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   schema::namespaces,
-  gen_multiple, gen_where4string,
-  models::{CargoDb, NamespaceDb, ProcessDb, SystemState},
+  models::{CargoDb, ColumnType, NamespaceDb, ProcessDb, SystemState},
 };
 
 use super::generic::*;
 
-impl RepositoryBase for NamespaceDb {}
+impl RepositoryBase for NamespaceDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("name", (ColumnType::Text, "namespaces.name")),
+      (
+        "created_at",
+        (ColumnType::Timestamptz, "namespaces.created_at"),
+      ),
+    ])
+  }
+}
 
 impl RepositoryCreate for NamespaceDb {}
 
@@ -34,13 +46,16 @@ impl RepositoryReadBy for NamespaceDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = namespaces::table.into_boxed();
-    if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, namespaces::name, name);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(namespaces::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, namespaces::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }
@@ -50,12 +65,9 @@ impl RepositoryCountBy for NamespaceDb {
   fn gen_count_query(
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = namespaces::table.into_boxed();
-    if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, namespaces::name, name);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

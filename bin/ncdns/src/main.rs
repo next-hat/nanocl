@@ -29,7 +29,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
     client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })?;
   }
   event::spawn(&client);
   let server = server::gen(&cli.host, &dnsmasq, &client)?;

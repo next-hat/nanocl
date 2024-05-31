@@ -38,7 +38,7 @@ impl SystemState {
     let (sx, rx) = mpsc::unbounded();
     let system_state = SystemState {
       inner: Arc::new(SystemStateInner {
-        pool: Arc::clone(&pool),
+        pool,
         docker_api: docker.clone(),
         config: conf.to_owned(),
         event_emitter: sx,
@@ -52,18 +52,19 @@ impl SystemState {
   }
 
   /// Start the system event loop
+  /// It will handle events and execute some actions
+  /// It will also emit the event to the raw event emitter for the http clients
   fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
     self.inner.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
-          let e_ptr = e.clone();
+          super::exec_event(&e, &self);
           let self_ptr = self.clone();
           rt::spawn(async move {
-            if let Err(err) = self_ptr.inner.event_emitter_raw.emit(&e_ptr) {
+            if let Err(err) = self_ptr.inner.event_emitter_raw.emit(&e) {
               log::error!("system::run: raw emit {err}");
             }
           });
-          super::exec_event(&e, &self);
         }
       });
     });

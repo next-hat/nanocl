@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
@@ -5,14 +7,22 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
-  gen_multiple, gen_where4string,
-  models::{NodeDb, Pool, SystemState},
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, NodeDb, Pool, SystemState},
   schema::nodes,
 };
 
 use super::generic::*;
 
-impl RepositoryBase for NodeDb {}
+impl RepositoryBase for NodeDb {
+  fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
+    HashMap::from([
+      ("name", (ColumnType::Text, "nodes.name")),
+      ("ip_address", (ColumnType::Text, "nodes.ip_address")),
+      ("created_at", (ColumnType::Timestamptz, "nodes.created_at")),
+    ])
+  }
+}
 
 impl RepositoryCreate for NodeDb {}
 
@@ -33,13 +43,16 @@ impl RepositoryReadBy for NodeDb {
     diesel::pg::PgConnection,
     Self::Output,
   > {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = nodes::table.into_boxed();
-    if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, nodes::name, name);
+    let columns = Self::get_columns();
+    query = gen_sql_query!(query, filter, columns);
+    if let Some(orders) = &filter.order_by {
+      query = gen_sql_order_by!(query, orders, columns);
+    } else {
+      query = query.order(nodes::created_at.desc());
     }
     if is_multiple {
-      gen_multiple!(query, nodes::created_at, filter);
+      gen_sql_multiple!(query, filter);
     }
     query
   }
@@ -49,12 +62,9 @@ impl RepositoryCountBy for NodeDb {
   fn gen_count_query(
     filter: &GenericFilter,
   ) -> impl diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, i64> {
-    let r#where = filter.r#where.clone().unwrap_or_default();
     let mut query = nodes::table.into_boxed();
-    if let Some(name) = r#where.get("name") {
-      gen_where4string!(query, nodes::name, name);
-    }
-    query.count()
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns).count()
   }
 }
 

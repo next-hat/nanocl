@@ -20,7 +20,7 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
     client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    });
+    })?;
   }
   let event_emitter = EventEmitter::new(&client);
   let state = Arc::new(SystemState {
