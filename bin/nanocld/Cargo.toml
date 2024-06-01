@@ -66,6 +66,7 @@ diesel = { version = "2.1", features = [
   "chrono",
   "uuid",
   "serde_json",
+  "ipnet-address",
   "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
 tokio = { version = "1.36", features = ["fs", "process", "io-std"] }
@@ -87,3 +88,4 @@ notify = "6.1"
 ntex-cors = "2"
 rand = "0.8"
 openssl = { version = "0.10" }
+ipnet = { version = "2.9.0", features = ["serde"] }

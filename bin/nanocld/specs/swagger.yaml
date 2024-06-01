@@ -5098,6 +5098,9 @@ components:
           type: string
           format: date-time
           description: When the namespace was created
+        Metadata:
+          description: User defined metadata
+          nullable: true
     NamespaceInspect:
       type: object
       description: |-
@@ -5129,6 +5132,9 @@ components:
         Name:
           type: string
           description: Name of the namespace
+        Metadata:
+          description: User defined metadata
+          nullable: true
       additionalProperties: false
     NamespaceSummary:
       type: object
@@ -5599,7 +5605,7 @@ components:
       - UpdatedAt
       - Name
       - Kind
-      - NodeKey
+      - NodeName
       - KindKey
       - Data
       properties:
@@ -5619,9 +5625,9 @@ components:
           description: Name of the process
         Kind:
           $ref: '#/components/schemas/ProcessKind'
-        NodeKey:
+        NodeName:
           type: string
-          description: Key of the node where the container is running
+          description: Name of the node where the container is running
         KindKey:
           type: string
           description: Key of the related kind

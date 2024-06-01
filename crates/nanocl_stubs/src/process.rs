@@ -85,8 +85,8 @@ pub struct ProcessPartial {
   pub kind: ProcessKind,
   /// The data of the process a ContainerInspect
   pub data: serde_json::Value,
-  /// Key of the node where the container is running
-  pub node_key: String,
+  /// Name of the node where the container is running
+  pub node_name: String,
   /// Key of the related kind
   pub kind_key: String,
   /// The created at date
@@ -110,8 +110,8 @@ pub struct Process {
   pub name: String,
   /// Kind of the process (Job, Vm, Cargo)
   pub kind: ProcessKind,
-  /// Key of the node where the container is running
-  pub node_key: String,
+  /// Name of the node where the container is running
+  pub node_name: String,
   /// Key of the related kind
   pub kind_key: String,
   /// The data of the process a ContainerInspect

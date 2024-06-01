@@ -11,8 +11,8 @@ use nanocl_stubs::{
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, Pool, ProcessDb, ProcessUpdateDb},
   schema::processes,
+  models::{ColumnType, Pool, ProcessDb, ProcessUpdateDb},
 };
 
 use super::generic::*;
@@ -23,7 +23,7 @@ impl RepositoryBase for ProcessDb {
       ("key", (ColumnType::Text, "processes.key")),
       ("name", (ColumnType::Text, "processes.name")),
       ("kind", (ColumnType::Text, "processes.kind")),
-      ("node_key", (ColumnType::Text, "processes.node_key")),
+      ("node_name", (ColumnType::Text, "processes.node_name")),
       ("kind_key", (ColumnType::Text, "processes.kind_key")),
       ("data", (ColumnType::Json, "processes.data")),
       (

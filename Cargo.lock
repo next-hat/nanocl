@@ -831,7 +831,9 @@ dependencies = [
  "byteorder",
  "chrono",
  "diesel_derives",
+ "ipnet",
  "itoa",
+ "libc",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -1683,6 +1685,9 @@ name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -2125,6 +2130,7 @@ dependencies = [
  "env_logger",
  "futures",
  "futures-util",
+ "ipnet",
  "jsonschema",
  "libc",
  "log",

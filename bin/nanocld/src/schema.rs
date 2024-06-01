@@ -55,6 +55,7 @@ diesel::table! {
     namespaces (name) {
         name -> Varchar,
         created_at -> Timestamptz,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -75,8 +76,11 @@ diesel::table! {
 diesel::table! {
     nodes (name) {
         name -> Varchar,
-        ip_address -> Varchar,
         created_at -> Timestamptz,
+        ip_address -> Inet,
+        endpoint -> Varchar,
+        version -> Varchar,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -100,7 +104,7 @@ diesel::table! {
         name -> Varchar,
         kind -> Varchar,
         data -> Jsonb,
-        node_key -> Varchar,
+        node_name -> Varchar,
         kind_key -> Varchar,
     }
 }
@@ -149,6 +153,7 @@ diesel::table! {
 diesel::table! {
     vm_images (name) {
         name -> Varchar,
+        node_name -> Varchar,
         created_at -> Timestamptz,
         kind -> Varchar,
         path -> Varchar,
@@ -162,11 +167,11 @@ diesel::table! {
 diesel::table! {
     vms (key) {
         key -> Varchar,
-        created_at -> Timestamptz,
         name -> Varchar,
-        spec_key -> Uuid,
-        status_key -> Varchar,
+        created_at -> Timestamptz,
         namespace_name -> Varchar,
+        status_key -> Varchar,
+        spec_key -> Uuid,
     }
 }
 
@@ -176,27 +181,29 @@ diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
+diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
+diesel::joinable!(vm_images -> nodes (node_name));
 diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargoes,
-  events,
-  jobs,
-  metrics,
-  namespaces,
-  node_group_links,
-  node_groups,
-  nodes,
-  object_process_statuses,
-  processes,
-  resource_kinds,
-  resources,
-  secrets,
-  specs,
-  vm_images,
-  vms,
+    cargoes,
+    events,
+    jobs,
+    metrics,
+    namespaces,
+    node_group_links,
+    node_groups,
+    nodes,
+    object_process_statuses,
+    processes,
+    resource_kinds,
+    resources,
+    secrets,
+    specs,
+    vm_images,
+    vms,
 );

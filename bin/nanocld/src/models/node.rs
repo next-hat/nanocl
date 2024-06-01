@@ -14,8 +14,14 @@ use crate::schema::nodes;
 pub struct NodeDb {
   /// The name of the node
   pub name: String,
-  /// The ip address of the node
-  pub ip_address: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
+  /// The ip address of the node
+  pub ip_address: ipnet::IpNet,
+  /// Endpoint to connect to the node
+  pub endpoint: String,
+  /// Version of the node
+  pub version: String,
+  /// User defined metadata
+  pub metadata: Option<serde_json::Value>,
 }
