@@ -101,7 +101,8 @@ async fn watch(state: &SystemStateRef) -> IoResult<()> {
   let path = format!("{}/log", state.store.dir);
   let path = Path::new(&path);
   if !path.exists() {
-    return Err(IoError::not_found("Metric", &format!("{}", path.display())));
+    std::fs::create_dir_all(path)
+      .map_err(|e| e.map_err_context(|| "metric"))?;
   }
   let (tx, rx) = std::sync::mpsc::channel();
   // Automatically select the best implementation for your platform.

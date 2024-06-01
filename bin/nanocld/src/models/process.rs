@@ -24,7 +24,7 @@ pub struct ProcessDb {
   /// The data of the process a ContainerInspect
   pub data: serde_json::Value,
   /// Id of the node where the container is running
-  pub node_key: String,
+  pub node_name: String,
   /// Id of the related kind
   pub kind_key: String,
 }
@@ -54,7 +54,7 @@ impl TryFrom<ProcessDb> for Process {
       kind: ProcessKind::try_from(model.kind)?,
       data: serde_json::from_value(model.data)
         .map_err(|err| err.map_err_context(|| "Process"))?,
-      node_key: model.node_key,
+      node_name: model.node_name,
       kind_key: model.kind_key,
     })
   }
@@ -67,7 +67,7 @@ impl From<&ProcessPartial> for ProcessDb {
       name: model.name.clone(),
       kind: model.kind.to_string(),
       data: model.data.clone(),
-      node_key: model.node_key.clone(),
+      node_name: model.node_name.clone(),
       kind_key: model.kind_key.clone(),
       created_at: model
         .created_at

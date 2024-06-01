@@ -19,6 +19,8 @@ pub struct NamespaceDb {
   pub name: String,
   /// When the namespace was created
   pub created_at: chrono::NaiveDateTime,
+  /// User defined metadata
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl NamespaceDb {
@@ -27,6 +29,7 @@ impl NamespaceDb {
     Self {
       name: name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
+      metadata: None,
     }
   }
 }
@@ -36,6 +39,7 @@ impl From<&NamespacePartial> for NamespaceDb {
     Self {
       name: p.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
+      metadata: p.metadata.clone(),
     }
   }
 }
@@ -45,6 +49,7 @@ impl From<NamespaceDb> for Namespace {
     Self {
       name: namespace.name,
       created_at: namespace.created_at,
+      metadata: namespace.metadata,
     }
   }
 }

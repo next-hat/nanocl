@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{net::IpAddr, collections::HashMap};
 
 use diesel::prelude::*;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
@@ -10,6 +10,7 @@ use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{ColumnType, NodeDb, Pool, SystemState},
   schema::nodes,
+  vars,
 };
 
 use super::generic::*;
@@ -80,10 +81,24 @@ impl NodeDb {
   }
 
   pub async fn register(state: &SystemState) -> IoResult<()> {
+    println!("DEBUG: Registering node {}", state.inner.config.gateway);
+    let ip_address =
+      state
+        .inner
+        .config
+        .gateway
+        .parse::<IpAddr>()
+        .map_err(|err| {
+          IoError::invalid_data("Invalid gateway", err.to_string().as_str())
+        })?;
+    let ip_address = ipnet::IpNet::from(ip_address);
     let node = NodeDb {
       name: state.inner.config.hostname.clone(),
-      ip_address: state.inner.config.gateway.clone(),
+      ip_address,
+      endpoint: state.inner.config.advertise_addr.clone(),
       created_at: chrono::Utc::now().naive_utc(),
+      version: vars::VERSION.to_owned(),
+      metadata: None,
     };
     NodeDb::create_if_not_exists(&node, &state.inner.pool).await?;
     Ok(())

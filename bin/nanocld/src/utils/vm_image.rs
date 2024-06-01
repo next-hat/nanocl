@@ -113,6 +113,7 @@ pub async fn create_snap(
   let img_info = get_info(&snapshot_path).await?;
   let snap_image = VmImageDb {
     name: name.to_owned(),
+    node_name: state.inner.config.hostname.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Snapshot".into(),
     path: snapshot_path.clone(),
@@ -232,6 +233,7 @@ pub async fn clone(
     };
     let new_base_image = VmImageDb {
       name: name.to_owned(),
+      node_name: daemon_conf.hostname.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       kind: "Base".into(),
       path: base_path.clone(),
@@ -312,7 +314,7 @@ pub async fn resize_by_name(
 pub async fn create(
   name: &str,
   filepath: &str,
-  pool: &Pool,
+  state: &SystemState,
 ) -> HttpResult<VmImageDb> {
   // Get image info
   let img_info = match utils::vm_image::get_info(filepath).await {
@@ -325,6 +327,7 @@ pub async fn create(
   };
   let vm_image = VmImageDb {
     name: name.to_owned(),
+    node_name: state.inner.config.hostname.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Base".into(),
     format: img_info.format,
@@ -333,6 +336,6 @@ pub async fn create(
     path: filepath.to_owned(),
     parent: None,
   };
-  let image = VmImageDb::create_from(vm_image, pool).await?;
+  let image = VmImageDb::create_from(vm_image, &state.inner.pool).await?;
   Ok(image)
 }

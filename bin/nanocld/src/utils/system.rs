@@ -68,7 +68,7 @@ pub async fn sync_process(
         name: name.clone(),
         kind: kind.to_owned().try_into()?,
         data: container_instance_data.clone(),
-        node_key: state.inner.config.hostname.clone(),
+        node_name: state.inner.config.hostname.clone(),
         kind_key: key.to_owned(),
         created_at: Some(
           chrono::NaiveDateTime::parse_from_str(
@@ -105,6 +105,7 @@ pub async fn register_namespace(
   }
   let new_nsp = NamespacePartial {
     name: name.to_owned(),
+    metadata: None,
   };
   if create_network {
     NamespaceDb::create_obj(&new_nsp, state).await?;
@@ -246,7 +247,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
       GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
     )
     .r#where(
-      "node_key",
+      "node_name",
       GenericClause::Eq(state.inner.config.hostname.clone()),
     );
   ProcessDb::del_by(&filter, &state.inner.pool).await?;
@@ -278,9 +279,7 @@ pub async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
     {
       continue;
     }
-    if let Err(error) =
-      utils::vm_image::create(&name, path, &state.inner.pool).await
-    {
+    if let Err(error) = utils::vm_image::create(&name, path, state).await {
       log::warn!("system::sync_vm_images: {error}")
     }
   }
