@@ -50,6 +50,7 @@ pub mod tests {
     let config = DaemonConfig {
       state_dir: format!("{home}/.nanocl_dev/state"),
       docker_host,
+      hostname: "nanocl.internal".to_owned(),
       store_addr: Some(
         "postgresql://root:root@store.nanocl.internal:26258/defaultdb"
           .to_owned(),
