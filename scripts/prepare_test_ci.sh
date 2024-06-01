@@ -20,7 +20,7 @@ docker run -d --rm \
   -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
   -w /project \
-  -- hostname nanocl.internal \
+  --hostname nanocl.internal \
   --network host \
   ghcr.io/next-hat/nanocl-dev:dev \
   run --bin nanocld --no-default-features --features "test" -- --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb\
