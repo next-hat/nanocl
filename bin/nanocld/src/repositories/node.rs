@@ -81,7 +81,6 @@ impl NodeDb {
   }
 
   pub async fn register(state: &SystemState) -> IoResult<()> {
-    println!("DEBUG: Registering node {}", state.inner.config.gateway);
     let ip_address =
       state
         .inner
