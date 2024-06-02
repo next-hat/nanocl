@@ -131,7 +131,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .await
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
-  let pg_style = utils::progress::create_spinner_style("green");
   for cargo in &cargoes {
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),
@@ -147,10 +146,9 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     if docker.inspect_image(&image).await.is_err() || args.force_pull {
       utils::docker::install_image(image_name, image_tag, &docker).await?;
     }
-    let pg = utils::progress::create_progress(
-      &format!("cargo/{}", &cargo.name),
-      &pg_style,
-    );
+    let token = format!("cargo/{}", &cargo.name);
+    let pg_style = utils::progress::create_spinner_style(&token, "red");
+    let pg = utils::progress::create_progress("submitting", &pg_style);
     let container = utils::docker::create_cargo_container(
       cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),

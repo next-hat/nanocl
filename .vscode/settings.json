@@ -76,6 +76,7 @@
     "precpu",
     "proto",
     "qcow",
+    "recurr",
     "rowid",
     "rustc",
     "schemars",

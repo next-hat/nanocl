@@ -6,5 +6,7 @@ Namespace: cargo-example
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: cargo-example
+  Metadata:
+    Certbot: managed
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
