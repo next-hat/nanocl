@@ -11,6 +11,7 @@ pub mod ctrl_client;
 pub mod server;
 pub mod container;
 pub mod query_string;
+pub mod network;
 
 #[cfg(test)]
 pub mod tests {
