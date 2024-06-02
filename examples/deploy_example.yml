@@ -72,6 +72,7 @@ Cargoes:
         App: deploy-example
     Secrets:
       - env.deploy-example.com
+      - env.deploy-secret
     Container:
       Image: ghcr.io/next-hat/nanocl-get-started:latest
       Env:
