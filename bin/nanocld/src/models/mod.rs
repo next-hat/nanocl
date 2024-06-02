@@ -2,6 +2,7 @@ use diesel::PgConnection;
 use diesel::r2d2::{Pool as R2D2Pool, PooledConnection, ConnectionManager};
 
 mod ws;
+use nanocl_error::io::{IoError, IoResult};
 pub use ws::*;
 
 mod node;
@@ -62,6 +63,8 @@ pub enum ColumnType {
   Text,
   Json,
   Uuid,
+  // TODO: Implement Inet type
+  // Inet,
   Timestamptz,
 }
 
@@ -185,6 +188,162 @@ macro_rules! gen_sql_where4string {
   };
 }
 
+pub fn parse_date_string(
+  date_str: &str,
+) -> IoResult<chrono::DateTime<chrono::Utc>> {
+  // Define possible date and datetime formats
+  let formats = [
+    "%Y-%m-%d %H:%M:%S%.f %:z", // 2023-06-01 12:34:56.789 +02:00
+    "%Y-%m-%d %H:%M:%S %:z",    // 2023-06-01 12:34:56 +02:00
+    "%Y-%m-%d %H:%M:%S%.f",     // 2023-06-01 12:34:56.789
+    "%Y-%m-%d %H:%M:%S",        // 2023-06-01 12:34:56
+    "%Y-%m-%d",                 // 2023-06-01
+  ];
+
+  // Attempt to parse with each format
+  for &format in &formats {
+    if let Ok(datetime) = chrono::DateTime::parse_from_str(date_str, format) {
+      // Convert to Utc if parsed as FixedOffset
+      return Ok(datetime.with_timezone(&chrono::Utc));
+    }
+  }
+
+  // Try parsing as RFC 3339 if other formats fail
+  if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(date_str) {
+    return Ok(datetime.with_timezone(&chrono::Utc));
+  }
+
+  // As a last resort, parse as NaiveDate (date without time) and assume UTC
+  if let Ok(naive_date) =
+    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+  {
+    let naive_datetime = chrono::NaiveDateTime::new(
+      naive_date,
+      chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+    );
+    return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+      naive_datetime,
+      chrono::Utc,
+    ));
+  }
+
+  // If all formats fail, return error
+  Err(IoError::invalid_data(
+    "Invalid date format",
+    &format!("Invalid date format: {}", date_str),
+  ))
+}
+
+#[macro_export]
+macro_rules! gen_sql_where4timestamptz {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.eq(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Ne(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.ne(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Gt(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.gt(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Lt(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.lt(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Ge(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.ge(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Le(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        $query = $query.filter($column.le(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        $query = $query.filter($column.is_null());
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        $query = $query.filter($column.is_not_null());
+      }
+      nanocl_stubs::generic::GenericClause::In(items) => {
+        let items: Vec<chrono::DateTime<chrono::Utc>> = items
+          .iter()
+          .map(|item| $crate::models::parse_date_string(item).unwrap())
+          .collect();
+        $query = $query.filter($column.eq_any(items));
+      }
+      nanocl_stubs::generic::GenericClause::NotIn(items) => {
+        let items: Vec<chrono::DateTime<chrono::Utc>> = items
+          .iter()
+          .map(|item| $crate::models::parse_date_string(item).unwrap())
+          .collect();
+        $query = $query.filter($column.ne_all(items));
+      }
+      _ => {
+        // Ignore unsupported clause
+      }
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! gen_sql_and4timestamptz {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.eq(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ne(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.ne(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Gt(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.gt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Lt(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.lt(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Ge(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.ge(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::Le(val) => {
+        let val = $crate::models::parse_date_string(&val).unwrap();
+        Box::new($query.and($column.le(val.clone())))
+      }
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        Box::new($query.and($column.is_null()))
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        Box::new($query.and($column.is_not_null()))
+      }
+      nanocl_stubs::generic::GenericClause::In(items) => {
+        let items: Vec<chrono::DateTime<chrono::Utc>> = items
+          .iter()
+          .map(|item| $crate::models::parse_date_string(item).unwrap())
+          .collect();
+        Box::new($query.and($column.eq_any(items)))
+      }
+      nanocl_stubs::generic::GenericClause::NotIn(items) => {
+        let items: Vec<chrono::DateTime<chrono::Utc>> = items
+          .iter()
+          .map(|item| $crate::models::parse_date_string(item).unwrap())
+          .collect();
+        Box::new($query.and($column.ne_all(items)))
+      }
+      _ => {
+        panic!("Unsupported clause");
+      }
+    }
+  };
+}
+
 /// Generate a where clause for a json column
 #[macro_export]
 macro_rules! gen_sql_where4json {
@@ -283,7 +442,11 @@ macro_rules! gen_sql_query {
               diesel::dsl::sql::<diesel::sql_types::Text>(s_column.1);
             $crate::gen_sql_where4string!($query, column, value);
           }
-          _ => {}
+          ColumnType::Timestamptz => {
+            let column =
+              diesel::dsl::sql::<diesel::sql_types::Timestamptz>(s_column.1);
+            $crate::gen_sql_where4timestamptz!($query, column, value);
+          }
         }
       }
     }
@@ -315,7 +478,12 @@ macro_rules! gen_sql_query {
               or_condition =
                 $crate::gen_sql_and4json!(or_condition, column, value);
             }
-            _ => {}
+            ColumnType::Timestamptz => {
+              let column =
+                diesel::dsl::sql::<diesel::sql_types::Timestamptz>(s_column.1);
+              or_condition =
+                $crate::gen_sql_and4timestamptz!(or_condition, column, value);
+            }
           }
         }
       }

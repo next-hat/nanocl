@@ -3619,7 +3619,9 @@ components:
         - contains
         properties:
           contains:
-            description: JSON contains
+            description: |-
+              TODO: Add Between
+              JSON contains
       - type: object
         required:
         - has-key
@@ -5433,12 +5435,29 @@ components:
       type: object
       required:
       - Name
+      - CreatedAt
       - IpAddress
+      - Endpoint
+      - Version
       properties:
         Name:
           type: string
-        IpAddress:
+          description: The name of the node
+        CreatedAt:
           type: string
+          format: date-time
+          description: The created at date
+        IpAddress:
+          $ref: '#/components/schemas/ipnet.IpNet'
+        Endpoint:
+          type: string
+          description: Endpoint to connect to the node
+        Version:
+          type: string
+          description: Version of the node
+        Metadata:
+          description: User defined metadata
+          nullable: true
     ObjPsStatus:
       type: object
       required:
