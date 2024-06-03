@@ -62,6 +62,8 @@ pub enum GenericClause {
   IsNull,
   /// Is not null
   IsNotNull,
+  /// TODO: Add Between
+  // Between(String, String),
   /// JSON contains
   Contains(serde_json::Value),
   /// JSON Has key

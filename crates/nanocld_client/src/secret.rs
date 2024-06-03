@@ -113,7 +113,7 @@ mod tests {
       kind: "gen.io/generic".to_owned(),
       data: serde_json::json!({"key": "value"}),
       metadata: None,
-      immutable: None,
+      immutable: false,
     };
     let secret = client.create_secret(&secret).await.unwrap();
     assert_eq!(secret.name, SECRET_NAME);

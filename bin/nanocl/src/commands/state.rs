@@ -563,6 +563,8 @@ async fn parse_state_file_recurr(
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   let mut states = vec![state_file.clone()];
+  // TODO: check if we need to reverse the order of parsed_sub_states
+  // parsed_sub_states.reverse();
   states.append(&mut parsed_sub_states.into_iter().flatten().collect());
   states.reverse();
   Ok(states)
@@ -575,31 +577,38 @@ async fn state_apply(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
-  let pg_style = utils::progress::create_spinner_style("green");
   if let Some(secrets) = &state_file.data.secrets {
     for secret in secrets {
       let token = format!("secret/{}", secret.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let pg_style = utils::progress::create_spinner_style(&token, "green");
+      let pg = utils::progress::create_progress("(submitting)", &pg_style);
       match client.inspect_secret(&secret.name).await {
         Err(_) => {
           client.create_secret(secret).await?;
+          pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: SecretPartial = inspect.into();
           if cmp != *secret {
             let update: SecretUpdate = secret.clone().into();
             client.patch_secret(&secret.name, &update).await?;
+            pg.set_message("(updated)");
+          } else {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }
-      pg.finish();
+      pg.finish_with_message("(done)");
     }
   }
   if let Some(jobs) = &state_file.data.jobs {
     for job in jobs {
       let token = format!("job/{}", job.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let pg_style = utils::progress::create_spinner_style(&token, "green");
+      let pg = utils::progress::create_progress("(submitting)", &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
+        pg.set_message("(clearing)");
         let waiter = utils::process::wait_process_state(
           &job.name,
           EventActorKind::Job,
@@ -609,8 +618,10 @@ async fn state_apply(
         .await?;
         client.delete_job(&job.name).await?;
         waiter.await??;
+        pg.set_message("(cleared)");
       }
       client.create_job(job).await?;
+      pg.set_message("(created)");
       let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
@@ -618,32 +629,36 @@ async fn state_apply(
         client,
       )
       .await?;
+      pg.set_message("(starting)");
       client.start_process("job", &job.name, None).await?;
       waiter.await??;
-      pg.finish();
+      pg.finish_with_message("(running)");
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes {
       let token = format!("cargo/{}", cargo.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let pg_style = utils::progress::create_spinner_style(&token, "green");
+      let pg = utils::progress::create_progress("(submitting)", &pg_style);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {
           client.create_cargo(cargo, Some(&namespace)).await?;
+          pg.set_message("(created)");
         }
         Ok(inspect) => {
-          if inspect.status.actual == ObjPsStatusKind::Start && !opts.reload {
-            pg.finish();
-            continue;
-          }
           let cmp: CargoSpecPartial = inspect.spec.into();
-          if cmp != *cargo || opts.reload {
+          if (cmp != *cargo) || opts.reload {
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
+            pg.set_message("(updated)");
+          } else if inspect.status.actual == ObjPsStatusKind::Start {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }
+      pg.set_message("(starting)");
       let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", cargo.name),
         EventActorKind::Cargo,
@@ -655,29 +670,32 @@ async fn state_apply(
         .start_process("cargo", &cargo.name, Some(&namespace))
         .await?;
       waiter.await??;
-      pg.finish();
+      pg.finish_with_message("(running)");
     }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
     for vm in vms {
       let token = format!("vm/{}", vm.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let pg_style = utils::progress::create_spinner_style(&token, "green");
+      let pg = utils::progress::create_progress("(submitting)", &pg_style);
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
           client.create_vm(vm, Some(&namespace)).await?;
+          pg.set_message("(created)");
         }
         Ok(inspect) => {
-          if inspect.status.actual == ObjPsStatusKind::Start && !opts.reload {
-            pg.finish();
-            continue;
-          }
           let cmp: VmSpecPartial = inspect.spec.into();
-          if cmp != *vm {
+          if (cmp != *vm) || opts.reload {
             let update: VmSpecUpdate = vm.clone().into();
             client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
+            pg.set_message("(updated)");
+          } else if inspect.status.actual == ObjPsStatusKind::Start {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }
+      pg.set_message("(starting)");
       let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", vm.name),
         EventActorKind::Vm,
@@ -689,26 +707,32 @@ async fn state_apply(
         .start_process("vm", &vm.name, Some(&namespace))
         .await?;
       waiter.await??;
-      pg.finish();
+      pg.finish_with_message("(running)");
     }
   }
   if let Some(resources) = &state_file.data.resources {
     for resource in resources {
       let token = format!("resource/{}", resource.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let pg_style = utils::progress::create_spinner_style(&token, "green");
+      let pg = utils::progress::create_progress("(submitting)", &pg_style);
       match client.inspect_resource(&resource.name).await {
         Err(_) => {
           client.create_resource(resource).await?;
+          pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: ResourcePartial = inspect.into();
-          if cmp != *resource {
+          if (cmp != *resource) || opts.reload {
             let update: ResourceUpdate = resource.clone().into();
             client.put_resource(&resource.name, &update).await?;
+            pg.set_message("(updated)");
+          } else {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }
-      pg.finish();
+      pg.finish_with_message("(done)");
     }
   }
   Ok(())
@@ -716,7 +740,7 @@ async fn state_apply(
 
 fn print_states(states: &[StateRef<Statefile>]) {
   let raw = states.iter().fold(String::new(), |init, state| {
-    format!("{init}{}\n", state.raw)
+    format!("{init}{}\n", state.raw.trim())
   });
   println!("{raw}");
 }

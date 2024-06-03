@@ -22,6 +22,8 @@ use crate::schema::vm_images;
 pub struct VmImageDb {
   /// The name of the virtual machine image
   pub name: String,
+  /// The node where the image is stored
+  pub node_name: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
   /// The kind of the virtual machine image (Base, Snapshot)

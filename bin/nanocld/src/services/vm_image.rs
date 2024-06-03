@@ -90,7 +90,7 @@ pub async fn import_vm_image(
         ))
       })?;
   }
-  utils::vm_image::create(&name, &filepath, &state.inner.pool).await?;
+  utils::vm_image::create(&name, &filepath, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 

@@ -17,16 +17,16 @@ use super::NamespaceDb;
 pub struct VmDb {
   /// The key of the vm
   pub key: String,
-  /// The created at date
-  pub created_at: chrono::NaiveDateTime,
   /// The name of the vm
   pub name: String,
-  /// The spec key reference
-  pub spec_key: uuid::Uuid,
-  /// The status key
-  pub status_key: String,
+  /// The created at date
+  pub created_at: chrono::NaiveDateTime,
   /// The namespace name reference
   pub namespace_name: String,
+  /// The status key
+  pub status_key: String,
+  /// The spec key reference
+  pub spec_key: uuid::Uuid,
 }
 
 /// This structure is used to update a vm in the database.

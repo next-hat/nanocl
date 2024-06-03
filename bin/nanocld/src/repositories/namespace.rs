@@ -2,13 +2,11 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use bollard_next::network::InspectNetworkOptions;
-
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{generic::GenericFilter, namespace::NamespaceSummary};
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
   schema::namespaces,
   models::{CargoDb, ColumnType, NamespaceDb, ProcessDb, SystemState},
 };
@@ -84,11 +82,7 @@ impl NamespaceDb {
         CargoDb::count_by_namespace(&item.name, &state.inner.pool).await?;
       let processes =
         ProcessDb::list_by_namespace(&item.name, &state.inner.pool).await?;
-      let network = state
-        .inner
-        .docker_api
-        .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
-        .await?;
+      let network = utils::network::inspect_network(&item.name, state).await?;
       let ipam = network.ipam.unwrap_or_default();
       let ipam_config = ipam.config.unwrap_or_default();
       let gateway = ipam_config

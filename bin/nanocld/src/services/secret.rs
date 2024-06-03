@@ -198,7 +198,7 @@ mod test_secret {
     let new_secret = SecretPartial {
       name: String::from("test-secret"),
       kind: String::from("test-create.io/test"),
-      immutable: None,
+      immutable: false,
       data: json!({
         "Tls": { "cert": "MY CERT", "key": "MY KEY" },
       }),
