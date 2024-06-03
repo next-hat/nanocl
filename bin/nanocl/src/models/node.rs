@@ -6,7 +6,6 @@ use super::GenericListOpts;
 
 /// `nanocl node` available arguments
 #[derive(Clone, Parser)]
-#[clap(name = "nanocl-resource")]
 pub struct NodeArg {
   #[clap(subcommand)]
   pub command: NodeCommand,

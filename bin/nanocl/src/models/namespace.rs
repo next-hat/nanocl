@@ -33,7 +33,6 @@ pub struct NamespaceDeleteOpts {
 
 /// `nanocl namespace` available arguments
 #[derive(Clone, Parser)]
-#[clap(name = "nanocl namespace")]
 pub struct NamespaceArg {
   #[clap(subcommand)]
   pub command: NamespaceCommand,

@@ -1,15 +1,15 @@
 # NAME
 
-nanocl cargo - \`nanocl cargo\` available arguments
+cargo - Manage cargoes
 
 # SYNOPSIS
 
-**nanocl cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
+**cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \<*subcommands*\>
 
 # DESCRIPTION
 
-\`nanocl cargo\` available arguments
+Manage cargoes
 
 # OPTIONS
 
@@ -23,62 +23,62 @@ nanocl cargo - \`nanocl cargo\` available arguments
 
 # SUBCOMMANDS
 
-nanocl cargo-list(1)
+cargo-list(1)
 
 :   List existing cargo
 
-nanocl cargo-create(1)
+cargo-create(1)
 
 :   Create a new cargo
 
-nanocl cargo-start(1)
+cargo-start(1)
 
 :   Start cargoes by names
 
-nanocl cargo-stop(1)
+cargo-stop(1)
 
 :   Stop cargoes by names
 
-nanocl cargo-restart(1)
+cargo-restart(1)
 
 :   Restart a cargo by its name
 
-nanocl cargo-remove(1)
+cargo-remove(1)
 
 :   Remove cargo by its name
 
-nanocl cargo-inspect(1)
+cargo-inspect(1)
 
 :   Inspect a cargo by its name
 
-nanocl cargo-patch(1)
+cargo-patch(1)
 
 :   Update a cargo by its name
 
-nanocl cargo-exec(1)
+cargo-exec(1)
 
 :   Execute a command inside a cargo
 
-nanocl cargo-history(1)
+cargo-history(1)
 
 :   List cargo history
 
-nanocl cargo-revert(1)
+cargo-revert(1)
 
 :   Revert cargo to a specific history
 
-nanocl cargo-logs(1)
+cargo-logs(1)
 
 :   Show logs
 
-nanocl cargo-run(1)
+cargo-run(1)
 
 :   Run a cargo
 
-nanocl cargo-stats(1)
+cargo-stats(1)
 
 :   Show stats of cargo
 
-nanocl cargo-help(1)
+cargo-help(1)
 
 :   Print this message or the help of the given subcommand(s)

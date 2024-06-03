@@ -1,14 +1,14 @@
 # NAME
 
-nanocl - \`nanocl state\` available arguments
+state - Apply or Remove a Statefile
 
 # SYNOPSIS
 
-**nanocl** \[**-h**\|**\--help**\] \<*subcommands*\>
+**state** \[**-h**\|**\--help**\] \<*subcommands*\>
 
 # DESCRIPTION
 
-\`nanocl state\` available arguments
+Apply or Remove a Statefile
 
 # OPTIONS
 
@@ -18,18 +18,18 @@ nanocl - \`nanocl state\` available arguments
 
 # SUBCOMMANDS
 
-nanocl-apply(1)
+state-apply(1)
 
 :   Create or Update elements from a Statefile
 
-nanocl-logs(1)
+state-logs(1)
 
 :   Logs elements from a Statefile
 
-nanocl-remove(1)
+state-remove(1)
 
 :   Remove elements from a Statefile
 
-nanocl-help(1)
+state-help(1)
 
 :   Print this message or the help of the given subcommand(s)
