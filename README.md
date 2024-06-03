@@ -29,7 +29,9 @@
 
 <br />
 
-**Nanocl** is an open-source distributed system designed to revolutionize developers' workflows. It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures. Nanocl also facilitates seamless deployment to production. By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
+**Nanocl** is an open-source distributed system designed to revolutionize developers' workflows.<br/>
+It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures.<br/>
+Nanocl also facilitates seamless deployment to production. By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
 
 **Join our *[discord][discord]* and help us shape the future of infrastructure management.**
 
@@ -133,11 +135,12 @@ Also don't hesitate to join the [discord][discord] if you have any question!
 Sponsors are the ones who make this project possible. They help us to keep the project alive and to improve it. If you want to become a sponsor, you can do so by clicking on the sponsor button. <br/>
 
 People that sponsor us will have their name or logo displayed here, and will have access to a special role on our discord server.
-Also if you sponsor for more then 40$ you will be rewarded with a VPS server with nanocl pre-installed ready to use for 1 month. <br/>
+
+**If you sponsor for more then 40$ you will be rewarded with a VPS server with nanocl pre-installed ready to use for 1 month.** <br/>
 
 You can also help us by contributing to the project, by reporting bugs, by suggesting new features, or by improving the [documentation][documentation_repository].
 
-**Don't forget to give a star to the project if you like it!** ⭐️
+**Or just give a star it's free and it helps us a lot! ⭐️**
 
 
 **Huge thanks to our sponsors**
