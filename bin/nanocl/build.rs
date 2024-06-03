@@ -7,20 +7,23 @@ use nanocl_utils::build_tools::*;
 
 include!("./src/models/mod.rs");
 
-/// ## ManPage
-///
-/// Definition of a man page to generate for given command
-///
-struct ManPage<'a> {
-  name: &'a str,
-  command: clap::Command,
-}
-
 /// ## MAN PATH
 ///
 /// Path where to render the man pages
 ///
 const MAN_PATH: &str = "./target/man";
+
+fn generate_man_recurr(base_name: &str, app: &clap::Command) -> Result<()> {
+  generate_man_page(base_name, app, MAN_PATH)?;
+  for subcommand in app.get_subcommands() {
+    let name = subcommand.get_name();
+    generate_man_page(&format!("{base_name}-{name}"), subcommand, MAN_PATH)?;
+    if subcommand.has_subcommands() {
+      generate_man_recurr(&format!("{base_name}-{name}"), subcommand)?;
+    }
+  }
+  Ok(())
+}
 
 /// ## Generate man pages
 ///
@@ -28,56 +31,12 @@ const MAN_PATH: &str = "./target/man";
 /// and write them inside [MAN_PATH](MAN_PATH)
 ///
 pub fn generate_man_pages() -> Result<()> {
-  let man_pages = [
-    ManPage {
-      name: "nanocl",
-      command: Cli::command(),
-    },
-    ManPage {
-      name: "nanocl-namespace",
-      command: NamespaceArg::command(),
-    },
-    ManPage {
-      name: "nanocl-cargo",
-      command: CargoArg::command(),
-    },
-    ManPage {
-      name: "nanocl-cargo-run",
-      command: CargoRunOpts::command(),
-    },
-    ManPage {
-      name: "nanocl-vm",
-      command: VmArg::command(),
-    },
-    ManPage {
-      name: "nanocl-vm-run",
-      command: VmRunOpts::command(),
-    },
-    ManPage {
-      name: "nanocl-state",
-      command: StateArg::command(),
-    },
-    ManPage {
-      name: "nanocl-state-apply",
-      command: StateApplyOpts::command(),
-    },
-    ManPage {
-      name: "nanocl-state-remove",
-      command: StateRemoveOpts::command(),
-    },
-    ManPage {
-      name: "nanocl-resource",
-      command: ResourceArg::command(),
-    },
-    ManPage {
-      name: "nanocl-setup",
-      command: InstallOpts::command(),
-    },
-  ];
+  // clear previous generation
+  fs::remove_dir_all(MAN_PATH)?;
+  // ensure the man page directory exists
   fs::create_dir_all(MAN_PATH)?;
-  for page in man_pages {
-    generate_man_page(page.name, &page.command, MAN_PATH)?;
-  }
+  let app = Cli::command();
+  generate_man_recurr("nanocl", &app)?;
   Ok(())
 }
 

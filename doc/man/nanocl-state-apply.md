@@ -1,16 +1,16 @@
 # NAME
 
-nanocl - \`nanocl state apply\` available options
+apply - Create or Update elements from a Statefile
 
 # SYNOPSIS
 
-**nanocl** \[**-s**\|**\--state-location**\] \[**-f**\|**\--follow**\]
+**apply** \[**-s**\|**\--state-location**\] \[**-f**\|**\--follow**\]
 \[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\] \[**-h**\|**\--help**\]
 \[*ARGS*\]
 
 # DESCRIPTION
 
-\`nanocl state apply\` available options
+Create or Update elements from a Statefile
 
 # OPTIONS
 

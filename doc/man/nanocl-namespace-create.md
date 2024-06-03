@@ -1,18 +1,16 @@
-NAME
-====
+# NAME
 
-nanocl-namespace-create
+create - Create new namespace
 
-SYNOPSIS
-========
+# SYNOPSIS
 
-**nanocl-namespace-create** \[**-h**\|**\--help**\] \<*NAME*\>
+**create** \[**-h**\|**\--help**\] \<*NAME*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
-OPTIONS
-=======
+Create new namespace
+
+# OPTIONS
 
 **-h**, **\--help**
 
