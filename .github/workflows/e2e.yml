@@ -46,6 +46,9 @@ jobs:
           NANOCL_CHANNEL=nightly cargo build --release --bin nanocl
           sudo cp target/release/nanocl /usr/bin/nanocl
           sudo chmod +x /usr/bin/nanocl
+          sudo groupadd nanocl
+          sudo usermod -aG nanocl $USER
+          newgrp nanocl
           sudo nanocl install -t installer.yml
       # Run E2E tests
       - name: E2E
