@@ -15,12 +15,12 @@ use nanocl_error::{
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+  utils,
   config::CliConfig,
   models::{
     GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
     GenericStopOpts,
   },
-  utils,
 };
 
 pub trait GenericCommand {
@@ -128,10 +128,10 @@ where
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
-    let pg_style = utils::progress::create_spinner_style("red");
     for name in &opts.keys {
-      let token = format!("{object_name}/{}", name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
+      let token = format!("{object_name}/{name}");
+      let pg_style = utils::progress::create_spinner_style(&token, "red");
+      let pg = utils::progress::create_progress("(deleting)", &pg_style);
       let (key, waiter_kind) = match object_name {
         "vms" => (
           format!("{name}.{}", namespace.clone().unwrap_or_default()),
@@ -166,18 +166,18 @@ where
       {
         if let HttpClientError::HttpError(err) = &err {
           if err.status == StatusCode::NOT_FOUND {
-            pg.finish();
+            pg.finish_with_message("(unchanged)");
             continue;
           }
         }
-        pg.finish_and_clear();
-        eprintln!("{err} {name}");
+        pg.finish();
+        eprintln!("{name}: {err}");
         continue;
       }
       if let Some(waiter) = waiter {
         waiter.await??;
       }
-      pg.finish();
+      pg.finish_with_message("(deleted)");
     }
     Ok(())
   }

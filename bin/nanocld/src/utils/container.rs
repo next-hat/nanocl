@@ -222,7 +222,7 @@ pub async fn create_instance(
     kind: kind.clone(),
     data: serde_json::to_value(&inspect)
       .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
-    node_key: state.inner.config.hostname.clone(),
+    node_name: state.inner.config.hostname.clone(),
     kind_key: kind_key.to_owned(),
     created_at: Some(
       chrono::NaiveDateTime::parse_from_str(

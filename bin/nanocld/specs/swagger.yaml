@@ -3619,7 +3619,9 @@ components:
         - contains
         properties:
           contains:
-            description: JSON contains
+            description: |-
+              TODO: Add Between
+              JSON contains
       - type: object
         required:
         - has-key
@@ -5098,6 +5100,9 @@ components:
           type: string
           format: date-time
           description: When the namespace was created
+        Metadata:
+          description: User defined metadata
+          nullable: true
     NamespaceInspect:
       type: object
       description: |-
@@ -5129,6 +5134,9 @@ components:
         Name:
           type: string
           description: Name of the namespace
+        Metadata:
+          description: User defined metadata
+          nullable: true
       additionalProperties: false
     NamespaceSummary:
       type: object
@@ -5427,12 +5435,29 @@ components:
       type: object
       required:
       - Name
+      - CreatedAt
       - IpAddress
+      - Endpoint
+      - Version
       properties:
         Name:
           type: string
-        IpAddress:
+          description: The name of the node
+        CreatedAt:
           type: string
+          format: date-time
+          description: The created at date
+        IpAddress:
+          $ref: '#/components/schemas/ipnet.IpNet'
+        Endpoint:
+          type: string
+          description: Endpoint to connect to the node
+        Version:
+          type: string
+          description: Version of the node
+        Metadata:
+          description: User defined metadata
+          nullable: true
     ObjPsStatus:
       type: object
       required:
@@ -5599,7 +5624,7 @@ components:
       - UpdatedAt
       - Name
       - Kind
-      - NodeKey
+      - NodeName
       - KindKey
       - Data
       properties:
@@ -5619,9 +5644,9 @@ components:
           description: Name of the process
         Kind:
           $ref: '#/components/schemas/ProcessKind'
-        NodeKey:
+        NodeName:
           type: string
-          description: Key of the node where the container is running
+          description: Name of the node where the container is running
         KindKey:
           type: string
           description: Key of the related kind
@@ -6321,7 +6346,6 @@ components:
         Immutable:
           type: boolean
           description: The secret cannot be updated
-          nullable: true
         Metadata:
           type: object
           description: The metadata of the resource (user defined)

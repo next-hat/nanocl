@@ -187,6 +187,7 @@ impl ObjTaskUpdate for CargoDb {
           });
         }
         Ok(_) => {
+          log::debug!("cargo instance {} started", cargo.spec.cargo_key);
           // Delete old containers
           let state_ptr_ptr = state.clone();
           let _ = utils::container::delete_instances(

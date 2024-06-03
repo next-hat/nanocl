@@ -4,8 +4,9 @@ use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::namespace::{NamespacePartial, Namespace, NamespaceInspect};
 
 use crate::{
+  utils,
   repositories::generic::*,
-  models::{NamespaceDb, SystemState, CargoDb},
+  models::{CargoDb, NamespaceDb, SystemState},
 };
 
 use super::generic::*;
@@ -60,17 +61,14 @@ impl ObjInspectByPk for NamespaceDb {
     let namespace = NamespaceDb::read_by_pk(pk, &state.inner.pool).await?;
     let models =
       CargoDb::read_by_namespace(&namespace.name, &state.inner.pool).await?;
+    // TODO: Refactor this it doesn't scale at all
     let mut cargoes = Vec::new();
     for cargo in models {
       let cargo =
         CargoDb::inspect_obj_by_pk(&cargo.spec.cargo_key, state).await?;
       cargoes.push(cargo);
     }
-    let network = state
-      .inner
-      .docker_api
-      .inspect_network(pk, None::<InspectNetworkOptions<String>>)
-      .await?;
+    let network = utils::network::inspect_network(pk, state).await?;
     Ok(NamespaceInspect {
       name: namespace.name,
       cargoes,

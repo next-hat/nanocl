@@ -193,6 +193,9 @@ mod tests {
         None::<String>,
       )
       .await;
-    assert!(wait_task.await.is_ok())
+    assert!(wait_task.await.is_ok());
+    let _ = client
+      .send_delete(&format!("/cargoes/{CARGO_NAME}"), None::<String>)
+      .await;
   }
 }

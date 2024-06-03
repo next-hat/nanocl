@@ -111,7 +111,8 @@ async fn exec_docker(
         ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
       match (&kind, &actual_status.wanted) {
         (EventActorKind::Cargo, status)
-          if status != &ObjPsStatusKind::Stop.to_string() =>
+          if status != &ObjPsStatusKind::Stop.to_string()
+            || status != &ObjPsStatusKind::Start.to_string() =>
         {
           ObjPsStatusDb::update_actual_status(
             &kind_key,
@@ -128,7 +129,8 @@ async fn exec_docker(
           );
         }
         (EventActorKind::Vm, status)
-          if status != &ObjPsStatusKind::Stop.to_string() =>
+          if status != &ObjPsStatusKind::Stop.to_string()
+            || status != &ObjPsStatusKind::Start.to_string() =>
         {
           ObjPsStatusDb::update_actual_status(
             &kind_key,

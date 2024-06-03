@@ -16,6 +16,7 @@ mod job;
 mod generic;
 mod metric;
 mod event;
+mod backup;
 
 pub use generic::*;
 
@@ -35,3 +36,4 @@ pub use install::exec_install;
 pub use uninstall::exec_uninstall;
 pub use secret::exec_secret;
 pub use metric::exec_metric;
+pub use backup::exec_backup;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - 2024-05-16
 
+### Chore
+
+- Update ntex to version 2
+
 ### Added
 
 - `--store-addr` options from the command line to specify the store address
@@ -15,11 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic RepositoryCountBy interface
 - Endpoint `GET /metrics/count` to get the number of metrics
 - status field for VmSummary, CargoSummary
+- Better generic filter to sql filter
+- Indexes for all sql schema
+- Filter query by dates
+- Updating a secret now trigger an update for related cargoes
+
 
 ### Fixed
 
 - Removing a job with a running process will now stop the process before removing the job
 - Patch a restarting cargo was not working and returning an error
+- Create network namespace if not existing when inspecting a listing namespaces
+- Patching cargo when restarting was not working
 
 ### Changed
 

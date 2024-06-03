@@ -149,6 +149,7 @@ mod test_namespace {
   async fn create(client: &TestClient) {
     let new_namespace = NamespacePartial {
       name: String::from("controller-default"),
+      metadata: None,
     };
     let res = client
       .send_post(ENDPOINT, Some(new_namespace), None::<String>)
