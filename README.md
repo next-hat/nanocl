@@ -1,14 +1,11 @@
 <div align="center">
-  <img width="200" height="200" src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h1>Nanocl</h1>
-  <p>
-
-[![Stars](https://img.shields.io/github/stars/next-hat/nanocl?label=%E2%AD%90%20stars%20%E2%AD%90)](https://github.com/next-hat/nanocl)
-[![Build With](https://img.shields.io/badge/built_with-Rust-dca282.svg?style=flat)](https://github.com/next-hat/nanocl)
-[![Chat on Discord](https://img.shields.io/discord/1011267493114949693?label=chat&logo=discord&style=flat)](https://discord.gg/WV4Aac8uZg)
-
+  <img width="142" height="142" src="https://download.next-hat.com/ressources/images/logo.png" >
+  <h3>Develop, Distribute</h3>
+  <p align="center">
+    <a href="https://next-hat.com/nanocl" target="_blank"><b>Docs</b></a> •
+    <a href="https://github.com/next-hat/nanocl/tree/nightly/examples" target="_blank"><b>Examples</b></a> •
+    <a href="https://discord.gg/WV4Aac8uZg" target="_blank"><b>Discord</b></a>
   </p>
-
   <p>
 
 [![Tests](https://github.com/next-hat/nanocl/actions/workflows/tests.yml/badge.svg)](https://github.com/next-hat/nanocl/actions/workflows/tests.yml)
@@ -30,44 +27,22 @@
  </span>
 </blockquote>
 
-## ❓ Why Nanocl
+<br />
 
-`Nanocl` is all about easing your container and VM management with Rust-powered platform.
-With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.
-We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean.
-**_Join our [discord][discord] and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
+**Nanocl** is an open-source distributed system designed to revolutionize developers' workflows. It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures. Nanocl also facilitates seamless deployment to production. By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
+<br/>
+**Join our *[discord][discord]* and help us shape the future of infrastructure management.**
 
-## 📙 Table of Contents
+## Latest news
 
-- [❓ Why Nanocl ?](#-why-nanocl)
-- [📙 Table of Contents](#-table-of-contents)
-- [🚀 Key Benefits](#-key-benefits)
-- [🔧 Usage](#-usage)
-- [📺 Demo](#-demo)
-- [🧿 Architecture](#-architecture)
-- [📚 Documentation](#-documentation)
-- [📋 Requirements](#-requirements)
-- [💾 Installation](#-installation)
-- [👨‍💻 Contributing](#-contributing)
-- [💎 Sponsors](#-sponsors)
-- [⭐️ Show your support](#️-show-your-support)
+- [2024/06/01] [We are invited to the Merge Berlin 2024](https://www.linkedin.com/feed/update/urn:li:activity:7201921660289998850) (event)
+- [2024/05/07] [Context, SubState and more](https://docs.next-hat.com/blog/nanocl-0.14) (release)
 
-## 🚀 Key Benefits
 
-- Easy deployment and management
-- Significantly reduce the delay between writing code and shipping it to production
-- Efficiently manage and scale your infrastructure as your needs evolve
-- Enhance security by isolating services using namespaces and networks.
-- Enjoy peace of mind with automatic backups, zero downtime fail-over, and comprehensive log monitoring
-- Enjoy history tracking of your container and virtual machine configuration
-- Revert configuration as quickly as pressing a button
-- Build an entire CI/CD pipeline, from tests to high-availability production
-- Best ideas and practices from the community
+## Usage
 
-## 🔧 Usage
-
-`Nanocl` is designed to be easy to operate by mostly using **Statefiles**.<br />
-**Statefiles** are `yaml` files that define the state you want.<br />
+**Nanocl** is designed to be easy to operate by mostly using **Statefiles**.<br />
+**Statefiles** are `yaml`, `toml` or `json` files that define the state you want.<br />
 There is an example used to deploy our [documentation][documentation]:
 
 ```yaml
@@ -78,13 +53,13 @@ ApiVersion: v0.14
 Cargoes:
 - Name: doc
   Container:
-    Image: ghcr.io/next-hat/documentation:0.13.0
+    Image: ghcr.io/next-hat/documentation:0.14.0
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: docs.next-hat.com
-  Kind: ncproxy.io/rule/v0.10
+  Kind: ncproxy.io/rule
   Data:
     Rules:
     - Domain: docs.next-hat.com
@@ -99,26 +74,30 @@ Resources:
 To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
 We can also revert a state by calling `nanocl state rm -s path|url`<br />
 
-## 📺 Demo
+## Demo
 
-Demo of `Nanocl` in action when applying `example/deploy_example.yml`:
+Below are live demos of **Nanocl** in action:
+
+### Cargo and Resource
+
+Demo of **Nanocl** in action when applying `example/deploy_example.yml`:
 
 <div align="center">
   <img src="./doc/example.gif" />
 </div>
 
-## 🧿 Architecture
+## Architecture
 
-`Nanocl` is designed in a **micro services** architecture several component are required and they are running as **container** included the `Nanocl Daemon` itself.
-The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionality:
+**Nanocl** is designed in a **micro services** architecture several component are required and they are running as **container** included the **Nanocl Daemon** itself.
+The following components will be installed during `nanocl install` and are required to ensure **Nanocl** functionality:
 
 - `nstore` to save our state
 - `ndaemon` as **REST API** to manage everything
 - `nmetrics` to monitor cpu, memory and network usage
-- `nproxy` proxy to redirect traffic to our **containers** and **virtual machines**
-- `ncproxy` to update proxy configuration based on the current state
-- `ndns` to manage the dns entries for the **containers** and **virtual machines**
-- `ncdns` to update dns entries based on the current state
+- `nproxy` proxy to redirect traffic to our **containers** and **virtual machines** (optional)
+- `ncproxy` to update proxy configuration based on the current state (optional)
+- `ndns` to manage the dns entries for the **containers** and **virtual machines** (optional)
+- `ncdns` to update dns entries based on the current state (optional)
 
 Simplified version of our architecture for a single node:
 
@@ -126,37 +105,45 @@ Simplified version of our architecture for a single node:
   <img src="./doc/architecture.png" />
 </div>
 
+## Installation
+
+To install **Nanocl** for your system, please refer to our online [installation guide][nanocl_install_guide].
+
 ## 📚 Documentation
 
-To learn more about `Nanocl`, you can take a look at the following resources:
+To learn more about **Nanocl**, you can take a look at the following resources:
 
 - [Overview][nanocl_overview]
 - [Get Started][nanocl_get_started]
 - [CLI References][nanocl_cli_ref]
 - [DAEMON References][nanocl_daemon_ref]
 
-## 📋 Requirements
-
-To work properly `Nanocl` must have theses dependencies installed on the system:
-
-- [Docker][docker] minimum version 1.41
-
-## 💾 Installation
-
-To install `Nanocl`, please refer to our online [installation guide][nanocl_install_guide].
-
-
-## 👨‍💻 Contributing
+## Contributing
 
 Every contribution is very welcome.
+Bug reports, feature requests, and pull requests are the most common ways to contribute.
 
-But to be able to do so you need a dev environnement right ?<br />
-You can learn more about it on the [contribution guide][contributing_guide].<br />
+You can also help us by improving the [documentation][documentation_repository].
+
+Learn how to setup a development environment by reading the [contribution guide][contributing_guide].
 Also don't hesitate to join the [discord][discord] if you have any question!
 
-## 💎 Sponsors
+## Sponsors
 
-Huge thanks to our sponsors
+Sponsors are the ones who make this project possible. They help us to keep the project alive and to improve it. If you want to become a sponsor, you can do so by clicking on the sponsor button. <br/>
+
+People that sponsor us will have their name or logo displayed here, and will have access to a special role on our discord server.
+Also if you sponsor for more then 40$ you will be rewarded with a VPS server with nanocl pre-installed ready to use for 1 month. <br/>
+
+You can also help us by contributing to the project, by reporting bugs, by suggesting new features, or by improving the [documentation][documentation_repository].
+
+**Don't forget to give a star to the project if you like it!** ⭐️
+
+<br/>
+
+**Huge thanks to our sponsors**
+
+<br/>
 
 <table>
   <tr>
@@ -185,9 +172,6 @@ Huge thanks to our sponsors
   </tr>
 </table>
 
-## ⭐️ Show your support
-
-Give a ⭐️ if this project helped you!
 
 [contributing_guide]: ./CONTRIBUTING.md
 [documentation]: https://docs.next-hat.com
@@ -198,3 +182,4 @@ Give a ⭐️ if this project helped you!
 [nanocl_daemon_ref]: https://docs.next-hat.com/references/nanocl/daemon/overview
 [docker]: https://www.docker.com
 [discord]: https://discord.gg/WV4Aac8uZg
+[documentation_repository]: https://github.com/next-hat/documentation

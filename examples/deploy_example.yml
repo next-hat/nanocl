@@ -1,85 +1,19 @@
 ApiVersion: v0.14
 
-Secrets:
-  - Name: env.deploy-example.com
-    Kind: nanocl.io/env
-    Data:
-      - MY_KEY=MY_VALUE
-
-  - Name: env.trash
-    Kind: nanocl.io/env
-    Data:
-      - MY_TRASH_KEY=MY_TRASH_VALUE
-
-# See all options:
-# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
-  - Name: deploy-example.com
-    Kind: ncproxy.io/rule
-    ## User defined metadata mostly used for plugins
-    Metadata:
-      CertManager: certbot
-      Selector:
-        App: deploy-example
-    Data:
-      Rules:
-        - Domain: deploy-example.com
-          Network: All
-          LimitReqZone:
-            Size: 10
-            Rate: 2
-          Locations:
-            - Path: /
-              LimitReq:
-                Burst: 2
-                Delay: 600
-              Target:
-                Key: deploy-example2.global.c
-                Port: 9000
-            - Path: /v1
-              Target:
-                Key: deploy-example.global.c
-                Port: 9000
-            - Path: /v2
-              Target:
-                Key: deploy-example2.global.c
-                Port: 9000
-            - Path: /private
-              AllowedIps:
-                - 127.0.0.2
-              Target:
-                Key: deploy-example2.global.c
-                Port: 9000
+- Name: deploy-example.com
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: deploy-example.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Key: deploy-example2.global.c
+          Port: 9000
 
-  - Name: proxy-get-started
-    Kind: ncproxy.io/rule
-    Data:
-      Rules:
-        - Domain: get-started.com
-          Network: All
-          Locations:
-            - Path: /
-              Target:
-                Url: https://google.com
-                Redirect: Temporary
-
-# See all options:
-# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
-  - Name: deploy-example
-    Metadata:
-      Selector:
-        App: deploy-example
-    Secrets:
-      - env.deploy-example.com
-      - env.deploy-secret
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
-
-  - Name: deploy-example2
-    Secrets:
-      - env.trash
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
-      Env:
-        - APP=GET_STARTED2
+- Name: deploy-example
+  Container:
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
