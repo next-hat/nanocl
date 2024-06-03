@@ -33,7 +33,6 @@ pub struct SecretArg {
 
 /// Create a new nanocl.io/env secret
 #[derive(Clone, Parser)]
-#[clap(name = "nanocl secret create env")]
 pub struct EnvCreateOpts {
   /// List of values in the form of `key=value`
   #[clap(required = true)]
@@ -42,7 +41,6 @@ pub struct EnvCreateOpts {
 
 /// Create a new nanocl.io/tls secret
 #[derive(Clone, Parser, Serialize)]
-#[clap(name = "nanocl secret create tls")]
 pub struct TlsCreateOpts {
   /// Certificate
   #[clap(long)]
@@ -65,7 +63,6 @@ pub struct TlsCreateOpts {
 
 /// Create a new nanocl.io/container-registry secret
 #[derive(Clone, Parser, Serialize)]
-#[clap(name = "nanocl secret create container-registry")]
 pub struct ContainerRegistryCreateOpts {
   pub username: Option<String>,
   pub password: Option<String>,
