@@ -282,8 +282,16 @@ pub struct ProxyHttpLocation {
   /// The target cargo
   pub target: LocationTarget,
   /// Setup limit request for this location
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub limit_req: Option<LimitReq>,
   /// Allowed ip addr
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub allowed_ips: Option<Vec<String>>,
   /// Extras header to add
   #[cfg_attr(

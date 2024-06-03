@@ -41,7 +41,7 @@ impl From<&SecretPartial> for SecretDb {
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
       kind: secret.kind.clone(),
-      immutable: secret.immutable.unwrap_or(false),
+      immutable: secret.immutable,
       data: secret.data.clone(),
       metadata: secret.metadata.clone(),
     }

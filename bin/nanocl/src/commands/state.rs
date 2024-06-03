@@ -593,6 +593,9 @@ async fn state_apply(
             let update: SecretUpdate = secret.clone().into();
             client.patch_secret(&secret.name, &update).await?;
             pg.set_message("(updated)");
+          } else {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }
@@ -641,14 +644,10 @@ async fn state_apply(
         Err(_) => {
           client.create_cargo(cargo, Some(&namespace)).await?;
           pg.set_message("(created)");
-          println!("created");
         }
         Ok(inspect) => {
           let cmp: CargoSpecPartial = inspect.spec.into();
-          let ccmp = serde_json::to_string(&cmp).unwrap();
-          let ccargo = serde_json::to_string(&cargo).unwrap();
-          if (ccmp != ccargo) || opts.reload {
-            println!("DIFF {cmp:?} {cargo:?}");
+          if (cmp != *cargo) || opts.reload {
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
@@ -686,13 +685,11 @@ async fn state_apply(
         }
         Ok(inspect) => {
           let cmp: VmSpecPartial = inspect.spec.into();
-          if cmp != *vm {
+          if (cmp != *vm) || opts.reload {
             let update: VmSpecUpdate = vm.clone().into();
             client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
             pg.set_message("(updated)");
-          } else if inspect.status.actual == ObjPsStatusKind::Start
-            && !opts.reload
-          {
+          } else if inspect.status.actual == ObjPsStatusKind::Start {
             pg.finish_with_message("(unchanged)");
             continue;
           }
@@ -725,10 +722,13 @@ async fn state_apply(
         }
         Ok(inspect) => {
           let cmp: ResourcePartial = inspect.into();
-          if cmp != *resource {
+          if (cmp != *resource) || opts.reload {
             let update: ResourceUpdate = resource.clone().into();
             client.put_resource(&resource.name, &update).await?;
             pg.set_message("(updated)");
+          } else {
+            pg.finish_with_message("(unchanged)");
+            continue;
           }
         }
       }

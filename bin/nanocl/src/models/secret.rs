@@ -91,7 +91,7 @@ impl TryFrom<SecretCreateOpts> for SecretPartial {
     Ok(Self {
       name: opts.name,
       kind: kind.to_string(),
-      immutable: None,
+      immutable: false,
       data,
       metadata: None,
     })
