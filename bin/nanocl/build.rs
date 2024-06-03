@@ -31,8 +31,6 @@ fn generate_man_recurr(base_name: &str, app: &clap::Command) -> Result<()> {
 /// and write them inside [MAN_PATH](MAN_PATH)
 ///
 pub fn generate_man_pages() -> Result<()> {
-  // clear previous generation
-  fs::remove_dir_all(MAN_PATH)?;
   // ensure the man page directory exists
   fs::create_dir_all(MAN_PATH)?;
   let app = Cli::command();
