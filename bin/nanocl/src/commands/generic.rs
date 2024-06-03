@@ -131,7 +131,7 @@ where
     for name in &opts.keys {
       let token = format!("{object_name}/{name}");
       let pg_style = utils::progress::create_spinner_style(&token, "red");
-      let pg = utils::progress::create_progress("(deleting)", &pg_style);
+      let pg = utils::progress::create_progress("(destroying)", &pg_style);
       let (key, waiter_kind) = match object_name {
         "vms" => (
           format!("{name}.{}", namespace.clone().unwrap_or_default()),
@@ -177,7 +177,7 @@ where
       if let Some(waiter) = waiter {
         waiter.await??;
       }
-      pg.finish_with_message("(deleted)");
+      pg.finish_with_message("(destroyed)");
     }
     Ok(())
   }

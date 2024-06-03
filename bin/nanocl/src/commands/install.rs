@@ -132,6 +132,9 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
   for cargo in &cargoes {
+    let token = format!("cargo/{}", &cargo.name);
+    let pg_style = utils::progress::create_spinner_style(&token, "green");
+    let pg = utils::progress::create_progress("(submitting)", &pg_style);
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),
       "is not specified".into(),
@@ -144,17 +147,18 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       ));
     };
     if docker.inspect_image(&image).await.is_err() || args.force_pull {
-      utils::docker::install_image(image_name, image_tag, &docker).await?;
+      pg.set_message("(pulling)");
+      utils::docker::install_image(image_name, image_tag, &docker, true)
+        .await?;
     }
-    let token = format!("cargo/{}", &cargo.name);
-    let pg_style = utils::progress::create_spinner_style(&token, "red");
-    let pg = utils::progress::create_progress("submitting", &pg_style);
+    pg.set_message("(creating)");
     let container = utils::docker::create_cargo_container(
       cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),
       &docker,
     )
     .await?;
+    pg.set_message("(starting)");
     docker
       .start_container(&container.id, None::<StartContainerOptions<String>>)
       .await
@@ -162,9 +166,11 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
         err.map_err_context(|| format!("Unable to start cargo {}", cargo.name))
       })?;
     ntex::time::sleep(Duration::from_secs(2)).await;
-    pg.finish();
+    pg.finish_with_message("(running)");
   }
   if is_docker_desktop {
+    println!("Docker desktop detected");
+    println!("Setting up context for docker desktop");
     let context = Context {
       name: "desktop-linux".into(),
       meta_data: ContextMetaData {
@@ -189,6 +195,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       eprintln!("WARN: Unable to use context for docker desktop: {err}");
     }
   }
+  println!("Nanocl system installed");
   if args.follow {
     cargoes
       .into_iter()

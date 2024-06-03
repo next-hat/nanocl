@@ -40,15 +40,17 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   for cargo in cargoes {
     let token = format!("cargo/{}", cargo.name);
     let pg_style = utils::progress::create_spinner_style(&token, "red");
-    let pg = utils::progress::create_progress("submitting", &pg_style);
+    let pg = utils::progress::create_progress("(submitting)", &pg_style);
     let key = format!("{}.system.c", &cargo.name);
     if docker
       .inspect_container(&key, None::<InspectContainerOptions>)
       .await
       .is_err()
     {
+      pg.finish_with_message("(not found)");
       continue;
     };
+    pg.set_message("(destroying)");
     docker
       .remove_container(
         &key,
@@ -63,7 +65,8 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
           format!("Unable to remove container {}", &cargo.name)
         })
       })?;
-    pg.finish();
+    pg.finish_with_message("(destroyed)");
   }
+  println!("Nanocl system uninstalled");
   Ok(())
 }
