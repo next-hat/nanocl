@@ -1,4 +1,4 @@
-name: Tests
+name: E2E Tests
 
 on:
   push:
@@ -15,7 +15,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  ubuntu_test:
+  ubuntu_e2e_test:
     strategy:
       fail-fast: true
     runs-on: ubuntu-latest
