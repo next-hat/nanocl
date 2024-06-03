@@ -18,6 +18,7 @@ mod job;
 mod generic;
 mod metric;
 mod event;
+mod backup;
 
 pub use event::*;
 pub use generic::*;
@@ -35,6 +36,7 @@ pub use install::*;
 pub use uninstall::*;
 pub use node::*;
 pub use job::*;
+pub use backup::*;
 
 /// Cli available options and commands
 #[derive(Parser)]
@@ -83,6 +85,8 @@ pub enum Command {
   Install(InstallOpts),
   /// Uninstall components
   Uninstall(UninstallOpts),
+  /// Backup the current state
+  Backup(BackupOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

@@ -133,7 +133,7 @@ impl From<Process> for ProcessRow {
       key: process.key,
       name: name.to_owned(),
       image: config.image.unwrap_or_default(),
-      node: process.node_key,
+      node: process.node_name,
       status,
       ip: ip_addr,
       created_at,

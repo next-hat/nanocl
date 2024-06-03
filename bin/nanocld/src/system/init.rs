@@ -165,6 +165,8 @@ mod tests {
         "postgresql://root:root@store.nanocl.internal:26258/defaultdb"
           .to_owned(),
       ),
+      hostname: Some("init-test.nanocl.io".to_owned()),
+      gateway: Some("127.0.0.1".to_owned()),
       conf_dir: String::from("/etc/nanocl"),
       nodes: Vec::default(),
       ..Default::default()

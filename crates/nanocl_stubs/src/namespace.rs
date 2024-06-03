@@ -19,6 +19,12 @@ pub struct Namespace {
   pub name: String,
   /// When the namespace was created
   pub created_at: chrono::NaiveDateTime,
+  /// User defined metadata
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
 }
 
 /// A Namespace partial is a payload used to create a new namespace
@@ -33,6 +39,12 @@ pub struct Namespace {
 pub struct NamespacePartial {
   /// Name of the namespace
   pub name: String,
+  /// User defined metadata
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
 }
 
 /// A Namespace Summary is a summary of a namespace

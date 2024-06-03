@@ -3,9 +3,12 @@ use std::str::FromStr;
 use ntex::rt;
 
 use nanocl_error::io::IoResult;
-use nanocl_stubs::system::{
-  Event, EventActor, EventActorKind, EventKind, NativeEventAction,
-  ObjPsStatusKind,
+use nanocl_stubs::{
+  generic::{GenericClause, GenericFilter},
+  system::{
+    Event, EventActor, EventActorKind, EventKind, NativeEventAction,
+    ObjPsStatusKind,
+  },
 };
 
 use crate::{
@@ -74,7 +77,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
-fn start(
+fn starting(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
@@ -99,7 +102,7 @@ fn start(
 /// Handle delete event for living objects (job, cargo, vm)
 /// by checking if the event is `NativeEventAction::Deleting`
 /// and pushing into the task manager the task to delete the object
-fn delete(
+fn destroying(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
@@ -122,7 +125,7 @@ fn delete(
   }
 }
 
-fn update(
+fn updating(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
@@ -140,7 +143,44 @@ fn update(
   }
 }
 
-fn stop(
+async fn update(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> Option<ObjTaskFuture> {
+  match actor.kind {
+    // If a secret is updated we check for the cargoes using it and fire an update for them
+    EventActorKind::Secret => {
+      log::debug!("handling update event for secret {key}");
+      let filter = GenericFilter::new().r#where(
+        "data",
+        GenericClause::Contains(serde_json::json!({
+          "Secrets": [
+            key
+          ]
+        })),
+      );
+      let cargoes = CargoDb::transform_read_by(&filter, &state.inner.pool)
+        .await
+        .unwrap();
+      log::debug!("found {} cargoes using secret {key}", cargoes.len());
+      for cargo in &cargoes {
+        ObjPsStatusDb::update_actual_status(
+          &cargo.spec.cargo_key,
+          &ObjPsStatusKind::Updating,
+          &state.inner.pool,
+        )
+        .await
+        .ok();
+        state.emit_normal_native_action(cargo, NativeEventAction::Updating);
+      }
+      None
+    }
+    _ => None,
+  }
+}
+
+fn stopping(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
@@ -166,7 +206,6 @@ fn stop(
 /// and push the action into the task manager
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
-
 async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   match e.kind {
     EventKind::Error | EventKind::Warning => return Ok(()),
@@ -199,10 +238,11 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   }
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
-    NativeEventAction::Starting => start(&key, actor, state),
-    NativeEventAction::Stopping => stop(&key, actor, state),
-    NativeEventAction::Updating => update(&key, actor, state),
-    NativeEventAction::Destroying => delete(&key, actor, state),
+    NativeEventAction::Starting => starting(&key, actor, state),
+    NativeEventAction::Stopping => stopping(&key, actor, state),
+    NativeEventAction::Updating => updating(&key, actor, state),
+    NativeEventAction::Update => update(&key, actor, state).await,
+    NativeEventAction::Destroying => destroying(&key, actor, state),
     NativeEventAction::Die => {
       job_ttl(actor, state).await?;
       None

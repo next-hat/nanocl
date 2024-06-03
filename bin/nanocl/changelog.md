@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - 2024-05-16
 
+### Added
+
+- Status information in the table of cargo ls and vm ls command and job ls
+- `nanocl metric inspect` command to get details about a metric
+- `nanocl event inspect` command to get details about an event
+- `nanocl backup` command to backup the current state into multiple Statefiles
+- `HOST` env variable to override the default host
+- `CERT` and `CERT_KEY` env variable to pass certificate and certificate key to the client
+
 ### Fixed
 
 - `nanocl cargo run` now correctly wait the cargo to be running before returning
@@ -17,17 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nanocl job start` now correctly wait the job to be running before returning
 - `nanocl vm start` now correctly wait the vm to be running before returning
 - `nanocl vm stop` now correctly wait the vm to be stopped before returning
+- Diff trigger when applying a Statefile now correctly compare the current state with the new state
 
 ### Changed
 
 - `inspect` `rm` `stop` `start` have been refactored to have a single interface matching all object
 - removed the namespace in the table of cargo ls and vm ls command
-
-### Added
-
-- Status information in the table of cargo ls and vm ls command and job ls
-- `nanocl metric inspect` command to get details about a metric
-- `nanocl event inspect` command to get details about an event
+- Cleaner Loader when apply and removing Statefile
 
 ## [0.14.0] - 2024-05-08
 
