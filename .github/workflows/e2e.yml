@@ -49,8 +49,8 @@ jobs:
           sudo groupadd nanocl
           sudo usermod -aG nanocl $USER
           newgrp nanocl
-          sudo nanocl install -t installer.yml
+          nanocl install -t installer.yml
       # Run E2E tests
       - name: E2E
         run: |
-          sudo ./tests/e2e.bats
+          bats ./tests/e2e.bats
