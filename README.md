@@ -30,7 +30,7 @@
 <br />
 
 **Nanocl** is an open-source distributed system designed to revolutionize developers' workflows. It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures. Nanocl also facilitates seamless deployment to production. By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
-<br/>
+
 **Join our *[discord][discord]* and help us shape the future of infrastructure management.**
 
 ## Latest news
@@ -71,8 +71,8 @@ Resources:
           Port: 80
 ```
 
-To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
-We can also revert a state by calling `nanocl state rm -s path|url`<br />
+To apply a state you can do it easily bu running `nanocl state apply -s path|url`<br />
+You can also remove a state by calling `nanocl state rm -s path|url`<br />
 
 ## Demo
 
@@ -139,11 +139,9 @@ You can also help us by contributing to the project, by reporting bugs, by sugge
 
 **Don't forget to give a star to the project if you like it!** ⭐️
 
-<br/>
 
 **Huge thanks to our sponsors**
 
-<br/>
 
 <table>
   <tr>
