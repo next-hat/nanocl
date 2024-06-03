@@ -96,6 +96,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Context(args) => commands::exec_context(&cli_conf, args).await,
     Command::Info => commands::exec_info(&cli_conf).await,
     Command::Metric(args) => commands::exec_metric(&cli_conf, args).await,
+    Command::Backup(opts) => commands::exec_backup(&cli_conf, opts).await,
   }
 }
 
