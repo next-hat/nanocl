@@ -273,7 +273,6 @@ pub enum CargoCommand {
 
 /// `nanocl cargo` available arguments
 #[derive(Clone, Parser)]
-#[clap(name = "nanocl cargo")]
 pub struct CargoArg {
   /// namespace to target by default global is used
   #[clap(long, short)]
