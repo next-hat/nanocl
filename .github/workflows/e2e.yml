@@ -53,4 +53,4 @@ jobs:
       # Run E2E tests
       - name: E2E
         run: |
-          sudo sh ./tests/e2e.bats
+          sudo ./tests/e2e.bats
