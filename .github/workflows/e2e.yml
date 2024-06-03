@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches: ["nightly"]
+  pull_request:
+    branches: ["nightly"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/nightly' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ubuntu_test:
+    strategy:
+      fail-fast: true
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone project
+      - uses: actions/checkout@v3
+      # Install buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      # Set buildx cache
+      - name: Cache register
+        uses: actions/cache@v3
+        with:
+          path: ~/buildx-cache
+          key: buildx-cache
+      # Install cargo make
+      - uses: davidB/rust-cargo-make@v1
+      - name: Install bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+      # Build nightly image and install nanocl
+      - name: Prepare CI
+        run: |
+          sh ./scripts/build_image.sh
+          NANOCL_CHANNEL=nightly cargo build --release --bin nanocl
+          cp target/release/nanocl /usr/bin/nanocl
+          chmod +x /usr/bin/nanocl
+          nanocl install -t installer.yml
+      # Run E2E tests
+      - name: E2E
+        run: |
+          ./tests/e2e.bats
