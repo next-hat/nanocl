@@ -44,10 +44,10 @@ jobs:
         run: |
           sh ./scripts/build_images.sh
           NANOCL_CHANNEL=nightly cargo build --release --bin nanocl
-          cp target/release/nanocl /usr/bin/nanocl
-          chmod +x /usr/bin/nanocl
-          nanocl install -t installer.yml
+          sudo cp target/release/nanocl /usr/bin/nanocl
+          sudo chmod +x /usr/bin/nanocl
+          sudo nanocl install -t installer.yml
       # Run E2E tests
       - name: E2E
         run: |
-          ./tests/e2e.bats
+          sudo sh ./tests/e2e.bats
