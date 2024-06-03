@@ -31,7 +31,8 @@
 
 **Nanocl** is an open-source distributed system designed to revolutionize developers' workflows.<br/>
 It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures.<br/>
-Nanocl also facilitates seamless deployment to production. By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
+Nanocl also facilitates seamless deployment to production.<br/>
+By empowering developers and DevOps professionals, Nanocl helps optimize workflows, enhance security, and reduce operational costs.
 
 **Join our *[discord][discord]* and help us shape the future of infrastructure management.**
 
