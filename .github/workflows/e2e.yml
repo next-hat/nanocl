@@ -42,7 +42,7 @@ jobs:
       # Build nightly image and install nanocl
       - name: Prepare CI
         run: |
-          sh ./scripts/build_image.sh
+          sh ./scripts/build_images.sh
           NANOCL_CHANNEL=nightly cargo build --release --bin nanocl
           cp target/release/nanocl /usr/bin/nanocl
           chmod +x /usr/bin/nanocl
