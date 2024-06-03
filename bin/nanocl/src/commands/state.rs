@@ -618,10 +618,10 @@ async fn state_apply(
         .await?;
         client.delete_job(&job.name).await?;
         waiter.await??;
-        pg.finish_with_message("(cleared)");
+        pg.set_message("(cleared)");
       }
       client.create_job(job).await?;
-      pg.finish_with_message("(created)");
+      pg.set_message("(created)");
       let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
@@ -658,7 +658,7 @@ async fn state_apply(
           }
         }
       }
-      pg.finish_with_message("(starting)");
+      pg.set_message("(starting)");
       let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", cargo.name),
         EventActorKind::Cargo,
