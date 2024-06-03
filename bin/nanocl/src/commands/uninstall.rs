@@ -37,12 +37,10 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();
-  let pg_style = utils::progress::create_spinner_style("red");
   for cargo in cargoes {
-    let pg = utils::progress::create_progress(
-      &format!("cargo/{}", cargo.name),
-      &pg_style,
-    );
+    let token = format!("cargo/{}", cargo.name);
+    let pg_style = utils::progress::create_spinner_style(&token, "red");
+    let pg = utils::progress::create_progress("submitting", &pg_style);
     let key = format!("{}.system.c", &cargo.name);
     if docker
       .inspect_container(&key, None::<InspectContainerOptions>)

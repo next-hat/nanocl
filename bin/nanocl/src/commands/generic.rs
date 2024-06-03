@@ -128,9 +128,9 @@ where
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
-    let pg_style = utils::progress::create_spinner_style("red");
     for name in &opts.keys {
       let token = format!("{object_name}/{}", name);
+      let pg_style = utils::progress::create_spinner_style(&token, "red");
       let pg = utils::progress::create_progress(&token, &pg_style);
       let (key, waiter_kind) = match object_name {
         "vms" => (

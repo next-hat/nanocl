@@ -20,7 +20,8 @@ pub struct SecretPartial {
   /// The kind of secret
   pub kind: String,
   /// The secret cannot be updated
-  pub immutable: Option<bool>,
+  #[cfg_attr(feature = "serde", serde(default))]
+  pub immutable: bool,
   /// The metadata of the resource (user defined)
   #[cfg_attr(
     feature = "serde",
@@ -66,13 +67,13 @@ pub struct Secret {
 }
 
 impl From<Secret> for SecretPartial {
-  fn from(db: Secret) -> Self {
+  fn from(secret: Secret) -> Self {
     SecretPartial {
-      name: db.name,
-      kind: db.kind,
-      immutable: Some(db.immutable),
-      data: db.data,
-      metadata: db.metadata,
+      name: secret.name,
+      kind: secret.kind,
+      immutable: secret.immutable,
+      data: secret.data,
+      metadata: secret.metadata,
     }
   }
 }
