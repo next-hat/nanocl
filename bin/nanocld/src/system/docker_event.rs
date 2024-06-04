@@ -16,9 +16,7 @@ use nanocl_stubs::system::{
 use crate::{
   vars,
   repositories::generic::*,
-  models::{
-    CargoDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb, SystemState, VmDb,
-  },
+  models::{ObjPsStatusDb, ProcessDb, ProcessUpdateDb, SystemState},
 };
 
 /// Take actions when a docker event is received

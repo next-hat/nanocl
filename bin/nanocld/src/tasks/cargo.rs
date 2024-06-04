@@ -76,7 +76,10 @@ impl ObjTaskDelete for CargoDb {
       let cargo =
         CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
       CargoDb::clear_by_pk(&key, &state.inner.pool).await?;
-      state.emit_normal_native_action(&cargo, NativeEventAction::Destroy);
+      log::debug!("emitting cargo destroy");
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
+        .await;
       Ok::<_, IoError>(())
     })
   }
@@ -203,7 +206,9 @@ impl ObjTaskUpdate for CargoDb {
         &state.inner.pool,
       )
       .await?;
-      state.emit_normal_native_action(&cargo, NativeEventAction::Start);
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
+        .await;
       Ok::<_, IoError>(())
     })
   }

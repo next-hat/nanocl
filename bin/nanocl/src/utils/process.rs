@@ -71,6 +71,7 @@ pub async fn wait_process_state(
   let fut = rt::spawn(async move {
     while let Some(event) = stream.next().await {
       let event = event?;
+      println!("{event:?}");
       let Some(actor) = event.actor else {
         continue;
       };
