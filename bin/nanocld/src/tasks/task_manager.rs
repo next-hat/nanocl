@@ -26,7 +26,7 @@ impl ObjTask {
       if self.fut.is_finished() {
         break;
       }
-      time::sleep(Duration::from_secs(1)).await;
+      time::sleep(Duration::from_micros(10)).await;
     }
   }
 }

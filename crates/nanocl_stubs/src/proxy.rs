@@ -14,7 +14,7 @@ pub enum ProxyRule {
   Stream(ProxyRuleStream),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -47,7 +47,7 @@ pub struct ProxySslConfig {
   pub dhparam: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -83,6 +83,12 @@ pub struct UpstreamTarget {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub disable_logging: Option<bool>,
+  /// SSL configuration for this target
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub ssl: Option<ProxySsl>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

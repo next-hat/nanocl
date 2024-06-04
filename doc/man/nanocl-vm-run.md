@@ -1,17 +1,17 @@
 # NAME
 
-nanocl - \`nanocl vm run\` available options
+run - Run a vm
 
 # SYNOPSIS
 
-**nanocl** \[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\]
+**run** \[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\]
 \[**\--net-iface**\] \[**\--user**\] \[**\--password**\]
 \[**\--ssh-key**\] \[**\--img-size**\] \[**\--kvm**\]
 \[**-a**\|**\--attach**\] \[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
 
 # DESCRIPTION
 
-\`nanocl vm run\` available options
+Run a vm
 
 # OPTIONS
 

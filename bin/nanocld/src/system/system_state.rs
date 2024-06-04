@@ -105,6 +105,31 @@ impl SystemState {
     self.inner.event_emitter_raw.subscribe(condition).await
   }
 
+  pub async fn emit_action_sync(
+    &self,
+    actor: &EventActor,
+    action: NativeEventAction,
+    kind: EventKind,
+    reason: &str,
+    note: Option<String>,
+    metadata: Option<serde_json::Value>,
+  ) {
+    let event = EventPartial {
+      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+      reporting_node: self.inner.config.hostname.clone(),
+      kind,
+      action: action.to_string(),
+      related: None,
+      reason: reason.to_owned(),
+      note,
+      metadata,
+      actor: Some(actor.clone()),
+    };
+    if let Err(err) = self.emit_event(event).await {
+      log::warn!("system::emit_event: {err}");
+    }
+  }
+
   pub fn emit_action(
     &self,
     actor: &EventActor,
@@ -188,6 +213,31 @@ impl SystemState {
       )),
       None,
     );
+  }
+
+  /// Emit a normal event action
+  pub async fn emit_normal_native_action_sync<A>(
+    &self,
+    actor: &A,
+    action: NativeEventAction,
+  ) where
+    A: Into<EventActor> + Clone,
+  {
+    let actor = actor.clone().into();
+    self
+      .emit_action_sync(
+        &actor,
+        action,
+        EventKind::Normal,
+        "state_sync",
+        Some(format!(
+          "{} {}",
+          actor.kind,
+          actor.key.clone().unwrap_or_default()
+        )),
+        None,
+      )
+      .await;
   }
 
   /// Wait for the event loop to finish

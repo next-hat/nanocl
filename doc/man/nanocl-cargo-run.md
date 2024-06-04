@@ -1,16 +1,15 @@
 # NAME
 
-nanocl - \`nanocl cargo run\` available options
+run - Run a cargo
 
 # SYNOPSIS
 
-**nanocl** \[**-v**\|**\--volume**\] \[**-e**\|**\--env**\]
-\[**\--rm**\] \[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
-\[*COMMAND*\]
+**run** \[**-v**\|**\--volume**\] \[**-e**\|**\--env**\] \[**\--rm**\]
+\[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\> \[*COMMAND*\]
 
 # DESCRIPTION
 
-\`nanocl cargo run\` available options
+Run a cargo
 
 # OPTIONS
 

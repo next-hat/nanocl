@@ -25,6 +25,9 @@ pub struct StateApplyOpts {
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
+  /// Remove orphaned elements
+  #[clap(long)]
+  pub remove_orphans: bool,
 }
 
 /// `nanocl state logs` available options

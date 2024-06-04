@@ -26,7 +26,9 @@ pub trait ObjDelByPk {
     Self::ObjDelOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_del_obj_by_pk(pk, opts, state).await?;
-    state.emit_normal_native_action(&obj, Self::get_del_event());
+    state
+      .emit_normal_native_action_sync(&obj, Self::get_del_event())
+      .await;
     Ok(obj)
   }
 }

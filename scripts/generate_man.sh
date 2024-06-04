@@ -13,9 +13,20 @@ for project in ./bin/*; do
   done
 done
 
-echo "# Man Page\n## Summary" > ./doc/man/readme.md
+echo """# Man Page
 
-for file in ./doc/man/*; do
+This is a collection of man pages for the projects in this repository.
+It's only include man for the \`nanocl\` binary.
+It is generated using \`pandoc\`.
+With \`scripts/generate_man.sh\` script.
+
+## Summary
+""" > ./doc/man/readme.md
+
+for file in $(ls -v ./doc/man/*); do
   file_name=$(basename "${file}")
+  if [ "$file_name" = "readme.md" ]; then
+    continue
+  fi
   echo "* [${file_name}](./${file_name})" >> ./doc/man/readme.md
 done
