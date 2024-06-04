@@ -178,6 +178,18 @@ pub async fn add_rule(
                 }
                 Ok(upstream_key) => upstream_key,
               };
+              let ssl = match &upstream.ssl {
+                Some(ssl) => {
+                  match super::rule::gen_ssl_config(ssl, state).await {
+                    Err(err) => {
+                      log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+                      None
+                    }
+                    Ok(ssl) => Some(ssl),
+                  }
+                }
+                None => None,
+              };
               let location = LocationTemplate {
                 path: location.path.clone(),
                 limit_req: location.limit_req.clone(),
@@ -187,6 +199,7 @@ pub async fn add_rule(
                 version: location.version,
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
+                ssl,
               };
               locations.push(location);
             }
@@ -206,6 +219,7 @@ pub async fn add_rule(
                 version: location.version,
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
+                ssl: None,
               };
               locations.push(location);
             }
@@ -219,6 +233,7 @@ pub async fn add_rule(
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
                 redirect: http.redirect.clone().map(|r| format!("{r}")),
+                ssl: None,
               };
               locations.push(location);
             }

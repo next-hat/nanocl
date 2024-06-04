@@ -1,4 +1,4 @@
-use nanocld_client::stubs::proxy::LimitReq;
+use nanocld_client::stubs::proxy::{LimitReq, ProxySslConfig};
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoResult, IoError};
@@ -13,6 +13,7 @@ pub struct LocationTemplate {
   pub allowed_ips: Option<Vec<String>>,
   pub version: Option<f64>,
   pub headers: Option<Vec<String>>,
+  pub ssl: Option<ProxySslConfig>,
 }
 
 pub struct Template<'a> {
