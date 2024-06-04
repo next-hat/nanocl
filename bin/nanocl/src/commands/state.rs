@@ -159,7 +159,6 @@ async fn log_jobs(
               wait_job_instance_and_log(client, instance, query).await;
             }
             Some(started_at) => {
-              println!("Logs for job instance {}", instance.name);
               if started_at == "0001-01-01T00:00:00Z" {
                 wait_job_instance_and_log(client, instance, query).await;
                 return;
@@ -923,7 +922,6 @@ async fn state_logs(
 ) {
   let client = &cli_conf.client;
   let tail = opts.tail.clone();
-  println!("follow: {}", &opts.follow);
   let log_opts = ProcessLogQuery {
     since: opts.since,
     until: opts.until,
