@@ -181,20 +181,24 @@ mod tests {
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();
-      state_ptr.emit_normal_native_action(
-        &actor,
-        nanocl_stubs::system::NativeEventAction::Create,
-      );
+      state_ptr
+        .emit_normal_native_action_sync(
+          &actor,
+          nanocl_stubs::system::NativeEventAction::Create,
+        )
+        .await;
     });
     raw_sub.next().await;
     let state_ptr = state.clone();
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();
-      state_ptr.emit_normal_native_action(
-        &actor,
-        nanocl_stubs::system::NativeEventAction::Create,
-      );
+      state_ptr
+        .emit_normal_native_action_sync(
+          &actor,
+          nanocl_stubs::system::NativeEventAction::Create,
+        )
+        .await;
     });
   }
 }

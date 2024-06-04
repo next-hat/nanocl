@@ -26,7 +26,9 @@ pub trait ObjPatchByPk {
     Self::ObjPatchOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_patch_obj_by_pk(pk, obj, state).await?;
-    state.emit_normal_native_action(&obj, Self::get_patch_event());
+    state
+      .emit_normal_native_action_sync(&obj, Self::get_patch_event())
+      .await;
     Ok(obj)
   }
 }

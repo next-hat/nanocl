@@ -18,12 +18,13 @@ use futures::{
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
-  ConnectOpts,
   stubs::{
+    generic::{GenericClause, GenericFilter, GenericFilterNsp},
     process::Process,
     statefile::{StatefileArgKind, SubState, SubStateValue},
     system::{EventActorKind, ObjPsStatusKind},
   },
+  ConnectOpts,
 };
 
 use nanocld_client::{
@@ -570,6 +571,32 @@ async fn parse_state_file_recurr(
   Ok(states)
 }
 
+fn insert_nanocl_group(
+  metadata: &Option<serde_json::Value>,
+  group: &str,
+) -> serde_json::Value {
+  match metadata {
+    Some(metadata) => {
+      let mut metadata = metadata.clone();
+      metadata.as_object_mut().unwrap().insert(
+        "io.nanocl.group".to_owned(),
+        Value::String(group.to_owned()),
+      );
+      metadata
+    }
+    None => serde_json::json!({
+      "io.nanocl.group": group,
+    }),
+  }
+}
+
+fn get_nanocl_group(state_file: &StateRef<Statefile>) -> String {
+  match &state_file.data.group {
+    Some(group) => group.to_owned(),
+    None => state_file.location.to_owned(),
+  }
+}
+
 async fn state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -577,19 +604,23 @@ async fn state_apply(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
+  let nanocl_group = get_nanocl_group(state_file);
   if let Some(secrets) = &state_file.data.secrets {
-    for secret in secrets {
+    for secret in secrets.iter() {
+      let mut secret = secret.to_owned();
       let token = format!("secret/{}", secret.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
+      let metadata = insert_nanocl_group(&secret.metadata, &nanocl_group);
+      secret.metadata = Some(metadata);
       match client.inspect_secret(&secret.name).await {
         Err(_) => {
-          client.create_secret(secret).await?;
+          client.create_secret(&secret).await?;
           pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: SecretPartial = inspect.into();
-          if cmp != *secret {
+          if cmp != secret {
             let update: SecretUpdate = secret.clone().into();
             client.patch_secret(&secret.name, &update).await?;
             pg.set_message("(updated)");
@@ -603,10 +634,13 @@ async fn state_apply(
     }
   }
   if let Some(jobs) = &state_file.data.jobs {
-    for job in jobs {
+    for job in jobs.iter() {
+      let mut job = job.to_owned();
       let token = format!("job/{}", job.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
+      let metadata = insert_nanocl_group(&job.metadata, &nanocl_group);
+      job.metadata = Some(metadata);
       if client.inspect_job(&job.name).await.is_ok() {
         pg.set_message("(clearing)");
         let waiter = utils::process::wait_process_state(
@@ -620,7 +654,7 @@ async fn state_apply(
         waiter.await??;
         pg.set_message("(cleared)");
       }
-      client.create_job(job).await?;
+      client.create_job(&job).await?;
       pg.set_message("(created)");
       let waiter = utils::process::wait_process_state(
         &job.name,
@@ -636,20 +670,23 @@ async fn state_apply(
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
-    for cargo in cargoes {
+    for cargo in cargoes.iter() {
+      let mut cargo = cargo.to_owned();
       let token = format!("cargo/{}", cargo.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
+      let metadata = insert_nanocl_group(&cargo.metadata, &nanocl_group);
+      cargo.metadata = Some(metadata);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {
-          client.create_cargo(cargo, Some(&namespace)).await?;
+          client.create_cargo(&cargo, Some(&namespace)).await?;
           pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: CargoSpecPartial = inspect.spec.into();
-          if (cmp != *cargo) || opts.reload {
+          if (cmp != cargo) || opts.reload {
             client
-              .put_cargo(&cargo.name, cargo, Some(&namespace))
+              .put_cargo(&cargo.name, &cargo, Some(&namespace))
               .await?;
             pg.set_message("(updated)");
           } else if inspect.status.actual == ObjPsStatusKind::Start {
@@ -674,18 +711,21 @@ async fn state_apply(
     }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    for vm in vms {
+    for vm in vms.iter() {
+      let mut vm = vm.to_owned();
       let token = format!("vm/{}", vm.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
+      let metadata = insert_nanocl_group(&vm.metadata, &nanocl_group);
+      vm.metadata = Some(metadata);
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
-          client.create_vm(vm, Some(&namespace)).await?;
+          client.create_vm(&vm, Some(&namespace)).await?;
           pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: VmSpecPartial = inspect.spec.into();
-          if (cmp != *vm) || opts.reload {
+          if (cmp != vm) || opts.reload {
             let update: VmSpecUpdate = vm.clone().into();
             client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
             pg.set_message("(updated)");
@@ -711,18 +751,21 @@ async fn state_apply(
     }
   }
   if let Some(resources) = &state_file.data.resources {
-    for resource in resources {
+    for resource in resources.iter() {
+      let mut resource = resource.to_owned();
       let token = format!("resource/{}", resource.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
+      let metadata = insert_nanocl_group(&resource.metadata, &nanocl_group);
+      resource.metadata = Some(metadata);
       match client.inspect_resource(&resource.name).await {
         Err(_) => {
-          client.create_resource(resource).await?;
+          client.create_resource(&resource).await?;
           pg.set_message("(created)");
         }
         Ok(inspect) => {
           let cmp: ResourcePartial = inspect.into();
-          if (cmp != *resource) || opts.reload {
+          if (cmp != resource) || opts.reload {
             let update: ResourceUpdate = resource.clone().into();
             client.put_resource(&resource.name, &update).await?;
             pg.set_message("(updated)");
@@ -745,6 +788,91 @@ fn print_states(states: &[StateRef<Statefile>]) {
   println!("{raw}");
 }
 
+async fn remove_orphans(
+  cli_conf: &CliConfig,
+  state: &StateRef<Statefile>,
+) -> IoResult<()> {
+  let filter = GenericFilter::new().r#where(
+    "metadata",
+    GenericClause::Contains(serde_json::json!({
+      "io.nanocl.group": get_nanocl_group(state),
+    })),
+  );
+  let old_secrets: Vec<SecretPartial> = cli_conf
+    .client
+    .list_secret(Some(&filter))
+    .await?
+    .iter()
+    .map(|secret| secret.clone().into())
+    .collect();
+  let old_cargoes: Vec<CargoSpecPartial> = cli_conf
+    .client
+    .list_cargo(Some(&GenericFilterNsp {
+      filter: Some(filter.clone()),
+      namespace: state.data.namespace.clone(),
+    }))
+    .await?
+    .iter()
+    .map(|cargo| cargo.spec.clone().into())
+    .collect();
+  let old_vms: Vec<VmSpecPartial> = cli_conf
+    .client
+    .list_vm(Some(&GenericFilterNsp {
+      filter: Some(filter.clone()),
+      namespace: state.data.namespace.clone(),
+    }))
+    .await?
+    .iter()
+    .map(|vm| vm.spec.clone().into())
+    .collect();
+  let old_resources: Vec<ResourcePartial> = cli_conf
+    .client
+    .list_resource(Some(&filter))
+    .await?
+    .iter()
+    .map(|resource| resource.clone().into())
+    .collect();
+  let removed_secrets = state.data.secrets.as_ref().map(|secrets| {
+    old_secrets
+      .into_iter()
+      .filter(|s| !secrets.iter().any(|ns| ns.name == s.name))
+      .collect::<Vec<_>>()
+  });
+  let removed_cargoes = state.data.cargoes.as_ref().map(|cargoes| {
+    old_cargoes
+      .into_iter()
+      .filter(|c| !cargoes.iter().any(|nc| nc.name == c.name))
+      .collect::<Vec<_>>()
+  });
+  let removed_vms = state.data.virtual_machines.as_ref().map(|vms| {
+    old_vms
+      .into_iter()
+      .filter(|v| !vms.iter().any(|nv| nv.name == v.name))
+      .collect::<Vec<_>>()
+  });
+  let removed_resources = state.data.resources.as_ref().map(|resources| {
+    old_resources
+      .into_iter()
+      .filter(|r| !resources.iter().any(|nr| nr.name == r.name))
+      .collect::<Vec<_>>()
+  });
+  let old_state = StateRef {
+    raw: "".to_owned(),
+    format: state.format.clone(),
+    data: Statefile {
+      secrets: removed_secrets,
+      cargoes: removed_cargoes,
+      virtual_machines: removed_vms,
+      resources: removed_resources,
+      ..state.data.clone()
+    },
+    root: state.root.clone(),
+    location: state.location.clone(),
+  };
+  state_remove(cli_conf, &old_state).await?;
+  Ok(())
+}
+
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
@@ -760,6 +888,9 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   for state in &states {
+    if opts.remove_orphans {
+      remove_orphans(cli_conf, state).await?;
+    }
     state_apply(cli_conf, opts, state).await?;
   }
   if opts.follow {

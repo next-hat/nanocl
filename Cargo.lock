@@ -2133,6 +2133,7 @@ dependencies = [
  "notify",
  "ntex",
  "ntex-cors",
+ "num_cpus",
  "openssl",
  "rand",
  "serde",
@@ -2182,6 +2183,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "ntex",
+ "num_cpus",
  "openssl",
  "serde",
  "serde_json",
@@ -2206,6 +2208,7 @@ dependencies = [
  "nanocld_client",
  "notify",
  "ntex",
+ "num_cpus",
  "openssl",
  "serde",
  "serde_json",
@@ -3871,7 +3874,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.6.9",
+ "winnow 0.6.11",
 ]
 
 [[package]]
@@ -4475,9 +4478,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.6.9"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86c949fede1d13936a99f14fafd3e76fd642b556dd2ce96287fbe2e0151bfac6"
+checksum = "56c52728401e1dc672a56e81e593e912aa54c78f40246869f78359a2bf24d29d"
 dependencies = [
  "memchr",
 ]

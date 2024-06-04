@@ -24,5 +24,6 @@ pub fn gen(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
     log::debug!("server::gen: dev mode http://0.0.0.0:8686");
     log::debug!("server::gen: swagger http://0.0.0.0:8686/explorer/");
   }
+  server = server.workers(num_cpus::get());
   Ok(server.run())
 }
