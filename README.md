@@ -121,7 +121,7 @@ Simplified version of our architecture for a single node:
 
 To install **Nanocl** for your system, please refer to our online [installation guide][nanocl_install_guide].
 
-## 📚 Documentation
+## Documentation
 
 To learn more about **Nanocl**, you can take a look at the following resources:
 

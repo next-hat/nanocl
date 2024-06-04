@@ -6,16 +6,16 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
 
 ## 📙 Table of Contents
 
-* [📁 Project Structure](#-project-structure)
-* [💾 Installation](#-installation)
-  * [🐧 Ubuntu](#-ubuntu)
-  * [🦀 Rust](#-rust)
-* [🏃 Running](#-running)
-  * [🐋 Docker Desktop](#-docker-desktop)
-* [🧪 Testing](#-testing)
-* [👌 Useful Command](#-useful-command)
+* [Project Structure](#project-structure)
+* [Installation](#installation)
+  * [Ubuntu](#ubuntu)
+  * [Rust](#rust)
+* [Running](#running)
+  * [Docker Desktop](#docker-desktop)
+* [Testing](#testing)
+* [Useful Command](#useful-command)
 
-## 📁 Project Structure
+## Project Structure
 
 `Nanocl` is using a **mono repository structure**.<br />
 
@@ -50,7 +50,7 @@ crates # Shared Libraries
 └── nanocld_client # A nanocld client
 ```
 
-## 💾 Installation
+## Installation
 
 Clone the repository:
 
@@ -68,7 +68,7 @@ To build and run `Nanocl` you will need these dependencies
 * libpq-dev
 * openssl-dev
 
-### 🐧 Ubuntu
+### Ubuntu
 
 If you are running ubuntu, the following scripts will install the required dependencies:
 
@@ -82,7 +82,7 @@ If you need docker:
 ./scripts/install_docker.ubuntu.sh
 ```
 
-### 🦀 Rust
+### Rust
 
 To install rust
 
@@ -96,7 +96,7 @@ Afterwards install rust devtools required to run `Nanocl`
 ./scripts/rust.deps.sh
 ```
 
-## 🏃 Running
+## Running
 
 Make sure your are in docker group, if not then you can add yourself:
 
@@ -132,7 +132,7 @@ If you need to work with the proxy or the dns, you can start them with:
 docker compose --profile proxy --profile dns up
 ```
 
-### 🐋 Docker Desktop
+### Docker Desktop
 
 > [!IMPORTANT]
 > With Docker Desktop you'll need an additional container, to enable it run docker compose with `vpnkit` profile
@@ -168,7 +168,7 @@ Now you can run the CLI using cargo make
 > sudo chown $USER:$USER -R target
 > ```
 
-## 🧪 Testing
+## Testing
 
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
 You also need theses entries in your `/etc/hosts`
@@ -222,7 +222,7 @@ sudo chown $USER:$USER -R ~/.nanocl_dev
 
 On test fails make sure to remove any resource or cargo still alive after tests
 
-## 👌 Useful Command
+## Useful Command
 
 Some useful command to know:
 
