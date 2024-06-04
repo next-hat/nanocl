@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nanocl backup` command to backup the current state into multiple Statefiles
 - `HOST` env variable to override the default host
 - `CERT` and `CERT_KEY` env variable to pass certificate and certificate key to the client
+- `nanocl state apply --remove-orphans` to remove orphaned objects
 
 ### Fixed
 
@@ -31,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `inspect` `rm` `stop` `start` have been refactored to have a single interface matching all object
-- removed the namespace in the table of cargo ls and vm ls command
+- Removed the namespace in the table of cargo ls and vm ls command
 - Cleaner Loader when apply and removing Statefile
 
 ## [0.14.0] - 2024-05-08

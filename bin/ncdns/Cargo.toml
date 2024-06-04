@@ -42,3 +42,4 @@ nanocld_client = { version = "0.15", features = ["tokio"] }
 nanocl_utils = { version = "0.6", features = ["ntex", "logger", "versioning"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 openssl = "0.10"
+num_cpus = "1.16.0"

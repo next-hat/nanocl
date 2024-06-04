@@ -54,7 +54,9 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
       &state.inner.pool,
     )
     .await?;
-    state.emit_normal_native_action(&job, NativeEventAction::Fail);
+    state
+      .emit_normal_native_action_sync(&job, NativeEventAction::Fail)
+      .await;
   } else {
     ObjPsStatusDb::update_actual_status(
       &job.name,
@@ -62,7 +64,9 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
       &state.inner.pool,
     )
     .await?;
-    state.emit_normal_native_action(&job, NativeEventAction::Finish);
+    state
+      .emit_normal_native_action_sync(&job, NativeEventAction::Finish)
+      .await;
   }
   let ttl = match job.ttl {
     None => return Ok(()),
@@ -172,7 +176,9 @@ async fn update(
         )
         .await
         .ok();
-        state.emit_normal_native_action(cargo, NativeEventAction::Updating);
+        state
+          .emit_normal_native_action_sync(cargo, NativeEventAction::Updating)
+          .await;
       }
       None
     }
@@ -225,18 +231,16 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
+  let action = NativeEventAction::from_str(e.action.as_str())?;
   match actor.kind {
-    EventActorKind::Job
-      if e.action == NativeEventAction::Destroying.to_string() =>
-    {
-      state.inner.task_manager.remove_task(&task_key).await;
-    }
-    EventActorKind::Cargo | EventActorKind::Vm | EventActorKind::Job => {
+    EventActorKind::Cargo | EventActorKind::Vm => {
       state.inner.task_manager.wait_task(&task_key).await;
+    }
+    EventActorKind::Job if action == NativeEventAction::Destroying => {
+      state.inner.task_manager.remove_task(&task_key).await;
     }
     _ => {}
   }
-  let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => starting(&key, actor, state),
     NativeEventAction::Stopping => stopping(&key, actor, state),
