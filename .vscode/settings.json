@@ -83,6 +83,7 @@
     "rustc",
     "schemars",
     "serveraddress",
+    "snmalloc",
     "sockaddr",
     "statefile",
     "Statefiles",

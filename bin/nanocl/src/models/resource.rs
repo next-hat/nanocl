@@ -25,7 +25,6 @@ pub enum ResourceCommand {
 
 /// `nanocl resource` available arguments
 #[derive(Clone, Parser)]
-#[clap(name = "nanocl-resource")]
 pub struct ResourceArg {
   #[clap(subcommand)]
   pub command: ResourceCommand,

@@ -37,7 +37,9 @@ impl ObjTaskStart for JobDb {
         &state.inner.pool,
       )
       .await?;
-      state.emit_normal_native_action(&job, NativeEventAction::Start);
+      state
+        .emit_normal_native_action_sync(&job, NativeEventAction::Start)
+        .await;
       for process in processes {
         let _ = state
           .inner
@@ -79,11 +81,14 @@ impl ObjTaskDelete for JobDb {
         &state,
       )
       .await?;
+      log::debug!("JobDb::delete_by_pk({:?})", &job.name);
       JobDb::clear_by_pk(&job.name, &state.inner.pool).await?;
       if job.schedule.is_some() {
         utils::cron::remove_cron_rule(&job, &state).await?;
       }
-      state.emit_normal_native_action(&job, NativeEventAction::Destroy);
+      state
+        .emit_normal_native_action_sync(&job, NativeEventAction::Destroy)
+        .await;
       Ok::<_, IoError>(())
     })
   }

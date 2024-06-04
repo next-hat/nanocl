@@ -44,6 +44,7 @@ pub fn gen(
     log::debug!("server::gen: dev mode http://0.0.0.0:8787");
     log::debug!("server::gen: swagger http://0.0.0.0:8787/explorer/");
   }
+  server = server.workers(num_cpus::get());
   Ok(server.run())
 }
 

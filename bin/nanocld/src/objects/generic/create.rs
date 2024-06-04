@@ -26,7 +26,9 @@ pub trait ObjCreate {
     Self::ObjCreateOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_create_obj(obj, state).await?;
-    state.emit_normal_native_action(&obj, NativeEventAction::Create);
+    state
+      .emit_normal_native_action_sync(&obj, NativeEventAction::Create)
+      .await;
     Ok(obj)
   }
 }

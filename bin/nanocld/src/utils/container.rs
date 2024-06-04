@@ -162,12 +162,12 @@ async fn _emit(
   match kind {
     ProcessKind::Vm => {
       let vm = VmDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-      state.emit_normal_native_action(&vm, action);
+      state.emit_normal_native_action_sync(&vm, action).await;
     }
     ProcessKind::Cargo => {
       let cargo =
         CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-      state.emit_normal_native_action(&cargo, action);
+      state.emit_normal_native_action_sync(&cargo, action).await;
     }
     ProcessKind::Job => {
       JobDb::update_pk(
@@ -180,7 +180,7 @@ async fn _emit(
       .await?;
       let job =
         JobDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-      state.emit_normal_native_action(&job, action);
+      state.emit_normal_native_action_sync(&job, action).await;
     }
   }
   Ok(())
@@ -457,11 +457,13 @@ pub async fn delete_instance(
         status_code,
         message: _,
       } => {
+        log::error!("Error while deleting container {pk}: {err}");
         if *status_code != 404 {
           return Err(err.into());
         }
       }
       _ => {
+        log::error!("Error while deleting container {pk}: {err}");
         return Err(err.into());
       }
     },
@@ -541,11 +543,6 @@ pub async fn stop_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let status = ObjPsStatusDb::read_by_pk(kind_pk, &state.inner.pool).await?;
-  // If the process is already stopped, return
-  if status.actual == ObjPsStatusKind::Stop.to_string() {
-    return Ok(());
-  }
   let processes =
     ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");
@@ -581,11 +578,6 @@ pub async fn start_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  // If the process is already running, return
-  if status.actual == ObjPsStatusKind::Start.to_string() {
-    return Ok(());
-  }
   let processes =
     ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
   for process in processes {
@@ -817,10 +809,6 @@ pub async fn emit_starting(
     ObjPsStatusKind::Start
   }
   .to_string();
-  if ProcessKind::Cargo == *kind && current_status.actual == wanted {
-    log::debug!("{kind:?} {kind_key} already running",);
-    return Ok(());
-  }
   let status_update = ObjPsStatusUpdate {
     wanted: Some(wanted),
     prev_wanted: Some(current_status.wanted),

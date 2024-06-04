@@ -59,6 +59,7 @@ pub async fn install_image(
   from_image: &str,
   tag: &str,
   docker_api: &Docker,
+  disable_progress: bool,
 ) -> IoResult<()> {
   let options = Some(CreateImageOptions {
     from_image,
@@ -72,6 +73,9 @@ pub async fn install_image(
   while let Some(res) = stream.next().await {
     let data = res
       .map_err(|err| err.map_err_context(|| "Install image stream failed"))?;
+    if disable_progress {
+      continue;
+    }
     let status = data.status.unwrap_or_default();
     let id = data.id.unwrap_or_default();
     let progress = data.progress_detail.unwrap_or_default();
@@ -100,7 +104,6 @@ pub async fn install_image(
       pg.set_message(format!("[{}] {}", &id, &status));
     }
   }
-
   Ok(())
 }
 
