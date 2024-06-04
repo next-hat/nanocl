@@ -27,7 +27,6 @@
  </span>
 </blockquote>
 
-<br />
 
 **Nanocl** is an open-source distributed system designed to revolutionize developers' workflows.<br/>
 It aims to provide an easy solution for localhost development, addressing common issues like CORS and cookies when working with complex microservice architectures.<br/>
@@ -83,10 +82,20 @@ Below are live demos of **Nanocl** in action:
 
 ### Cargo and Resource
 
-Demo of **Nanocl** in action when applying `example/deploy_example.yml`:
+<div align="center">
+  <img src="./doc/cargo_resource_example.gif" />
+</div>
+
+### Job
 
 <div align="center">
-  <img src="./doc/example.gif" />
+  <img src="./doc/job_example.gif" />
+</div>
+
+### Vm
+
+<div align="center">
+  <img src="./doc/vm_example.gif" />
 </div>
 
 ## Architecture

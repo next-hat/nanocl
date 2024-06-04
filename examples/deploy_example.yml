@@ -10,7 +10,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: deploy-example2.global.c
+          Key: deploy-example.global.c
           Port: 9000
 
 Cargoes:
