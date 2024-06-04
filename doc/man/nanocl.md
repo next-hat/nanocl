@@ -91,6 +91,10 @@ nanocl-uninstall(1)
 
 :   Uninstall components
 
+nanocl-backup(1)
+
+:   Backup the current state
+
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)

@@ -1,15 +1,15 @@
 # NAME
 
-nanocl - \`nanocl state rm\` available options
+remove - Remove elements from a Statefile
 
 # SYNOPSIS
 
-**nanocl** \[**-s**\|**\--state-location**\] \[**-y**\|**\--yes**\]
+**remove** \[**-s**\|**\--state-location**\] \[**-y**\|**\--yes**\]
 \[**-h**\|**\--help**\] \[*ARGS*\]
 
 # DESCRIPTION
 
-\`nanocl state rm\` available options
+Remove elements from a Statefile
 
 # OPTIONS
 

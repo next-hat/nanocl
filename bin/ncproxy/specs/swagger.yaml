@@ -273,6 +273,10 @@ components:
           type: boolean
           description: Disable logging for this target
           nullable: true
+        Ssl:
+          allOf:
+          - $ref: '#/components/schemas/ProxySsl'
+          nullable: true
       additionalProperties: false
     UriTarget:
       type: object

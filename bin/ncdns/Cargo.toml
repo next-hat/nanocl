@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
 name = "ncdns"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 
 [[bin]]
@@ -42,3 +42,4 @@ nanocld_client = { version = "0.15", features = ["tokio"] }
 nanocl_utils = { version = "0.6", features = ["ntex", "logger", "versioning"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 openssl = "0.10"
+num_cpus = "1.16.0"

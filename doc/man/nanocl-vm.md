@@ -1,15 +1,15 @@
 # NAME
 
-nanocl - \`nanocl vm\` available arguments
+vm - Manage virtual machines
 
 # SYNOPSIS
 
-**nanocl** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
+**vm** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \<*subcommands*\>
 
 # DESCRIPTION
 
-\`nanocl vm\` available arguments
+Manage virtual machines
 
 # OPTIONS
 
@@ -23,46 +23,46 @@ nanocl - \`nanocl vm\` available arguments
 
 # SUBCOMMANDS
 
-nanocl-run(1)
+vm-run(1)
 
 :   Run a vm
 
-nanocl-image(1)
+vm-image(1)
 
 :   Manage vm images
 
-nanocl-create(1)
+vm-create(1)
 
 :   Create a vm
 
-nanocl-list(1)
+vm-list(1)
 
 :   List vms
 
-nanocl-remove(1)
+vm-remove(1)
 
 :   Remove vms
 
-nanocl-inspect(1)
+vm-inspect(1)
 
 :   Inspect a vm
 
-nanocl-start(1)
+vm-start(1)
 
 :   Start a vm
 
-nanocl-stop(1)
+vm-stop(1)
 
 :   Stop a vm
 
-nanocl-attach(1)
+vm-attach(1)
 
 :   Attach to a vm
 
-nanocl-patch(1)
+vm-patch(1)
 
 :   Patch a vm
 
-nanocl-help(1)
+vm-help(1)
 
 :   Print this message or the help of the given subcommand(s)

@@ -104,6 +104,7 @@ pub async fn gen(
       "server::gen: swagger available at http://0.0.0.0:8585/explorer/"
     );
   }
+  server = server.workers(num_cpus::get());
   log::info!("server::gen: ready");
   Ok(server.run())
 }

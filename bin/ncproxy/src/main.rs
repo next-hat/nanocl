@@ -1,6 +1,6 @@
 /// # ncproxy
 ///
-/// The program in charge of managing proxying network for nanocl.
+/// The program in charge of managing writing proxy configuration.
 /// It's based on nginx and use the nanocld api to get the configuration wanted by the user.
 ///
 /// It work by doing 4 main tasks:ncproxy is
