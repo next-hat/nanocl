@@ -606,7 +606,8 @@ async fn state_apply(
   let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
   let nanocl_group = get_nanocl_group(state_file);
   if let Some(secrets) = &state_file.data.secrets {
-    for mut secret in secrets.clone() {
+    for secret in secrets.iter() {
+      let mut secret = secret.to_owned();
       let token = format!("secret/{}", secret.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
@@ -633,7 +634,8 @@ async fn state_apply(
     }
   }
   if let Some(jobs) = &state_file.data.jobs {
-    for mut job in jobs.clone() {
+    for job in jobs.iter() {
+      let mut job = job.to_owned();
       let token = format!("job/{}", job.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
@@ -668,7 +670,8 @@ async fn state_apply(
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
-    for mut cargo in cargoes.clone() {
+    for cargo in cargoes.iter() {
+      let mut cargo = cargo.to_owned();
       let token = format!("cargo/{}", cargo.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
@@ -708,7 +711,8 @@ async fn state_apply(
     }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    for mut vm in vms.clone() {
+    for vm in vms.iter() {
+      let mut vm = vm.to_owned();
       let token = format!("vm/{}", vm.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
@@ -747,7 +751,8 @@ async fn state_apply(
     }
   }
   if let Some(resources) = &state_file.data.resources {
-    for mut resource in resources.clone() {
+    for resource in resources.iter() {
+      let mut resource = resource.to_owned();
       let token = format!("resource/{}", resource.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
