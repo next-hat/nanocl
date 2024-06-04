@@ -40,6 +40,18 @@ By empowering developers and DevOps professionals, Nanocl helps optimize workflo
 - [2024/06/01] [We are invited to the Merge Berlin 2024](https://www.linkedin.com/feed/update/urn:li:activity:7201921660289998850) (event)
 - [2024/05/07] [Context, SubState and more](https://docs.next-hat.com/blog/nanocl-0.14) (release)
 
+## Installation
+
+To install **Nanocl** for your system, please refer to our online [installation guide][nanocl_install_guide].
+
+## Documentation
+
+To learn more about **Nanocl**, you can take a look at the following resources:
+
+- [Overview][nanocl_overview]
+- [Get Started][nanocl_get_started]
+- [CLI References][nanocl_cli_ref]
+- [DAEMON References][nanocl_daemon_ref]
 
 ## Usage
 
@@ -116,19 +128,6 @@ Simplified version of our architecture for a single node:
 <div align="center">
   <img src="./doc/architecture.png" />
 </div>
-
-## Installation
-
-To install **Nanocl** for your system, please refer to our online [installation guide][nanocl_install_guide].
-
-## Documentation
-
-To learn more about **Nanocl**, you can take a look at the following resources:
-
-- [Overview][nanocl_overview]
-- [Get Started][nanocl_get_started]
-- [CLI References][nanocl_cli_ref]
-- [DAEMON References][nanocl_daemon_ref]
 
 ## Contributing
 
