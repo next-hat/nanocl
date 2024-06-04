@@ -572,11 +572,12 @@ async fn parse_state_file_recurr(
 }
 
 fn insert_nanocl_group(
-  metadata: Option<serde_json::Value>,
+  metadata: &Option<serde_json::Value>,
   group: &str,
 ) -> serde_json::Value {
   match metadata {
-    Some(mut metadata) => {
+    Some(metadata) => {
+      let mut metadata = metadata.clone();
       metadata.as_object_mut().unwrap().insert(
         "io.nanocl.group".to_owned(),
         Value::String(group.to_owned()),
@@ -605,12 +606,11 @@ async fn state_apply(
   let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
   let nanocl_group = get_nanocl_group(state_file);
   if let Some(secrets) = &state_file.data.secrets {
-    for mut secret in secrets.iter().cloned() {
+    for mut secret in secrets.clone() {
       let token = format!("secret/{}", secret.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata =
-        insert_nanocl_group(secret.metadata.clone(), &nanocl_group);
+      let metadata = insert_nanocl_group(&secret.metadata, &nanocl_group);
       secret.metadata = Some(metadata);
       match client.inspect_secret(&secret.name).await {
         Err(_) => {
@@ -633,11 +633,11 @@ async fn state_apply(
     }
   }
   if let Some(jobs) = &state_file.data.jobs {
-    for mut job in jobs.iter().cloned() {
+    for mut job in jobs.clone() {
       let token = format!("job/{}", job.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(job.metadata.clone(), &nanocl_group);
+      let metadata = insert_nanocl_group(&job.metadata, &nanocl_group);
       job.metadata = Some(metadata);
       if client.inspect_job(&job.name).await.is_ok() {
         pg.set_message("(clearing)");
@@ -668,11 +668,11 @@ async fn state_apply(
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
-    for mut cargo in cargoes.iter().cloned() {
+    for mut cargo in cargoes.clone() {
       let token = format!("cargo/{}", cargo.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(cargo.metadata.clone(), &nanocl_group);
+      let metadata = insert_nanocl_group(&cargo.metadata, &nanocl_group);
       cargo.metadata = Some(metadata);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {
@@ -708,11 +708,11 @@ async fn state_apply(
     }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    for mut vm in vms.iter().cloned() {
+    for mut vm in vms.clone() {
       let token = format!("vm/{}", vm.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(vm.metadata.clone(), &nanocl_group);
+      let metadata = insert_nanocl_group(&vm.metadata, &nanocl_group);
       vm.metadata = Some(metadata);
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
@@ -747,12 +747,11 @@ async fn state_apply(
     }
   }
   if let Some(resources) = &state_file.data.resources {
-    for mut resource in resources.iter().cloned() {
+    for mut resource in resources.clone() {
       let token = format!("resource/{}", resource.name);
       let pg_style = utils::progress::create_spinner_style(&token, "green");
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata =
-        insert_nanocl_group(resource.metadata.clone(), &nanocl_group);
+      let metadata = insert_nanocl_group(&resource.metadata, &nanocl_group);
       resource.metadata = Some(metadata);
       match client.inspect_resource(&resource.name).await {
         Err(_) => {
