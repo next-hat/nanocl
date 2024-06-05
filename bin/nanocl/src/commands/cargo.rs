@@ -293,9 +293,13 @@ async fn exec_cargo_revert(
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter =
+    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
+      .await?;
   let cargo = client
     .revert_cargo(&opts.name, &opts.history_id, args.namespace.as_deref())
     .await?;
+  waiter.await??;
   utils::print::print_yml(cargo)?;
   Ok(())
 }
