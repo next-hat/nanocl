@@ -20,13 +20,13 @@ use nanocl_error::{
 use nanocl_stubs::{
   cargo::{Cargo, CargoKillOptions},
   generic::{GenericClause, GenericFilter, ImagePullPolicy},
+  vm::Vm,
   job::Job,
   process::{Process, ProcessKind, ProcessPartial},
   system::{
     EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
     ObjPsStatusKind,
   },
-  vm::Vm,
 };
 
 use crate::{
@@ -547,10 +547,6 @@ pub async fn stop_instances(
     ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");
   for process in processes {
-    let process_state = process.data.state.unwrap_or_default();
-    if !process_state.running.unwrap_or_default() {
-      return Ok(());
-    }
     state
       .inner
       .docker_api
@@ -581,10 +577,6 @@ pub async fn start_instances(
   let processes =
     ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
   for process in processes {
-    let process_state = process.data.state.unwrap_or_default();
-    if process_state.running.unwrap_or_default() {
-      continue;
-    }
     state
       .inner
       .docker_api
