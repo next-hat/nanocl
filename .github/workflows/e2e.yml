@@ -51,6 +51,7 @@ jobs:
           newgrp nanocl
           nanocl install -t installer.yml
           sleep 8
+          docker ps -a
           nanocl version
       # Run E2E tests
       - name: E2E
