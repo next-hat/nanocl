@@ -59,7 +59,7 @@ jobs:
         run: echo "Starting ngrok tunnel..."
         shell: bash
       - name: Setup ngrok tunnel
-        run: timeout 1h ./ngrok tcp 22
+        run: timeout 1h ./ngrok tcp 22 &
         shell: bash
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
