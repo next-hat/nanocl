@@ -50,6 +50,8 @@ jobs:
           sudo usermod -aG nanocl $USER
           newgrp nanocl
           nanocl install -t installer.yml
+          sleep 8
+          nanocl version
       # Run E2E tests
       - name: E2E
         run: |
