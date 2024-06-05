@@ -210,10 +210,16 @@ impl ObjPatchByPk for CargoDb {
         cmd,
         image,
         env: Some(env_vars),
-        host_config: Some(HostConfig {
-          binds: Some(volumes),
-          ..cargo.spec.container.host_config.unwrap_or_default()
-        }),
+        host_config: if !volumes.is_empty()
+          || cargo.spec.container.host_config.is_some()
+        {
+          Some(HostConfig {
+            binds: Some(volumes),
+            ..cargo.spec.container.host_config.unwrap_or_default()
+          })
+        } else {
+          None
+        },
         ..cargo.spec.container
       }
     } else {
