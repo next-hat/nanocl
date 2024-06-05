@@ -177,14 +177,14 @@ mod tests {
       .list_history_cargo(CARGO_NAME, None)
       .await
       .unwrap()
-      .first()
+      .last()
       .unwrap()
       .clone();
     assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
     // Try to stop a cargo
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
     // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-y", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
   }
 
   /// Test state file when then include other state files
