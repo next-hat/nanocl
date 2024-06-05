@@ -35,13 +35,32 @@ jobs:
           key: buildx-cache
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
-      # Setup ssh tunnel for remote debugging
-      - name: Setup tunnel
-        uses: joshlarsen/ssh-tunnel-action@main
-        with:
-          timeout: 1h
-          ssh_public_key: ${{ secrets.WORKFLOW_SSH_PUB_KEY }}
-          ngrok_token: ${{ secrets.NGROK_TOKEN }}
+      - name: Download ngrok
+        run: curl -sO https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+        shell: bash
+      - name: Unzip ngrok
+        run: unzip ngrok-stable-linux-amd64.zip
+        shell: bash
+      - name: Add ~/.ssh directory
+        run: mkdir -p ~/.ssh
+        shell: bash
+      - name: Add SSH public key to authorized_keys
+        run: echo "${{ secrets.WORKFLOW_SSH_PUB_KEY }}" >> ~/.ssh/authorized_keys
+        shell: bash
+      - name: Fix home directory permissions
+        run: chmod 755 ~
+        shell: bash
+      - run: chmod 600 ~/.ssh/authorized_keys
+        shell: bash
+      - name: Set ngrok auth token
+        run: ./ngrok authtoken ${{ secrets.NGROK_TOKEN }}
+        shell: bash
+      - name: Debug message
+        run: echo "Starting ngrok tunnel..."
+        shell: bash
+      - name: Setup ngrok tunnel
+        run: timeout 1h ./ngrok tcp 22
+        shell: bash
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
         with:
