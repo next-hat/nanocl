@@ -212,7 +212,7 @@ fn stopping(
 /// and push the action into the task manager
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
-async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
+pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   match e.kind {
     EventKind::Error | EventKind::Warning => return Ok(()),
     _ => {}
@@ -231,7 +231,6 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
-  log::debug!("task key: {task_key}");
   let action = NativeEventAction::from_str(e.action.as_str())?;
   match (&actor.kind, &action) {
     (EventActorKind::Cargo | EventActorKind::Vm, _) => {
@@ -274,14 +273,4 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
     })
     .await;
   Ok(())
-}
-
-pub fn exec_event(e: &Event, state: &SystemState) {
-  let e = e.clone();
-  let state = state.clone();
-  rt::spawn(async move {
-    if let Err(err) = _exec_event(&e, &state).await {
-      log::error!("exec_event: {err}");
-    }
-  });
 }

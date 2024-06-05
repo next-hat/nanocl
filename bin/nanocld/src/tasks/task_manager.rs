@@ -61,7 +61,7 @@ impl TaskManager {
       tasks.lock().await.remove(&key_ptr);
       Ok::<_, IoError>(())
     });
-    self.tasks.lock().await.insert(key, new_task.clone());
+    self.tasks.lock().await.insert(key, new_task);
   }
 
   pub async fn remove_task(&self, key: &str) {
@@ -82,7 +82,7 @@ impl TaskManager {
   pub async fn wait_task(&self, key: &str) {
     if let Some(task) = self.get_task(key).await {
       task.wait().await;
-      log::debug!("Task finished: {key} removing it");
+      log::debug!("Task finished: {key} {} removing it", task.kind);
       self.remove_task(key).await;
     }
   }
