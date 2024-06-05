@@ -35,6 +35,13 @@ jobs:
           key: buildx-cache
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
+      # Setup ssh tunnel for remote debugging
+      - name: Setup tunnel
+        uses: joshlarsen/ssh-tunnel-action@main
+        with:
+          timeout: 1h
+          ssh_public_key: ${{ secrets.WORKFLOW_SSH_PUB_KEY }}
+          ngrok_token: ${{ secrets.NGROK_TOKEN }}
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
         with:
