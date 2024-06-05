@@ -177,7 +177,7 @@ mod tests {
       .list_history_cargo(CARGO_NAME, None)
       .await
       .unwrap()
-      .first()
+      .last()
       .unwrap()
       .clone();
     assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());

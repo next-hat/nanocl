@@ -24,6 +24,7 @@ impl ObjTask {
   pub async fn wait(&self) {
     loop {
       if self.fut.is_finished() {
+        log::debug!("Task finished: {}", self.kind);
         break;
       }
       time::sleep(Duration::from_micros(10)).await;
@@ -81,6 +82,7 @@ impl TaskManager {
   pub async fn wait_task(&self, key: &str) {
     if let Some(task) = self.get_task(key).await {
       task.wait().await;
+      log::debug!("Task finished: {key} removing it");
       self.remove_task(key).await;
     }
   }

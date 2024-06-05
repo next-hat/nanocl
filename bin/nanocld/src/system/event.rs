@@ -231,12 +231,14 @@ async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
+  log::debug!("task key: {task_key}");
   let action = NativeEventAction::from_str(e.action.as_str())?;
-  match actor.kind {
-    EventActorKind::Cargo | EventActorKind::Vm => {
+  match (&actor.kind, &action) {
+    (EventActorKind::Cargo | EventActorKind::Vm, _) => {
       state.inner.task_manager.wait_task(&task_key).await;
     }
-    EventActorKind::Job if action == NativeEventAction::Destroying => {
+    (EventActorKind::Job, NativeEventAction::Destroying) => {
+      log::debug!("Removing task for job {key}");
       state.inner.task_manager.remove_task(&task_key).await;
     }
     _ => {}
