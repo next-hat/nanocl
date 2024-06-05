@@ -53,6 +53,8 @@ jobs:
           sleep 20
           docker ps -a
           docker logs ndaemon.system.c
+          sudo chmod -R 777 /var/lib/nanocl
+          sudo chmod -R 777 /run/nanocl
           nanocl version
       # Run E2E tests
       - name: E2E
