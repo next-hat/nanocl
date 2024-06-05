@@ -50,8 +50,9 @@ jobs:
           sudo usermod -aG nanocl $USER
           newgrp nanocl
           nanocl install -t installer.yml
-          sleep 8
+          sleep 20
           docker ps -a
+          docker logs ndaemon.system.c
           nanocl version
       # Run E2E tests
       - name: E2E
