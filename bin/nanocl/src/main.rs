@@ -182,7 +182,7 @@ mod tests {
       .clone();
     assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
     // Try to stop a cargo
-    // assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    assert_cli_ok!("cargo", "stop", CARGO_NAME);
     // Try to remove cargo
     assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
   }
