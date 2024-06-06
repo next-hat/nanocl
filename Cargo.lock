@@ -3874,7 +3874,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.6.11",
+ "winnow 0.6.12",
 ]
 
 [[package]]
@@ -4478,9 +4478,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.6.11"
+version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56c52728401e1dc672a56e81e593e912aa54c78f40246869f78359a2bf24d29d"
+checksum = "41ff33f391015ecab21cd092389215eb265ef9496a9a07b6bee7d3529831deda"
 dependencies = [
  "memchr",
 ]
