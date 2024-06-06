@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-FROM --platform=$BUILDPLATFORM rust:1.78.0-alpine3.19 as planner
+FROM --platform=$BUILDPLATFORM rust:1.78.0-alpine3.20 as planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -15,14 +15,14 @@ COPY ./bin/ncvpnkit/Cargo.toml ./bin/ncvpnkit/Cargo.toml
 COPY ./bin/ncdns/Cargo.toml ./bin/ncdns/Cargo.toml
 
 # stage 2 - Build our project
-FROM --platform=$BUILDPLATFORM rust:1.78.0-alpine3.19 as builder
+FROM --platform=$BUILDPLATFORM rust:1.78.0-alpine3.20 as builder
 
 ARG channel=stable
 ## Build our nanocl daemon binary
 COPY --from=planner /app /app
 WORKDIR /app
-RUN export ARCH=$(uname -m) \
-  && rustup target add $ARCH-unknown-linux-musl
+RUN export ARCH=$(uname -m) && \
+  rustup target add $ARCH-unknown-linux-musl
 RUN apk add --no-cache --upgrade \
   build-base \
   musl-dev \
@@ -53,10 +53,10 @@ COPY ./bin/ncdns/src ./bin/ncdns/src
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN export ARCH=$(uname -m) \
-  && cargo build --release --target=$ARCH-unknown-linux-musl --features vendored --features release --bin nanocl
-RUN export ARCH=$(uname -m) \
-  && cp /app/target/$ARCH-unknown-linux-musl/release/nanocl /bin/nanocl
+RUN export ARCH=$(uname -m) && \
+  cargo build --release --target=$ARCH-unknown-linux-musl --features vendored --features release --bin nanocl
+RUN export ARCH=$(uname -m) && \
+  cp /app/target/$ARCH-unknown-linux-musl/release/nanocl /bin/nanocl
 
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
