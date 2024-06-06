@@ -57,7 +57,7 @@ Cargoes:
 - Name: nproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nproxy:1.25.4-n0.11-nightly
+    Image: ghcr.io/next-hat/nproxy:1.26.0-n0.12-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nproxy:1.25.4-n0.11
     # {% endif %}
@@ -99,7 +99,7 @@ Cargoes:
 - Name: ndns
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ndns:2.90.0-n0.6-nightly
+    Image: ghcr.io/next-hat/ndns:2.90.0-n0.7-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ndns:2.90.0-n0.6
     # {% endif %}

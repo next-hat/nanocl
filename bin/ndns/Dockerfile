@@ -1,10 +1,10 @@
-FROM alpine:3.19.1
+FROM alpine:3.20.0
 
-RUN apk --update add dnsmasq \
-  && rm -rf /var/cache/apk/* \
-  && rm -rf /tmp/* \
-  && rm -rf /var/log/* \
-  && rm -rf /var/tmp/*
+RUN apk --update add dnsmasq && \
+  rm -rf /var/cache/apk/* && \
+  rm -rf /tmp/* && \
+  rm -rf /var/log/* && \
+  rm -rf /var/tmp/*
 
 EXPOSE 53/udp
 
