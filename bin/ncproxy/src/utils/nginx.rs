@@ -32,7 +32,7 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
       "log",
       "secrets",
     ]
-    .into_iter()
+    .iter()
     .map(|name| {
       fs::create_dir_all(format!("{}/{}", state_ref.store.dir, name))?;
       Ok::<_, IoError>(())
