@@ -31,14 +31,13 @@ cargo build --release --target=${target_arch} --features vendored --features rel
 # Generate man pages
 for file in ./bin/nanocl/target/man/*; do
   file_name=$(basename "${file}")
-  gzip < "$file" > "${release_path}"/usr/share/man/man1/"$file_name".gz
-  pandoc --from man --to markdown < "$file" > ./doc/man/"${file_name%.1}".md
+  gzip <"$file" >"${release_path}"/usr/share/man/man1/"$file_name".gz
 done
 
 # Copy binary
 cp ./target/${target_arch}/release/${pkg_name} "${release_path}"/usr/bin
 # Generate DEBIAN controll
-cat > ${release_path}/DEBIAN/control <<- EOM
+cat >${release_path}/DEBIAN/control <<-EOM
 Package: ${pkg_name}
 Version: ${version}
 Architecture: ${pkg_arch}
