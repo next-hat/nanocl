@@ -5,8 +5,8 @@ apply - Create or Update elements from a Statefile
 # SYNOPSIS
 
 **apply** \[**-s**\|**\--state-location**\] \[**-f**\|**\--follow**\]
-\[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\] \[**-h**\|**\--help**\]
-\[*ARGS*\]
+\[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\]
+\[**\--remove-orphans**\] \[**-h**\|**\--help**\] \[*ARGS*\]
 
 # DESCRIPTION
 
@@ -29,6 +29,10 @@ Create or Update elements from a Statefile
 **-r**, **\--reload**
 
 :   Perform an apply even if state didnt changed
+
+**\--remove-orphans**
+
+:   Remove orphaned elements
 
 **-h**, **\--help**
 
