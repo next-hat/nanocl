@@ -5,6 +5,9 @@
     "editor.defaultFormatter": "sissel.shopify-liquid",
     "editor.formatOnSave": false
   },
+  "[docker]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
   "editor.detectIndentation": false,
   "editor.trimAutoWhitespace": true,
   "editor.formatOnSave": true,

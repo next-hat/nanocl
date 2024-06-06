@@ -21,7 +21,7 @@ ARG channel=stable
 ## Build our nanocl daemon binary
 COPY --from=planner /app /app
 WORKDIR /app
-RUN export ARCH=$(uname -m) &&
+RUN export ARCH=$(uname -m) && \
   rustup target add $ARCH-unknown-linux-musl
 RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
@@ -48,7 +48,7 @@ RUN cargo build --release --features release --bin nanocld
 RUN cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.19.0
+FROM --platform=$BUILDPLATFORM alpine:3.20.0
 
 ## Install dependencies
 RUN apk --update add libgcc \
@@ -58,10 +58,10 @@ RUN apk --update add libgcc \
   bash \
   curl \
   cloud-utils \
-  cdrkit &&
-  rm -rf /var/cache/apk/* &&
-  rm -rf /tmp/* &&
-  rm -rf /var/log/* &&
+  cdrkit && \
+  rm -rf /var/cache/apk/* && \
+  rm -rf /tmp/* && \
+  rm -rf /var/log/* && \
   rm -rf /var/tmp/*
 
 ## Copy the binary
