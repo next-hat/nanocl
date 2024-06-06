@@ -153,51 +153,51 @@ impl ObjTaskUpdate for CargoDb {
             cargo.spec.cargo_key
           );
           let state_ptr_ptr = state.clone();
-          rt::spawn(async move {
-            ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-            let _ = utils::container::delete_instances(
-              &new_instances
-                .iter()
-                .map(|p| p.key.clone())
-                .collect::<Vec<_>>(),
-              &state_ptr_ptr,
-            )
-            .await;
-            let res = processes
+          let _ = utils::container::delete_instances(
+            &new_instances
               .iter()
-              .map(|process| {
-                let docker_api = state_ptr_ptr.inner.docker_api.clone();
-                async move {
-                  docker_api
-                    .rename_container(
-                      &process.key,
-                      RenameContainerOptions {
-                        name: &process.name,
-                      },
-                    )
-                    .await?;
-                  Ok::<_, HttpError>(())
-                }
-              })
-              .collect::<FuturesUnordered<_>>()
-              .collect::<Vec<_>>()
-              .await
-              .into_iter()
-              .collect::<HttpResult<Vec<_>>>();
-            if let Err(err) = res {
-              log::error!("Unable to rename containers back: {err}");
-            }
-          });
+              .map(|p| p.key.clone())
+              .collect::<Vec<_>>(),
+            &state_ptr_ptr,
+          )
+          .await;
+          let res = processes
+            .iter()
+            .map(|process| {
+              let docker_api = state_ptr_ptr.inner.docker_api.clone();
+              async move {
+                docker_api
+                  .rename_container(
+                    &process.key,
+                    RenameContainerOptions {
+                      name: &process.name,
+                    },
+                  )
+                  .await?;
+                Ok::<_, HttpError>(())
+              }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<HttpResult<Vec<_>>>();
+          if let Err(err) = res {
+            log::error!("Unable to rename containers back: {err}");
+          }
         }
         Ok(_) => {
           log::debug!("cargo instance {} started", cargo.spec.cargo_key);
           // Delete old containers
           let state_ptr_ptr = state.clone();
-          let _ = utils::container::delete_instances(
-            &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
-            &state_ptr_ptr,
-          )
-          .await;
+          rt::spawn(async move {
+            ntex::time::sleep(std::time::Duration::from_secs(4)).await;
+            let _ = utils::container::delete_instances(
+              &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
+              &state_ptr_ptr,
+            )
+            .await;
+          });
         }
       }
       ObjPsStatusDb::update_actual_status(

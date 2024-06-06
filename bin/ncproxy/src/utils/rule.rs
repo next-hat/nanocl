@@ -62,6 +62,10 @@ pub async fn get_addresses(
 ) -> IoResult<Vec<String>> {
   let mut addresses = vec![];
   for process in processes {
+    log::debug!("get_addresses from: {}", process.name);
+    if process.name.starts_with("tmp-") {
+      continue;
+    }
     let networks = process
       .data
       .network_settings
