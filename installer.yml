@@ -39,7 +39,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/metrsd:0.5.4-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/metrsd:0.5.3
+    Image: ghcr.io/next-hat/metrsd:0.5.4
     # {% endif %}
     Tty: true
     Cmd:

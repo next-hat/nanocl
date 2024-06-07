@@ -37,7 +37,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/next-hat/metrsd:0.5.3
+    image: ghcr.io/next-hat/metrsd:0.5.4
     tty: true
     networks:
       - system
