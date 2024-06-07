@@ -41,6 +41,7 @@ pub struct EnvCreateOpts {
 
 /// Create a new nanocl.io/tls secret
 #[derive(Clone, Parser, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct TlsCreateOpts {
   /// Certificate
   #[clap(long)]
@@ -63,6 +64,7 @@ pub struct TlsCreateOpts {
 
 /// Create a new nanocl.io/container-registry secret
 #[derive(Clone, Parser, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct ContainerRegistryCreateOpts {
   pub username: Option<String>,
   pub password: Option<String>,
@@ -81,6 +83,26 @@ impl TryFrom<SecretCreateOpts> for SecretPartial {
         ("nanocl.io/env", serde_json::to_value(&env.values)?)
       }
       SecretKindCreateCommand::Tls(tls) => {
+        let mut cert = tls.certificate.clone();
+        let mut cert_key = tls.certificate_key.clone();
+        let mut cert_client = tls.certificate_client.clone();
+        if std::path::Path::new(&cert).exists() {
+          cert = std::fs::read_to_string(&cert)?;
+        }
+        if std::path::Path::new(&cert_key).exists() {
+          cert_key = std::fs::read_to_string(&cert_key)?;
+        }
+        if let Some(ca) = &cert_client {
+          if std::path::Path::new(ca).exists() {
+            cert_client = Some(std::fs::read_to_string(ca)?);
+          }
+        }
+        let tls = TlsCreateOpts {
+          certificate: cert,
+          certificate_key: cert_key,
+          certificate_client: cert_client,
+          ..tls.to_owned()
+        };
         ("nanocl.io/tls", serde_json::to_value(tls)?)
       }
       SecretKindCreateCommand::ContainerRegistry(container_registry) => (
