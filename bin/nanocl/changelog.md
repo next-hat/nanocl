@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HOST` env variable to override the default host
 - `CERT` and `CERT_KEY` env variable to pass certificate and certificate key to the client
 - `nanocl state apply --remove-orphans` to remove orphaned objects
+- `nanocl secret create tls` now accept path to the certificate and key
 
 ### Fixed
 

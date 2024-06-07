@@ -107,46 +107,49 @@ async fn exec_docker(
       }
     }
     "die" => {
-      let actual_status =
-        ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
-      match (&kind, &actual_status.wanted) {
-        (EventActorKind::Cargo, status)
-          if status != &ObjPsStatusKind::Stop.to_string()
-            || status != &ObjPsStatusKind::Start.to_string() =>
-        {
-          ObjPsStatusDb::update_actual_status(
-            &kind_key,
-            &ObjPsStatusKind::Fail,
-            &state.inner.pool,
-          )
-          .await?;
-          let cargo =
-            CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-          state.emit_warning_native_action(
-            &cargo,
-            NativeEventAction::Fail,
-            Some(format!("Process {name}")),
-          );
+      if !name.starts_with("tmp-") {
+        let actual_status =
+          ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
+        match (&kind, &actual_status.wanted) {
+          (EventActorKind::Cargo, status)
+            if status != &ObjPsStatusKind::Stop.to_string()
+              || status != &ObjPsStatusKind::Start.to_string() =>
+          {
+            ObjPsStatusDb::update_actual_status(
+              &kind_key,
+              &ObjPsStatusKind::Fail,
+              &state.inner.pool,
+            )
+            .await?;
+            let cargo =
+              CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
+                .await?;
+            state.emit_warning_native_action(
+              &cargo,
+              NativeEventAction::Fail,
+              Some(format!("Process {name}")),
+            );
+          }
+          (EventActorKind::Vm, status)
+            if status != &ObjPsStatusKind::Stop.to_string()
+              || status != &ObjPsStatusKind::Start.to_string() =>
+          {
+            ObjPsStatusDb::update_actual_status(
+              &kind_key,
+              &ObjPsStatusKind::Fail,
+              &state.inner.pool,
+            )
+            .await?;
+            let vm =
+              VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
+            state.emit_warning_native_action(
+              &vm,
+              NativeEventAction::Fail,
+              Some(format!("Process {name}")),
+            );
+          }
+          _ => {}
         }
-        (EventActorKind::Vm, status)
-          if status != &ObjPsStatusKind::Stop.to_string()
-            || status != &ObjPsStatusKind::Start.to_string() =>
-        {
-          ObjPsStatusDb::update_actual_status(
-            &kind_key,
-            &ObjPsStatusKind::Fail,
-            &state.inner.pool,
-          )
-          .await?;
-          let vm =
-            VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-          state.emit_warning_native_action(
-            &vm,
-            NativeEventAction::Fail,
-            Some(format!("Process {name}")),
-          );
-        }
-        _ => {}
       }
       action.clone_into(&mut event.action);
     }
