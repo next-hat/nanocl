@@ -12,5 +12,5 @@ docker pull cockroachdb/cockroach:v24.1.0
 docker pull ghcr.io/next-hat/metrsd:0.5.4
 docker pull ghcr.io/next-hat/nanocl-get-started:latest
 docker pull ghcr.io/next-hat/nanocl-dev:dev
-docker buildx build --load --network host -t ndns:dev -f ./bin/ndns/Dockerfile .
-docker buildx build --load --network host -t nproxy:dev -f ./bin/nproxy/Dockerfile .
+docker buildx build --load -t ndns:dev -f ./bin/ndns/Dockerfile .
+docker buildx build --load -t nproxy:dev -f ./bin/nproxy/Dockerfile .
