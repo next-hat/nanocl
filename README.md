@@ -37,6 +37,7 @@ By empowering developers and DevOps professionals, Nanocl helps optimize workflo
 
 ## Latest news
 
+- [2024/06/11] [Man page, Backup, Remove Orphans and more](https://docs.next-hat.com/blog/nanocl-0.15) (release)
 - [2024/06/01] [We are invited to the Merge Berlin 2024](https://www.linkedin.com/feed/update/urn:li:activity:7201921660289998850) (event)
 - [2024/05/07] [Context, SubState and more](https://docs.next-hat.com/blog/nanocl-0.14) (release)
 
