@@ -1,47 +1,35 @@
-# NAME
+---
+title: Secret create container registry
+sidebar_position: 54
+---
 
-container-registry - Create a new nanocl.io/container-registry secret
+# Secret create container registry
 
-# SYNOPSIS
+## SYNOPSIS
 
-**container-registry** \[**-h**\|**\--help**\] \[*USERNAME*\]
+**container-registry** \[**-h**\|**--help**\] \[*USERNAME*\]
 \[*PASSWORD*\] \[*AUTH*\] \[*EMAIL*\] \[*SERVERADDRESS*\]
 \[*IDENTITYTOKEN*\] \[*REGISTRYTOKEN*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new nanocl.io/container-registry secret
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
+\[*USERNAME*\]  
 
-\[*USERNAME*\]
+\[*PASSWORD*\]  
 
-:   
+\[*AUTH*\]  
 
-\[*PASSWORD*\]
+\[*EMAIL*\]  
 
-:   
+\[*SERVERADDRESS*\]  
 
-\[*AUTH*\]
+\[*IDENTITYTOKEN*\]  
 
-:   
-
-\[*EMAIL*\]
-
-:   
-
-\[*SERVERADDRESS*\]
-
-:   
-
-\[*IDENTITYTOKEN*\]
-
-:   
-
-\[*REGISTRYTOKEN*\]
-
-:   
+\[*REGISTRYTOKEN*\]  

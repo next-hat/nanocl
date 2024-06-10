@@ -1,43 +1,39 @@
-# NAME
+---
+title: Resource
+sidebar_position: 46
+---
 
-resource - Manage resources
+# Resource
 
-# SYNOPSIS
+## SYNOPSIS
 
-**resource** \[**-h**\|**\--help**\] \<*subcommands*\>
+**resource** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage resources
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-resource-remove(1)
+resource-remove(1)  
+Remove existing resource
 
-:   Remove existing resource
+resource-list(1)  
+List existing namespaces
 
-resource-list(1)
+resource-inspect(1)  
+Inspect a resource
 
-:   List existing namespaces
+resource-history(1)  
+Browse history of a resource
 
-resource-inspect(1)
+resource-revert(1)  
+Revert a resource to a specific history
 
-:   Inspect a resource
-
-resource-history(1)
-
-:   Browse history of a resource
-
-resource-revert(1)
-
-:   Revert a resource to a specific history
-
-resource-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+resource-help(1)  
+Print this message or the help of the given subcommand(s)

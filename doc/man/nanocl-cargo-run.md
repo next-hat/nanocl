@@ -1,42 +1,37 @@
-# NAME
+---
+title: Cargo run
+sidebar_position: 14
+---
 
-run - Run a cargo
+# Cargo run
 
-# SYNOPSIS
+## SYNOPSIS
 
-**run** \[**-v**\|**\--volume**\] \[**-e**\|**\--env**\] \[**\--rm**\]
-\[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\> \[*COMMAND*\]
+**run** \[**-v**\|**--volume**\] \[**-e**\|**--env**\] \[**--rm**\]
+\[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\> \[*COMMAND*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Run a cargo
 
-# OPTIONS
+## OPTIONS
 
-**-v**, **\--volume**=*VOLUMES*
+**-v**, **--volume**=*VOLUMES*  
+Volumes of the cargo
 
-:   Volumes of the cargo
+**-e**, **--env**=*ENV*  
+Environment variables of the cargo
 
-**-e**, **\--env**=*ENV*
+**--rm**  
 
-:   Environment variables of the cargo
+**-h**, **--help**  
+Print help
 
-**\--rm**
+\<*NAME*\>  
+Name of the cargo
 
-:   
+\<*IMAGE*\>  
+Image of the cargo
 
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the cargo
-
-\<*IMAGE*\>
-
-:   Image of the cargo
-
-\[*COMMAND*\]
-
-:   Command to execute
+\[*COMMAND*\]  
+Command to execute

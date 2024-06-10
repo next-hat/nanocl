@@ -1,26 +1,25 @@
-# NAME
+---
+title: Vm image remove
+sidebar_position: 73
+---
 
-remove - Remove a VM image
+# Vm image remove
 
-# SYNOPSIS
+## SYNOPSIS
 
-**remove** \[**-y**\|**\--skip-confirm**\] \[**-h**\|**\--help**\]
+**remove** \[**-y**\|**--skip-confirm**\] \[**-h**\|**--help**\]
 \[*KEYS*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Remove a VM image
 
-# OPTIONS
+## OPTIONS
 
-**-y**, **\--skip-confirm**
+**-y**, **--skip-confirm**  
 
-:   
+**-h**, **--help**  
+Print help
 
-**-h**, **\--help**
-
-:   Print help
-
-\[*KEYS*\]
-
-:   The keys or names of the objects to remove
+\[*KEYS*\]  
+The keys or names of the objects to remove

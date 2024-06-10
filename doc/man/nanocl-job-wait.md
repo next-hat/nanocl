@@ -1,25 +1,25 @@
-# NAME
+---
+title: Job wait
+sidebar_position: 34
+---
 
-wait - Wait for a job to finish
+# Job wait
 
-# SYNOPSIS
+## SYNOPSIS
 
-**wait** \[**-c **\] \[**-h**\|**\--help**\] \<*NAME*\>
+**wait** \[**-c **\] \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Wait for a job to finish
 
-# OPTIONS
+## OPTIONS
 
-**-c**=*CONDITION*
+**-c**=*CONDITION*  
+State to wait
 
-:   State to wait
+**-h**, **--help**  
+Print help
 
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of job to wait
+\<*NAME*\>  
+Name of job to wait

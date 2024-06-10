@@ -1,21 +1,21 @@
-# NAME
+---
+title: Job start
+sidebar_position: 33
+---
 
-start - Start a job
+# Job start
 
-# SYNOPSIS
+## SYNOPSIS
 
-**start** \[**-h**\|**\--help**\] \[*NAMES*\]
+**start** \[**-h**\|**--help**\] \[*NAMES*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Start a job
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\[*NAMES*\]
-
-:   
+\[*NAMES*\]  

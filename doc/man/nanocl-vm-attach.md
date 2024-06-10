@@ -1,21 +1,22 @@
-# NAME
+---
+title: Vm attach
+sidebar_position: 67
+---
 
-attach - Attach to a vm
+# Vm attach
 
-# SYNOPSIS
+## SYNOPSIS
 
-**attach** \[**-h**\|**\--help**\] \<*NAME*\>
+**attach** \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Attach to a vm
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the vm
+\<*NAME*\>  
+Name of the vm

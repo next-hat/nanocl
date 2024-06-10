@@ -1,21 +1,22 @@
-# NAME
+---
+title: Namespace create
+sidebar_position: 39
+---
 
-create - Create new namespace
+# Namespace create
 
-# SYNOPSIS
+## SYNOPSIS
 
-**create** \[**-h**\|**\--help**\] \<*NAME*\>
+**create** \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create new namespace
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   name of the namespace to create
+\<*NAME*\>  
+name of the namespace to create

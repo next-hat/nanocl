@@ -1,39 +1,36 @@
-# NAME
+---
+title: Secret
+sidebar_position: 52
+---
 
-secret - Manage secrets
+# Secret
 
-# SYNOPSIS
+## SYNOPSIS
 
-**secret** \[**-h**\|**\--help**\] \<*subcommands*\>
+**secret** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage secrets
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-secret-remove(1)
+secret-remove(1)  
+Remove existing secret
 
-:   Remove existing secret
+secret-list(1)  
+List existing secret
 
-secret-list(1)
+secret-inspect(1)  
+Inspect a secret
 
-:   List existing secret
+secret-create(1)  
+Create a new secret
 
-secret-inspect(1)
-
-:   Inspect a secret
-
-secret-create(1)
-
-:   Create a new secret
-
-secret-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+secret-help(1)  
+Print this message or the help of the given subcommand(s)

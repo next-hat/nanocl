@@ -7,9 +7,29 @@ for project in ./bin/*; do
     continue
   fi
 
-  for file in $project/target/man/*; do
+  count=1
+  for file in $(ls $project/target/man/*); do
+    echo "Processing $file"
     file_name=$(basename "${file}")
-    pandoc --from man --to markdown < $file > ./doc/man/${file_name%.1}.md
+    # replace - with _ in the file name
+    # replace nanocl with nanocl_ in the file name
+    title=$(echo ${file_name%.1} | sed 's/nanocl-//g' | sed 's/-/ /g' | sed 's/.*/\u&/')
+    echo "---
+title: ${title}
+sidebar_position: ${count}
+---
+
+# ${title}
+" > ./doc/man/${file_name%.1}.md
+    pandoc --from man --to gfm < $file >> ./doc/man/${file_name%.1}.md
+    awk '/^# NAME/{flag=1; next} /^# SYNOPSIS/{flag=0} !flag' ./doc/man/${file_name%.1}.md | sponge ./doc/man/${file_name%.1}.md
+    # Replace # SYNOPSIS with ## SYNOPSIS
+    sed -i "s/^# SYNOPSIS/## SYNOPSIS/" -i ./doc/man/${file_name%.1}.md
+    # Replace # DESCRIPTION with ## DESCRIPTION
+    sed -i "s/^# DESCRIPTION/## DESCRIPTION/" -i ./doc/man/${file_name%.1}.md
+    # Replace # OPTIONS with ## OPTIONS
+    sed -i "s/^# OPTIONS/## OPTIONS/" -i ./doc/man/${file_name%.1}.md
+    count=$((count+1))
   done
 done
 
@@ -23,7 +43,8 @@ With \`scripts/generate_man.sh\` script.
 ## Summary
 """ > ./doc/man/readme.md
 
-for file in $(ls -v ./doc/man/*); do
+for file in $(ls ./doc/man/*); do
+  echo "Processing $file"
   file_name=$(basename "${file}")
   if [ "$file_name" = "readme.md" ]; then
     continue

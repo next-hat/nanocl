@@ -1,39 +1,36 @@
-# NAME
+---
+title: Secret create tls
+sidebar_position: 56
+---
 
-tls - Create a new nanocl.io/tls secret
+# Secret create tls
 
-# SYNOPSIS
+## SYNOPSIS
 
-**tls** \<**\--certificate**\> \<**\--certificate-key**\>
-\[**\--certificate-client**\] \[**\--dhparam**\]
-\[**\--verify-client**\] \[**-h**\|**\--help**\]
+**tls** \<**--certificate**\> \<**--certificate-key**\>
+\[**--certificate-client**\] \[**--dhparam**\] \[**--verify-client**\]
+\[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new nanocl.io/tls secret
 
-# OPTIONS
+## OPTIONS
 
-**\--certificate**=*CERTIFICATE*
+**--certificate**=*CERTIFICATE*  
+Certificate
 
-:   Certificate
+**--certificate-key**=*CERTIFICATE_KEY*  
+Certificate key
 
-**\--certificate-key**=*CERTIFICATE_KEY*
+**--certificate-client**=*CERTIFICATE_CLIENT*  
+Client certificate
 
-:   Certificate key
+**--dhparam**=*DHPARAM*  
+DHParam
 
-**\--certificate-client**=*CERTIFICATE_CLIENT*
+**--verify-client**  
+Verify client
 
-:   Client certificate
-
-**\--dhparam**=*DHPARAM*
-
-:   DHParam
-
-**\--verify-client**
-
-:   Verify client
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

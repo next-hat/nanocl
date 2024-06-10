@@ -1,28 +1,28 @@
-# NAME
+---
+title: Cargo inspect
+sidebar_position: 7
+---
 
-inspect - Inspect a cargo by its name
+# Cargo inspect
 
-# SYNOPSIS
+## SYNOPSIS
 
-**inspect** \[**\--display**\] \[**-h**\|**\--help**\] \<*KEY*\>
+**inspect** \[**--display**\] \[**-h**\|**--help**\] \<*KEY*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Inspect a cargo by its name
 
-# OPTIONS
+## OPTIONS
 
-**\--display**=*DISPLAY*
+**--display**=*DISPLAY*  
+Display format  
 
-:   Display format\
-
-\
+  
 \[*possible values: *yaml, toml, json\]
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*KEY*\>
-
-:   Key or Name of the object to inspect
+\<*KEY*\>  
+Key or Name of the object to inspect

@@ -1,68 +1,58 @@
-# NAME
+---
+title: Vm run
+sidebar_position: 79
+---
 
-run - Run a vm
+# Vm run
 
-# SYNOPSIS
+## SYNOPSIS
 
-**run** \[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\]
-\[**\--net-iface**\] \[**\--user**\] \[**\--password**\]
-\[**\--ssh-key**\] \[**\--img-size**\] \[**\--kvm**\]
-\[**-a**\|**\--attach**\] \[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
+**run** \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
+\[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
+\[**--img-size**\] \[**--kvm**\] \[**-a**\|**--attach**\]
+\[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Run a vm
 
-# OPTIONS
+## OPTIONS
 
-**\--hostname**=*HOSTNAME*
+**--hostname**=*HOSTNAME*  
+hostname of the vm
 
-:   hostname of the vm
+**--cpu**=*CPU*  
+Cpu of the vm default to 1
 
-**\--cpu**=*CPU*
+**--mem**=*MEMORY*  
+Memory of the vm in MB default to 512
 
-:   Cpu of the vm default to 1
+**--net-iface**=*NET_IFACE*  
+network interface of the vm
 
-**\--mem**=*MEMORY*
+**--user**=*USER*  
+Default user of the VM
 
-:   Memory of the vm in MB default to 512
+**--password**=*PASSWORD*  
+Default password of the VM
 
-**\--net-iface**=*NET_IFACE*
+**--ssh-key**=*SSH_KEY*  
+Ssh key for the user
 
-:   network interface of the vm
+**--img-size**=*IMAGE_SIZE*  
+Size of the disk in GB
 
-**\--user**=*USER*
+**--kvm**  
+Enable KVM
 
-:   Default user of the VM
+**-a**, **--attach**  
+Attach to the vm
 
-**\--password**=*PASSWORD*
+**-h**, **--help**  
+Print help
 
-:   Default password of the VM
+\<*NAME*\>  
+Name of the vm
 
-**\--ssh-key**=*SSH_KEY*
-
-:   Ssh key for the user
-
-**\--img-size**=*IMAGE_SIZE*
-
-:   Size of the disk in GB
-
-**\--kvm**
-
-:   Enable KVM
-
-**-a**, **\--attach**
-
-:   Attach to the vm
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the vm
-
-\<*IMAGE*\>
-
-:   Name of the vm image
+\<*IMAGE*\>  
+Name of the vm image

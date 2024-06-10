@@ -1,30 +1,28 @@
-# NAME
+---
+title: Vm image resize
+sidebar_position: 74
+---
 
-resize - Resize a VM image
+# Vm image resize
 
-# SYNOPSIS
+## SYNOPSIS
 
-**resize** \[**\--shrink**\] \[**-h**\|**\--help**\] \<*NAME*\>
-\<*SIZE*\>
+**resize** \[**--shrink**\] \[**-h**\|**--help**\] \<*NAME*\> \<*SIZE*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Resize a VM image
 
-# OPTIONS
+## OPTIONS
 
-**\--shrink**
+**--shrink**  
+Shrink the image
 
-:   Shrink the image
+**-h**, **--help**  
+Print help
 
-**-h**, **\--help**
+\<*NAME*\>  
+Name of the VM image
 
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the VM image
-
-\<*SIZE*\>
-
-:   New size of the VM image
+\<*SIZE*\>  
+New size of the VM image

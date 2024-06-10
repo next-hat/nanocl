@@ -1,47 +1,42 @@
-# NAME
+---
+title: State logs
+sidebar_position: 62
+---
 
-logs - Logs elements from a Statefile
+# State logs
 
-# SYNOPSIS
+## SYNOPSIS
 
-**logs** \[**-s**\|**\--state-location**\] \[**\--since**\] \[**-u **\]
-\[**-t **\] \[**\--timestamps**\] \[**-f **\] \[**-h**\|**\--help**\]
+**logs** \[**-s**\|**--state-location**\] \[**--since**\] \[**-u **\]
+\[**-t **\] \[**--timestamps**\] \[**-f **\] \[**-h**\|**--help**\]
 \[*ARGS*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Logs elements from a Statefile
 
-# OPTIONS
+## OPTIONS
 
-**-s**, **\--state-location**=*STATE_LOCATION*
+**-s**, **--state-location**=*STATE_LOCATION*  
+Path or Url to the Statefile
 
-:   Path or Url to the Statefile
+**--since**=*SINCE*  
+Only include logs since unix timestamp
 
-**\--since**=*SINCE*
+**-u**=*UNTIL*  
+Only include logs until unix timestamp
 
-:   Only include logs since unix timestamp
+**-t**=*TAIL*  
+If integer only return last n logs, if "all" returns all logs
 
-**-u**=*UNTIL*
+**--timestamps**  
+Bool, if set include timestamp to ever log line
 
-:   Only include logs until unix timestamp
+**-f**  
+Bool, if set open the log as stream
 
-**-t**=*TAIL*
+**-h**, **--help**  
+Print help
 
-:   If integer only return last n logs, if \"all\" returns all logs
-
-**\--timestamps**
-
-:   Bool, if set include timestamp to ever log line
-
-**-f**
-
-:   Bool, if set open the log as stream
-
-**-h**, **\--help**
-
-:   Print help
-
-\[*ARGS*\]
-
-:   Additional arguments to pass to the file
+\[*ARGS*\]  
+Additional arguments to pass to the file

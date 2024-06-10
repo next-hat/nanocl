@@ -1,39 +1,36 @@
-# NAME
+---
+title: Namespace
+sidebar_position: 38
+---
 
-namespace - Manage namespaces
+# Namespace
 
-# SYNOPSIS
+## SYNOPSIS
 
-**namespace** \[**-h**\|**\--help**\] \<*subcommands*\>
+**namespace** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage namespaces
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-namespace-create(1)
+namespace-create(1)  
+Create new namespace
 
-:   Create new namespace
+namespace-inspect(1)  
+Inspect a namespace
 
-namespace-inspect(1)
+namespace-remove(1)  
+Remove a namespace
 
-:   Inspect a namespace
+namespace-list(1)  
+List existing namespaces
 
-namespace-remove(1)
-
-:   Remove a namespace
-
-namespace-list(1)
-
-:   List existing namespaces
-
-namespace-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+namespace-help(1)  
+Print this message or the help of the given subcommand(s)

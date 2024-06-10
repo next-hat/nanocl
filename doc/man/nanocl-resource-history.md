@@ -1,21 +1,22 @@
-# NAME
+---
+title: Resource history
+sidebar_position: 47
+---
 
-history - Browse history of a resource
+# Resource history
 
-# SYNOPSIS
+## SYNOPSIS
 
-**history** \[**-h**\|**\--help**\] \<*NAME*\>
+**history** \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Browse history of a resource
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   The name of the resource to browse history
+\<*NAME*\>  
+The name of the resource to browse history

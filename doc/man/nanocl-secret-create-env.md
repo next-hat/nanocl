@@ -1,21 +1,22 @@
-# NAME
+---
+title: Secret create env
+sidebar_position: 55
+---
 
-env - Create a new nanocl.io/env secret
+# Secret create env
 
-# SYNOPSIS
+## SYNOPSIS
 
-**env** \[**-h**\|**\--help**\] \<*VALUES*\>
+**env** \[**-h**\|**--help**\] \<*VALUES*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new nanocl.io/env secret
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*VALUES*\>
-
-:   List of values in the form of \`key=value\`
+\<*VALUES*\>  
+List of values in the form of \`key=value\`

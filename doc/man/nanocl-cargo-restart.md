@@ -1,21 +1,21 @@
-# NAME
+---
+title: Cargo restart
+sidebar_position: 12
+---
 
-restart - Restart a cargo by its name
+# Cargo restart
 
-# SYNOPSIS
+## SYNOPSIS
 
-**restart** \[**-h**\|**\--help**\] \[*NAMES*\]
+**restart** \[**-h**\|**--help**\] \[*NAMES*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Restart a cargo by its name
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\[*NAMES*\]
-
-:   
+\[*NAMES*\]  

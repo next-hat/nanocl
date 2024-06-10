@@ -1,28 +1,28 @@
-# NAME
+---
+title: Resource inspect
+sidebar_position: 48
+---
 
-inspect - Inspect a resource
+# Resource inspect
 
-# SYNOPSIS
+## SYNOPSIS
 
-**inspect** \[**\--display**\] \[**-h**\|**\--help**\] \<*KEY*\>
+**inspect** \[**--display**\] \[**-h**\|**--help**\] \<*KEY*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Inspect a resource
 
-# OPTIONS
+## OPTIONS
 
-**\--display**=*DISPLAY*
+**--display**=*DISPLAY*  
+Display format  
 
-:   Display format\
-
-\
+  
 \[*possible values: *yaml, toml, json\]
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*KEY*\>
-
-:   Key or Name of the object to inspect
+\<*KEY*\>  
+Key or Name of the object to inspect

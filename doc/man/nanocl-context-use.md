@@ -1,21 +1,22 @@
-# NAME
+---
+title: Context use
+sidebar_position: 21
+---
 
-use - Set current context
+# Context use
 
-# SYNOPSIS
+## SYNOPSIS
 
-**use** \[**-h**\|**\--help**\] \<*NAME*\>
+**use** \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Set current context
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   Context name
+\<*NAME*\>  
+Context name

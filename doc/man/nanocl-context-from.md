@@ -1,21 +1,22 @@
-# NAME
+---
+title: Context from
+sidebar_position: 19
+---
 
-from - Create a new context from a file
+# Context from
 
-# SYNOPSIS
+## SYNOPSIS
 
-**from** \[**-h**\|**\--help**\] \<*PATH*\>
+**from** \[**-h**\|**--help**\] \<*PATH*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new context from a file
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*PATH*\>
-
-:   Path to context file
+\<*PATH*\>  
+Path to context file

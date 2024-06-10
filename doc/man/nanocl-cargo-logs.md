@@ -1,42 +1,38 @@
-# NAME
+---
+title: Cargo logs
+sidebar_position: 9
+---
 
-logs - Show logs
+# Cargo logs
 
-# SYNOPSIS
+## SYNOPSIS
 
-**logs** \[**-s **\] \[**-u **\] \[**-t **\] \[**\--timestamps**\]
-\[**-f **\] \[**-h**\|**\--help**\] \<*NAME*\>
+**logs** \[**-s **\] \[**-u **\] \[**-t **\] \[**--timestamps**\] \[**-f
+**\] \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show logs
 
-# OPTIONS
+## OPTIONS
 
-**-s**=*SINCE*
+**-s**=*SINCE*  
+Only include logs since unix timestamp
 
-:   Only include logs since unix timestamp
+**-u**=*UNTIL*  
+Only include logs until unix timestamp
 
-**-u**=*UNTIL*
+**-t**=*TAIL*  
+If integer only return last n logs, if "all" returns all logs
 
-:   Only include logs until unix timestamp
+**--timestamps**  
+Bool, if set include timestamp to ever log line
 
-**-t**=*TAIL*
+**-f**  
+Bool, if set open the log as stream
 
-:   If integer only return last n logs, if \"all\" returns all logs
+**-h**, **--help**  
+Print help
 
-**\--timestamps**
-
-:   Bool, if set include timestamp to ever log line
-
-**-f**
-
-:   Bool, if set open the log as stream
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of cargo to show logs
+\<*NAME*\>  
+Name of cargo to show logs

@@ -1,21 +1,22 @@
-# NAME
+---
+title: Cargo history
+sidebar_position: 6
+---
 
-history - List cargo history
+# Cargo history
 
-# SYNOPSIS
+## SYNOPSIS
 
-**history** \[**-h**\|**\--help**\] \<*NAME*\>
+**history** \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 List cargo history
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   Name of cargo to browse history
+\<*NAME*\>  
+Name of cargo to browse history

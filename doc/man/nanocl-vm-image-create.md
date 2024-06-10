@@ -1,25 +1,25 @@
-# NAME
+---
+title: Vm image create
+sidebar_position: 71
+---
 
-create - Create a base VM image
+# Vm image create
 
-# SYNOPSIS
+## SYNOPSIS
 
-**create** \[**-h**\|**\--help**\] \<*NAME*\> \<*FILE_PATH*\>
+**create** \[**-h**\|**--help**\] \<*NAME*\> \<*FILE_PATH*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a base VM image
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
+\<*NAME*\>  
+Name of the VM image
 
-\<*NAME*\>
-
-:   Name of the VM image
-
-\<*FILE_PATH*\>
-
-:   Path or url to the VM image
+\<*FILE_PATH*\>  
+Path or url to the VM image

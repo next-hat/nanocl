@@ -1,34 +1,32 @@
-# NAME
+---
+title: Cargo create
+sidebar_position: 4
+---
 
-create - Create a new cargo
+# Cargo create
 
-# SYNOPSIS
+## SYNOPSIS
 
-**create** \[**-v**\|**\--volume**\] \[**-e**\|**\--env**\]
-\[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
+**create** \[**-v**\|**--volume**\] \[**-e**\|**--env**\]
+\[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new cargo
 
-# OPTIONS
+## OPTIONS
 
-**-v**, **\--volume**=*VOLUMES*
+**-v**, **--volume**=*VOLUMES*  
+Volumes of the cargo
 
-:   Volumes of the cargo
+**-e**, **--env**=*ENV*  
+Environment variables of the cargo
 
-**-e**, **\--env**=*ENV*
+**-h**, **--help**  
+Print help
 
-:   Environment variables of the cargo
+\<*NAME*\>  
+Name of the cargo
 
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the cargo
-
-\<*IMAGE*\>
-
-:   Image of the cargo
+\<*IMAGE*\>  
+Image of the cargo

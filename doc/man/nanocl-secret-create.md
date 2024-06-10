@@ -1,39 +1,36 @@
-# NAME
+---
+title: Secret create
+sidebar_position: 53
+---
 
-create - Create a new secret
+# Secret create
 
-# SYNOPSIS
+## SYNOPSIS
 
-**create** \[**-h**\|**\--help**\] \<*NAME*\> \<*subcommands*\>
+**create** \[**-h**\|**--help**\] \<*NAME*\> \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a new secret
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*NAME*\>
-
-:   Name of your secret
+\<*NAME*\>  
+Name of your secret
 
 # SUBCOMMANDS
 
-create-env(1)
+create-env(1)  
+Create a new nanocl.io/env secret
 
-:   Create a new nanocl.io/env secret
+create-tls(1)  
+Create a new nanocl.io/tls secret
 
-create-tls(1)
+create-container-registry(1)  
+Create a new nanocl.io/container-registry secret
 
-:   Create a new nanocl.io/tls secret
-
-create-container-registry(1)
-
-:   Create a new nanocl.io/container-registry secret
-
-create-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+create-help(1)  
+Print this message or the help of the given subcommand(s)

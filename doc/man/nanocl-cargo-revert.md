@@ -1,25 +1,25 @@
-# NAME
+---
+title: Cargo revert
+sidebar_position: 13
+---
 
-revert - Revert cargo to a specific history
+# Cargo revert
 
-# SYNOPSIS
+## SYNOPSIS
 
-**revert** \[**-h**\|**\--help**\] \<*NAME*\> \<*HISTORY_ID*\>
+**revert** \[**-h**\|**--help**\] \<*NAME*\> \<*HISTORY_ID*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Revert cargo to a specific history
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
+\<*NAME*\>  
+Name of cargo to revert
 
-\<*NAME*\>
-
-:   Name of cargo to revert
-
-\<*HISTORY_ID*\>
-
-:   Revert to a specific historic
+\<*HISTORY_ID*\>  
+Revert to a specific historic

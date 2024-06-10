@@ -1,25 +1,25 @@
-# NAME
+---
+title: Resource revert
+sidebar_position: 51
+---
 
-revert - Revert a resource to a specific history
+# Resource revert
 
-# SYNOPSIS
+## SYNOPSIS
 
-**revert** \[**-h**\|**\--help**\] \<*NAME*\> \<*KEY*\>
+**revert** \[**-h**\|**--help**\] \<*NAME*\> \<*KEY*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Revert a resource to a specific history
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
+\<*NAME*\>  
+The name of the resource to revert
 
-\<*NAME*\>
-
-:   The name of the resource to revert
-
-\<*KEY*\>
-
-:   The key of the history to revert to
+\<*KEY*\>  
+The key of the history to revert to

@@ -1,21 +1,21 @@
-# NAME
+---
+title: Vm start
+sidebar_position: 80
+---
 
-start - Start a vm
+# Vm start
 
-# SYNOPSIS
+## SYNOPSIS
 
-**start** \[**-h**\|**\--help**\] \[*NAMES*\]
+**start** \[**-h**\|**--help**\] \[*NAMES*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Start a vm
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\[*NAMES*\]
-
-:   
+\[*NAMES*\]  

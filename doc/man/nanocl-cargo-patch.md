@@ -1,39 +1,36 @@
-# NAME
+---
+title: Cargo patch
+sidebar_position: 10
+---
 
-patch - Update a cargo by its name
+# Cargo patch
 
-# SYNOPSIS
+## SYNOPSIS
 
-**patch** \[**-n**\|**\--name**\] \[**-i**\|**\--image**\]
-\[**-e**\|**\--env**\] \[**-v**\|**\--volume**\] \[**-h**\|**\--help**\]
+**patch** \[**-n**\|**--name**\] \[**-i**\|**--image**\]
+\[**-e**\|**--env**\] \[**-v**\|**--volume**\] \[**-h**\|**--help**\]
 \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Update a cargo by its name
 
-# OPTIONS
+## OPTIONS
 
-**-n**, **\--name**=*NEW_NAME*
+**-n**, **--name**=*NEW_NAME*  
+New name of cargo
 
-:   New name of cargo
+**-i**, **--image**=*IMAGE*  
+New image of cargo
 
-**-i**, **\--image**=*IMAGE*
+**-e**, **--env**=*ENV*  
+New environment variables of cargo
 
-:   New image of cargo
+**-v**, **--volume**=*VOLUMES*  
+New volumes of cargo
 
-**-e**, **\--env**=*ENV*
+**-h**, **--help**  
+Print help
 
-:   New environment variables of cargo
-
-**-v**, **\--volume**=*VOLUMES*
-
-:   New volumes of cargo
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of cargo to update
+\<*NAME*\>  
+Name of cargo to update

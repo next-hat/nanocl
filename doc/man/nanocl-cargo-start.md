@@ -1,21 +1,21 @@
-# NAME
+---
+title: Cargo start
+sidebar_position: 15
+---
 
-start - Start cargoes by names
+# Cargo start
 
-# SYNOPSIS
+## SYNOPSIS
 
-**start** \[**-h**\|**\--help**\] \[*NAMES*\]
+**start** \[**-h**\|**--help**\] \[*NAMES*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Start cargoes by names
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\[*NAMES*\]
-
-:   
+\[*NAMES*\]  

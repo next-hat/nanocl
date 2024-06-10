@@ -1,21 +1,21 @@
-# NAME
+---
+title: Vm stop
+sidebar_position: 81
+---
 
-stop - Stop a vm
+# Vm stop
 
-# SYNOPSIS
+## SYNOPSIS
 
-**stop** \[**-h**\|**\--help**\] \[*NAMES*\]
+**stop** \[**-h**\|**--help**\] \[*NAMES*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Stop a vm
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\[*NAMES*\]
-
-:   
+\[*NAMES*\]  

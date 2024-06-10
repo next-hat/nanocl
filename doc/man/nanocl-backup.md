@@ -1,26 +1,26 @@
-# NAME
+---
+title: Backup
+sidebar_position: 2
+---
 
-backup - Backup the current state
+# Backup
 
-# SYNOPSIS
+## SYNOPSIS
 
-**backup** \[**-o**\|**\--output-dir**\] \[**-y**\|**\--yes**\]
-\[**-h**\|**\--help**\]
+**backup** \[**-o**\|**--output-dir**\] \[**-y**\|**--yes**\]
+\[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Backup the current state
 
-# OPTIONS
+## OPTIONS
 
-**-o**, **\--output-dir**=*OUTPUT_DIR*
+**-o**, **--output-dir**=*OUTPUT_DIR*  
+Directory where to write the backup default to the current directory
 
-:   Directory where to write the backup default to the current directory
+**-y**, **--yes**  
+Skip confirmation
 
-**-y**, **\--yes**
-
-:   Skip confirmation
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

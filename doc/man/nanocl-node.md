@@ -1,27 +1,27 @@
-# NAME
+---
+title: Node
+sidebar_position: 43
+---
 
-node - Manage nodes (experimental)
+# Node
 
-# SYNOPSIS
+## SYNOPSIS
 
-**node** \[**-h**\|**\--help**\] \<*subcommands*\>
+**node** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage nodes (experimental)
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-node-list(1)
+node-list(1)  
+List nodes
 
-:   List nodes
-
-node-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+node-help(1)  
+Print this message or the help of the given subcommand(s)

@@ -4444,6 +4444,36 @@ components:
           minimum: 0
         Spec:
           $ref: '#/components/schemas/Job'
+    LimitReq:
+      type: object
+      required:
+      - Burst
+      properties:
+        Burst:
+          type: integer
+          description: The burst size
+          minimum: 0
+        Delay:
+          type: integer
+          description: The delay to wait before retrying
+          nullable: true
+          minimum: 0
+      additionalProperties: false
+    LimitReqZone:
+      type: object
+      required:
+      - Size
+      - Rate
+      properties:
+        Size:
+          type: integer
+          description: The max size of the cache in megabytes
+          minimum: 0
+        Rate:
+          type: integer
+          description: The max number of request per second
+          minimum: 0
+      additionalProperties: false
     LocalNodeState:
       type: string
       description: |-
@@ -5448,7 +5478,8 @@ components:
           format: date-time
           description: The created at date
         IpAddress:
-          $ref: '#/components/schemas/ipnet.IpNet'
+          type: string
+          description: The ip address of the node
         Endpoint:
           type: string
           description: Endpoint to connect to the node

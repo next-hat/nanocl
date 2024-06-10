@@ -1,17 +1,19 @@
-# NAME
+---
+title: Info
+sidebar_position: 26
+---
 
-info - Show nanocl host information
+# Info
 
-# SYNOPSIS
+## SYNOPSIS
 
-**info** \[**-h**\|**\--help**\]
+**info** \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show nanocl host information
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

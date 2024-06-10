@@ -1,103 +1,85 @@
-# NAME
+---
+title: Nanocl
+sidebar_position: 1
+---
 
-nanocl - The Self-Sufficient Orchestrator CLI
+# Nanocl
 
-# SYNOPSIS
+## SYNOPSIS
 
-**nanocl** \[**-H**\|**\--host**\] \[**-h**\|**\--help**\]
-\[**-V**\|**\--version**\] \<*subcommands*\>
+**nanocl** \[**-H**\|**--host**\] \[**-h**\|**--help**\]
+\[**-V**\|**--version**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 The Self-Sufficient Orchestrator CLI
 
-# OPTIONS
+## OPTIONS
 
-**-H**, **\--host**=*HOST*
+**-H**, **--host**=*HOST*  
+Nanocld host default: unix://run/nanocl/nanocl.sock
 
-:   Nanocld host default: unix://run/nanocl/nanocl.sock
+**-h**, **--help**  
+Print help
 
-**-h**, **\--help**
-
-:   Print help
-
-**-V**, **\--version**
-
-:   Print version
+**-V**, **--version**  
+Print version
 
 # SUBCOMMANDS
 
-nanocl-namespace(1)
+nanocl-namespace(1)  
+Manage namespaces
 
-:   Manage namespaces
+nanocl-secret(1)  
+Manage secrets
 
-nanocl-secret(1)
+nanocl-job(1)  
+Manage jobs
 
-:   Manage secrets
+nanocl-cargo(1)  
+Manage cargoes
 
-nanocl-job(1)
+nanocl-vm(1)  
+Manage virtual machines
 
-:   Manage jobs
+nanocl-resource(1)  
+Manage resources
 
-nanocl-cargo(1)
+nanocl-metric(1)  
+Manage metrics
 
-:   Manage cargoes
+nanocl-context(1)  
+Manage contexts
 
-nanocl-vm(1)
+nanocl-node(1)  
+Manage nodes (experimental)
 
-:   Manage virtual machines
+nanocl-state(1)  
+Apply or Remove a Statefile
 
-nanocl-resource(1)
+nanocl-event(1)  
+Show or watch events
 
-:   Manage resources
+nanocl-ps(1)  
+Show processes
 
-nanocl-metric(1)
+nanocl-info(1)  
+Show nanocl host information
 
-:   Manage metrics
+nanocl-version(1)  
+Show nanocl version information
 
-nanocl-context(1)
+nanocl-install(1)  
+Install components
 
-:   Manage contexts
+nanocl-uninstall(1)  
+Uninstall components
 
-nanocl-node(1)
+nanocl-backup(1)  
+Backup the current state
 
-:   Manage nodes (experimental)
-
-nanocl-state(1)
-
-:   Apply or Remove a Statefile
-
-nanocl-event(1)
-
-:   Show or watch events
-
-nanocl-ps(1)
-
-:   Show processes
-
-nanocl-info(1)
-
-:   Show nanocl host information
-
-nanocl-version(1)
-
-:   Show nanocl version information
-
-nanocl-install(1)
-
-:   Install components
-
-nanocl-uninstall(1)
-
-:   Uninstall components
-
-nanocl-backup(1)
-
-:   Backup the current state
-
-nanocl-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+nanocl-help(1)  
+Print this message or the help of the given subcommand(s)
 
 # VERSION
 

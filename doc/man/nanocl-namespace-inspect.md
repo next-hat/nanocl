@@ -1,28 +1,28 @@
-# NAME
+---
+title: Namespace inspect
+sidebar_position: 40
+---
 
-inspect - Inspect a namespace
+# Namespace inspect
 
-# SYNOPSIS
+## SYNOPSIS
 
-**inspect** \[**\--display**\] \[**-h**\|**\--help**\] \<*KEY*\>
+**inspect** \[**--display**\] \[**-h**\|**--help**\] \<*KEY*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Inspect a namespace
 
-# OPTIONS
+## OPTIONS
 
-**\--display**=*DISPLAY*
+**--display**=*DISPLAY*  
+Display format  
 
-:   Display format\
-
-\
+  
 \[*possible values: *yaml, toml, json\]
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*KEY*\>
-
-:   Key or Name of the object to inspect
+\<*KEY*\>  
+Key or Name of the object to inspect

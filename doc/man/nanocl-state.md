@@ -1,35 +1,33 @@
-# NAME
+---
+title: State
+sidebar_position: 60
+---
 
-state - Apply or Remove a Statefile
+# State
 
-# SYNOPSIS
+## SYNOPSIS
 
-**state** \[**-h**\|**\--help**\] \<*subcommands*\>
+**state** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Apply or Remove a Statefile
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-state-apply(1)
+state-apply(1)  
+Create or Update elements from a Statefile
 
-:   Create or Update elements from a Statefile
+state-logs(1)  
+Logs elements from a Statefile
 
-state-logs(1)
+state-remove(1)  
+Remove elements from a Statefile
 
-:   Logs elements from a Statefile
-
-state-remove(1)
-
-:   Remove elements from a Statefile
-
-state-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+state-help(1)  
+Print this message or the help of the given subcommand(s)

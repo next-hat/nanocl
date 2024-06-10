@@ -1,55 +1,48 @@
-# NAME
+---
+title: Vm patch
+sidebar_position: 77
+---
 
-patch - Patch a vm
+# Vm patch
 
-# SYNOPSIS
+## SYNOPSIS
 
-**patch** \[**\--user**\] \[**\--password**\] \[**\--ssh-key**\]
-\[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\] \[**\--kvm**\]
-\[**\--net-iface**\] \[**-h**\|**\--help**\] \<*NAME*\>
+**patch** \[**--user**\] \[**--password**\] \[**--ssh-key**\]
+\[**--hostname**\] \[**--cpu**\] \[**--mem**\] \[**--kvm**\]
+\[**--net-iface**\] \[**-h**\|**--help**\] \<*NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Patch a vm
 
-# OPTIONS
+## OPTIONS
 
-**\--user**=*USER*
+**--user**=*USER*  
+Default user of the VM
 
-:   Default user of the VM
+**--password**=*PASSWORD*  
+Default password of the VM
 
-**\--password**=*PASSWORD*
+**--ssh-key**=*SSH_KEY*  
+Ssh key for the user
 
-:   Default password of the VM
+**--hostname**=*HOSTNAME*  
+hostname of the vm
 
-**\--ssh-key**=*SSH_KEY*
+**--cpu**=*CPU*  
+Cpu of the vm default to 1
 
-:   Ssh key for the user
+**--mem**=*MEMORY*  
+Memory of the vm in MB default to 512
 
-**\--hostname**=*HOSTNAME*
+**--kvm**  
+Enable KVM
 
-:   hostname of the vm
+**--net-iface**=*NET_IFACE*  
+network interface of the vm
 
-**\--cpu**=*CPU*
+**-h**, **--help**  
+Print help
 
-:   Cpu of the vm default to 1
-
-**\--mem**=*MEMORY*
-
-:   Memory of the vm in MB default to 512
-
-**\--kvm**
-
-:   Enable KVM
-
-**\--net-iface**=*NET_IFACE*
-
-:   network interface of the vm
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the vm
+\<*NAME*\>  
+Name of the vm

@@ -1,17 +1,19 @@
-# NAME
+---
+title: Version
+sidebar_position: 65
+---
 
-version - Show nanocl version information
+# Version
 
-# SYNOPSIS
+## SYNOPSIS
 
-**version** \[**-h**\|**\--help**\]
+**version** \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show nanocl version information
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

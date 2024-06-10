@@ -1,60 +1,51 @@
-# NAME
+---
+title: Vm create
+sidebar_position: 68
+---
 
-create - Create a vm
+# Vm create
 
-# SYNOPSIS
+## SYNOPSIS
 
-**create** \[**\--hostname**\] \[**\--cpu**\] \[**\--mem**\]
-\[**\--net-iface**\] \[**\--user**\] \[**\--password**\]
-\[**\--ssh-key**\] \[**\--kvm**\] \[**-h**\|**\--help**\] \<*NAME*\>
-\<*IMAGE*\>
+**create** \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
+\[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
+\[**--kvm**\] \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create a vm
 
-# OPTIONS
+## OPTIONS
 
-**\--hostname**=*HOSTNAME*
+**--hostname**=*HOSTNAME*  
+hostname of the vm
 
-:   hostname of the vm
+**--cpu**=*CPU*  
+Cpu of the vm default to 1
 
-**\--cpu**=*CPU*
+**--mem**=*MEMORY*  
+Memory of the vm in MB default to 512
 
-:   Cpu of the vm default to 1
+**--net-iface**=*NET_IFACE*  
+network interface of the vm
 
-**\--mem**=*MEMORY*
+**--user**=*USER*  
+Default user of the VM
 
-:   Memory of the vm in MB default to 512
+**--password**=*PASSWORD*  
+Default password of the VM
 
-**\--net-iface**=*NET_IFACE*
+**--ssh-key**=*SSH_KEY*  
+Ssh key for the user
 
-:   network interface of the vm
+**--kvm**  
+Enable KVM
 
-**\--user**=*USER*
+**-h**, **--help**  
+Print help
 
-:   Default user of the VM
+\<*NAME*\>  
+Name of the vm
 
-**\--password**=*PASSWORD*
-
-:   Default password of the VM
-
-**\--ssh-key**=*SSH_KEY*
-
-:   Ssh key for the user
-
-**\--kvm**
-
-:   Enable KVM
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of the vm
-
-\<*IMAGE*\>
-
-:   Name of the vm image
+\<*IMAGE*\>  
+Name of the vm image

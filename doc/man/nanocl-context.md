@@ -1,35 +1,33 @@
-# NAME
+---
+title: Context
+sidebar_position: 18
+---
 
-context - Manage contexts
+# Context
 
-# SYNOPSIS
+## SYNOPSIS
 
-**context** \[**-h**\|**\--help**\] \<*subcommands*\>
+**context** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage contexts
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-context-list(1)
+context-list(1)  
+List contexts
 
-:   List contexts
+context-use(1)  
+Set current context
 
-context-use(1)
+context-from(1)  
+Create a new context from a file
 
-:   Set current context
-
-context-from(1)
-
-:   Create a new context from a file
-
-context-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+context-help(1)  
+Print this message or the help of the given subcommand(s)

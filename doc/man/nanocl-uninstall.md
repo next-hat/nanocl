@@ -1,32 +1,31 @@
-# NAME
+---
+title: Uninstall
+sidebar_position: 64
+---
 
-uninstall - Uninstall components
+# Uninstall
 
-# SYNOPSIS
+## SYNOPSIS
 
-**uninstall** \[**\--docker-host**\] \[**-t**\|**\--template**\]
-\[**\--docker-desktop**\] \[**-h**\|**\--help**\]
+**uninstall** \[**--docker-host**\] \[**-t**\|**--template**\]
+\[**--docker-desktop**\] \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Uninstall components
 
-# OPTIONS
+## OPTIONS
 
-**\--docker-host**=*DOCKER_HOST*
+**--docker-host**=*DOCKER_HOST*  
+The docker host where nanocl is installed default is
+unix:///var/run/docker.sock
 
-:   The docker host where nanocl is installed default is
-    unix:///var/run/docker.sock
+**-t**, **--template**=*TEMPLATE*  
+Uninstall template to use for nanocl by default its detected
 
-**-t**, **\--template**=*TEMPLATE*
+**--docker-desktop**  
+Specify if the docker host is docker desktop detected if docker context
+is desktop-linux
 
-:   Uninstall template to use for nanocl by default its detected
-
-**\--docker-desktop**
-
-:   Specify if the docker host is docker desktop detected if docker
-    context is desktop-linux
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

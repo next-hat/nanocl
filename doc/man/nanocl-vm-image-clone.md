@@ -1,25 +1,25 @@
-# NAME
+---
+title: Vm image clone
+sidebar_position: 70
+---
 
-clone - Clone a VM image
+# Vm image clone
 
-# SYNOPSIS
+## SYNOPSIS
 
-**clone** \[**-h**\|**\--help**\] \<*NAME*\> \<*CLONE_NAME*\>
+**clone** \[**-h**\|**--help**\] \<*NAME*\> \<*CLONE_NAME*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Clone a VM image
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
+\<*NAME*\>  
+Name of the VM image
 
-\<*NAME*\>
-
-:   Name of the VM image
-
-\<*CLONE_NAME*\>
-
-:   Name of the cloned VM image
+\<*CLONE_NAME*\>  
+Name of the cloned VM image

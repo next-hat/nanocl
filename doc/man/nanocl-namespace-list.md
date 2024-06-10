@@ -1,34 +1,32 @@
-# NAME
+---
+title: Namespace list
+sidebar_position: 41
+---
 
-list - List existing namespaces
+# Namespace list
 
-# SYNOPSIS
+## SYNOPSIS
 
-**list** \[**-q**\|**\--quiet**\] \[**-l**\|**\--limit**\]
-\[**-o**\|**\--offset**\] \[**\--filters**\] \[**-h**\|**\--help**\]
+**list** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
+\[**-o**\|**--offset**\] \[**--filters**\] \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 List existing namespaces
 
-# OPTIONS
+## OPTIONS
 
-**-q**, **\--quiet**
+**-q**, **--quiet**  
+Only show keys
 
-:   Only show keys
+**-l**, **--limit**=*LIMIT*  
+Limit the number of results default to 100
 
-**-l**, **\--limit**=*LIMIT*
+**-o**, **--offset**=*OFFSET*  
+Offset the results to navigate through the results
 
-:   Limit the number of results default to 100
+**--filters**=*FILTERS*  
+Filters
 
-**-o**, **\--offset**=*OFFSET*
-
-:   Offset the results to navigate through the results
-
-**\--filters**=*FILTERS*
-
-:   Filters
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

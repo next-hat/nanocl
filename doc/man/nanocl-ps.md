@@ -1,48 +1,41 @@
-# NAME
+---
+title: Ps
+sidebar_position: 45
+---
 
-ps - Show processes
+# Ps
 
-# SYNOPSIS
+## SYNOPSIS
 
-**ps** \[**-q**\|**\--quiet**\] \[**-l**\|**\--limit**\]
-\[**-o**\|**\--offset**\] \[**\--filters**\]
-\[**-n**\|**\--namespace**\] \[**-k**\|**\--kind**\]
-\[**-a**\|**\--all**\] \[**-h**\|**\--help**\]
+**ps** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
+\[**-o**\|**--offset**\] \[**--filters**\] \[**-n**\|**--namespace**\]
+\[**-k**\|**--kind**\] \[**-a**\|**--all**\] \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show processes
 
-# OPTIONS
+## OPTIONS
 
-**-q**, **\--quiet**
+**-q**, **--quiet**  
+Only show keys
 
-:   Only show keys
+**-l**, **--limit**=*LIMIT*  
+Limit the number of results default to 100
 
-**-l**, **\--limit**=*LIMIT*
+**-o**, **--offset**=*OFFSET*  
+Offset the results to navigate through the results
 
-:   Limit the number of results default to 100
+**--filters**=*FILTERS*  
+Filters
 
-**-o**, **\--offset**=*OFFSET*
+**-n**, **--namespace**=*NAMESPACE*  
+Show all processes for the given namespace
 
-:   Offset the results to navigate through the results
+**-k**, **--kind**=*KIND*  
+Show all processes for the given kind
 
-**\--filters**=*FILTERS*
+**-a**, **--all**  
 
-:   Filters
-
-**-n**, **\--namespace**=*NAMESPACE*
-
-:   Show all processes for the given namespace
-
-**-k**, **\--kind**=*KIND*
-
-:   Show all processes for the given kind
-
-**-a**, **\--all**
-
-:   
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

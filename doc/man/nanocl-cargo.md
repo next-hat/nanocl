@@ -1,84 +1,70 @@
-# NAME
+---
+title: Cargo
+sidebar_position: 3
+---
 
-cargo - Manage cargoes
+# Cargo
 
-# SYNOPSIS
+## SYNOPSIS
 
-**cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
+**cargo** \[**-n**\|**--namespace**\] \[**-h**\|**--help**\]
 \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage cargoes
 
-# OPTIONS
+## OPTIONS
 
-**-n**, **\--namespace**=*NAMESPACE*
+**-n**, **--namespace**=*NAMESPACE*  
+namespace to target by default global is used
 
-:   namespace to target by default global is used
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-cargo-list(1)
+cargo-list(1)  
+List existing cargo
 
-:   List existing cargo
+cargo-create(1)  
+Create a new cargo
 
-cargo-create(1)
+cargo-start(1)  
+Start cargoes by names
 
-:   Create a new cargo
+cargo-stop(1)  
+Stop cargoes by names
 
-cargo-start(1)
+cargo-restart(1)  
+Restart a cargo by its name
 
-:   Start cargoes by names
+cargo-remove(1)  
+Remove cargo by its name
 
-cargo-stop(1)
+cargo-inspect(1)  
+Inspect a cargo by its name
 
-:   Stop cargoes by names
+cargo-patch(1)  
+Update a cargo by its name
 
-cargo-restart(1)
+cargo-exec(1)  
+Execute a command inside a cargo
 
-:   Restart a cargo by its name
+cargo-history(1)  
+List cargo history
 
-cargo-remove(1)
+cargo-revert(1)  
+Revert cargo to a specific history
 
-:   Remove cargo by its name
+cargo-logs(1)  
+Show logs
 
-cargo-inspect(1)
+cargo-run(1)  
+Run a cargo
 
-:   Inspect a cargo by its name
+cargo-stats(1)  
+Show stats of cargo
 
-cargo-patch(1)
-
-:   Update a cargo by its name
-
-cargo-exec(1)
-
-:   Execute a command inside a cargo
-
-cargo-history(1)
-
-:   List cargo history
-
-cargo-revert(1)
-
-:   Revert cargo to a specific history
-
-cargo-logs(1)
-
-:   Show logs
-
-cargo-run(1)
-
-:   Run a cargo
-
-cargo-stats(1)
-
-:   Show stats of cargo
-
-cargo-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+cargo-help(1)  
+Print this message or the help of the given subcommand(s)

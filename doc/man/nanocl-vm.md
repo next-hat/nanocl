@@ -1,68 +1,58 @@
-# NAME
+---
+title: Vm
+sidebar_position: 66
+---
 
-vm - Manage virtual machines
+# Vm
 
-# SYNOPSIS
+## SYNOPSIS
 
-**vm** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
+**vm** \[**-n**\|**--namespace**\] \[**-h**\|**--help**\]
 \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage virtual machines
 
-# OPTIONS
+## OPTIONS
 
-**-n**, **\--namespace**=*NAMESPACE*
+**-n**, **--namespace**=*NAMESPACE*  
+namespace to target by default global is used
 
-:   namespace to target by default global is used
-
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-vm-run(1)
+vm-run(1)  
+Run a vm
 
-:   Run a vm
+vm-image(1)  
+Manage vm images
 
-vm-image(1)
+vm-create(1)  
+Create a vm
 
-:   Manage vm images
+vm-list(1)  
+List vms
 
-vm-create(1)
+vm-remove(1)  
+Remove vms
 
-:   Create a vm
+vm-inspect(1)  
+Inspect a vm
 
-vm-list(1)
+vm-start(1)  
+Start a vm
 
-:   List vms
+vm-stop(1)  
+Stop a vm
 
-vm-remove(1)
+vm-attach(1)  
+Attach to a vm
 
-:   Remove vms
+vm-patch(1)  
+Patch a vm
 
-vm-inspect(1)
-
-:   Inspect a vm
-
-vm-start(1)
-
-:   Start a vm
-
-vm-stop(1)
-
-:   Stop a vm
-
-vm-attach(1)
-
-:   Attach to a vm
-
-vm-patch(1)
-
-:   Patch a vm
-
-vm-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+vm-help(1)  
+Print this message or the help of the given subcommand(s)

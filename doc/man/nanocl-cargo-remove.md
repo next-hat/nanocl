@@ -1,30 +1,27 @@
-# NAME
+---
+title: Cargo remove
+sidebar_position: 11
+---
 
-remove - Remove cargo by its name
+# Cargo remove
 
-# SYNOPSIS
+## SYNOPSIS
 
-**remove** \[**-y**\|**\--skip-confirm**\] \[**-f**\|**\--force**\]
-\[**-h**\|**\--help**\] \[*KEYS*\]
+**remove** \[**-y**\|**--skip-confirm**\] \[**-f**\|**--force**\]
+\[**-h**\|**--help**\] \[*KEYS*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Remove cargo by its name
 
-# OPTIONS
+## OPTIONS
 
-**-y**, **\--skip-confirm**
+**-y**, **--skip-confirm**  
 
-:   
+**-f**, **--force**  
 
-**-f**, **\--force**
+**-h**, **--help**  
+Print help
 
-:   
-
-**-h**, **\--help**
-
-:   Print help
-
-\[*KEYS*\]
-
-:   The keys or names of the objects to remove
+\[*KEYS*\]  
+The keys or names of the objects to remove

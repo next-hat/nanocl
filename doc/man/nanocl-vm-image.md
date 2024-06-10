@@ -1,43 +1,39 @@
-# NAME
+---
+title: Vm image
+sidebar_position: 69
+---
 
-image - Manage vm images
+# Vm image
 
-# SYNOPSIS
+## SYNOPSIS
 
-**image** \[**-h**\|**\--help**\] \<*subcommands*\>
+**image** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage vm images
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-image-create(1)
+image-create(1)  
+Create a base VM image
 
-:   Create a base VM image
+image-clone(1)  
+Clone a VM image
 
-image-clone(1)
+image-resize(1)  
+Resize a VM image
 
-:   Clone a VM image
+image-list(1)  
+List VM images
 
-image-resize(1)
+image-remove(1)  
+Remove a VM image
 
-:   Resize a VM image
-
-image-list(1)
-
-:   List VM images
-
-image-remove(1)
-
-:   Remove a VM image
-
-image-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+image-help(1)  
+Print this message or the help of the given subcommand(s)

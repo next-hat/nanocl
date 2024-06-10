@@ -1,17 +1,19 @@
-# NAME
+---
+title: Event watch
+sidebar_position: 25
+---
 
-watch - Watch for new events in real time
+# Event watch
 
-# SYNOPSIS
+## SYNOPSIS
 
-**watch** \[**-h**\|**\--help**\]
+**watch** \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Watch for new events in real time
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

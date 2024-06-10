@@ -1,28 +1,28 @@
-# NAME
+---
+title: Metric inspect
+sidebar_position: 36
+---
 
-inspect - Inspect a metric
+# Metric inspect
 
-# SYNOPSIS
+## SYNOPSIS
 
-**inspect** \[**\--display**\] \[**-h**\|**\--help**\] \<*KEY*\>
+**inspect** \[**--display**\] \[**-h**\|**--help**\] \<*KEY*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Inspect a metric
 
-# OPTIONS
+## OPTIONS
 
-**\--display**=*DISPLAY*
+**--display**=*DISPLAY*  
+Display format  
 
-:   Display format\
-
-\
+  
 \[*possible values: *yaml, toml, json\]
 
-**-h**, **\--help**
+**-h**, **--help**  
+Print help
 
-:   Print help
-
-\<*KEY*\>
-
-:   Key or Name of the object to inspect
+\<*KEY*\>  
+Key or Name of the object to inspect

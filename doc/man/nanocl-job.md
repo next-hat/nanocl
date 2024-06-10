@@ -1,47 +1,42 @@
-# NAME
+---
+title: Job
+sidebar_position: 28
+---
 
-job - Manage jobs
+# Job
 
-# SYNOPSIS
+## SYNOPSIS
 
-**job** \[**-h**\|**\--help**\] \<*subcommands*\>
+**job** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Manage jobs
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-job-list(1)
+job-list(1)  
+List existing job
 
-:   List existing job
+job-remove(1)  
+Remove job by its name
 
-job-remove(1)
+job-inspect(1)  
+Inspect a job by its name
 
-:   Remove job by its name
+job-logs(1)  
+Show logs of a job
 
-job-inspect(1)
+job-wait(1)  
+Wait for a job to finish
 
-:   Inspect a job by its name
+job-start(1)  
+Start a job
 
-job-logs(1)
-
-:   Show logs of a job
-
-job-wait(1)
-
-:   Wait for a job to finish
-
-job-start(1)
-
-:   Start a job
-
-job-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+job-help(1)  
+Print this message or the help of the given subcommand(s)

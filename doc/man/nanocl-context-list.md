@@ -1,17 +1,19 @@
-# NAME
+---
+title: Context list
+sidebar_position: 20
+---
 
-list - List contexts
+# Context list
 
-# SYNOPSIS
+## SYNOPSIS
 
-**list** \[**-h**\|**\--help**\]
+**list** \[**-h**\|**--help**\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 List contexts
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help

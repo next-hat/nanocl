@@ -1,51 +1,45 @@
-# NAME
+---
+title: Cargo exec
+sidebar_position: 5
+---
 
-exec - Execute a command inside a cargo
+# Cargo exec
 
-# SYNOPSIS
+## SYNOPSIS
 
-**exec** \[**-t**\|**\--tty**\] \[**\--detach-keys**\] \[**-e **\]
-\[**\--privileged**\] \[**-u **\] \[**-w**\|**\--workdir**\]
-\[**-h**\|**\--help**\] \<*NAME*\> \[*COMMAND*\]
+**exec** \[**-t**\|**--tty**\] \[**--detach-keys**\] \[**-e **\]
+\[**--privileged**\] \[**-u **\] \[**-w**\|**--workdir**\]
+\[**-h**\|**--help**\] \<*NAME*\> \[*COMMAND*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Execute a command inside a cargo
 
-# OPTIONS
+## OPTIONS
 
-**-t**, **\--tty**
+**-t**, **--tty**  
+Allocate a pseudo-TTY
 
-:   Allocate a pseudo-TTY
+**--detach-keys**=*DETACH_KEYS*  
+Override the key sequence for detaching a container
 
-**\--detach-keys**=*DETACH_KEYS*
+**-e**=*ENV*  
+Set environment variables
 
-:   Override the key sequence for detaching a container
+**--privileged**  
+Give extended privileges to the command
 
-**-e**=*ENV*
+**-u**=*USER*  
+Username or UID (format: "\<name\|uid\>\[:\<group\|gid\>\]")
 
-:   Set environment variables
+**-w**, **--workdir**=*WORKING_DIR*  
+Working directory inside the container
 
-**\--privileged**
+**-h**, **--help**  
+Print help
 
-:   Give extended privileges to the command
+\<*NAME*\>  
+Name of cargo to execute command
 
-**-u**=*USER*
-
-:   Username or UID (format: \"\<name\|uid\>\[:\<group\|gid\>\]\")
-
-**-w**, **\--workdir**=*WORKING_DIR*
-
-:   Working directory inside the container
-
-**-h**, **\--help**
-
-:   Print help
-
-\<*NAME*\>
-
-:   Name of cargo to execute command
-
-\[*COMMAND*\]
-
-:   Command to execute
+\[*COMMAND*\]  
+Command to execute

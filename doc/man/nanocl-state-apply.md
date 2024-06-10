@@ -1,43 +1,39 @@
-# NAME
+---
+title: State apply
+sidebar_position: 61
+---
 
-apply - Create or Update elements from a Statefile
+# State apply
 
-# SYNOPSIS
+## SYNOPSIS
 
-**apply** \[**-s**\|**\--state-location**\] \[**-f**\|**\--follow**\]
-\[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\]
-\[**\--remove-orphans**\] \[**-h**\|**\--help**\] \[*ARGS*\]
+**apply** \[**-s**\|**--state-location**\] \[**-f**\|**--follow**\]
+\[**-y**\|**--yes**\] \[**-r**\|**--reload**\] \[**--remove-orphans**\]
+\[**-h**\|**--help**\] \[*ARGS*\]
 
-# DESCRIPTION
+## DESCRIPTION
 
 Create or Update elements from a Statefile
 
-# OPTIONS
+## OPTIONS
 
-**-s**, **\--state-location**=*STATE_LOCATION*
+**-s**, **--state-location**=*STATE_LOCATION*  
+Path or Url to the Statefile
 
-:   Path or Url to the Statefile
+**-f**, **--follow**  
+Follow logs of the deployed cargo
 
-**-f**, **\--follow**
+**-y**, **--yes**  
+Skip the confirmation prompt
 
-:   Follow logs of the deployed cargo
+**-r**, **--reload**  
+Perform an apply even if state didnt changed
 
-**-y**, **\--yes**
+**--remove-orphans**  
+Remove orphaned elements
 
-:   Skip the confirmation prompt
+**-h**, **--help**  
+Print help
 
-**-r**, **\--reload**
-
-:   Perform an apply even if state didnt changed
-
-**\--remove-orphans**
-
-:   Remove orphaned elements
-
-**-h**, **\--help**
-
-:   Print help
-
-\[*ARGS*\]
-
-:   Additional arguments to pass to the file
+\[*ARGS*\]  
+Additional arguments to pass to the file

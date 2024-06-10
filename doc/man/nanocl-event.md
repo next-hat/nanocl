@@ -1,35 +1,33 @@
-# NAME
+---
+title: Event
+sidebar_position: 22
+---
 
-event - Show or watch events
+# Event
 
-# SYNOPSIS
+## SYNOPSIS
 
-**event** \[**-h**\|**\--help**\] \<*subcommands*\>
+**event** \[**-h**\|**--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+## DESCRIPTION
 
 Show or watch events
 
-# OPTIONS
+## OPTIONS
 
-**-h**, **\--help**
-
-:   Print help
+**-h**, **--help**  
+Print help
 
 # SUBCOMMANDS
 
-event-list(1)
+event-list(1)  
+List existing events
 
-:   List existing events
+event-watch(1)  
+Watch for new events in real time
 
-event-watch(1)
+event-inspect(1)  
+Inspect a specific event
 
-:   Watch for new events in real time
-
-event-inspect(1)
-
-:   Inspect a specific event
-
-event-help(1)
-
-:   Print this message or the help of the given subcommand(s)
+event-help(1)  
+Print this message or the help of the given subcommand(s)
