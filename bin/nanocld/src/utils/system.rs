@@ -94,7 +94,6 @@ pub async fn sync_process(
 /// User can registered they own namespace to ensure better encapsulation.
 pub async fn register_namespace(
   name: &str,
-  create_network: bool,
   state: &SystemState,
 ) -> IoResult<()> {
   if NamespaceDb::read_by_pk(name, &state.inner.pool)
@@ -107,11 +106,7 @@ pub async fn register_namespace(
     name: name.to_owned(),
     metadata: None,
   };
-  if create_network {
-    NamespaceDb::create_obj(&new_nsp, state).await?;
-  } else {
-    NamespaceDb::create_from(&new_nsp, &state.inner.pool).await?;
-  }
+  NamespaceDb::create_from(&new_nsp, &state.inner.pool).await?;
   Ok(())
 }
 
@@ -205,7 +200,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
       match CargoDb::transform_read_by_pk(key, &state.inner.pool).await {
         // unless we create his config
         Err(_err) => {
-          if let Err(err) = register_namespace(namespace, false, state).await {
+          if let Err(err) = register_namespace(namespace, state).await {
             log::warn!("system::sync_processes: namespace {err}");
             continue;
           }

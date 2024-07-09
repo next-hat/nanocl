@@ -4,7 +4,6 @@ use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::namespace::{NamespacePartial, Namespace, NamespaceInspect};
 
 use crate::{
-  utils,
   repositories::generic::*,
   models::{CargoDb, NamespaceDb, SystemState},
 };
@@ -68,11 +67,9 @@ impl ObjInspectByPk for NamespaceDb {
         CargoDb::inspect_obj_by_pk(&cargo.spec.cargo_key, state).await?;
       cargoes.push(cargo);
     }
-    let network = utils::network::inspect_network(pk, state).await?;
     Ok(NamespaceInspect {
       name: namespace.name,
       cargoes,
-      network,
     })
   }
 }

@@ -123,8 +123,8 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   let system_state = SystemState::new(conf).await?;
   let system_ptr = system_state.clone();
   NodeDb::register(&system_ptr).await?;
-  utils::system::register_namespace("global", true, &system_ptr).await?;
-  utils::system::register_namespace("system", false, &system_ptr).await?;
+  utils::system::register_namespace("global", &system_ptr).await?;
+  utils::system::register_namespace("system", &system_ptr).await?;
   rt::spawn(async move {
     let fut = async move {
       utils::system::sync_processes(&system_ptr).await?;

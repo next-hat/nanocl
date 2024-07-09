@@ -3,21 +3,18 @@ use std::collections::HashMap;
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use nix::unistd::Group;
-use bollard_next::{
-  container::{LogOutput, LogsOptions, StartContainerOptions},
-  network::{CreateNetworkOptions, InspectNetworkOptions},
-};
+use bollard_next::container::{LogOutput, LogsOptions, StartContainerOptions};
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_utils::unix;
 use nanocld_client::stubs::statefile::Statefile;
 
 use crate::{
+  utils,
   models::{
     Context, ContextEndpoint, ContextMetaData, InstallOpts, NanocldArg,
     StateRoot,
   },
-  utils,
 };
 
 /// This function is called when running `nanocl install`
@@ -114,23 +111,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
-  if docker
-    .inspect_network("system", None::<InspectNetworkOptions<String>>)
-    .await
-    .is_err()
-  {
-    let mut options = HashMap::new();
-    options.insert("com.docker.network.bridge.name", "nanocl.system");
-    docker
-      .create_network(CreateNetworkOptions {
-        name: "system",
-        driver: "bridge",
-        options,
-        ..Default::default()
-      })
-      .await
-      .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
-  }
   for cargo in &cargoes {
     let token = format!("cargo/{}", &cargo.name);
     let pg_style = utils::progress::create_spinner_style(&token, "green");

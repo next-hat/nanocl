@@ -1,4 +1,3 @@
-use bollard_next::service::Network;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -62,8 +61,6 @@ pub struct NamespaceSummary {
   pub cargoes: usize,
   /// Number of instances
   pub instances: usize,
-  /// Gateway of the namespace
-  pub gateway: String,
   /// When the namespace was created
   pub created_at: chrono::NaiveDateTime,
 }
@@ -82,8 +79,6 @@ pub struct NamespaceInspect {
   pub name: String,
   /// Number of cargoes
   pub cargoes: Vec<CargoInspect>,
-  // Network of the namespace
-  pub network: Network,
 }
 
 /// Convert a Namespace into an EventActor

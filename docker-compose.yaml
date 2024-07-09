@@ -4,14 +4,6 @@ volumes:
   nanocl-deps:
     name: "nanocl-deps"
 
-networks:
-  system:
-    name: system
-    driver: bridge
-    external: false
-    driver_opts:
-      com.docker.network.bridge.name: nanocl.system
-
 services:
   nstore:
     container_name: nstore.system.c
@@ -22,8 +14,6 @@ services:
     ports:
       - 26257:26257
       - 26258:26258
-    networks:
-      - system
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     environment:
@@ -50,8 +40,6 @@ services:
     container_name: nmetrics.system.c
     image: ghcr.io/next-hat/metrsd:0.5.4
     tty: true
-    networks:
-      - system
     environment:
       - LOG_LEVEL=metrsd=info
     command:
@@ -91,8 +79,6 @@ services:
       - proxy
     ports:
       - 8686:8686
-    networks:
-      - system
     command:
       - watch
       - -w
@@ -138,8 +124,6 @@ services:
       - dns
     ports:
       - 8787:8787
-    networks:
-      - system
     command:
       - watch
       - -w
@@ -165,8 +149,6 @@ services:
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
-    networks:
-      - system
     ports:
       - 8585:8585
       - 9443:9443
@@ -211,8 +193,6 @@ services:
     hostname: dbeaver.nanocl.internal
     profiles:
       - debug
-    networks:
-      - system
     ports:
       - 9090:8978
     environment:
@@ -233,8 +213,6 @@ services:
     hostname: ncvpnkit.nanocl.internal
     profiles:
       - vpnkit
-    networks:
-      - system
     environment:
       - USER_HOME=${HOME}
     labels:

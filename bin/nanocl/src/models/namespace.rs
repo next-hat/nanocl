@@ -55,8 +55,6 @@ pub struct NamespaceRow {
   pub cargoes: usize,
   /// Number of instances
   pub instances: usize,
-  /// Default gateway of the namespace
-  pub gateway: String,
   #[tabled(rename = "CREATED AT")]
   pub created_at: String,
 }
@@ -75,7 +73,6 @@ impl From<NamespaceSummary> for NamespaceRow {
       name: item.name,
       cargoes: item.cargoes,
       instances: item.instances,
-      gateway: item.gateway,
       created_at: created_at.to_string(),
     }
   }

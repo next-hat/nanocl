@@ -86,20 +86,9 @@ impl From<Process> for ProcessRow {
     let mut names = name.split('.');
     let _next_name = names.next().unwrap_or(&name);
     let config = container.config.unwrap_or_default();
-    let kind = config
-      .labels
-      .unwrap_or_default()
-      .get("io.nanocl.kind")
-      .cloned()
-      .unwrap_or("Unknown".to_owned());
-    let namespace = if kind.as_str() != "job" {
-      names.next().unwrap_or("<none>")
-    } else {
-      "<none>"
-    };
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
-    let mut ip_addr = if let Some(network) = networks.get(namespace) {
+    let mut ip_addr = if let Some(network) = networks.get("bridge") {
       network.ip_address.clone().unwrap_or("<none>".to_owned())
     } else {
       format!(

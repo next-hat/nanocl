@@ -6,26 +6,6 @@ use nanocld_client::stubs::generic::{GenericFilter, GenericClause};
 
 use crate::dnsmasq::Dnsmasq;
 
-/// Get gateway of given namespace
-async fn get_namespace_addr(
-  namespace: &str,
-  client: &NanocldClient,
-) -> IoResult<String> {
-  let namespace = client.inspect_namespace(namespace).await.map_err(|err| {
-    err.map_err_context(|| format!("Unable to inspect namespace {namespace}"))
-  })?;
-  let ipam = namespace.network.ipam.unwrap_or_default();
-  let configs = ipam.config.unwrap_or_default();
-  let config = configs.first().ok_or(IoError::not_found(
-    "NamespaceNetworkConfigs",
-    "Unable to get index 0",
-  ))?;
-  config.gateway.clone().ok_or(IoError::not_found(
-    "NamespaceNetworkGateway",
-    "Unable to get gateway",
-  ))
-}
-
 /// Get public address of host
 async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
   let info = client
@@ -43,10 +23,6 @@ async fn get_network_addr(
   let addr = match network {
     "Private" => "127.0.0.1".into(),
     "Public" => get_host_addr(client).await?,
-    network if network.ends_with(".nsp") => {
-      let network = network.trim_end_matches(".nsp");
-      get_namespace_addr(network, client).await?
-    }
     _ => {
       return Err(IoError::invalid_input(
         "Network",
@@ -98,10 +74,8 @@ pub(crate) async fn update_entries(
     format!("bind-dynamic\nlisten-address={listen_address}\n");
   for entry in &entries {
     let ip_address = match entry.ip_address.as_str() {
-      namespace if namespace.ends_with(".nsp") => {
-        let namespace = namespace.trim_end_matches(".nsp");
-        get_namespace_addr(namespace, client).await?
-      }
+      "Public" => get_host_addr(client).await?,
+      "Private" => "127.0.0.1".into(),
       _ => entry.ip_address.clone(),
     };
     let entry = &format!("address=/{}/{}", entry.name, ip_address);

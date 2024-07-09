@@ -419,11 +419,6 @@ pub async fn create_cargo(
           env: Some(env),
           host_config: Some(HostConfig {
             restart_policy,
-            network_mode: Some(
-                host_config
-                .network_mode
-                .unwrap_or(cargo.namespace_name.clone()),
-            ),
             ..host_config
           }),
           ..container

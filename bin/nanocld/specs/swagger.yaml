@@ -5143,7 +5143,6 @@ components:
       required:
       - Name
       - Cargoes
-      - Network
       properties:
         Name:
           type: string
@@ -5153,8 +5152,6 @@ components:
           items:
             $ref: '#/components/schemas/CargoInspect'
           description: Number of cargoes
-        Network:
-          $ref: '#/components/schemas/Network'
     NamespacePartial:
       type: object
       description: A Namespace partial is a payload used to create a new namespace
@@ -5178,7 +5175,6 @@ components:
       - Name
       - Cargoes
       - Instances
-      - Gateway
       - CreatedAt
       properties:
         Name:
@@ -5192,9 +5188,6 @@ components:
           type: integer
           description: Number of instances
           minimum: 0
-        Gateway:
-          type: string
-          description: Gateway of the namespace
         CreatedAt:
           type: string
           format: date-time
