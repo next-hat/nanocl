@@ -40,7 +40,7 @@ impl ObjTaskStart for CargoDb {
           Some(ReplicationMode::Static(replication)) => replication.number,
           _ => 1,
         };
-        utils::container::create_cargo(&cargo, number, &state).await?;
+        utils::container::cargo::create(&cargo, number, &state).await?;
       }
       utils::container::start_instances(
         &cargo.spec.cargo_key,
@@ -133,7 +133,7 @@ impl ObjTaskUpdate for CargoDb {
       };
       // Create instance with the new spec
       let new_instances =
-        match utils::container::create_cargo(&cargo, number, &state).await {
+        match utils::container::cargo::create(&cargo, number, &state).await {
           Err(err) => {
             log::warn!(
               "Unable to create cargo instance {} : {err}",

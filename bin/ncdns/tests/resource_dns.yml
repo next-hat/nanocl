@@ -1,4 +1,4 @@
-Network: system.nsp
+Network: Private
 Entries:
 - Name: test.com
   IpAddress: 127.0.0.1
