@@ -4,7 +4,6 @@ use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
 use bollard_next::{
-  auth::DockerCredentials,
   container::{
     Config, CreateContainerOptions, InspectContainerOptions,
     RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
@@ -20,136 +19,22 @@ use nanocl_error::{
 use nanocl_stubs::{
   cargo::{Cargo, CargoKillOptions},
   generic::{GenericClause, GenericFilter, ImagePullPolicy},
-  vm::Vm,
   job::Job,
   process::{Process, ProcessKind, ProcessPartial},
-  system::{
-    EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
-    ObjPsStatusKind,
-  },
+  system::{NativeEventAction, ObjPsStatusKind},
+  vm::Vm,
 };
 
 use crate::{
-  vars,
   models::{
     CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb,
     SecretDb, SystemState, VmDb, VmImageDb,
   },
   repositories::generic::*,
+  vars,
 };
 
-/// Get the image name and tag from a string
-pub fn parse_img_name(name: &str) -> HttpResult<(String, String)> {
-  let image_info: Vec<&str> = name.split(':').collect();
-  if image_info.len() != 2 {
-    return Err(HttpError::bad_request("Missing tag in image name"));
-  }
-  let image_name = image_info[0].to_ascii_lowercase();
-  let image_tag = image_info[1].to_ascii_lowercase();
-  Ok((image_name, image_tag))
-}
-
-/// Download the image
-pub async fn download_image<A>(
-  image: &str,
-  secret: Option<String>,
-  policy: ImagePullPolicy,
-  actor: &A,
-  state: &SystemState,
-) -> HttpResult<()>
-where
-  A: Into<EventActor> + Clone,
-{
-  match policy {
-    ImagePullPolicy::Always => {}
-    ImagePullPolicy::IfNotPresent => {
-      if state.inner.docker_api.inspect_image(image).await.is_ok() {
-        return Ok(());
-      }
-    }
-    ImagePullPolicy::Never => {
-      return Ok(());
-    }
-  }
-  let credentials = match secret {
-    Some(secret) => {
-      let secret = SecretDb::read_by_pk(&secret, &state.inner.pool).await?;
-      serde_json::from_value::<DockerCredentials>(secret.data)
-        .map(Some)
-        .map_err(|err| HttpError::bad_request(err.to_string()))?
-    }
-    None => None,
-  };
-  let (name, tag) = parse_img_name(image)?;
-  let mut stream = state.inner.docker_api.create_image(
-    Some(bollard_next::image::CreateImageOptions {
-      from_image: name.clone(),
-      tag: tag.clone(),
-      ..Default::default()
-    }),
-    None,
-    credentials,
-  );
-  while let Some(chunk) = stream.next().await {
-    let chunk = match chunk {
-      Err(err) => {
-        let event = EventPartial {
-          reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-          reporting_node: state.inner.config.hostname.clone(),
-          action: NativeEventAction::Downloading.to_string(),
-          reason: "state_sync".to_owned(),
-          kind: EventKind::Error,
-          actor: Some(EventActor {
-            key: Some(image.to_owned()),
-            kind: EventActorKind::ContainerImage,
-            attributes: None,
-          }),
-          related: Some(actor.clone().into()),
-          note: Some(format!("Error while downloading image {image} {err}")),
-          metadata: None,
-        };
-        state.spawn_emit_event(event);
-        return Err(err.into());
-      }
-      Ok(chunk) => chunk,
-    };
-    let event = EventPartial {
-      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: state.inner.config.hostname.clone(),
-      action: NativeEventAction::Downloading.to_string(),
-      reason: "state_sync".to_owned(),
-      kind: EventKind::Normal,
-      actor: Some(EventActor {
-        key: Some(image.to_owned()),
-        kind: EventActorKind::ContainerImage,
-        attributes: None,
-      }),
-      related: Some(actor.clone().into()),
-      note: Some(format!("Downloading image {name}:{tag}")),
-      metadata: Some(serde_json::json!({
-        "state": chunk,
-      })),
-    };
-    state.spawn_emit_event(event);
-  }
-  let event = EventPartial {
-    reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-    reporting_node: state.inner.config.hostname.clone(),
-    action: NativeEventAction::Download.to_string(),
-    reason: "state_sync".to_owned(),
-    kind: EventKind::Normal,
-    actor: Some(EventActor {
-      key: Some(image.to_owned()),
-      kind: EventActorKind::ContainerImage,
-      attributes: None,
-    }),
-    related: Some(actor.clone().into()),
-    note: Some(format!("{name}:{tag}")),
-    metadata: None,
-  };
-  state.spawn_emit_event(event);
-  Ok(())
-}
+mod image;
 
 /// Internal utils to emit an event when the state of a process kind changes
 /// Eg: (job, cargo, vm)
@@ -255,7 +140,7 @@ async fn execute_cargo_before(
         network_mode: Some(cargo.namespace_name.clone()),
         ..before.host_config.unwrap_or_default()
       });
-      download_image(
+      image::download(
         &image,
         cargo.spec.image_pull_secret.clone(),
         cargo.spec.image_pull_policy.clone().unwrap_or_default(),
@@ -331,7 +216,7 @@ pub async fn create_cargo(
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
   execute_cargo_before(cargo, state).await?;
-  download_image(
+  image::download(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo.spec.image_pull_secret.clone(),
     cargo.spec.image_pull_policy.clone().unwrap_or_default(),
@@ -705,7 +590,7 @@ pub async fn create_vm_instance(
     Some(runtime) => runtime.to_owned(),
     None => vars::VM_RUNTIME.to_owned(),
   };
-  download_image(&image, None, ImagePullPolicy::IfNotPresent, vm, state)
+  image::download(&image, None, ImagePullPolicy::IfNotPresent, vm, state)
     .await?;
   let spec = bollard_next::container::Config {
     image: Some(image),
@@ -764,7 +649,7 @@ pub async fn create_job_instances(
 ) -> HttpResult<Vec<Process>> {
   let mut processes = Vec::new();
   for (index, container) in job.containers.iter().enumerate() {
-    download_image(
+    image::download(
       &container.image.clone().unwrap_or_default(),
       job.image_pull_secret.clone(),
       job.image_pull_policy.clone().unwrap_or_default(),
