@@ -1,21 +1,22 @@
 use std::{
-  fs,
-  time::Duration,
   collections::HashMap,
-  path::{Path, PathBuf},
   env::{consts, vars_os},
+  fs,
+  path::{Path, PathBuf},
+  time::Duration,
 };
 
-use url::Url;
-use serde_json::{Map, Value};
-use clap::{Arg, Command, ArgAction};
 use async_recursion::async_recursion;
+use clap::{Arg, ArgAction, Command};
 use futures::{
-  join, StreamExt,
+  join,
   stream::{FuturesOrdered, FuturesUnordered},
+  StreamExt,
 };
+use serde_json::{Map, Value};
+use url::Url;
 
-use nanocl_error::io::{IoError, FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
   stubs::{
@@ -28,17 +29,17 @@ use nanocld_client::{
 };
 
 use nanocld_client::{
-  NanocldClient,
   stubs::{
-    job::JobPartial,
-    statefile::Statefile,
-    process::ProcessLogQuery,
     cargo_spec::CargoSpecPartial,
-    vm_spec::{VmSpecPartial, VmSpecUpdate},
+    job::JobPartial,
+    process::ProcessLogQuery,
     resource::{ResourcePartial, ResourceUpdate},
-    secret::{SecretUpdate, SecretPartial},
+    secret::{SecretPartial, SecretUpdate},
+    statefile::Statefile,
     system::NativeEventAction,
+    vm_spec::{VmSpecPartial, VmSpecUpdate},
   },
+  NanocldClient,
 };
 
 use crate::{

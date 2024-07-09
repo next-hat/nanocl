@@ -1,5 +1,5 @@
-use ntex::util::Bytes;
 use futures::StreamExt;
+use ntex::util::Bytes;
 use serde::Serialize;
 
 use nanocl_error::http::{HttpError, HttpResult};

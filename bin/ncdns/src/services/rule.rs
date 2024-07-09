@@ -2,10 +2,10 @@ use ntex::web;
 
 use nanocl_error::http::HttpError;
 
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
+use nanocld_client::NanocldClient;
 
-use crate::{utils, dnsmasq};
+use crate::{dnsmasq, utils};
 
 /// Create/Update a new DnsRule
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -68,8 +68,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocld_client::stubs::dns::ResourceDnsRule;
+  use ntex::http;
 
   use crate::utils::tests::*;
 

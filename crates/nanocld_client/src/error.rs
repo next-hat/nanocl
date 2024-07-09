@@ -1,8 +1,8 @@
 use ntex::http;
 
-use nanocl_error::io::FromIo;
 use nanocl_error::http::HttpError;
-use nanocl_error::http_client::{HttpClientResult, HttpClientError};
+use nanocl_error::http_client::{HttpClientError, HttpClientResult};
+use nanocl_error::io::FromIo;
 
 pub(crate) async fn is_api_error(
   res: &mut http::client::ClientResponse,

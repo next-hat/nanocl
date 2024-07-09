@@ -7,8 +7,8 @@ use super::generic::ObjTaskFuture;
 
 use std::{sync::Arc, time::Duration};
 
-use ntex::{rt, time};
 use futures_util::Future;
+use ntex::{rt, time};
 
 use nanocl_error::io::IoResult;
 

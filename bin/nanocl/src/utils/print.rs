@@ -1,13 +1,13 @@
-use ntex::channel::mpsc::Receiver;
 use futures::StreamExt;
-use tabled::Table;
+use ntex::channel::mpsc::Receiver;
 use tabled::settings::object::Segment;
-use tabled::settings::{Style, Modify, Padding, Alignment};
+use tabled::settings::{Alignment, Modify, Padding, Style};
+use tabled::Table;
 
 use nanocl_error::http::HttpError;
-use nanocl_error::io::{IoError, IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
-use nanocld_client::stubs::process::{ProcessOutputLog, OutputKind};
+use nanocld_client::stubs::process::{OutputKind, ProcessOutputLog};
 
 use crate::models::DisplayFormat;
 

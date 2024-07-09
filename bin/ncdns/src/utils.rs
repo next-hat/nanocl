@@ -1,8 +1,8 @@
-use nanocl_error::io::{FromIo, IoResult, IoError};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::{GenericFilter, GenericClause};
+use nanocld_client::stubs::generic::{GenericClause, GenericFilter};
+use nanocld_client::NanocldClient;
 
 use crate::dnsmasq::Dnsmasq;
 
@@ -128,7 +128,7 @@ pub mod tests {
   pub use nanocl_utils::ntex::test_client::*;
   use nanocld_client::{ConnectOpts, NanocldClient};
 
-  use crate::{vars, dnsmasq, services};
+  use crate::{dnsmasq, services, vars};
 
   // Before a test
   pub fn before() {

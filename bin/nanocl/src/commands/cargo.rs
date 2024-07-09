@@ -1,8 +1,8 @@
-use std::{process, collections::HashMap};
+use std::{collections::HashMap, process};
 
-use ntex::rt;
-use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
+use futures::{channel::mpsc, stream::FuturesUnordered, SinkExt, StreamExt};
+use ntex::rt;
 
 use nanocl_error::io::IoResult;
 use nanocld_client::{
@@ -16,14 +16,14 @@ use nanocld_client::{
 };
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    GenericRemoveForceOpts, GenericRemoveOpts, CargoArg, CargoCreateOpts,
-    CargoCommand, CargoRow, CargoPatchOpts, CargoExecOpts, CargoHistoryOpts,
-    CargoRevertOpts, CargoLogsOpts, CargoRunOpts, CargoRestartOpts,
-    CargoStatsOpts, ProcessStatsRow,
+    CargoArg, CargoCommand, CargoCreateOpts, CargoExecOpts, CargoHistoryOpts,
+    CargoLogsOpts, CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow,
+    CargoRunOpts, CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts,
+    ProcessStatsRow,
   },
+  utils,
 };
 
 use super::{

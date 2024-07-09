@@ -1,8 +1,8 @@
-use diesel::{prelude::*, associations};
+use diesel::{associations, prelude::*};
 
 use nanocl_error::io::IoResult;
 
-use crate::{utils, models::Pool};
+use crate::{models::Pool, utils};
 
 pub trait RepositoryUpdate: super::RepositoryBase {
   type UpdateItem;

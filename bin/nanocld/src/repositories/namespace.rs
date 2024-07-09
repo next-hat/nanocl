@@ -6,9 +6,9 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::{generic::GenericFilter, namespace::NamespaceSummary};
 
 use crate::{
-  schema::namespaces,
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{CargoDb, ColumnType, NamespaceDb, ProcessDb, SystemState},
+  schema::namespaces,
 };
 
 use super::generic::*;

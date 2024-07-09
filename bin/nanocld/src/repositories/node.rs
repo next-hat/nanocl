@@ -1,4 +1,4 @@
-use std::{net::IpAddr, collections::HashMap};
+use std::{collections::HashMap, net::IpAddr};
 
 use diesel::prelude::*;
 
@@ -7,9 +7,10 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query, vars,
-  schema::nodes,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{ColumnType, NodeDb, Pool, SystemState},
+  schema::nodes,
+  vars,
 };
 
 use super::generic::*;

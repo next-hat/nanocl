@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use ntex::rt;
 use futures::channel::mpsc;
+use ntex::rt;
 
 use nanocl_stubs::{config::DaemonConfig, system::Event};
 

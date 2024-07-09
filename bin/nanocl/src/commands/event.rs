@@ -4,9 +4,9 @@ use nanocl_error::io::IoResult;
 use nanocld_client::stubs::system::Event;
 
 use crate::{
-  utils,
   config::CliConfig,
-  models::{EventArg, EventRow, EventCommand},
+  models::{EventArg, EventCommand, EventRow},
+  utils,
 };
 
 use super::{GenericCommand, GenericCommandInspect, GenericCommandLs};

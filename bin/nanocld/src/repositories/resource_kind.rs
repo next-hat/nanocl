@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use diesel::prelude::*;
 
 use nanocl_error::{
-  io::IoResult,
   http::{HttpError, HttpResult},
+  io::IoResult,
 };
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
-  resource_kind::{ResourceKind, ResourceKindPartial, ResourceKindInspect},
+  generic::{GenericClause, GenericFilter},
+  resource_kind::{ResourceKind, ResourceKindInspect, ResourceKindPartial},
 };
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  schema::resource_kinds,
   models::{ColumnType, Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
+  schema::resource_kinds,
 };
 
 use super::generic::*;

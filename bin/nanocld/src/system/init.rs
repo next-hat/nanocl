@@ -1,10 +1,10 @@
-use std::{path::Path, process::Command, os::unix::prelude::PermissionsExt};
+use std::{os::unix::prelude::PermissionsExt, path::Path, process::Command};
 
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use ntex::rt;
 use tokio::fs;
-use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 
-use nanocl_error::io::{FromIo, IoResult, IoError};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::{

@@ -3,7 +3,7 @@ use nanocld_client::stubs::process::Process;
 
 use crate::{
   config::CliConfig,
-  models::{ProcessRow, ProcessArg, GenericListOpts, ProcessFilter},
+  models::{GenericListOpts, ProcessArg, ProcessFilter, ProcessRow},
 };
 
 use super::{GenericCommand, GenericCommandLs};

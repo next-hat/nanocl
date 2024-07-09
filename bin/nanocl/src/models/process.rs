@@ -1,8 +1,10 @@
+use chrono::DateTime;
 use clap::Args;
 use tabled::Tabled;
-use chrono::DateTime;
 
-use bollard_next::{container::MemoryStatsStats, service::ContainerStateStatusEnum};
+use bollard_next::{
+  container::MemoryStatsStats, service::ContainerStateStatusEnum,
+};
 
 use nanocld_client::stubs::{
   generic::{GenericClause, GenericFilter},

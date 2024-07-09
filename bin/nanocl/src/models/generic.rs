@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use clap::{Args, Parser};
+use serde::Deserialize;
 
 use nanocld_client::stubs::{generic::GenericFilter, system::ObjPsStatus};
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ntex::{web, util::Bytes};
+use ntex::{util::Bytes, web};
 
 use nanocl_error::http::{HttpError, HttpResult};
 

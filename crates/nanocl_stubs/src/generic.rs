@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Generic namespace query filter
 #[derive(Debug, Clone)]

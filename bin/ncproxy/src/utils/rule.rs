@@ -1,17 +1,17 @@
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
-  NanocldClient,
   stubs::{
     process::Process,
     proxy::{
-      UpstreamTarget, StreamTarget, UnixTarget, ProxySsl, ProxySslConfig,
+      ProxySsl, ProxySslConfig, StreamTarget, UnixTarget, UpstreamTarget,
     },
   },
+  NanocldClient,
 };
 
 use crate::models::{
-  SystemStateRef, NginxRuleKind, UPSTREAM_TEMPLATE, UNIX_UPSTREAM_TEMPLATE,
+  NginxRuleKind, SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
 };
 
 /// Get public address of host

@@ -232,12 +232,12 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocl_stubs::{
+    generic::{GenericClause, GenericFilter, GenericListQuery},
     resource::{Resource, ResourcePartial, ResourceUpdate},
-    generic::{GenericFilter, GenericClause, GenericListQuery},
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
   };
+  use ntex::http;
 
   use crate::utils::tests::*;
 

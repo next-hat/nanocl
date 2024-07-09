@@ -8,10 +8,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  models::{NamespaceDb, SystemState},
   objects::generic::*,
   repositories::generic::*,
-  models::{NamespaceDb, SystemState},
+  utils,
 };
 
 /// List namespaces

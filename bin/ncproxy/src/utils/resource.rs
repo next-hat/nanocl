@@ -1,16 +1,16 @@
 use futures::{stream::FuturesUnordered, StreamExt};
-use nanocl_error::io::{IoError, IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
-  NanocldClient,
   stubs::{
-    generic::{GenericFilter, GenericClause},
+    generic::{GenericClause, GenericFilter},
     proxy::ResourceProxyRule,
     resource::{Resource, ResourcePartial},
   },
+  NanocldClient,
 };
 
-use crate::{vars, models::SystemStateRef};
+use crate::{models::SystemStateRef, vars};
 
 pub async fn list_by_secret(
   name: &str,

@@ -1,16 +1,16 @@
 use std::{
   pin::Pin,
-  time::Duration,
   sync::{Arc, Mutex},
-  task::{Poll, Context},
+  task::{Context, Poll},
+  time::Duration,
 };
 
 use futures::Stream;
 
-use ntex::{rt, time, web, util::Bytes};
-use tokio::sync::mpsc::{Sender, Receiver, channel};
+use ntex::{rt, time, util::Bytes, web};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::system::{Event, EventCondition};
 

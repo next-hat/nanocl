@@ -1,18 +1,18 @@
 use std::{
-  thread,
   io::{Read, Write},
   os::fd::AsRawFd,
+  thread,
   time::Duration,
 };
 
-use ntex::{rt, ws, time, util::Bytes};
 use futures::{
   channel::mpsc,
   {SinkExt, StreamExt},
 };
-use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
+use ntex::{rt, time, util::Bytes, ws};
+use termios::{tcsetattr, Termios, ECHO, ICANON, TCSANOW};
 
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::{
   stubs::{
     process::{OutputKind, OutputLog},
@@ -24,19 +24,19 @@ use nanocld_client::{
 };
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
     GenericDefaultOpts, VmArg, VmCommand, VmCreateOpts, VmPatchOpts, VmRow,
     VmRunOpts,
   },
+  utils,
 };
 
+use super::vm_image::exec_vm_image;
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
 };
-use super::vm_image::exec_vm_image;
 
 impl GenericCommand for VmArg {
   fn object_name() -> &'static str {

@@ -1,11 +1,11 @@
-use bollard_next::network::{InspectNetworkOptions, CreateNetworkOptions};
+use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
-use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::namespace::{NamespacePartial, Namespace, NamespaceInspect};
+use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_stubs::namespace::{Namespace, NamespaceInspect, NamespacePartial};
 
 use crate::{
-  repositories::generic::*,
   models::{CargoDb, NamespaceDb, SystemState},
+  repositories::generic::*,
 };
 
 use super::generic::*;

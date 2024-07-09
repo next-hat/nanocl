@@ -6,9 +6,9 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::system::Event;
 
 use crate::{
-  gen_sql_order_by, gen_sql_multiple, gen_sql_query,
-  schema::events,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{ColumnType, EventDb},
+  schema::events,
 };
 
 use super::generic::*;

@@ -1,20 +1,20 @@
-use std::time::Duration;
 use std::collections::HashMap;
+use std::time::Duration;
 
+use bollard_next::container::{LogOutput, LogsOptions, StartContainerOptions};
 use futures::{stream::FuturesUnordered, StreamExt};
 use nix::unistd::Group;
-use bollard_next::container::{LogOutput, LogsOptions, StartContainerOptions};
 
-use nanocl_error::io::{IoError, IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_utils::unix;
 use nanocld_client::stubs::statefile::Statefile;
 
 use crate::{
-  utils,
   models::{
     Context, ContextEndpoint, ContextMetaData, InstallOpts, NanocldArg,
     StateRoot,
   },
+  utils,
 };
 
 /// This function is called when running `nanocl install`

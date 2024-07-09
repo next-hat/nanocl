@@ -1,6 +1,6 @@
 use std::process::Stdio;
 
-use ntex::{rt, web, util::Bytes, channel::mpsc::Receiver};
+use ntex::{channel::mpsc::Receiver, rt, util::Bytes, web};
 use tokio::{fs, io::AsyncReadExt, process::Command};
 
 use nanocl_error::http::{HttpError, HttpResult};
@@ -8,9 +8,9 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{
-  utils,
+  models::{Pool, QemuImgInfo, SystemState, VmImageDb, VmImageUpdateDb},
   repositories::generic::*,
-  models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, SystemState},
+  utils,
 };
 
 /// Delete a vm image from the database and the filesystem

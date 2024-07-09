@@ -1,16 +1,16 @@
-use ntex::rt;
 use futures_util::StreamExt;
+use ntex::rt;
 
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
-  system::EventsOptions,
   container::InspectContainerOptions,
-  service::{EventMessageTypeEnum, EventMessage},
+  service::{EventMessage, EventMessageTypeEnum},
+  system::EventsOptions,
 };
 use nanocl_stubs::system::{
-  ObjPsStatusKind, EventActor, EventActorKind, EventKind, EventPartial,
-  NativeEventAction,
+  EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
+  ObjPsStatusKind,
 };
 
 use crate::{

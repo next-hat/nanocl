@@ -4,8 +4,8 @@ use diesel::prelude::*;
 
 use jsonschema::{Draft, JSONSchema};
 use nanocl_error::{
-  io::IoResult,
   http::{HttpError, HttpResult},
+  io::IoResult,
 };
 
 use nanocl_stubs::{
@@ -15,11 +15,12 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
-  schema::resources,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
     ColumnType, Pool, ResourceDb, ResourceKindDb, ResourceUpdateDb, SpecDb,
   },
+  schema::resources,
+  utils,
 };
 
 use super::generic::*;

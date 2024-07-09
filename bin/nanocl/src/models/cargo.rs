@@ -1,12 +1,12 @@
-use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
+use tabled::Tabled;
 
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::stubs::{
   cargo::CargoSummary,
-  cargo_spec::{CargoSpecUpdate, Config, CargoSpecPartial, HostConfig},
+  cargo_spec::{CargoSpecPartial, CargoSpecUpdate, Config, HostConfig},
 };
 
 use super::{

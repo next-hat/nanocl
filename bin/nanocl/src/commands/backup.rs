@@ -5,7 +5,7 @@ use nanocld_client::stubs::{
   vm_spec::VmSpecPartial,
 };
 
-use crate::{utils, config::CliConfig, models::BackupOpts};
+use crate::{config::CliConfig, models::BackupOpts, utils};
 
 pub async fn exec_backup(
   cli_conf: &CliConfig,

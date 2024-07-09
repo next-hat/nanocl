@@ -1,5 +1,5 @@
-use ntex::web;
 use ntex::http;
+use ntex::web;
 
 /// An http response error
 #[derive(Clone, Debug)]

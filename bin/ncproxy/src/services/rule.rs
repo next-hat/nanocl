@@ -4,7 +4,7 @@ use nanocl_error::http::HttpError;
 
 use nanocld_client::stubs::proxy::ResourceProxyRule;
 
-use crate::{utils, models::SystemStateRef};
+use crate::{models::SystemStateRef, utils};
 
 /// Create/Update a new ProxyRule
 #[cfg_attr(feature = "dev", utoipa::path(

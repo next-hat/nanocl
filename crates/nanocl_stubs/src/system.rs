@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bollard_next::service::SystemInfo;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::config::DaemonConfig;
 

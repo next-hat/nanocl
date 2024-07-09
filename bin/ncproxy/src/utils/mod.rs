@@ -1,14 +1,14 @@
-pub mod server;
-pub mod rule;
 pub mod nginx;
 pub mod resource;
+pub mod rule;
+pub mod server;
 
 #[cfg(test)]
 pub(crate) mod tests {
   use std::sync::Arc;
 
   use bollard_next::container::Config;
-  use nanocl_error::io::{IoResult, FromIo};
+  use nanocl_error::io::{FromIo, IoResult};
   use nanocl_utils::logger;
 
   pub use nanocl_utils::ntex::test_client::*;
@@ -20,7 +20,7 @@ pub(crate) mod tests {
     ConnectOpts, NanocldClient,
   };
 
-  use crate::{vars, services};
+  use crate::{services, vars};
 
   // Before a test
   pub fn before() {

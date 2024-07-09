@@ -1,6 +1,6 @@
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::generic::{
-  GenericFilter, GenericFilterNsp, GenericListQueryNsp, GenericListQuery,
+  GenericFilter, GenericFilterNsp, GenericListQuery, GenericListQueryNsp,
 };
 
 pub fn parse_qs_filter(qs: &GenericListQuery) -> HttpResult<GenericFilter> {

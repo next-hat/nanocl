@@ -4,7 +4,7 @@ use bollard_next::service::ExecInspectResponse;
 
 use bollard_next::{
   container::LogOutput,
-  exec::{StartExecOptions, StartExecResults, CreateExecResults},
+  exec::{CreateExecResults, StartExecOptions, StartExecResults},
 };
 
 use nanocl_error::http::HttpResult;

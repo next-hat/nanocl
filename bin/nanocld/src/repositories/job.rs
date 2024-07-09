@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
 
 use nanocl_error::{
   http::{HttpError, HttpResult},
@@ -15,11 +15,12 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
-  schema::jobs,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
     ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState,
   },
+  schema::jobs,
+  utils,
 };
 
 use super::generic::*;

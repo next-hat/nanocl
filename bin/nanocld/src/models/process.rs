@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use nanocl_error::io::{IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError};
 
 use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
 

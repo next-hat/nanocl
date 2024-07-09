@@ -1,6 +1,6 @@
-use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
+use tabled::Tabled;
 
 use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 

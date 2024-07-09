@@ -1,15 +1,15 @@
 use clap::Parser;
 
-use nanocl_utils::logger;
 use nanocl_error::io::IoResult;
+use nanocl_utils::logger;
 
 mod cli;
-mod utils;
+mod dnsmasq;
 mod event;
 mod server;
-mod vars;
-mod dnsmasq;
 mod services;
+mod utils;
+mod vars;
 
 use nanocld_client::NanocldClient;
 

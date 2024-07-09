@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::schema::nodes;
 

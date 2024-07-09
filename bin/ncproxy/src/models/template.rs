@@ -1,7 +1,7 @@
 use nanocld_client::stubs::proxy::{LimitReq, ProxySslConfig};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationTemplate {

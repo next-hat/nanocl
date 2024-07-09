@@ -1,42 +1,42 @@
-use serde::{Serialize, Deserialize};
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::{Deserialize, Serialize};
 
-mod namespace;
+mod backup;
 mod cargo;
+mod context;
+mod event;
+mod generic;
+mod install;
+mod job;
+mod metric;
+mod namespace;
+mod node;
+mod process;
 mod resource;
-mod version;
+mod secret;
 mod state;
+mod uninstall;
+mod version;
 mod vm;
 mod vm_image;
-mod process;
-mod install;
-mod uninstall;
-mod node;
-mod context;
-mod secret;
-mod job;
-mod generic;
-mod metric;
-mod event;
-mod backup;
 
+pub use backup::*;
+pub use cargo::*;
+pub use context::*;
 pub use event::*;
 pub use generic::*;
-pub use process::*;
+pub use install::*;
+pub use job::*;
 pub use metric::*;
+pub use namespace::*;
+pub use node::*;
+pub use process::*;
+pub use resource::*;
 pub use secret::*;
-pub use context::*;
+pub use state::*;
+pub use uninstall::*;
 pub use vm::*;
 pub use vm_image::*;
-pub use namespace::*;
-pub use cargo::*;
-pub use resource::*;
-pub use state::*;
-pub use install::*;
-pub use uninstall::*;
-pub use node::*;
-pub use job::*;
-pub use backup::*;
 
 /// Cli available options and commands
 #[derive(Parser)]

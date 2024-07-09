@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nanocl_error::io::{IoError, FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::stubs::proxy::ProxyRule;
 

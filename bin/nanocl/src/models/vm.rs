@@ -1,10 +1,10 @@
-use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
+use tabled::Tabled;
 
 use nanocld_client::stubs::vm::VmSummary;
 use nanocld_client::stubs::vm_spec::{
-  VmSpecPartial, VmDisk, VmHostConfig, VmSpecUpdate,
+  VmDisk, VmHostConfig, VmSpecPartial, VmSpecUpdate,
 };
 
 use super::{

@@ -1,12 +1,14 @@
-use std::{io, rc::Rc, cell::RefCell, time::Instant};
+use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
+use futures::{future::ready, StreamExt};
 use ntex::{
-  rt, ws, web, chain, fn_service, Service,
-  util::Bytes,
+  chain,
   channel::{mpsc, oneshot},
-  service::{map_config, fn_shutdown, fn_factory_with_config},
+  fn_service, rt,
+  service::{fn_factory_with_config, fn_shutdown, map_config},
+  util::Bytes,
+  web, ws, Service,
 };
-use futures::{StreamExt, future::ready};
 use tokio::io::AsyncWriteExt;
 
 use nanocl_error::{
@@ -24,12 +26,12 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  models::{
+    SpecDb, SystemState, VmDb, VmObjCreateIn, VmObjPatchIn, WsConState,
+  },
   objects::generic::*,
   repositories::generic::*,
-  models::{
-    SystemState, WsConState, SpecDb, VmDb, VmObjCreateIn, VmObjPatchIn,
-  },
+  utils,
 };
 
 /// List virtual machines
@@ -370,12 +372,12 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocl_stubs::vm::{VmInspect, VmSummary};
-  use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
+  use nanocl_stubs::vm_spec::{VmDisk, VmSpecPartial};
+  use ntex::http;
 
-  use crate::utils::tests::*;
   use crate::services::vm_image::tests::ensure_test_image;
+  use crate::utils::tests::*;
 
   #[ntex::test]
   async fn basic() {

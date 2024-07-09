@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use nanocl_error::{io::IoResult, http::HttpResult};
+use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
@@ -12,12 +12,13 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query, utils,
-  schema::vms,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
     ColumnType, NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb,
     VmUpdateDb,
   },
+  schema::vms,
+  utils,
 };
 
 use super::generic::*;

@@ -4,21 +4,21 @@
 /// so the daemon will be able to save them to the database
 /// and broadcast them in real time
 use std::{
-  sync::Arc,
   fs::File,
+  io::{BufReader, Read, Seek, SeekFrom},
   path::Path,
+  sync::Arc,
   time::Duration,
-  io::{Read, Seek, BufReader, SeekFrom},
 };
 
-use ntex::{rt, http};
-use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use ntex::{http, rt};
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
+  stubs::metric::{HttpMetric, MetricPartial},
   NanocldClient,
-  stubs::metric::{MetricPartial, HttpMetric},
 };
 
 use crate::models::SystemStateRef;

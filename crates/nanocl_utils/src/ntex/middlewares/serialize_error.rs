@@ -1,8 +1,8 @@
-use ntex::{web, http};
-use ntex::util::BytesMut;
-use ntex::{Service, Middleware, ServiceCtx};
-use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer};
 use futures::StreamExt;
+use ntex::util::BytesMut;
+use ntex::web::{Error, ErrorRenderer, WebRequest, WebResponse};
+use ntex::{http, web};
+use ntex::{Middleware, Service, ServiceCtx};
 
 /// Middleware to convert default ntex SerializeError from text/plain to application/json
 pub struct SerializeError;

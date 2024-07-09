@@ -11,13 +11,13 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  models::{
+    CargoDb, CargoObjCreateIn, CargoObjPatchIn, CargoObjPutIn, SpecDb,
+    SystemState,
+  },
   objects::generic::*,
   repositories::generic::*,
-  models::{
-    SystemState, SpecDb, CargoObjCreateIn, CargoDb, CargoObjPutIn,
-    CargoObjPatchIn,
-  },
+  utils,
 };
 
 /// List cargoes
@@ -300,10 +300,10 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use ntex::http;
 
-  use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
   use nanocl_stubs::cargo::{
-    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoKillOptions,
+    Cargo, CargoDeleteQuery, CargoInspect, CargoKillOptions, CargoSummary,
   };
+  use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
   use crate::utils::tests::*;
 

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use bollard_next::{
   container::{LogOutput, LogsOptions, Stats, StatsOptions},

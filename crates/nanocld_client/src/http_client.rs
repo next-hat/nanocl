@@ -1,17 +1,17 @@
 use std::error::Error;
 
 use nanocl_error::io::IoResult;
-use ntex::{rt, http};
 use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
+use ntex::{http, rt};
 
-use ntex::util::{Bytes, Stream};
-use ntex::channel::mpsc::Receiver;
 use futures::{StreamExt, TryStreamExt};
+use ntex::channel::mpsc::Receiver;
+use ntex::util::{Bytes, Stream};
 
 use nanocl_error::{
-  io::{IoError, FromIo},
   http::HttpError,
   http_client::HttpClientError,
+  io::{FromIo, IoError},
 };
 
 use crate::error::is_api_error;
@@ -116,7 +116,7 @@ impl NanocldClient {
     }
     #[cfg(feature = "openssl")]
     {
-      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode};
+      use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
       if let Some(ssl) = &self.ssl {
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
         builder.set_verify(SslVerifyMode::PEER);

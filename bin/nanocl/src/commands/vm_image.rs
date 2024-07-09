@@ -1,21 +1,21 @@
 use std::path::Path;
 
-use tokio_util::codec;
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use tokio_util::codec;
 
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::{
-  NanocldClient,
   stubs::vm_image::{VmImage, VmImageCloneStream},
+  NanocldClient,
 };
 
 use crate::{
-  utils,
   models::{
     GenericDefaultOpts, VmImageArg, VmImageCommand, VmImageCreateOpts,
     VmImageResizeOpts, VmImageRow,
   },
+  utils,
 };
 
 use super::{GenericCommand, GenericCommandLs, GenericCommandRm};

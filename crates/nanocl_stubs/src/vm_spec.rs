@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Disk representation of a VM
 #[derive(Debug, Default, Clone, PartialEq)]

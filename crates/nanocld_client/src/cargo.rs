@@ -3,9 +3,9 @@ use bollard_next::service::ContainerSummary;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilterNsp, GenericNspQuery},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect, CargoSummary},
   cargo_spec::{CargoSpec, CargoSpecPartial, CargoSpecUpdate},
+  generic::{GenericFilterNsp, GenericNspQuery},
 };
 
 use super::http_client::NanocldClient;

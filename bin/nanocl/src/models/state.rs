@@ -1,6 +1,6 @@
 use std::{
-  path::PathBuf,
   fmt::{Display, Formatter},
+  path::PathBuf,
 };
 
 use clap::{Parser, Subcommand};

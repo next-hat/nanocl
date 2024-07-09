@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::stubs::{
   job::JobInspect,
@@ -7,11 +7,11 @@ use nanocld_client::stubs::{
 };
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
     GenericDefaultOpts, JobArg, JobCommand, JobLogsOpts, JobRow, JobWaitOpts,
   },
+  utils,
 };
 
 use super::{

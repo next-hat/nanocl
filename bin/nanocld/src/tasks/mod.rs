@@ -1,6 +1,6 @@
 pub mod generic;
 
-mod job;
 mod cargo;
-mod vm;
+mod job;
 mod task_manager;
+mod vm;

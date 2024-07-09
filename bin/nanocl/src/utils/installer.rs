@@ -1,10 +1,10 @@
 use ntex::http;
 
-use nanocl_error::io::{FromIo, IoResult};
 use nanocl_error::http::HttpError;
-use nanocl_error::http_client::{HttpClientResult, HttpClientError};
+use nanocl_error::http_client::{HttpClientError, HttpClientResult};
+use nanocl_error::io::{FromIo, IoResult};
 
-use crate::version::{VERSION, CHANNEL};
+use crate::version::{CHANNEL, VERSION};
 
 /// Get template from our GitHub repo for installation
 async fn get() -> HttpClientResult<String> {

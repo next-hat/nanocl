@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use ntex::rt;
-use futures::{SinkExt, StreamExt, channel::mpsc};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::NanocldClient;
 

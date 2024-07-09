@@ -8,9 +8,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{MetricDb, MetricNodePartial, SystemState},
+  repositories::generic::*,
+  utils,
 };
 
 /// Get metrics of all peer nodes
@@ -112,11 +112,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocl_stubs::{
-    metric::{Metric, MetricPartial},
     generic::{GenericClause, GenericFilter, GenericListQuery},
+    metric::{Metric, MetricPartial},
   };
+  use ntex::http;
 
   use crate::utils::tests::*;
 
