@@ -196,6 +196,7 @@ pub async fn create(
           env: Some(env),
           host_config: Some(HostConfig {
             restart_policy,
+            network_mode: Some("nanoclbr0".to_owned()),
             ..host_config
           }),
           ..container

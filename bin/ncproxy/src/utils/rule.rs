@@ -147,7 +147,7 @@ pub async fn gen_upstream(
             format!("Unable to inspect cargo {target_name}")
           })
         })?;
-      let addresses = get_addresses(&cargo.instances, "bridge").await?;
+      let addresses = get_addresses(&cargo.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,
@@ -164,7 +164,7 @@ pub async fn gen_upstream(
         .map_err(|err| {
           err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
         })?;
-      let addresses = get_addresses(&vm.instances, "bridge").await?;
+      let addresses = get_addresses(&vm.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-vm", vm.spec.vm_key, port);
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,

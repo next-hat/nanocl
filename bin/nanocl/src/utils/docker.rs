@@ -226,6 +226,7 @@ pub async fn create_cargo_container(
       &config.labels.clone().unwrap_or_default(),
     )),
     host_config: Some(HostConfig {
+      network_mode: Some("nanoclbr0".to_owned()),
       restart_policy: Some(RestartPolicy {
         name: Some(RestartPolicyNameEnum::ALWAYS),
         ..Default::default()

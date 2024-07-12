@@ -90,7 +90,7 @@ impl From<Process> for ProcessRow {
     let config = container.config.unwrap_or_default();
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
-    let mut ip_addr = if let Some(network) = networks.get("bridge") {
+    let mut ip_addr = if let Some(network) = networks.get("nanoclbr0") {
       network.ip_address.clone().unwrap_or("<none>".to_owned())
     } else {
       format!(

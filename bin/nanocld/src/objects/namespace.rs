@@ -1,5 +1,3 @@
-use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
-
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::namespace::{Namespace, NamespaceInspect, NamespacePartial};
 
@@ -27,22 +25,6 @@ impl ObjCreate for NamespaceDb {
         &obj.name
       )));
     }
-    if state
-      .inner
-      .docker_api
-      .inspect_network(&obj.name, None::<InspectNetworkOptions<String>>)
-      .await
-      .is_ok()
-    {
-      let item = NamespaceDb::create_from(obj, &state.inner.pool).await?;
-      return Ok(item.into());
-    }
-    let config = CreateNetworkOptions {
-      name: obj.name.to_owned(),
-      driver: String::from("bridge"),
-      ..Default::default()
-    };
-    state.inner.docker_api.create_network(config).await?;
     let item = NamespaceDb::create_from(obj, &state.inner.pool)
       .await?
       .into();

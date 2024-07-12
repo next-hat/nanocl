@@ -1,12 +1,12 @@
 version: "3.9"
 
 networks:
-  system:
-    name: system
+  nanoclbr0:
+    name: nanoclbr0
     driver: bridge
     external: false
     driver_opts:
-      com.docker.network.bridge.name: nanocl.system
+      com.docker.network.bridge.name: nanoclbr0
 
 services:
   nstore:
@@ -19,7 +19,7 @@ services:
       - 26257:26257
       - 26258:26258
     networks:
-      - system
+      - nanoclbr0
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     environment:
@@ -40,7 +40,7 @@ services:
     image: ghcr.io/next-hat/metrsd:0.5.4
     tty: true
     networks:
-      - system
+      - nanoclbr0
     environment:
       - TZ=Europe/Paris
       - LOG_LEVEL=metrsd=info

@@ -4,6 +4,14 @@ volumes:
   nanocl-deps:
     name: "nanocl-deps"
 
+networks:
+  nanoclbr0:
+    name: nanoclbr0
+    driver: bridge
+    external: false
+    driver_opts:
+      com.docker.network.bridge.name: nanoclbr0
+
 services:
   nstore:
     container_name: nstore.system.c
@@ -11,6 +19,8 @@ services:
     image: cockroachdb/cockroach:v24.1.0
     entrypoint: /bin/sh
     tty: true
+    networks:
+      - nanoclbr0
     ports:
       - 26257:26257
       - 26258:26258
@@ -42,6 +52,8 @@ services:
     tty: true
     environment:
       - LOG_LEVEL=metrsd=info
+    networks:
+      - nanoclbr0
     command:
       - --hosts
       - unix:///run/nanocl/metrics.sock
@@ -79,6 +91,8 @@ services:
       - proxy
     ports:
       - 8686:8686
+    networks:
+      - nanoclbr0
     command:
       - watch
       - -w
@@ -124,6 +138,8 @@ services:
       - dns
     ports:
       - 8787:8787
+    networks:
+      - nanoclbr0
     command:
       - watch
       - -w
@@ -149,6 +165,8 @@ services:
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
+    networks:
+      - nanoclbr0
     ports:
       - 8585:8585
       - 9443:9443
@@ -191,6 +209,8 @@ services:
     tty: true
     user: root
     hostname: dbeaver.nanocl.internal
+    networks:
+      - nanoclbr0
     profiles:
       - debug
     ports:
@@ -210,6 +230,8 @@ services:
     container_name: ncvpnkit.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
+    networks:
+      - nanoclbr0
     hostname: ncvpnkit.nanocl.internal
     profiles:
       - vpnkit

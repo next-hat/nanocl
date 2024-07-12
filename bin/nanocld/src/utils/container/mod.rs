@@ -353,7 +353,7 @@ pub async fn create_vm_instance(
           .host_config
           .runtime_network
           .clone()
-          .unwrap_or(vm.namespace_name.to_owned()),
+          .unwrap_or("nanoclbr0".to_owned()),
       ),
       binds: Some(vec![format!("{img_path}:{img_path}")]),
       devices: Some(devices),
