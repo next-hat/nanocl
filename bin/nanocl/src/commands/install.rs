@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use bollard_next::container::{LogOutput, LogsOptions, StartContainerOptions};
+use bollard_next::{
+  container::{LogOutput, LogsOptions, StartContainerOptions},
+  network::{CreateNetworkOptions, InspectNetworkOptions},
+};
 use futures::{stream::FuturesUnordered, StreamExt};
 use nix::unistd::Group;
 
@@ -111,6 +114,27 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
+  if docker
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .await
+    .is_err()
+  {
+    docker
+      .create_network(CreateNetworkOptions {
+        name: "nanoclbr0",
+        check_duplicate: true,
+        driver: "bridge",
+        internal: false,
+        attachable: true,
+        ingress: true,
+        enable_ipv6: true,
+        ..Default::default()
+      })
+      .await
+      .map_err(|err| {
+        err.map_err_context(|| "Unable to create nanoclbr0 network")
+      })?;
+  }
   for cargo in &cargoes {
     let token = format!("cargo/{}", &cargo.name);
     let pg_style = utils::progress::create_spinner_style(&token, "green");
