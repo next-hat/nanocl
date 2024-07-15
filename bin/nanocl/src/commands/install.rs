@@ -126,8 +126,8 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
         driver: "bridge",
         internal: false,
         attachable: true,
-        ingress: true,
-        enable_ipv6: true,
+        ingress: false,
+        enable_ipv6: false,
         ..Default::default()
       })
       .await

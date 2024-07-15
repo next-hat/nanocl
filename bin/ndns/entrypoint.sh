@@ -17,5 +17,5 @@ if [ ! -d $STATE_DIR/dnsmasq.d ]; then
   mkdir $STATE_DIR/dnsmasq.d
 fi
 
-# Start dnsmasq
+# Start dnsmasq with the config file and log to stdout
 dnsmasq -k -C $STATE_DIR/dnsmasq.conf --log-facility=-
