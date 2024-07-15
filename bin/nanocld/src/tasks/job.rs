@@ -2,7 +2,7 @@ use futures_util::StreamExt;
 
 use bollard_next::container::{StartContainerOptions, WaitContainerOptions};
 
-use nanocl_error::{io::IoError, http::HttpError};
+use nanocl_error::{http::HttpError, io::IoError};
 
 use nanocl_stubs::{
   process::ProcessKind,
@@ -10,9 +10,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{JobDb, ObjPsStatusDb, ProcessDb, SystemState},
+  repositories::generic::*,
+  utils,
 };
 
 use super::generic::*;

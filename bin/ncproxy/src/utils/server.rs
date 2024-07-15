@@ -6,7 +6,7 @@ use nanocl_error::io::IoResult;
 
 use nanocl_utils::ntex::middlewares;
 
-use crate::{services, models::SystemStateRef};
+use crate::{models::SystemStateRef, services};
 
 pub fn gen(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
   let state = Arc::clone(state);

@@ -5,8 +5,8 @@ use nanocl_error::http::HttpResult;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 use nanocl_stubs::generic::GenericNspQuery;
 
-use crate::utils;
 use crate::models::SystemState;
+use crate::utils;
 
 /// Inspect a command executed in a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -90,10 +90,12 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
 
-  use ntex::http;
-  use futures::{TryStreamExt, StreamExt};
+  use bollard_next::exec::{
+    CreateExecOptions, CreateExecResults, StartExecOptions,
+  };
   use bollard_next::service::ExecInspectResponse;
-  use bollard_next::exec::{CreateExecOptions, CreateExecResults, StartExecOptions};
+  use futures::{StreamExt, TryStreamExt};
+  use ntex::http;
 
   use nanocl_stubs::generic::GenericNspQuery;
 

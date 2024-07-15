@@ -14,11 +14,11 @@ use clap::Parser;
 use nanocl_utils::logger;
 
 mod cli;
-mod utils;
 mod models;
-mod vars;
 mod services;
 mod subsystem;
+mod utils;
+mod vars;
 
 #[ntex::main]
 async fn main() -> std::io::Result<()> {

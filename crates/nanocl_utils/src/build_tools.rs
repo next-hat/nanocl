@@ -1,4 +1,4 @@
-use std::io::{Result, Error, ErrorKind};
+use std::io::{Error, ErrorKind, Result};
 
 /// Execute the git command to extract the hash of the current commit
 /// and set it as an environment variable for the produced binary

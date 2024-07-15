@@ -8,9 +8,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{ResourceKindDb, SpecDb, SystemState},
+  repositories::generic::*,
+  utils,
 };
 
 /// List resource kinds
@@ -173,7 +173,7 @@ mod tests {
   use crate::utils::tests::*;
 
   use nanocl_stubs::resource_kind::{
-    ResourceKind, ResourceKindPartial, ResourceKindSpec, ResourceKindInspect,
+    ResourceKind, ResourceKindInspect, ResourceKindPartial, ResourceKindSpec,
     ResourceKindVersion,
   };
 

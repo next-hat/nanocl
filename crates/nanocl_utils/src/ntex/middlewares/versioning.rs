@@ -2,8 +2,8 @@
 use std::rc::Rc;
 
 use ntex::http::header::{HeaderName, HeaderValue};
-use ntex::{Service, ServiceCtx, Middleware};
-use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
+use ntex::web::{Error, ErrorRenderer, HttpResponse, WebRequest, WebResponse};
+use ntex::{Middleware, Service, ServiceCtx};
 
 struct Inner {
   version: String,

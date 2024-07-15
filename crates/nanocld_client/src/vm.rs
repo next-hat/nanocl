@@ -1,10 +1,10 @@
-use ntex::{rt, ws, io};
+use ntex::{io, rt, ws};
 
-use nanocl_error::io::FromIo;
 use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::io::FromIo;
 
 use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
-use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
+use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;

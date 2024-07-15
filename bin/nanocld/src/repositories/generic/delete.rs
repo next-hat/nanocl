@@ -1,10 +1,10 @@
-use diesel::{prelude::*, associations::HasTable, query_dsl, query_builder};
+use diesel::{associations::HasTable, prelude::*, query_builder, query_dsl};
 
 use nanocl_error::io::IoResult;
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::{utils, models::Pool};
+use crate::{models::Pool, utils};
 
 pub trait RepositoryDelByPk: super::RepositoryBase {
   async fn del_by_pk<Pk>(

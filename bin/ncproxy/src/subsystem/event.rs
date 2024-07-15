@@ -1,22 +1,22 @@
-use std::{sync::Arc, str::FromStr};
+use std::{str::FromStr, sync::Arc};
 
+use futures::{stream::FuturesUnordered, StreamExt};
 use ntex::rt;
-use futures::{StreamExt, stream::FuturesUnordered};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_utils::versioning;
 use nanocld_client::{
-  NanocldClient,
   stubs::{
-    system::Event,
     resource::ResourcePartial,
-    system::{EventActorKind, NativeEventAction},
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
+    system::Event,
+    system::{EventActorKind, NativeEventAction},
   },
+  NanocldClient,
 };
 
-use crate::{utils, vars, models::SystemStateRef};
+use crate::{models::SystemStateRef, utils, vars};
 
 /// Get cargo attributes from nanocld event
 fn get_cargo_attributes(

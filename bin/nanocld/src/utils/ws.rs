@@ -1,13 +1,13 @@
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Instant;
 
-use ntex::ws;
+use ntex::channel::oneshot;
 use ntex::time;
 use ntex::util;
-use ntex::channel::oneshot;
+use ntex::ws;
 
-use crate::models::{WsConState, HEARTBEAT_INTERVAL, CLIENT_TIMEOUT};
+use crate::models::{WsConState, CLIENT_TIMEOUT, HEARTBEAT_INTERVAL};
 
 /// ## Heartbeat
 ///

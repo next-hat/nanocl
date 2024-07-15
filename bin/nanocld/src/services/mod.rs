@@ -5,20 +5,20 @@ use nanocl_error::http::{HttpError, HttpResult};
 #[cfg(feature = "dev")]
 mod openapi;
 
-mod exec;
-mod node;
-mod namespace;
-mod system;
-mod resource;
 mod cargo;
+mod event;
+mod exec;
+mod job;
 mod metric;
+mod namespace;
+mod node;
+mod process;
+mod resource;
+mod resource_kind;
+mod secret;
+mod system;
 mod vm;
 mod vm_image;
-mod secret;
-mod job;
-mod process;
-mod resource_kind;
-mod event;
 
 pub async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError::not_found("Route or method unhandled"))
@@ -27,9 +27,9 @@ pub async fn unhandled() -> HttpResult<web::HttpResponse> {
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
-    use utoipa::OpenApi;
     use nanocl_utils::ntex::swagger;
     use openapi::ApiDoc;
+    use utoipa::OpenApi;
     let api_doc = ApiDoc::openapi();
     std::fs::write(
       "./bin/nanocld/specs/swagger.yaml",
@@ -75,8 +75,8 @@ mod tests {
 
   use super::ntex_config;
 
-  use crate::vars;
   use crate::utils::tests::*;
+  use crate::vars;
 
   #[ntex::test]
   pub async fn get_version() {

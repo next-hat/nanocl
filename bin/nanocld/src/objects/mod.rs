@@ -1,8 +1,8 @@
-mod job;
 mod cargo;
-mod vm;
-mod secret;
-mod resource;
+mod job;
 mod namespace;
+mod resource;
+mod secret;
+mod vm;
 
 pub mod generic;

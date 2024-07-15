@@ -1,4 +1,4 @@
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// How often heartbeat pings are sent
 pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);

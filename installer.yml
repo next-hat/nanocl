@@ -10,13 +10,12 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: cockroachdb/cockroach:v24.1.0
+    Image: docker.io/cockroachdb/cockroach:v24.1.0
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:
     - /bin/sh
     HostConfig:
-      NetworkMode: system
       Binds:
       - ${{ state_dir }}/store:${{ state_dir }}/store
     Env:
@@ -46,7 +45,6 @@ Cargoes:
     - --hosts
     - unix:///run/nanocl/metrics.sock
     HostConfig:
-      NetworkMode: system
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -87,7 +85,6 @@ Cargoes:
     - --state-dir
     - ${{ state_dir }}/proxy
     HostConfig:
-      NetworkMode: system
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -126,7 +123,6 @@ Cargoes:
     - --dns
     - 1.0.0.1
     HostConfig:
-      NetworkMode: system
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -164,7 +160,6 @@ Cargoes:
     Env:
     - NANOCL_GID=${{ gid }}
     HostConfig:
-      NetworkMode: system
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -195,7 +190,6 @@ Cargoes:
     Env:
     - USER_HOME=${{ home_dir }}
     HostConfig:
-      NetworkMode: system
       Binds:
       - //run/guest-services/nanocl:/run/nanocl
       - //run/host-services/backend.sock:/run/host-services/backend.sock

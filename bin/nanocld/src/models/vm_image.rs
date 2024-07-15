@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use nanocl_stubs::vm_image::VmImage;
 

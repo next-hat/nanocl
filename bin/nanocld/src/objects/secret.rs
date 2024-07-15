@@ -5,8 +5,8 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  repositories::generic::*,
   models::{SecretDb, SystemState},
+  repositories::generic::*,
 };
 
 use super::generic::*;

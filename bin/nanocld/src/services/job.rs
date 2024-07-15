@@ -7,10 +7,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  models::{JobDb, SystemState},
   objects::generic::*,
   repositories::generic::*,
-  models::{JobDb, SystemState},
+  utils,
 };
 
 /// List jobs
@@ -132,8 +132,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocl_stubs::job::{Job, JobSummary};
+  use ntex::http;
 
   use crate::utils::tests::*;
 

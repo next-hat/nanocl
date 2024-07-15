@@ -1,7 +1,7 @@
 max_width = 80
 tab_spaces = 2
-reorder_imports = false
-reorder_modules = false
+reorder_imports = true
+reorder_modules = true
 ###
 #  UNSTABLE FEATURE
 #  DISABLED FOR CI FMT

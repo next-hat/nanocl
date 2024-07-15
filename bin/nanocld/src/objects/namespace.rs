@@ -1,12 +1,9 @@
-use bollard_next::network::{InspectNetworkOptions, CreateNetworkOptions};
-
-use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::namespace::{NamespacePartial, Namespace, NamespaceInspect};
+use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_stubs::namespace::{Namespace, NamespaceInspect, NamespacePartial};
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{CargoDb, NamespaceDb, SystemState},
+  repositories::generic::*,
 };
 
 use super::generic::*;
@@ -28,22 +25,6 @@ impl ObjCreate for NamespaceDb {
         &obj.name
       )));
     }
-    if state
-      .inner
-      .docker_api
-      .inspect_network(&obj.name, None::<InspectNetworkOptions<String>>)
-      .await
-      .is_ok()
-    {
-      let item = NamespaceDb::create_from(obj, &state.inner.pool).await?;
-      return Ok(item.into());
-    }
-    let config = CreateNetworkOptions {
-      name: obj.name.to_owned(),
-      driver: String::from("bridge"),
-      ..Default::default()
-    };
-    state.inner.docker_api.create_network(config).await?;
     let item = NamespaceDb::create_from(obj, &state.inner.pool)
       .await?
       .into();
@@ -68,11 +49,9 @@ impl ObjInspectByPk for NamespaceDb {
         CargoDb::inspect_obj_by_pk(&cargo.spec.cargo_key, state).await?;
       cargoes.push(cargo);
     }
-    let network = utils::network::inspect_network(pk, state).await?;
     Ok(NamespaceInspect {
       name: namespace.name,
       cargoes,
-      network,
     })
   }
 }

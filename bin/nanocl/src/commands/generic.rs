@@ -1,6 +1,10 @@
 use clap::Args;
 use ntex::http::StatusCode;
 
+use nanocl_error::{
+  http_client::HttpClientError,
+  io::{FromIo, IoResult},
+};
 use nanocld_client::{
   stubs::{
     generic::{GenericFilter, GenericListQuery, GenericNspQuery},
@@ -8,19 +12,15 @@ use nanocld_client::{
   },
   NanocldClient,
 };
-use nanocl_error::{
-  io::{FromIo, IoResult},
-  http_client::HttpClientError,
-};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
     GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
     GenericStopOpts,
   },
+  utils,
 };
 
 pub trait GenericCommand {

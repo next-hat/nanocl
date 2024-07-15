@@ -1,6 +1,6 @@
 use utoipa::OpenApi;
 
-use nanocld_client::stubs::dns::{ResourceDnsRule, DnsEntry};
+use nanocld_client::stubs::dns::{DnsEntry, ResourceDnsRule};
 
 use super::rule;
 

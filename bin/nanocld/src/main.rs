@@ -5,15 +5,15 @@ use nanocl_utils::logger;
 
 mod cli;
 mod config;
-mod schema;
 mod models;
-mod vars;
-mod utils;
-mod system;
-mod repositories;
-mod services;
 mod objects;
+mod repositories;
+mod schema;
+mod services;
+mod system;
 mod tasks;
+mod utils;
+mod vars;
 
 /// Provides an api to manage containers and virtual machines across physical hosts
 /// There are these advantages :

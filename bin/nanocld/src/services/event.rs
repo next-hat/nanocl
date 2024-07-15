@@ -7,9 +7,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{EventDb, SystemState},
+  repositories::generic::*,
+  utils,
 };
 
 /// Get events of all peer nodes
@@ -111,15 +111,15 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::{rt, http};
-  use futures::{StreamExt, TryStreamExt};
   use bollard_next::container::Config;
+  use futures::{StreamExt, TryStreamExt};
   use nanocl_stubs::{
     cargo_spec::CargoSpecPartial,
     system::{
       Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
     },
   };
+  use ntex::{http, rt};
 
   use crate::utils::tests::*;
 

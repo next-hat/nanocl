@@ -4,8 +4,8 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::system::HostInfo;
 
-use crate::vars;
 use crate::models::SystemState;
+use crate::vars;
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -71,11 +71,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use ntex::http;
   use nanocl_stubs::system::HostInfo;
+  use ntex::http;
 
-  use crate::utils::tests::*;
   use crate::services::ntex_config;
+  use crate::utils::tests::*;
 
   #[ntex::test]
   async fn system_info() {

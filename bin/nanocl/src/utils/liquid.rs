@@ -1,9 +1,9 @@
-use std::{fs, path::Path, borrow::Cow};
+use std::{borrow::Cow, fs, path::Path};
 
-use url::Url;
 use liquid::partials::PartialSource;
+use url::Url;
 
-use crate::{utils, models::StateRoot};
+use crate::{models::StateRoot, utils};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateSource {

@@ -1,5 +1,5 @@
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Proxy rules modes
 #[derive(Debug, Clone)]

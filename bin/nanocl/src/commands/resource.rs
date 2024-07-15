@@ -2,12 +2,12 @@ use nanocl_error::io::IoResult;
 use nanocld_client::stubs::resource::Resource;
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
     GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceHistoryOpts,
     ResourceRevertOpts, ResourceRow,
   },
+  utils,
 };
 
 use super::{

@@ -5,15 +5,15 @@ use diesel::prelude::*;
 use nanocl_error::io::IoResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
-  cargo_spec::{CargoSpecPartial, CargoSpec},
+  cargo_spec::{CargoSpec, CargoSpecPartial},
+  generic::{GenericClause, GenericFilter},
   vm_spec::{VmSpec, VmSpecPartial},
 };
 
 use crate::{
-  schema::specs,
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{ColumnType, Pool, SpecDb},
+  schema::specs,
 };
 
 use super::generic::*;

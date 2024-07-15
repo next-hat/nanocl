@@ -1,7 +1,7 @@
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
-use ntex::rt;
 use futures_util::lock::Mutex;
+use ntex::rt;
 
 use nanocl_error::io::IoResult;
 

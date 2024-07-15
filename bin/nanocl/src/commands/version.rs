@@ -1,7 +1,7 @@
 use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
-use crate::{version, config::CliConfig};
+use crate::{config::CliConfig, version};
 
 /// Print version of nanocli and nanocld
 async fn print_version(client: &NanocldClient) -> IoResult<()> {

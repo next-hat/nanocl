@@ -96,8 +96,8 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use futures::StreamExt;
   use bollard_next::container::Config;
+  use futures::StreamExt;
 
   use crate::ConnectOpts;
 

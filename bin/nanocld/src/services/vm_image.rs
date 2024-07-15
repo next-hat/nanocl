@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use ntex::web;
 use futures::StreamExt;
+use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
@@ -11,9 +11,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{SystemState, VmImageDb},
+  repositories::generic::*,
+  utils,
 };
 
 /// List virtual machine images
@@ -254,11 +254,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 pub mod tests {
-  use tokio_util::codec;
-  use ntex::http::StatusCode;
   use futures_util::StreamExt;
+  use ntex::http::StatusCode;
+  use tokio_util::codec;
 
-  use nanocl_error::io::{IoResult, FromIo, IoError};
+  use nanocl_error::io::{FromIo, IoError, IoResult};
   use nanocl_stubs::vm_image::VmImage;
 
   use crate::utils::tests::*;

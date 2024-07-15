@@ -4,7 +4,7 @@ use tokio::{fs, io::AsyncWriteExt};
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::job::Job;
 
-use crate::{vars, models::SystemState};
+use crate::{models::SystemState, vars};
 
 /// Format the cron job command to start a job at a given time
 fn format_cron_job_command(job: &Job, state: &SystemState) -> String {

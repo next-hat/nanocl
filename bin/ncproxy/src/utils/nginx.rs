@@ -1,19 +1,19 @@
 use std::{fs, sync::Arc};
 
-use ntex::web;
 use futures::StreamExt;
+use ntex::web;
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::{
-  stubs::proxy::{ResourceProxyRule, ProxyRule, LocationTarget},
   bollard_next::exec::{CreateExecOptions, StartExecOptions},
+  stubs::proxy::{LocationTarget, ProxyRule, ResourceProxyRule},
   NanocldClient,
 };
 
 use crate::models::{
-  SystemStateRef, NginxRuleKind, LocationTemplate, STREAM_TEMPLATE,
-  HTTP_TEMPLATE, CONF_TEMPLATE,
+  LocationTemplate, NginxRuleKind, SystemStateRef, CONF_TEMPLATE,
+  HTTP_TEMPLATE, STREAM_TEMPLATE,
 };
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {

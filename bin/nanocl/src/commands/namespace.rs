@@ -1,7 +1,6 @@
-use nanocld_client::{stubs::namespace::NamespaceInspect, NanocldClient};
 use nanocl_error::io::IoResult;
+use nanocld_client::{stubs::namespace::NamespaceInspect, NanocldClient};
 
-use nanocld_client::stubs::namespace::NamespaceSummary;
 use crate::{
   config::CliConfig,
   models::{
@@ -9,6 +8,7 @@ use crate::{
     NamespaceRow,
   },
 };
+use nanocld_client::stubs::namespace::NamespaceSummary;
 
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,

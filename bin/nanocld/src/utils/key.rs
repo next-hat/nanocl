@@ -3,11 +3,11 @@
 /// or on the key of the parent for relational purpose.
 /// For example if we create a cargo `get-started` in the default namespace `global`
 /// The cargo key will be `get-started.global`
-use rand::{Rng, thread_rng, distributions::Alphanumeric};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 use nanocl_error::{
   http::{HttpError, HttpResult},
-  io::{IoResult, IoError},
+  io::{IoError, IoResult},
 };
 
 use nanocl_stubs::process::ProcessKind;

@@ -1,7 +1,7 @@
-use serde::Serialize;
-use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
+use serde::Serialize;
+use tabled::Tabled;
 
 use nanocl_error::io::IoError;
 use nanocld_client::stubs::secret::{Secret, SecretPartial};

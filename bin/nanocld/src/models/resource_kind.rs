@@ -1,12 +1,12 @@
 use diesel::prelude::*;
 
-use nanocl_error::io::{IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError};
 
 use nanocl_stubs::resource_kind::{
   ResourceKind, ResourceKindPartial, ResourceKindVersion,
 };
 
-use crate::{utils, schema::resource_kinds};
+use crate::{schema::resource_kinds, utils};
 
 use super::SpecDb;
 

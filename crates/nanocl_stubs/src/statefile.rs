@@ -1,9 +1,9 @@
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-  job::JobPartial, secret::SecretPartial, vm_spec::VmSpecPartial,
-  cargo_spec::CargoSpecPartial, resource::ResourcePartial,
+  cargo_spec::CargoSpecPartial, job::JobPartial, resource::ResourcePartial,
+  secret::SecretPartial, vm_spec::VmSpecPartial,
 };
 
 /// Statefile argument definition to pass to the Statefile

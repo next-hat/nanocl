@@ -5,25 +5,24 @@ volumes:
     name: "nanocl-deps"
 
 networks:
-  system:
-    name: system
+  nanoclbr0:
+    name: nanoclbr0
     driver: bridge
-    external: false
     driver_opts:
-      com.docker.network.bridge.name: nanocl.system
+      com.docker.network.bridge.name: nanoclbr0
 
 services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: cockroachdb/cockroach:v24.1.0
+    image: docker.io/cockroachdb/cockroach:v24.1.0
     entrypoint: /bin/sh
     tty: true
+    networks:
+      - nanoclbr0
     ports:
       - 26257:26257
       - 26258:26258
-    networks:
-      - system
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     environment:
@@ -50,10 +49,10 @@ services:
     container_name: nmetrics.system.c
     image: ghcr.io/next-hat/metrsd:0.5.4
     tty: true
-    networks:
-      - system
     environment:
       - LOG_LEVEL=metrsd=info
+    networks:
+      - nanoclbr0
     command:
       - --hosts
       - unix:///run/nanocl/metrics.sock
@@ -92,7 +91,7 @@ services:
     ports:
       - 8686:8686
     networks:
-      - system
+      - nanoclbr0
     command:
       - watch
       - -w
@@ -139,7 +138,7 @@ services:
     ports:
       - 8787:8787
     networks:
-      - system
+      - nanoclbr0
     command:
       - watch
       - -w
@@ -166,7 +165,7 @@ services:
     tty: true
     hostname: nanocl.internal
     networks:
-      - system
+      - nanoclbr0
     ports:
       - 8585:8585
       - 9443:9443
@@ -209,10 +208,10 @@ services:
     tty: true
     user: root
     hostname: dbeaver.nanocl.internal
+    networks:
+      - nanoclbr0
     profiles:
       - debug
-    networks:
-      - system
     ports:
       - 9090:8978
     environment:
@@ -230,11 +229,11 @@ services:
     container_name: ncvpnkit.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
+    networks:
+      - nanoclbr0
     hostname: ncvpnkit.nanocl.internal
     profiles:
       - vpnkit
-    networks:
-      - system
     environment:
       - USER_HOME=${HOME}
     labels:

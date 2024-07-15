@@ -1,6 +1,6 @@
 use chrono::TimeZone;
-use tabled::Tabled;
 use clap::{Parser, Subcommand};
+use tabled::Tabled;
 
 use nanocld_client::stubs::metric::Metric;
 

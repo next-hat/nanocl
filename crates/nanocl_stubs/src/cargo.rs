@@ -1,11 +1,11 @@
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use bollard_next::container::KillContainerOptions;
 
 use crate::{
-  process::Process,
   cargo_spec::CargoSpecPartial,
+  process::Process,
   system::{EventActor, EventActorKind, ObjPsStatus},
 };
 

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use ntex::web::test::TestServer;
 use ntex::http::client::{ClientRequest, ClientResponse};
+use ntex::web::test::TestServer;
 
 #[macro_export]
 macro_rules! test_status_code {

@@ -1,16 +1,16 @@
-mod node;
-mod namespace;
-mod secret;
-mod process;
-mod spec;
-mod job;
 mod cargo;
-mod resource_kind;
-mod resource;
+mod event;
+mod job;
 mod metric;
+mod namespace;
+mod node;
+mod object_process_status;
+mod process;
+mod resource;
+mod resource_kind;
+mod secret;
+mod spec;
 mod vm;
 mod vm_image;
-mod event;
-mod object_process_status;
 
 pub mod generic;

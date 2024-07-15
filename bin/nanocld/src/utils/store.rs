@@ -1,16 +1,18 @@
 use std::{net::ToSocketAddrs, time::Duration};
 
-use ntex::{rt, web, time};
 use diesel::{
+  r2d2::{ConnectionManager, Pool as R2D2Pool},
   PgConnection,
-  r2d2::{Pool as R2D2Pool, ConnectionManager},
 };
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{
+  embed_migrations, EmbeddedMigrations, MigrationHarness,
+};
+use ntex::{rt, time, web};
 
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::models::{Pool, DBConn};
+use crate::models::{DBConn, Pool};
 
 /// Create a pool connection to the store `cockroachdb`
 pub async fn create_pool(store_addr: &str) -> IoResult<Pool> {

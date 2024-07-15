@@ -1,7 +1,7 @@
+use futures_util::{stream::select_all, StreamExt, TryStreamExt};
 use ntex::web;
-use futures_util::{StreamExt, TryStreamExt, stream::select_all};
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::{
   container::{
@@ -19,9 +19,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  models::{ProcessDb, SystemState},
   repositories::generic::*,
-  models::{SystemState, ProcessDb},
+  utils,
 };
 
 /// List process (Vm, Job, Cargo)

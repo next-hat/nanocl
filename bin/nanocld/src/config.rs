@@ -1,7 +1,7 @@
 use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
+use nanocl_error::io::{FromIo, IoResult};
 use nanocl_utils::unix;
-use nanocl_error::io::{IoResult, FromIo};
 
 use crate::cli::Cli;
 

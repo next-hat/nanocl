@@ -1,13 +1,13 @@
-use futures_util::StreamExt;
-use futures::stream::FuturesUnordered;
-use ntex::rt;
 use bollard_next::container::{
   RemoveContainerOptions, RenameContainerOptions, StopContainerOptions,
 };
+use futures::stream::FuturesUnordered;
+use futures_util::StreamExt;
+use ntex::rt;
 
 use nanocl_error::{
-  io::IoError,
   http::{HttpError, HttpResult},
+  io::IoError,
 };
 use nanocl_stubs::{
   cargo_spec::ReplicationMode,
@@ -16,9 +16,9 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{CargoDb, ObjPsStatusDb, ProcessDb, SystemState},
+  repositories::generic::*,
+  utils,
 };
 
 use super::generic::*;
@@ -40,7 +40,7 @@ impl ObjTaskStart for CargoDb {
           Some(ReplicationMode::Static(replication)) => replication.number,
           _ => 1,
         };
-        utils::container::create_cargo(&cargo, number, &state).await?;
+        utils::container::cargo::create(&cargo, number, &state).await?;
       }
       utils::container::start_instances(
         &cargo.spec.cargo_key,
@@ -133,7 +133,7 @@ impl ObjTaskUpdate for CargoDb {
       };
       // Create instance with the new spec
       let new_instances =
-        match utils::container::create_cargo(&cargo, number, &state).await {
+        match utils::container::cargo::create(&cargo, number, &state).await {
           Err(err) => {
             log::warn!(
               "Unable to create cargo instance {} : {err}",

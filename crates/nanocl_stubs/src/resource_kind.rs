@@ -1,5 +1,5 @@
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Specification of a resource kind.
 /// Depending on the spec it will validate a JSONSchema or call a service.

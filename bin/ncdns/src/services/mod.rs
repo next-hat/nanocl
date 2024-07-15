@@ -18,9 +18,9 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
-    use utoipa::OpenApi;
     use nanocl_utils::ntex::swagger;
     use openapi::ApiDoc;
+    use utoipa::OpenApi;
 
     let api_doc = ApiDoc::openapi();
     std::fs::write(

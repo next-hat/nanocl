@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use nanocl_error::io::{IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError};
 
-mod read;
 mod create;
-mod update;
 mod delete;
+mod read;
+mod update;
 mod with_spec;
 
-pub use read::*;
 pub use create::*;
-pub use update::*;
 pub use delete::*;
+pub use read::*;
+pub use update::*;
 pub use with_spec::*;
 
 use crate::models::ColumnType;

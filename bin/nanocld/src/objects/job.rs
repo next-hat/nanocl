@@ -1,13 +1,13 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
-  job::{Job, JobPartial, JobInspect},
-  system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
+  job::{Job, JobInspect, JobPartial},
+  system::{NativeEventAction, ObjPsStatusKind, ObjPsStatusPartial},
 };
 
 use crate::{
-  utils,
-  repositories::generic::*,
   models::{JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb},
+  repositories::generic::*,
+  utils,
 };
 
 use super::generic::*;

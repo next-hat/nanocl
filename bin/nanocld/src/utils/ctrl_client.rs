@@ -1,10 +1,10 @@
-use ntex::rt;
+use ntex::http::client::{ClientResponse, Connector};
 use ntex::http::{Client, StatusCode};
-use ntex::http::client::{Connector, ClientResponse};
+use ntex::rt;
 
-use nanocl_error::io::FromIo;
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
+use nanocl_error::io::FromIo;
 
 /// Controller client
 pub struct CtrlClient {

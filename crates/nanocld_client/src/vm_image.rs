@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use ntex::util::Bytes;
-use ntex::channel::mpsc::Receiver;
 use futures::Stream;
+use ntex::channel::mpsc::Receiver;
+use ntex::util::Bytes;
 
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;

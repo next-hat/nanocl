@@ -1,7 +1,7 @@
 use diesel::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use nanocl_stubs::namespace::{NamespacePartial, Namespace};
+use nanocl_stubs::namespace::{Namespace, NamespacePartial};
 
 use crate::schema::namespaces;
 

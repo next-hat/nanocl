@@ -1,6 +1,6 @@
-use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use nanocld_client::stubs::node::Node;
+use tabled::Tabled;
 
 use super::GenericListOpts;
 

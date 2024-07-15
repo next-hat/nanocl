@@ -1,17 +1,17 @@
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
-  NanocldClient,
   stubs::{
     process::Process,
     proxy::{
-      UpstreamTarget, StreamTarget, UnixTarget, ProxySsl, ProxySslConfig,
+      ProxySsl, ProxySslConfig, StreamTarget, UnixTarget, UpstreamTarget,
     },
   },
+  NanocldClient,
 };
 
 use crate::models::{
-  SystemStateRef, NginxRuleKind, UPSTREAM_TEMPLATE, UNIX_UPSTREAM_TEMPLATE,
+  NginxRuleKind, SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
 };
 
 /// Get public address of host
@@ -21,25 +21,6 @@ async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
     .await
     .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
   Ok(info.host_gateway)
-}
-
-async fn get_namespace_addr(
-  name: &str,
-  client: &NanocldClient,
-) -> IoResult<String> {
-  let namespace = client.inspect_namespace(name).await.map_err(|err| {
-    err.map_err_context(|| format!("Unable to inspect namespace {name}"))
-  })?;
-  let ipam = namespace.network.ipam.unwrap_or_default();
-  let ipam_config = ipam.config.unwrap_or_default();
-  let ipam_config = ipam_config
-    .first()
-    .ok_or(IoError::invalid_data("IpamConfig", "Unable to get index 0"))?;
-  let ip_address = ipam_config
-    .gateway
-    .clone()
-    .ok_or(IoError::invalid_data("IpamConfig", "Unable to get gateway"))?;
-  Ok(ip_address)
 }
 
 fn parse_upstream_target(key: &str) -> IoResult<(String, String, String)> {
@@ -105,12 +86,7 @@ pub async fn get_network_addr(
       let ip = get_host_addr(client).await?;
       Ok(format!("{ip}:{port}"))
     }
-    "Internal" => Ok(format!("127.0.0.1:{port}")),
-    network if network.ends_with(".nsp") => {
-      let namespace = network.trim_end_matches(".nsp");
-      let ip_address = get_namespace_addr(namespace, client).await?;
-      Ok(format!("{ip_address}:{port}"))
-    }
+    "Private" => Ok(format!("127.0.0.1:{port}")),
     _ => Err(IoError::invalid_data(
       "Network",
       &format!("invalid network {network}"),
@@ -171,8 +147,7 @@ pub async fn gen_upstream(
             format!("Unable to inspect cargo {target_name}")
           })
         })?;
-      let addresses =
-        get_addresses(&cargo.instances, &target_namespace).await?;
+      let addresses = get_addresses(&cargo.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,
@@ -189,7 +164,7 @@ pub async fn gen_upstream(
         .map_err(|err| {
           err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
         })?;
-      let addresses = get_addresses(&vm.instances, &target_namespace).await?;
+      let addresses = get_addresses(&vm.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-vm", vm.spec.vm_key, port);
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,

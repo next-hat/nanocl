@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use ntex::{rt, time::interval};
 use futures::StreamExt;
+use ntex::{rt, time::interval};
 
 use nanocl_error::io::IoResult;
 
-use metrsd_client::{MetrsdClient, stubs::MetrsdEvent};
+use metrsd_client::{stubs::MetrsdEvent, MetrsdClient};
 
 use crate::{
+  models::{MetricDb, MetricNodePartial, Pool, SystemState},
   repositories::generic::*,
-  models::{Pool, SystemState, MetricDb, MetricNodePartial},
 };
 
 /// Save metric event send by [metrsd](http://github.com/next-hat/metrs) to the database

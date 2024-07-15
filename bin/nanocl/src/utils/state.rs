@@ -1,8 +1,8 @@
-use regex::Regex;
 use liquid::ObjectView;
+use regex::Regex;
 
-use nanocl_error::io::{IoError, IoResult, FromIo};
 use crate::models::{DisplayFormat, StateRef, StateRoot};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use super::liquid::StateSource;
 

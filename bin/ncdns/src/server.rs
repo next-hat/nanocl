@@ -1,11 +1,11 @@
 use ntex::web;
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 use nanocl_utils::ntex::middlewares;
 use nanocld_client::NanocldClient;
 
-use crate::services;
 use crate::dnsmasq::Dnsmasq;
+use crate::services;
 
 pub fn gen(
   host: &str,

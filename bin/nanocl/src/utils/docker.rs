@@ -1,23 +1,23 @@
 use std::collections::HashMap;
 
 use futures::StreamExt;
-use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use bollard_next::{Docker, API_DEFAULT_VERSION};
-use bollard_next::image::CreateImageOptions;
 use bollard_next::container::CreateContainerOptions;
+use bollard_next::image::CreateImageOptions;
 use bollard_next::service::{
-  HostConfig, ProgressDetail, RestartPolicy, RestartPolicyNameEnum,
-  ContainerCreateResponse,
+  ContainerCreateResponse, HostConfig, ProgressDetail, RestartPolicy,
+  RestartPolicyNameEnum,
 };
+use bollard_next::{Docker, API_DEFAULT_VERSION};
 
-use nanocl_error::io::{IoError, FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, Config};
 
+use crate::models::DockerContextMeta;
 use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
-use crate::models::DockerContextMeta;
 
 /// Update progress bar for install image
 fn update_image_progress(
@@ -227,10 +227,7 @@ pub async fn create_cargo_container(
     )),
     host_config: Some(HostConfig {
       network_mode: Some(
-        host_config
-          .network_mode
-          .clone()
-          .unwrap_or(namespace.to_owned()),
+        host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
       ),
       restart_policy: Some(RestartPolicy {
         name: Some(RestartPolicyNameEnum::ALWAYS),

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use diesel::prelude::*;
-use futures_util::{StreamExt, stream::FuturesUnordered};
+use futures_util::{stream::FuturesUnordered, StreamExt};
 use nanocl_error::{
   http::HttpResult,
   io::{IoError, IoResult},
@@ -15,13 +15,14 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_sql_order_by, gen_sql_multiple, gen_sql_query, utils,
-  schema::cargoes,
-  objects::generic::*,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
     CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb, Pool,
     ProcessDb, SpecDb, SystemState,
   },
+  objects::generic::*,
+  schema::cargoes,
+  utils,
 };
 
 use super::generic::*;

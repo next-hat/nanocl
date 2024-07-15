@@ -1,16 +1,16 @@
 use clap::Parser;
 use dotenvy::dotenv;
 
-use nanocld_client::{stubs::system::SslConfig, ConnectOpts, NanocldClient};
 use nanocl_error::io::{IoError, IoResult};
+use nanocld_client::{stubs::system::SslConfig, ConnectOpts, NanocldClient};
 
-mod utils;
+mod commands;
 mod config;
 mod models;
+mod utils;
 mod version;
-mod commands;
 
-use config::{UserConfig, CliConfig};
+use config::{CliConfig, UserConfig};
 use models::{Cli, Command, Context};
 
 /// Create a CliConfig struct from the cli arguments
@@ -124,7 +124,7 @@ async fn main() -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-  use std::{path::Path, env};
+  use std::{env, path::Path};
 
   use crate::utils::tests::*;
 

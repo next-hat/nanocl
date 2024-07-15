@@ -1,6 +1,6 @@
 use chrono::{DateTime, FixedOffset};
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Metric entry
 #[derive(Debug)]

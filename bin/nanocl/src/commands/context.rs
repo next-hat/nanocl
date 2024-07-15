@@ -1,8 +1,8 @@
 use nanocl_error::io::IoResult;
 
-use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{Context, ContextArg, ContextCommand, ContextRow};
+use crate::utils;
 
 /// Function that execute when running `nanocl context ls`
 /// Will print the list of contexts

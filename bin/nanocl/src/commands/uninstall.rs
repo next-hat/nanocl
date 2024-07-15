@@ -1,11 +1,13 @@
 use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::stubs::statefile::Statefile;
 
-use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
+use bollard_next::container::{
+  InspectContainerOptions, RemoveContainerOptions,
+};
 
 use crate::{
-  utils, version,
   models::{StateRoot, UninstallOpts},
+  utils, version,
 };
 
 /// This function is called when running `nanocl uninstall`.

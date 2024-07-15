@@ -1,5 +1,5 @@
+use diesel::r2d2::{ConnectionManager, Pool as R2D2Pool, PooledConnection};
 use diesel::PgConnection;
-use diesel::r2d2::{Pool as R2D2Pool, PooledConnection, ConnectionManager};
 
 mod ws;
 use nanocl_error::io::{IoError, IoResult};

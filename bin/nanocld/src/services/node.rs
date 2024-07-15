@@ -1,21 +1,23 @@
-use std::{rc::Rc, cell::RefCell, time::Instant};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use ntex::{
-  rt, ws, web, Service, chain, fn_service,
-  channel::oneshot,
-  util::ByteString,
-  service::{map_config, fn_shutdown, fn_factory_with_config},
-};
 use futures::future::ready;
+use ntex::{
+  chain,
+  channel::oneshot,
+  fn_service, rt,
+  service::{fn_factory_with_config, fn_shutdown, map_config},
+  util::ByteString,
+  web, ws, Service,
+};
 
 use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::generic::{GenericCount, GenericListQuery};
 
 use crate::{
-  utils,
+  models::{NodeDb, SystemState, WsConState},
   repositories::generic::*,
-  models::{SystemState, WsConState, NodeDb},
+  utils,
 };
 
 /// List nodes

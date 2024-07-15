@@ -1,8 +1,8 @@
-use std::io::Error;
+use libc::{c_char, gethostname, sockaddr_in, _SC_HOST_NAME_MAX};
 use std::ffi::CStr;
+use std::io::Error;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
-use libc::{c_char, gethostname, sockaddr_in, _SC_HOST_NAME_MAX};
 
 use nanocl_error::io::{FromIo, IoResult};
 

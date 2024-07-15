@@ -6,7 +6,7 @@ use nanocld_client::NanocldClient;
 
 use crate::{
   cli::Cli,
-  models::{Store, SystemState, SystemStateRef, EventEmitter},
+  models::{EventEmitter, Store, SystemState, SystemStateRef},
 };
 
 use super::{event, metric};

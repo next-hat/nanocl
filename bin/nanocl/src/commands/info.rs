@@ -1,6 +1,6 @@
 use nanocl_error::io::IoResult;
 
-use crate::{utils, config::CliConfig};
+use crate::{config::CliConfig, utils};
 
 /// Function that execute when running `nanocl info`
 /// Will print the info of the daemon

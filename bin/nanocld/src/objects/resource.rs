@@ -1,12 +1,12 @@
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   resource::{Resource, ResourcePartial},
   system::NativeEventAction,
 };
 
 use crate::{
+  models::{ResourceDb, SpecDb, SystemState},
   repositories::generic::*,
-  models::{ResourceDb, SystemState, SpecDb},
 };
 
 use super::generic::*;

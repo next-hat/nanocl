@@ -2,9 +2,9 @@ use diesel::{prelude::*, query_dsl::methods::LoadQuery};
 
 use nanocl_error::io::IoResult;
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::generic::{GenericClause, GenericFilter};
 
-use crate::{utils, models::Pool};
+use crate::{models::Pool, utils};
 
 use super::RepositoryBase;
 

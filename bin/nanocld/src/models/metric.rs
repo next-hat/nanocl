@@ -1,12 +1,12 @@
-use uuid::Uuid;
 use diesel::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use nanocl_error::io::IoResult;
 
 use nanocl_stubs::metric::MetricPartial;
 
-use crate::{utils, schema::metrics};
+use crate::{schema::metrics, utils};
 
 /// This structure represent a metric in the database.
 /// A metric is a data point that can be used to monitor the system.

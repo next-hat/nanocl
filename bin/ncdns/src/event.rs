@@ -4,7 +4,9 @@ use nanocl_error::io::IoResult;
 
 use nanocl_utils::versioning;
 
-use nanocld_client::stubs::resource_kind::{ResourceKindPartial, ResourceKindSpec};
+use nanocld_client::stubs::resource_kind::{
+  ResourceKindPartial, ResourceKindSpec,
+};
 
 use nanocld_client::NanocldClient;
 

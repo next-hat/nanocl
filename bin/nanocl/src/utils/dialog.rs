@@ -1,5 +1,5 @@
-use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
+use dialoguer::Confirm;
 use nanocl_error::io::IoResult;
 
 /// Ask for confirmation

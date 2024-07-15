@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 
 use nanocl_error::io::IoError;
-use nanocl_stubs::system::{ObjPsStatusPartial, ObjPsStatus};
+use nanocl_stubs::system::{ObjPsStatus, ObjPsStatusPartial};
 
 use crate::schema::object_process_statuses;
 

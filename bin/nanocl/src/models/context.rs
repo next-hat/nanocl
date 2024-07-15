@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use tabled::Tabled;
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use tabled::Tabled;
 
 use nanocld_client::stubs::system::SslConfig;
 

@@ -1,8 +1,8 @@
-use diesel::{prelude::*, associations::HasTable};
+use diesel::{associations::HasTable, prelude::*};
 
 use nanocl_error::io::{IoError, IoResult};
 
-use crate::{utils, models::Pool};
+use crate::{models::Pool, utils};
 
 pub trait RepositoryCreate: super::RepositoryBase {
   async fn create_from<I>(item: I, pool: &Pool) -> IoResult<Self>

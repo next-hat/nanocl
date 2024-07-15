@@ -1,9 +1,9 @@
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub use bollard_next::container::Config;
-pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
+pub use bollard_next::models::HostConfig;
 
 use crate::generic::ImagePullPolicy;
 
