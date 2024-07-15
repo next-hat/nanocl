@@ -10,7 +10,7 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: cockroachdb/cockroach:v24.1.0
+    Image: docker.io/cockroachdb/cockroach:v24.1.0
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:

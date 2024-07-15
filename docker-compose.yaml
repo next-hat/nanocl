@@ -8,7 +8,6 @@ networks:
   nanoclbr0:
     name: nanoclbr0
     driver: bridge
-    external: false
     driver_opts:
       com.docker.network.bridge.name: nanoclbr0
 
@@ -16,7 +15,7 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: cockroachdb/cockroach:v24.1.0
+    image: docker.io/cockroachdb/cockroach:v24.1.0
     entrypoint: /bin/sh
     tty: true
     networks:

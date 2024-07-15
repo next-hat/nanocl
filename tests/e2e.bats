@@ -31,7 +31,7 @@
 }
 
 @test "curl --header \"Host: deploy-example.com\" 127.0.0.1" {
-  run sleep 1
+  run sleep 2
   run curl --header "Host: deploy-example.com" 127.0.0.1
   [ "$status" -eq 0 ]
 }
