@@ -22,7 +22,7 @@ openssl = ["dep:openssl"]
 
 [dev-dependencies]
 tokio-util = "0.7"
-tokio = { version = "1.36", features = ["fs"] }
+tokio = { version = "1.39", features = ["fs"] }
 
 [dependencies]
 futures = "0.3"
