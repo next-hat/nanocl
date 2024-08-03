@@ -228,6 +228,11 @@ impl ObjPatchByPk for CargoDb {
     let spec = CargoSpecPartial {
       name: cargo.spec.name.clone(),
       container,
+      replicas: if obj.spec.replicas.is_some() {
+        obj.spec.replicas
+      } else {
+        cargo.spec.replicas
+      },
       init_container: if obj.spec.init_container.is_some() {
         obj.spec.init_container.clone()
       } else {

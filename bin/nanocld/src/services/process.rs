@@ -117,75 +117,20 @@ async fn logs_processes(
   )
 }
 
-/// Get logs of a single process instance by it's name or id
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Processes",
-  path = "/processes/{name}/logs",
-  params(
-    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
-    ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
-    ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
-    ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
-    ("follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
-    ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
-  ),
-  responses(
-    (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
-  ),
-))]
-#[web::get("/processes/{name}/logs")]
-async fn logs_process(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<ProcessLogQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let (_, name) = path.into_inner();
-  log::debug!("process::logs_process: {name}");
-  let options: LogsOptions<String> = qs.into_inner().into();
-  let stream = state
-    .inner
-    .docker_api
-    .logs(
-      &name,
-      Some(LogsOptions::<String> {
-        stdout: true,
-        stderr: true,
-        ..options.clone()
-      }),
-    )
-    .map(move |elem| match elem {
-      Err(err) => Err(err),
-      Ok(elem) => Ok(ProcessOutputLog {
-        name: name.clone(),
-        log: elem.into(),
-      }),
-    });
-  let stream = utils::stream::transform_stream::<
-    ProcessOutputLog,
-    ProcessOutputLog,
-  >(stream);
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(stream),
-  )
-}
-
-/// Start process by it's pk
-/// Internal endpoint used for multi node communication
+/// Start process by it's name or id
+/// Internal endpoint used for multi node interactions
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
-  path = "/processes/{pk}/start",
+  path = "/processes/{name}/start",
   params(
-    ("pk" = String, Path, description = "Pk of the process", example = "1234567890"),
+    ("name" = String, Path, description = "Name or Id of the process", example = "1234567890"),
   ),
   responses(
     (status = 202, description = "Process instances started"),
   ),
 ))]
-#[web::post("/processes/{pk}/start")]
+#[web::post("/processes/{name}/start")]
 pub async fn start_process_by_pk(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
@@ -448,7 +393,7 @@ pub async fn stats_processes(
   ),
 ))]
 #[web::get("/processes/count")]
-pub async fn count_process(
+pub async fn count_processes(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -457,17 +402,133 @@ pub async fn count_process(
   Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
 }
 
+/// Create a process of given kind and name
+#[web::post("/processes/{kind}/{name}")]
+pub async fn create_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  Ok(web::HttpResponse::Created().json(&kind_key))
+}
+
+/// Delete a process by it's name or id
+#[web::delete("/processes/{name}")]
+pub async fn delete_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Start a process by it's name or id
+#[web::post("/processes/{name}/start")]
+pub async fn start_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Stop a process by it's name or id
+#[web::post("/processes/{name}/stop")]
+pub async fn stop_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Restart a process by it's name or id
+#[web::post("/processes/{name}/restart")]
+pub async fn restart_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Get logs of a single process instance by it's name or id
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes/{name}/logs",
+  params(
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
+    ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
+    ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
+    ("follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
+    ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
+  ),
+  responses(
+    (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
+  ),
+))]
+#[web::get("/processes/{name}/logs")]
+async fn logs_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<ProcessLogQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  log::debug!("process::logs_process: {name}");
+  let options: LogsOptions<String> = qs.into_inner().into();
+  let stream = state
+    .inner
+    .docker_api
+    .logs(
+      &name,
+      Some(LogsOptions::<String> {
+        stdout: true,
+        stderr: true,
+        ..options.clone()
+      }),
+    )
+    .map(move |elem| match elem {
+      Err(err) => Err(err),
+      Ok(elem) => Ok(ProcessOutputLog {
+        name: name.clone(),
+        log: elem.into(),
+      }),
+    });
+  let stream = utils::stream::transform_stream::<
+    ProcessOutputLog,
+    ProcessOutputLog,
+  >(stream);
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(stream),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
+  // Single process actions
+  config.service(create_process);
+  config.service(delete_process);
+  config.service(start_process);
+  config.service(stop_process);
+  config.service(restart_process);
+  config.service(logs_process);
+  // Multiple process actions
   config.service(list_processes);
   config.service(logs_processes);
-  config.service(logs_process);
   config.service(restart_processes);
   config.service(start_processes);
   config.service(stop_processes);
   config.service(kill_processes);
   config.service(wait_processes);
   config.service(stats_processes);
-  config.service(count_process);
+  config.service(count_processes);
 }
 
 #[cfg(test)]

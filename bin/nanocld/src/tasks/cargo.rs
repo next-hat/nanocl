@@ -12,13 +12,13 @@ use nanocl_error::{
 use nanocl_stubs::{
   cargo_spec::ReplicationMode,
   process::ProcessKind,
-  system::{NativeEventAction, ObjPsStatusKind},
+  system::{Event, NativeEventAction, ObjPsStatusKind},
 };
 
 use crate::{
-  utils,
+  models::{CargoDb, MetricDb, ObjPsStatusDb, ProcessDb, SystemState},
   repositories::generic::*,
-  models::{CargoDb, ObjPsStatusDb, ProcessDb, SystemState},
+  utils,
 };
 
 use super::generic::*;
@@ -26,21 +26,40 @@ use super::generic::*;
 // impl ObjTask for CargoDb {}
 
 impl ObjTaskStart for CargoDb {
-  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
+  fn create_start_task(
+    key: &str,
+    event: &Event,
+    state: &SystemState,
+  ) -> ObjTaskFuture {
     let key = key.to_owned();
+    let event = event.clone();
     let state = state.clone();
     Box::pin(async move {
       let cargo =
         CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-      let processes =
-        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
-          .await?;
+      let node = &state.inner.config.hostname;
+      let processes = ProcessDb::read_by_kind_key_for_node(
+        &cargo.spec.cargo_key,
+        node,
+        &state.inner.pool,
+      )
+      .await?;
+      // If the event come from the current node
+      // We have to detect the best node to run the cargo
+      let node_limit = cargo.spec.replicas.unwrap_or(1);
+      if state.inner.config.hostname == event.reporting_node {
+        // Detect best nodes to run the cargo
+        let best_nodes =
+          MetricDb::find_best_nodes(90.0, 90.0, node_limit, &state.inner.pool)
+            .await?;
+        println!("best nodes: {best_nodes:?}");
+        // If the current node is not in the best nodes
+        // We just forward th event to the best node
+      }
       if processes.is_empty() {
-        let number = match &cargo.spec.replication {
-          Some(ReplicationMode::Static(replication)) => replication.number,
-          _ => 1,
-        };
-        utils::container::create_cargo(&cargo, number, &state).await?;
+        let replicas = cargo.spec.replicas.unwrap_or(1);
+        utils::container::create_cargo_instance(&cargo, replicas, &state)
+          .await?;
       }
       utils::container::start_instances(
         &cargo.spec.cargo_key,
@@ -133,7 +152,9 @@ impl ObjTaskUpdate for CargoDb {
       };
       // Create instance with the new spec
       let new_instances =
-        match utils::container::create_cargo(&cargo, number, &state).await {
+        match utils::container::create_cargo_instance(&cargo, number, &state)
+          .await
+        {
           Err(err) => {
             log::warn!(
               "Unable to create cargo instance {} : {err}",

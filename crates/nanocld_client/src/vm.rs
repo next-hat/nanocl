@@ -1,4 +1,4 @@
-use ntex::{rt, ws, io};
+use ntex::{ws, io};
 
 use nanocl_error::io::FromIo;
 use nanocl_error::http_client::HttpClientResult;
@@ -137,23 +137,27 @@ impl NanocldClient {
     };
     let url = format!("{}/{}/vms/{name}/attach{qs}", self.url, &self.version);
     // open websockets connection over http transport
-    let con = match &self.unix_socket {
-      Some(path) => ws::WsClient::build(&url)
-        .connector(ntex::service::fn_service(|_| async move {
-          Ok::<_, _>(rt::unix_connect(&path).await?)
-        }))
-        .finish()
-        .map_err(|err| err.map_err_context(|| path))?
-        .connect()
-        .await
-        .map_err(|err| err.map_err_context(|| path))?,
-      None => ws::WsClient::build(&url)
-        .finish()
-        .map_err(|err| err.map_err_context(|| &self.url))?
-        .connect()
-        .await
-        .map_err(|err| err.map_err_context(|| &self.url))?,
-    };
+    #[cfg(not(target_os = "windows"))]
+    {
+      if let Some(unix_socket) = &self.unix_socket {
+        let con = ws::WsClient::build(&url)
+          .connector(ntex::service::fn_service(|_| async move {
+            Ok::<_, _>(ntex::rt::unix_connect(&unix_socket).await?)
+          }))
+          .finish()
+          .map_err(|err| err.map_err_context(|| unix_socket))?
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| unix_socket))?;
+        return Ok(con);
+      }
+    }
+    let con = ws::WsClient::build(&url)
+      .finish()
+      .map_err(|err| err.map_err_context(|| &self.url))?
+      .connect()
+      .await
+      .map_err(|err| err.map_err_context(|| &self.url))?;
     Ok(con)
   }
 }

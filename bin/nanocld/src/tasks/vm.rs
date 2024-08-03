@@ -1,5 +1,8 @@
 use nanocl_error::io::IoError;
-use nanocl_stubs::{process::ProcessKind, system::NativeEventAction};
+use nanocl_stubs::{
+  process::ProcessKind,
+  system::{Event, NativeEventAction},
+};
 
 use crate::{
   utils,
@@ -12,7 +15,11 @@ use super::generic::*;
 // impl ObjTask for VmDb {}
 
 impl ObjTaskStart for VmDb {
-  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
+  fn create_start_task(
+    key: &str,
+    event: &Event,
+    state: &SystemState,
+  ) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {

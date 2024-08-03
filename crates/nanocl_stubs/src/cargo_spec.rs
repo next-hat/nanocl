@@ -104,6 +104,12 @@ pub struct CargoSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
+  /// Minimum number of replicas in the cluster (default: 1)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replicas: Option<usize>,
 }
 
 /// Payload used to patch a cargo
@@ -167,12 +173,19 @@ pub struct CargoSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
+  /// New minimum number of replicas in the cluster (default: 1)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replicas: Option<usize>,
 }
 
 impl From<CargoSpecPartial> for CargoSpecUpdate {
   fn from(spec: CargoSpecPartial) -> Self {
     Self {
       name: Some(spec.name),
+      replicas: spec.replicas,
       init_container: spec.init_container,
       container: Some(spec.container),
       replication: spec.replication,
@@ -242,6 +255,12 @@ pub struct CargoSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
+  /// Minimum number of replicas in the cluster (default: 1)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replicas: Option<usize>,
 }
 
 impl From<CargoSpec> for CargoSpecPartial {
@@ -255,6 +274,7 @@ impl From<CargoSpec> for CargoSpecPartial {
       secrets: spec.secrets,
       image_pull_secret: spec.image_pull_secret,
       image_pull_policy: spec.image_pull_policy,
+      replicas: spec.replicas,
     }
   }
 }

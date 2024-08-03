@@ -891,7 +891,7 @@ paths:
       tags:
       - Processes
       summary: Count processes
-      operationId: count_process
+      operationId: count_processes
       parameters:
       - name: filter
         in: query
@@ -2400,6 +2400,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
+        Replicas:
+          type: integer
+          description: 'Minimum number of replicas in the cluster (default: 1)'
+          nullable: true
+          minimum: 0
     CargoSpecPartial:
       type: object
       description: A cargo spec partial is used to create a Cargo
@@ -2439,6 +2444,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
+        Replicas:
+          type: integer
+          description: 'Minimum number of replicas in the cluster (default: 1)'
+          nullable: true
+          minimum: 0
       additionalProperties: false
     CargoSpecUpdate:
       type: object
@@ -2482,6 +2492,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
+        Replicas:
+          type: integer
+          description: 'New minimum number of replicas in the cluster (default: 1)'
+          nullable: true
+          minimum: 0
       additionalProperties: false
     CargoSummary:
       type: object

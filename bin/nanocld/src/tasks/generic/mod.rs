@@ -3,6 +3,7 @@ use std::pin::Pin;
 use futures_util::Future;
 
 use nanocl_error::io::IoError;
+use nanocl_stubs::system::Event;
 
 use crate::models::SystemState;
 
@@ -13,7 +14,11 @@ pub type ObjTaskFuture = Pin<Box<dyn Future<Output = Result<(), IoError>>>>;
 pub trait ObjTaskStart {
   /// Create a task (future) that will be run when a process object (job, cargo, vm) is starting
   /// This task run on his own event loop hosted by the SystemState
-  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture;
+  fn create_start_task(
+    key: &str,
+    event: &Event,
+    state: &SystemState,
+  ) -> ObjTaskFuture;
 }
 
 pub trait ObjTaskDelete {

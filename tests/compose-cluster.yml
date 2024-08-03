@@ -36,9 +36,7 @@ services:
     container_name: ndaemon.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
-    hostname: nanocl.internal
-    networks:
-      - system
+    network_mode: host
     ports:
       - 8585:8585
       - 9443:9443
@@ -68,14 +66,13 @@ services:
           -- \
           --hosts unix:///run/nanocl/nanocl.sock \
           --gid 1001 \
-          --store-addr postgresql://root:root@192.168.121.157:26257/defaultdb \
+          --store-addr postgresql://root:root@192.168.56.41:26258/defaultdb \
           --hosts tcp://0.0.0.0:9443 \
-          --hostname n1.nanocl.internal \
-          --gateway 192.168.121.69 \
-          --advertise-addr 192.168.121.69:8585 \
+          --gateway 192.168.56.42 \
+          --advertise-addr 192.168.56.42:8585 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \
           --cert-ca ./tests/ca.crt \
-          --node 192.168.121.157:8585 \
+          --node 192.168.56.41:8585 \
           --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 

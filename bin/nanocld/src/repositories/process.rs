@@ -118,9 +118,18 @@ impl ProcessDb {
       .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()));
     ProcessDb::transform_read_by(&filter, pool).await
   }
-}
 
-impl ProcessDb {
+  pub async fn read_by_kind_key_for_node(
+    kind_key: &str,
+    node_name: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<Process>> {
+    let filter = GenericFilter::new()
+      .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()))
+      .r#where("node_name", GenericClause::Eq(node_name.to_owned()));
+    ProcessDb::transform_read_by(&filter, pool).await
+  }
+
   pub async fn list_by_namespace(
     name: &str,
     pool: &Pool,

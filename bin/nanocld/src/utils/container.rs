@@ -325,7 +325,7 @@ async fn execute_cargo_before(
 /// Create instances (containers) based on the cargo spec
 /// The number of containers created is based on the number of instances defined in the cargo spec
 /// Example: cargo-key-(random-id), cargo-key-(random-id1), cargo-key-(random-id2)
-pub async fn create_cargo(
+pub async fn create_cargo_instance(
   cargo: &Cargo,
   number: usize,
   state: &SystemState,
@@ -504,7 +504,9 @@ pub async fn kill_by_kind_key(
   opts: &CargoKillOptions,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
+  let node = &state.inner.config.hostname;
+  let processes =
+    ProcessDb::read_by_kind_key_for_node(pk, node, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
@@ -523,7 +525,9 @@ pub async fn restart_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
+  let node = &state.inner.config.hostname;
+  let processes =
+    ProcessDb::read_by_kind_key_for_node(pk, node, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
@@ -543,9 +547,11 @@ pub async fn stop_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
+  let node = &state.inner.config.hostname;
   let processes =
-    ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
-  log::debug!("stop_process_by_kind_pk: {kind_pk}");
+    ProcessDb::read_by_kind_key_for_node(kind_pk, node, &state.inner.pool)
+      .await?;
+  log::debug!("stop_process_by_kind_pk: {kind_pk} for node: {node}");
   for process in processes {
     state
       .inner
@@ -574,8 +580,10 @@ pub async fn start_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
+  let node = &state.inner.config.hostname;
   let processes =
-    ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key_for_node(kind_key, node, &state.inner.pool)
+      .await?;
   for process in processes {
     state
       .inner

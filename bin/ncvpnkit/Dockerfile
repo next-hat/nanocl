@@ -52,8 +52,8 @@ RUN export ARCH=$(uname -m) && \
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
 
-LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
-LABEL org.opencontainers.image.description Nanocl Controller Vpnkit
+LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
+LABEL org.opencontainers.image.description="Nanocl Controller Vpnkit"
 
 COPY --from=builder /bin/ncvpnkit /bin/ncvpnkit
 

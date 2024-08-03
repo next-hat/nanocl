@@ -145,6 +145,7 @@ impl SpecDb {
     let spec = CargoSpec {
       key: self.key,
       cargo_key: self.kind_key.clone(),
+      replicas: p.replicas,
       version: self.version.clone(),
       created_at: self.created_at,
       name: p.name,

@@ -102,17 +102,20 @@ impl NanocldClient {
 
   fn gen_client(&self) -> IoResult<http::client::Client> {
     let mut client = http::client::Client::build();
-    if let Some(unix_socket) = &self.unix_socket {
-      let unix_socket = unix_socket.clone();
-      client = client.connector(
-        http::client::Connector::default()
-          .connector(ntex::service::fn_service(move |_| {
-            let unix_socket = unix_socket.clone();
-            async { Ok::<_, _>(rt::unix_connect(unix_socket).await?) }
-          }))
-          .timeout(ntex::time::Millis::from_secs(100))
-          .finish(),
-      );
+    #[cfg(not(target_os = "windows"))]
+    {
+      if let Some(unix_socket) = &self.unix_socket {
+        let unix_socket = unix_socket.clone();
+        client = client.connector(
+          http::client::Connector::default()
+            .connector(ntex::service::fn_service(move |_| {
+              let unix_socket = unix_socket.clone();
+              async { Ok::<_, _>(rt::unix_connect(unix_socket).await?) }
+            }))
+            .timeout(ntex::time::Millis::from_secs(100))
+            .finish(),
+        );
+      }
     }
     #[cfg(feature = "openssl")]
     {

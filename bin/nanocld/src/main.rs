@@ -38,7 +38,6 @@ async fn main() -> std::io::Result<()> {
       err.print_and_exit();
     }
     Ok(config) => config,
-    // gfg
   };
   // Boot internal dependencies (database, event bus, etc...)
   let daemon_state = match system::init(&config).await {

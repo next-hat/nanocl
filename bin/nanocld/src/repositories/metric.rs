@@ -1,10 +1,12 @@
-use diesel::prelude::*;
-use nanocl_stubs::generic::GenericFilter;
+use diesel::{prelude::*, sql_query};
+use nanocl_error::io::{IoError, IoResult};
+use nanocl_stubs::generic::{GenericClause, GenericFilter};
 
 use crate::{
-  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, MetricDb},
+  utils,
   schema::metrics,
+  gen_sql_multiple, gen_sql_order_by, gen_sql_query,
+  models::{ColumnType, MetricDb, NodeDb, Pool},
 };
 
 use super::generic::*;
@@ -64,5 +66,73 @@ impl RepositoryCountBy for MetricDb {
     let mut query = metrics::table.into_boxed();
     let columns = Self::get_columns();
     gen_sql_query!(query, filter, columns).count()
+  }
+}
+
+#[derive(Selectable, Queryable, QueryableByName, Debug)]
+#[diesel(table_name = crate::schema::metrics)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct MetricNodeDb {
+  // Ensure these fields match your SQL query's output
+  #[diesel(sql_type = diesel::sql_types::Text)]
+  pub node_name: String,
+  // Add other fields here, matching the SQL output
+}
+
+impl MetricDb {
+  pub async fn find_best_nodes(
+    cpu_threshold: f32,
+    memory_threshold: f32,
+    limit: usize,
+    pool: &Pool,
+  ) -> IoResult<Vec<NodeDb>> {
+    let pool_ptr = pool.clone();
+    let node_names = ntex::rt::spawn_blocking(move || {
+      let query = sql_query(
+        "
+          WITH LatestMetrics AS (
+            SELECT
+              node_name,
+              data,
+              ROW_NUMBER() OVER(PARTITION BY node_name ORDER BY created_at DESC) AS rn
+            FROM metrics
+            WHERE kind = 'nanocl.io/metrs'
+          ), CpuUsages AS (
+            SELECT
+              node_name,
+              jsonb_array_elements(data->'Cpus') AS cpu
+            FROM LatestMetrics
+            WHERE rn = 1
+          )
+          SELECT
+            node_name,
+            AVG((cpu->>'Usage')::float) AS avg_cpu_usage
+          FROM CpuUsages
+          GROUP BY node_name
+          HAVING AVG((cpu->>'Usage')::float) >= $1
+          ORDER BY avg_cpu_usage DESC
+          LIMIT $2
+        ",
+      );
+      let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
+      let node_names = query
+        .bind::<diesel::sql_types::Float, _>(cpu_threshold)
+        .bind::<diesel::sql_types::BigInt, _>(limit as i64)
+        .get_results::<MetricNodeDb>(&mut conn).map_err(|err| {
+          IoError::interrupted("Find best node", err.to_string().as_str())
+        })?;
+      Ok::<_, IoError>(node_names)
+    })
+    .await
+    .map_err(|err| {
+      IoError::interrupted("Find best node", err.to_string().as_str())
+    })??;
+    let filter = GenericFilter::new().r#where(
+      "node_name",
+      GenericClause::In(
+        node_names.iter().map(|x| x.node_name.clone()).collect(),
+      ),
+    );
+    NodeDb::read_by(&filter, pool).await
   }
 }

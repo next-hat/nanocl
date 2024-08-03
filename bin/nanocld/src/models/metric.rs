@@ -13,25 +13,33 @@ use crate::{utils, schema::metrics};
 /// It is stored as a json object in the database.
 /// We use the `node_name` to link the metric to the node.
 #[derive(
-  Debug, Insertable, Identifiable, Queryable, Serialize, Deserialize,
+  Debug, Insertable, Identifiable, Queryable, Serialize, Deserialize, Selectable,
 )]
 #[serde(rename_all = "PascalCase")]
 #[diesel(primary_key(key))]
 #[diesel(table_name = metrics)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct MetricDb {
   /// The key of the metric in the database `UUID`
+  #[diesel(sql_type = diesel::sql_types::Uuid)]
   pub key: Uuid,
   /// When the metric was created
+  #[diesel(sql_type = diesel::sql_types::Timestamp)]
   pub created_at: chrono::NaiveDateTime,
   /// When the metric will expire
+  #[diesel(sql_type = diesel::sql_types::Timestamp)]
   pub expires_at: chrono::NaiveDateTime,
   /// The node who saved the metric
+  #[diesel(sql_type = diesel::sql_types::Text)]
   pub node_name: String,
   /// The kind of the metric
+  #[diesel(sql_type = diesel::sql_types::Text)]
   pub kind: String,
   /// The data of the metric
+  #[diesel(sql_type = diesel::sql_types::Jsonb)]
   pub data: serde_json::Value,
   /// Optional note about the metric
+  #[diesel(sql_type = diesel::sql_type::Nullable<diesel::sql_types::Text>)]
   pub note: Option<String>,
 }
 

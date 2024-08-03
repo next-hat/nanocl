@@ -244,6 +244,13 @@ Some useful command to know:
   docker run --rm -v $(pwd):/local openapitools/openapi-generator-cli generate -g rust -i /local/specs/v1/swagger.json -o /local/client
   ```
 
+- Rsync from host to the vagrant vm
+
+```sh
+vagrant rsync-auto --poll node1
+vagrant rsync-auto --poll node2
+```
+
 ## Version bumping
 
 On version bump of api or proxy, example files have to be updated to the last version to avoid test failing

@@ -83,20 +83,21 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
 
 fn starting(
   key: &str,
+  event: &Event,
   actor: &EventActor,
   state: &SystemState,
 ) -> Option<ObjTaskFuture> {
   match actor.kind {
     EventActorKind::Job => {
-      let task = JobDb::create_start_task(key, state);
+      let task = JobDb::create_start_task(key, event, state);
       Some(task)
     }
     EventActorKind::Cargo => {
-      let task = CargoDb::create_start_task(key, state);
+      let task = CargoDb::create_start_task(key, event, state);
       Some(task)
     }
     EventActorKind::Vm => {
-      let task = VmDb::create_start_task(key, state);
+      let task = VmDb::create_start_task(key, event, state);
       Some(task)
     }
     _ => None,
@@ -212,26 +213,26 @@ fn stopping(
 /// and push the action into the task manager
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
-pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
-  match e.kind {
+pub async fn exec_event(event: &Event, state: &SystemState) -> IoResult<()> {
+  match event.kind {
     EventKind::Error | EventKind::Warning => return Ok(()),
     _ => {}
   }
-  let Some(ref actor) = e.actor else {
+  let Some(ref actor) = event.actor else {
     return Ok(());
   };
   let key = actor.key.clone().unwrap_or_default();
   log::info!(
     "exec_event: {} {} {}",
-    e.kind,
-    e.action,
+    event.kind,
+    event.action,
     actor.key.clone().unwrap_or_default()
   );
   // Specific key of the task for this object
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
-  let action = NativeEventAction::from_str(e.action.as_str())?;
+  let action = NativeEventAction::from_str(event.action.as_str())?;
   match (&actor.kind, &action) {
     (EventActorKind::Cargo | EventActorKind::Vm, _) => {
       state.inner.task_manager.wait_task(&task_key).await;
@@ -243,7 +244,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
     _ => {}
   }
   let task: Option<ObjTaskFuture> = match action {
-    NativeEventAction::Starting => starting(&key, actor, state),
+    NativeEventAction::Starting => starting(&key, event, actor, state),
     NativeEventAction::Stopping => stopping(&key, actor, state),
     NativeEventAction::Updating => updating(&key, actor, state),
     NativeEventAction::Update => update(&key, actor, state).await,

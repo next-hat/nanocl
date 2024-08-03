@@ -1,6 +1,7 @@
+use futures::SinkExt;
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
   system::EventCondition,
@@ -102,11 +103,31 @@ pub async fn count_event(
   Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
 }
 
+/// Handle event created from a remote node
+/// If it's a (job, cargo, vm) start it may create instances
+///
+#[web::post("/events/{key}/handle")]
+pub async fn handle_event(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let event = EventDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
+  state
+    .inner
+    .event_emitter
+    .clone()
+    .send(event)
+    .await
+    .map_err(|err| HttpError::internal_server_error(err.to_string()))?;
+  Ok(web::HttpResponse::Ok().finish())
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_event);
   config.service(watch_event);
   config.service(inspect_event);
   config.service(count_event);
+  config.service(handle_event);
 }
 
 #[cfg(test)]
