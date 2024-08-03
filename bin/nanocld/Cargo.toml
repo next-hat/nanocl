@@ -69,7 +69,7 @@ diesel = { version = "2.2", features = [
   "ipnet-address",
   "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
-tokio = { version = "1.36", features = ["fs", "process", "io-std"] }
+tokio = { version = "1.39", features = ["fs", "process", "io-std"] }
 tokio-util = "0.7"
 futures-util = "0.3"
 libc = "0.2"
