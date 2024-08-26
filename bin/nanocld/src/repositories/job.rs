@@ -123,7 +123,7 @@ impl JobDb {
       status_key: p.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
-      metadata: Default::default(),
+      metadata: p.metadata.clone(),
       data,
     })
   }
