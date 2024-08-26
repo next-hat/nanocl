@@ -3,6 +3,8 @@ ApiVersion: v0.14
 Jobs:
 - Name: cron-job-example
   Schedule: "*/1 * * * *"
+  Metadata:
+    GG: WP
   Containers:
   - Image: alpine:latest
     Cmd:
