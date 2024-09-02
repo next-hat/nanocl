@@ -46,7 +46,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   if running != 0 {
     return Ok(());
   }
-  println!("instance_failed: {instance_failed}");
+  log::debug!("instance_failed: {instance_failed}");
   if instance_failed > 0 {
     ObjPsStatusDb::update_actual_status(
       &job.name,
