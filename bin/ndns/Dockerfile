@@ -1,4 +1,4 @@
-FROM alpine:3.20.0
+FROM alpine:3.20.2
 
 RUN apk --update add dnsmasq && \
   rm -rf /var/cache/apk/* && \

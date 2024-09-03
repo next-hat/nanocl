@@ -1,6 +1,6 @@
 [package]
 name = "ncvpnkit"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,10 +11,10 @@ test = []
 vendored = ["openssl/vendored"]
 
 [build-dependencies]
-nanocl_utils = { version = "0.6", features = ["build_tools"] }
+nanocl_utils = { version = "0.7", features = ["build_tools"] }
 
 [dependencies]
-nanocl_error = { version = "0.4", features = [
+nanocl_error = { version = "0.5", features = [
   "io",
   "http_client",
   "serde_json",
@@ -23,7 +23,7 @@ log = "0.4"
 futures-util = "0.3"
 ntex = { version = "2", features = ["tokio"] }
 vpnkitrc = { version = "0.1", features = ["tokio"] }
-nanocld_client = { version = "0.15" }
-nanocl_utils = { version = "0.6", features = ["logger"] }
+nanocld_client = { version = "0.16" }
+nanocl_utils = { version = "0.7", features = ["logger"] }
 serde_json = "1.0"
 openssl = "0.10"

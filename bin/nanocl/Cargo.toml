@@ -1,6 +1,6 @@
 [package]
 name = "nanocl"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Orchestrator CLI"
@@ -32,10 +32,10 @@ chrono = { version = "0.4", default-features = false, features = [
   "clock",
 ] }
 bollard-next = { version = "0.16.1" }
-nanocl_utils = { version = "0.6", features = ["build_tools"] }
-nanocld_client = { version = "0.15" }
+nanocl_utils = { version = "0.7", features = ["build_tools"] }
+nanocld_client = { version = "0.16" }
 serde_json = "1.0"
-nanocl_error = { version = "0.4", features = ["io", "serde_json"] }
+nanocl_error = { version = "0.5", features = ["io", "serde_json"] }
 
 [dependencies]
 bollard-next = { version = "0.16.1" }
@@ -57,8 +57,8 @@ dialoguer = "0.11"
 termios = "0.3"
 liquid = { version = "0.26", features = ["stdlib"] }
 regex = "1.10"
-nanocld_client = { version = "0.15", features = ["tokio", "openssl"] }
-nanocl_error = { version = "0.4", features = [
+nanocld_client = { version = "0.16", features = ["tokio", "openssl"] }
+nanocl_error = { version = "0.5", features = [
   "io",
   "tokio",
   "http_client",
@@ -66,7 +66,7 @@ nanocl_error = { version = "0.4", features = [
   "bollard",
   "serde_yaml",
 ] }
-nanocl_utils = { version = "0.6", features = ["unix"] }
+nanocl_utils = { version = "0.7", features = ["unix"] }
 ctrlc = "3.4"
 toml = "0.8"
 ring = "0.17"

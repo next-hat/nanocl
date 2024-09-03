@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
 name = "ncproxy"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Official nanocl controller daemon proxy"
@@ -30,14 +30,14 @@ vendored = ["openssl/vendored"]
 [build-dependencies]
 clap = { version = "4.5", features = ["derive"] }
 clap_mangen = { version = "0.2" }
-nanocl_utils = { version = "0.6", features = ["build_tools"] }
+nanocl_utils = { version = "0.7", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
 bollard-next = "0.16.1"
 
 [dependencies]
-nanocl_error = { version = "0.4", features = [
+nanocl_error = { version = "0.5", features = [
   "io",
   "ntex",
   "http",
@@ -55,8 +55,8 @@ futures = "0.3"
 notify = { version = "6.1", default-features = false, features = [
   "macos_kqueue",
 ] }
-nanocld_client = { version = "0.15", features = ["tokio"] }
-nanocl_utils = { version = "0.6", features = ["ntex", "logger", "versioning"] }
+nanocld_client = { version = "0.16", features = ["tokio"] }
+nanocl_utils = { version = "0.7", features = ["ntex", "logger", "versioning"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 chrono = { version = "0.4", default-features = false, features = [
   "std",
