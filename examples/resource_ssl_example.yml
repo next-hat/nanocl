@@ -8,7 +8,7 @@ Resources:
   Data:
     Rules:
       - Domain: deploy-example.com
-        Network: Internal
+        Network: Local
         Ssl:
           Certificate: /random/path/to/cert
           CertificateKey: /random/path/to/key

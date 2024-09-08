@@ -9,13 +9,13 @@ Resources:
   Kind: ncproxy.io/rule
   Data:
     Rules:
-    - Network: Internal
+    - Network: Local
       Port: 8181
       Protocol: Tcp
       Target:
         Key: deploy-example2.global.c
         Port: 9000
-    - Network: Internal
+    - Network: Local
       Port: 8181
       Protocol: Tcp
       Target:
