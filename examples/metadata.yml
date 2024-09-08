@@ -12,7 +12,7 @@ Resources:
   Data:
     Rules:
     - Domain: deploy-example.com
-      Network: Internal
+      Network: Local
       Locations:
       - Path: /
         Target:

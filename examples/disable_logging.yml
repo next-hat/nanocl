@@ -10,7 +10,7 @@ Resources:
   Data:
     Rules:
     - Domain: deploy-example.internal
-      Network: Internal
+      Network: Local
       Locations:
       - Path: /
         Target:
