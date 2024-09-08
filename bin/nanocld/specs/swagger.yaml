@@ -4196,11 +4196,14 @@ components:
       - type: object
         required:
         - HostGateway
+        - Network
         - Config
         properties:
           HostGateway:
             type: string
             description: HostGateway is the gateway address of the host
+          Network:
+            $ref: '#/components/schemas/Network'
           Config:
             $ref: '#/components/schemas/DaemonConfig'
       description: HostInfo contains information about the host and the docker daemon
@@ -5764,9 +5767,14 @@ components:
           type: string
           description: The domain
           nullable: true
+        Port:
+          type: integer
+          format: int32
+          description: Port to listen on (default 80 or 443)
+          nullable: true
+          minimum: 0
         Network:
-          type: string
-          description: Type of private | public | internal | namespace:$namespace_name
+          $ref: '#/components/schemas/ProxyNetwork'
         LimitReqZone:
           allOf:
           - $ref: '#/components/schemas/LimitReqZone'
@@ -5797,8 +5805,7 @@ components:
       - Target
       properties:
         Network:
-          type: string
-          description: Type of the network binding private | public | internal | namespace:$namespace_name
+          $ref: '#/components/schemas/ProxyNetwork'
         Protocol:
           $ref: '#/components/schemas/ProxyStreamProtocol'
         Port:
