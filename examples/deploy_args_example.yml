@@ -14,7 +14,7 @@ Resources:
   Data:
     Rules:
     - Domain: ${{ Args.domain }}
-      Network: Internal
+      Network: Local
       Locations:
       - Path: /
         Target:
