@@ -9,7 +9,7 @@ Resources:
   Kind: ncproxy.io/rule
   Data:
     Rules:
-    - Network: Internal
+    - Network: Local
       Protocol: Tcp
       Port: 5555
       Target:
