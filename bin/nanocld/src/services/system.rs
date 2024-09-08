@@ -1,3 +1,4 @@
+use bollard_next::network::InspectNetworkOptions;
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -55,9 +56,15 @@ pub async fn get_info(
 ) -> HttpResult<web::HttpResponse> {
   let docker = state.inner.docker_api.info().await?;
   let host_gateway = state.inner.config.gateway.clone();
+  let network = state
+    .inner
+    .docker_api
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .await?;
   let info = HostInfo {
     docker,
     host_gateway,
+    network,
     config: state.inner.config.clone(),
   };
   Ok(web::HttpResponse::Ok().json(&info))
