@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bollard_next::service::SystemInfo;
+use bollard_next::{secret::Network, service::SystemInfo};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -134,6 +134,8 @@ pub struct HostInfo {
   pub docker: SystemInfo,
   /// HostGateway is the gateway address of the host
   pub host_gateway: String,
+  /// Network configuration
+  pub network: Network,
   /// Daemon configuration
   pub config: DaemonConfig,
 }

@@ -22,7 +22,7 @@ Rules:
       Port: 9000
 - Protocol: Tcp
   Port: 9998
-  Network: Private
+  Network: Internal
   Target:
     Key: ncproxy-test.global.c
     Port: 9000
@@ -34,20 +34,20 @@ Rules:
     Port: 9000
 - Protocol: Tcp
   Port: 9997
-  Network: Private
+  Network: Internal
   Target:
     Key: ncproxy-test.global.c
     Port: 9000
 - Protocol: Tcp
   Port: 9988
-  Network: Private
+  Network: Internal
   Ssl: test-secret
   Target:
     Key: ncproxy-test.global.c
     Port: 9000
 - Protocol: Udp
   Port: 9999
-  Network: Private
+  Network: Internal
   Ssl: test-secret
   Target:
     Key: ncproxy-test.global.c
