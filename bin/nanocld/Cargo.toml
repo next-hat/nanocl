@@ -88,5 +88,5 @@ notify = "6.1"
 ntex-cors = "2"
 rand = "0.8"
 openssl = { version = "0.10" }
-ipnet = { version = "2.9.0", features = ["serde"] }
+ipnet = { version = "2.10.0", features = ["serde"] }
 num_cpus = "1.16.0"
