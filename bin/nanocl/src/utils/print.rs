@@ -55,7 +55,7 @@ where
   T: serde::Serialize,
 {
   let toml = toml::to_string(&data).map_err(|err| {
-    IoError::new(
+    IoError::with_context(
       "Print toml",
       std::io::Error::new(std::io::ErrorKind::InvalidData, err),
     )

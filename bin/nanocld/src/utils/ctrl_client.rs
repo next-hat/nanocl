@@ -66,14 +66,13 @@ impl CtrlClient {
         .json::<serde_json::Value>()
         .await
         .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
-      let msg = body["msg"].as_str().ok_or(HttpError {
-        status: *status,
-        msg: String::default(),
-      })?;
-      return Err(HttpClientError::HttpError(HttpError {
-        status: *status,
-        msg: format!("{}: {msg}", self.name),
-      }));
+      let msg = body["msg"]
+        .as_str()
+        .ok_or(HttpError::new(*status, String::default()))?;
+      return Err(HttpClientError::HttpError(HttpError::new(
+        *status,
+        format!("{}: {msg}", self.name),
+      )));
     }
     Ok(())
   }
