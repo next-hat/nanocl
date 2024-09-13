@@ -18,7 +18,7 @@ jobs:
   ubuntu_e2e_test:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       # Clone project
@@ -59,4 +59,4 @@ jobs:
       # Run E2E tests
       - name: E2E
         run: |
-          bats ./tests/e2e.bats
+          bats --verbose-run ./tests/e2e.bats

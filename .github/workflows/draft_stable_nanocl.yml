@@ -13,8 +13,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release_nanocl_bin_linux:
-    runs-on: ubuntu-latest
+  release_image:
+    runs-on: ubuntu-24.04
     container: rust:1.82.0-alpine3.20
 
     steps:

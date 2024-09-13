@@ -18,7 +18,7 @@ jobs:
     name: Clippy
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository code
@@ -41,7 +41,7 @@ jobs:
 
   fmt:
     name: Fmt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
