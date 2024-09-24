@@ -262,6 +262,11 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
     .inner
     .task_manager
     .add_task(&task_key, action.clone(), task, move |err| {
+      log::error!(
+        "exec_event add_task: error {action} {} {:#?} {err}",
+        actor.kind,
+        actor.key
+      );
       let action = match action {
         NativeEventAction::Starting => NativeEventAction::Start,
         NativeEventAction::Stopping => NativeEventAction::Stop,
@@ -269,6 +274,19 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
         NativeEventAction::Destroying => NativeEventAction::Destroy,
         _ => return,
       };
+      let state = state_ptr.clone();
+      let key = actor.key.clone().unwrap_or_default();
+      rt::spawn(async move {
+        if let Err(err) = ObjPsStatusDb::update_actual_status(
+          &key,
+          &ObjPsStatusKind::Fail,
+          &state.inner.pool,
+        )
+        .await
+        {
+          log::error!("exec_event failed to change object status: {err}");
+        }
+      });
       state_ptr.emit_error_native_action(&actor, action, Some(err.to_string()));
     })
     .await;

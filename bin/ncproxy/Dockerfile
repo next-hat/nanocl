@@ -52,8 +52,8 @@ RUN export ARCH=$(uname -m) && \
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
 
-LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
-LABEL org.opencontainers.image.description Nanocl Controller Proxy
+LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
+LABEL org.opencontainers.image.description="Nanocl Controller Proxy"
 
 COPY --from=builder /bin/ncproxy /bin/ncproxy
 

@@ -74,3 +74,10 @@ impl From<&MetricNodePartial> for MetricDb {
     }
   }
 }
+
+/// Result of the query to find the best node to run workload
+#[derive(Debug, Selectable, Queryable, QueryableByName)]
+#[diesel(table_name = crate::schema::metrics)]
+pub struct MetricNodeDb {
+  pub node_name: String,
+}

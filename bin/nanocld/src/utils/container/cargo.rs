@@ -29,7 +29,7 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
         .unwrap_or(cargo.spec.container.image.clone().unwrap());
       before.image = Some(image.clone());
       before.host_config = Some(HostConfig {
-        network_mode: Some(cargo.namespace_name.clone()),
+        network_mode: Some("nanoclbr0".to_owned()),
         ..before.host_config.unwrap_or_default()
       });
       super::image::download(
