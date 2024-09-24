@@ -2293,9 +2293,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0670f267be315383b642e8eb947543ca9d32ec3c54f7fc84bf668c473479aa3"
+checksum = "ee6dff6ba7ca78f2b2ed6352a389694d84b6ea5ee411fd5c08561b1f5e45965a"
 dependencies = [
  "base64",
  "bitflags 2.6.0",
@@ -2332,9 +2332,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-async-std"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0755241ebac01bd919bf071cbfb4d2e6c3c74613f284cc9fcc6604b6fd949b60"
+checksum = "576023bde2355c67c5babc0c6f2bdc6ae4846962dc67a9710cfdb048800ca7b3"
 dependencies = [
  "async-std",
  "log",
@@ -2378,9 +2378,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-glommio"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af97a09ca3840c7b16ae537fea7f24d9e8117425dadd1b84c1141c22362828e7"
+checksum = "db981c642d1cf01569a3090a37bd9b25f849602fe9da68fd221121c1d7fda12d"
 dependencies = [
  "futures-lite 2.3.0",
  "glommio",
@@ -2428,9 +2428,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "2.3.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d70ba5f75e13e6c98060f18617aeab519e84432830054ae0a6532679e2108429"
+checksum = "ec68a2766bcc47426631e3461c8d7994f6eec194445f394ab61f83d92756ad12"
 dependencies = [
  "bitflags 2.6.0",
  "log",
@@ -2454,9 +2454,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-net"
-version = "2.1.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0990f6039444dc5e9a5dfe21226bc2699763011db918ed735bd0165698bed97"
+checksum = "02e13c469c8cccf7907480b24c9fd08558779b9f62e7f4885821e37179619c64"
 dependencies = [
  "log",
  "ntex-async-std",
@@ -2547,9 +2547,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tokio"
-version = "0.5.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5715ef31e5a599ab467846acd948ea597193fc08343338fdecbd1e5fe181af3d"
+checksum = "623868ff022f737d7b94212dc85e471f895e58f6c59c72552cdc9a22c5f167ed"
 dependencies = [
  "log",
  "ntex-bytes",
