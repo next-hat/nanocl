@@ -9,8 +9,6 @@ use crate::{
 
 use super::generic::*;
 
-// impl ObjTask for VmDb {}
-
 impl ObjTaskStart for VmDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
@@ -22,9 +20,10 @@ impl ObjTaskStart for VmDb {
       let processes =
         ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
       if processes.is_empty() {
-        utils::container::create_vm_instance(&vm, &image, true, &state).await?;
+        utils::container::vm::create_vm_instance(&vm, &image, true, &state)
+          .await?;
       }
-      utils::container::start_instances(
+      utils::container::process::start_instances(
         &vm.spec.vm_key,
         &ProcessKind::Vm,
         &state,
@@ -40,7 +39,8 @@ impl ObjTaskStop for VmDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
-      utils::container::stop_instances(&key, &ProcessKind::Vm, &state).await?;
+      utils::container::process::stop_instances(&key, &ProcessKind::Vm, &state)
+        .await?;
       Ok::<_, IoError>(())
     })
   }
@@ -54,7 +54,7 @@ impl ObjTaskDelete for VmDb {
       let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
       let processes =
         ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
-      utils::container::delete_instances(
+      utils::container::process::delete_instances(
         &processes
           .into_iter()
           .map(|p| p.key)
@@ -81,9 +81,16 @@ impl ObjTaskUpdate for VmDb {
       let container_name = format!("{}.v", &vm.spec.vm_key);
       let image =
         VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
-      utils::container::delete_instances(&[container_name], &state).await?;
-      utils::container::create_vm_instance(&vm, &image, false, &state).await?;
-      utils::container::start_instances(&key, &ProcessKind::Vm, &state).await?;
+      utils::container::process::delete_instances(&[container_name], &state)
+        .await?;
+      utils::container::vm::create_vm_instance(&vm, &image, false, &state)
+        .await?;
+      utils::container::process::start_instances(
+        &key,
+        &ProcessKind::Vm,
+        &state,
+      )
+      .await?;
       Ok::<_, IoError>(())
     })
   }
