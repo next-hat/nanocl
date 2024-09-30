@@ -380,6 +380,13 @@ async fn create_job_instance(
   let mut labels = container.labels.clone().unwrap_or_default();
   labels.insert("io.nanocl.j".to_owned(), name.to_owned());
   container.labels = Some(labels);
+  let host_config = container.host_config.clone().unwrap_or_default();
+  container.host_config = Some(HostConfig {
+    network_mode: Some(
+      host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
+    ),
+    ..host_config
+  });
   let short_id = super::key::generate_short_id(6);
   let container_name = format!("{name}-{index}-{short_id}.j");
   process::create(&ProcessKind::Job, &container_name, name, &container, state)

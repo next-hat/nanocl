@@ -35,6 +35,10 @@ impl ObjTaskStart for CargoDb {
       let processes =
         ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
           .await?;
+      // TODO: FIND BEST NODES TO RUN WORKLOAD
+      // let nodes =
+      //   MetricDb::find_best_nodes(90.0, 90.0, 100, &state.inner.pool).await?;
+      // log::debug!("BEST NODES FOR CARGO {key}: {nodes:?}");
       if processes.is_empty() {
         let number = match &cargo.spec.replication {
           Some(ReplicationMode::Static(replication)) => replication.number,
@@ -135,11 +139,11 @@ impl ObjTaskUpdate for CargoDb {
       let new_instances =
         match utils::container::cargo::create(&cargo, number, &state).await {
           Err(err) => {
-            log::warn!(
+            log::error!(
               "Unable to create cargo instance {} : {err}",
               cargo.spec.cargo_key
             );
-            Vec::default()
+            return Err(err.into());
           }
           Ok(instances) => instances,
         };

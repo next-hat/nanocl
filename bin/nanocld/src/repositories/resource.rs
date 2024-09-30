@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use jsonschema::{Draft, JSONSchema};
+use jsonschema::{Draft, Validator};
 use nanocl_error::{
   http::{HttpError, HttpResult},
   io::IoResult,
@@ -192,7 +192,7 @@ impl ResourceDb {
   /// It call a custom controller at a specific url or just validate a schema.
   /// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
   /// To call a custom controller, the resource Kind must have a Url field in his config.
-  /// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
+  /// Unless it must have a Schema field in his config that is a Validator to validate the resource.
   pub async fn hook_create(
     resource: &ResourcePartial,
     pool: &Pool,
@@ -204,9 +204,9 @@ impl ResourceDb {
       .await?
       .try_into()?;
     if let Some(schema) = &kind.data.schema {
-      let schema: JSONSchema = JSONSchema::options()
+      let schema: Validator = Validator::options()
         .with_draft(Draft::Draft7)
-        .compile(schema)
+        .build(schema)
         .map_err(|err| {
           HttpError::bad_request(format!("Invalid schema {}", err))
         })?;
