@@ -46,7 +46,7 @@ impl ObjTaskStart for CargoDb {
         };
         utils::container::cargo::create(&cargo, number, &state).await?;
       }
-      utils::container::start_instances(
+      utils::container::process::start_instances(
         &cargo.spec.cargo_key,
         &ProcessKind::Cargo,
         &state,
@@ -148,8 +148,12 @@ impl ObjTaskUpdate for CargoDb {
           Ok(instances) => instances,
         };
       // start created containers
-      match utils::container::start_instances(&key, &ProcessKind::Cargo, &state)
-        .await
+      match utils::container::process::start_instances(
+        &key,
+        &ProcessKind::Cargo,
+        &state,
+      )
+      .await
       {
         Err(err) => {
           log::error!(
@@ -157,7 +161,7 @@ impl ObjTaskUpdate for CargoDb {
             cargo.spec.cargo_key
           );
           let state_ptr_ptr = state.clone();
-          let _ = utils::container::delete_instances(
+          let _ = utils::container::process::delete_instances(
             &new_instances
               .iter()
               .map(|p| p.key.clone())
@@ -196,7 +200,7 @@ impl ObjTaskUpdate for CargoDb {
           let state_ptr_ptr = state.clone();
           rt::spawn(async move {
             ntex::time::sleep(std::time::Duration::from_secs(4)).await;
-            let _ = utils::container::delete_instances(
+            let _ = utils::container::process::delete_instances(
               &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
               &state_ptr_ptr,
             )
@@ -223,8 +227,12 @@ impl ObjTaskStop for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
-      utils::container::stop_instances(&key, &ProcessKind::Cargo, &state)
-        .await?;
+      utils::container::process::stop_instances(
+        &key,
+        &ProcessKind::Cargo,
+        &state,
+      )
+      .await?;
       Ok::<_, IoError>(())
     })
   }

@@ -17,8 +17,6 @@ use crate::{
 
 use super::generic::*;
 
-// impl ObjTask for JobDb {}
-
 impl ObjTaskStart for JobDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
@@ -29,7 +27,7 @@ impl ObjTaskStart for JobDb {
         ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
       if processes.is_empty() {
         processes =
-          utils::container::create_job_instances(&job, &state).await?;
+          utils::container::job::create_job_instances(&job, &state).await?;
       }
       ObjPsStatusDb::update_actual_status(
         &key,
@@ -73,7 +71,7 @@ impl ObjTaskDelete for JobDb {
       let job = JobDb::transform_read_by_pk(&key, &state.inner.pool).await?;
       let processes =
         ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
-      utils::container::delete_instances(
+      utils::container::process::delete_instances(
         &processes
           .iter()
           .map(|p| p.key.clone())
@@ -99,7 +97,12 @@ impl ObjTaskStop for JobDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
-      utils::container::stop_instances(&key, &ProcessKind::Job, &state).await?;
+      utils::container::process::stop_instances(
+        &key,
+        &ProcessKind::Job,
+        &state,
+      )
+      .await?;
       Ok::<_, IoError>(())
     })
   }

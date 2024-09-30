@@ -38,7 +38,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   let instances =
     ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
   let (_, instance_failed, _, running) =
-    utils::container::count_status(&instances);
+    utils::container::generic::count_status(&instances);
   log::debug!(
     "event::job_ttl: {} has {running} running instances",
     job.name
@@ -261,7 +261,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   state
     .inner
     .task_manager
-    .add_task(&task_key, action.clone(), task, move |err| {
+    .add_task(&task_key, action.clone(), task, |err| async move {
       log::error!(
         "exec_event add_task: error {action} {} {:#?} {err}",
         actor.kind,
@@ -270,24 +270,20 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
       let action = match action {
         NativeEventAction::Starting => NativeEventAction::Start,
         NativeEventAction::Stopping => NativeEventAction::Stop,
-        NativeEventAction::Updating => NativeEventAction::Start,
+        NativeEventAction::Updating => NativeEventAction::Update,
         NativeEventAction::Destroying => NativeEventAction::Destroy,
-        _ => return,
+        _ => return Ok(()),
       };
       let state = state_ptr.clone();
       let key = actor.key.clone().unwrap_or_default();
-      rt::spawn(async move {
-        if let Err(err) = ObjPsStatusDb::update_actual_status(
-          &key,
-          &ObjPsStatusKind::Fail,
-          &state.inner.pool,
-        )
-        .await
-        {
-          log::error!("exec_event failed to change object status: {err}");
-        }
-      });
+      ObjPsStatusDb::update_actual_status(
+        &key,
+        &ObjPsStatusKind::Fail,
+        &state.inner.pool,
+      )
+      .await?;
       state_ptr.emit_error_native_action(&actor, action, Some(err.to_string()));
+      Ok(())
     })
     .await;
   Ok(())
