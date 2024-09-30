@@ -1272,13 +1272,13 @@ checksum = "32085ea23f3234fc7846555e85283ba4de91e21016dc0455a16286d87a292d64"
 
 [[package]]
 name = "glommio"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1f09bf53139d5680da6325b4e79c6bc1518e94a65ab74df14b7e3693a8c78b"
+checksum = "e1f8bc1fce949d18098dc0a4e861314e40351a0144ebf61e59bdb5254a2273b2"
 dependencies = [
  "ahash 0.7.8",
  "backtrace",
- "bitflags 1.3.2",
+ "bitflags 2.6.0",
  "bitmaps",
  "buddy-alloc",
  "cc",
@@ -1292,7 +1292,7 @@ dependencies = [
  "libc",
  "lockfree",
  "log",
- "nix 0.23.2",
+ "nix 0.27.1",
  "pin-project-lite",
  "rlimit",
  "scoped-tls",
@@ -1607,7 +1607,7 @@ version = "0.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "189d0897e4cbe8c75efedf3502c18c887b05046e59d28404d4d8e46cbc4d1e86"
 dependencies = [
- "memoffset 0.9.1",
+ "memoffset",
 ]
 
 [[package]]
@@ -1844,15 +1844,6 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
-
-[[package]]
-name = "memoffset"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
 
 [[package]]
 name = "memoffset"
@@ -2169,15 +2160,14 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.23.2"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3790c00a0150112de0f4cd161e3d7fc4b2d8a5542ffc35f099a2562aecb35c"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
 dependencies = [
- "bitflags 1.3.2",
- "cc",
+ "bitflags 2.6.0",
  "cfg-if",
  "libc",
- "memoffset 0.6.5",
+ "memoffset",
 ]
 
 [[package]]
@@ -2223,9 +2213,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32c07038be98195e5ef0a912720d3d1388e319e55f74e86fe99f994d2ad46a2a"
+checksum = "93daf570cdedb9a01a3020ccd367b2ff37402b30c979aff2da23e3e84d2b6cfc"
 dependencies = [
  "base64",
  "bitflags 2.6.0",
@@ -2308,9 +2298,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-glommio"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db981c642d1cf01569a3090a37bd9b25f849602fe9da68fd221121c1d7fda12d"
+checksum = "72c46a5fd03ae56b5828a919c1acecfdb7ee3fd3ff1288329e40e996a9b3def2"
 dependencies = [
  "futures-lite 2.3.0",
  "glommio",
@@ -2384,9 +2374,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-net"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bd6dd674c3040f0eae3b57379a6ef73c277de4e65fd61e0666317b90dd63559"
+checksum = "02f3d87616c8fc39c41d432402d98a118861e8e144df30037fe1400cdd29ac35"
 dependencies = [
  "log",
  "ntex-async-std",
@@ -2416,9 +2406,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-rt"
-version = "0.4.17"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1999924bc0fed3271b05c0dc64b5508bd7fb6ed1280ba248d7a4a0648a1db6e0"
+checksum = "1d24cfad65aab77e56ee1f1a218ca248c141a22f6f65aba8ed56037ec3c6f3a4"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",
