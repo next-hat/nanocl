@@ -75,7 +75,7 @@ impl ObjInspectByPk for JobDb {
     let job = JobDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let instances = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
     let (instance_total, instance_failed, instance_success, instance_running) =
-      utils::container::count_status(&instances);
+      utils::container::generic::count_status(&instances);
     let job_inspect = JobInspect {
       spec: job,
       instance_total,
