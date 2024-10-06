@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
