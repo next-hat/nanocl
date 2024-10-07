@@ -1,25 +1,29 @@
 use std::collections::HashMap;
 
 use bollard_next::secret::{DeviceMapping, HostConfig};
-use nanocl_error::http::HttpResult;
+
+use nanocl_error::io::IoResult;
 use nanocl_stubs::{
   generic::ImagePullPolicy,
   process::{Process, ProcessKind},
+  system::NativeEventAction,
   vm::Vm,
 };
 
 use crate::{
-  models::{SystemState, VmImageDb},
-  vars,
+  models::{ProcessDb, SystemState, VmDb, VmImageDb},
+  repositories::generic::*,
+  utils, vars,
 };
 
-/// Create a VM instance from a VM image
-pub async fn create_vm_instance(
+/// Create a VM instance
+///
+pub async fn create_instance(
   vm: &Vm,
   image: &VmImageDb,
   disable_keygen: bool,
   state: &SystemState,
-) -> HttpResult<Process> {
+) -> IoResult<Process> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let img_path = format!("{}/vms/images", state.inner.config.state_dir);
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
@@ -129,4 +133,54 @@ pub async fn create_vm_instance(
   )
   .await?;
   Ok(process)
+}
+
+/// Start VM instance
+///
+pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
+  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  let image =
+    VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
+  if processes.is_empty() {
+    create_instance(&vm, &image, true, state).await?;
+  }
+  super::process::start_instances(&vm.spec.vm_key, &ProcessKind::Vm, state)
+    .await?;
+  Ok(())
+}
+
+/// Delete VM instance and the VM itself from the database
+///
+pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
+  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(key, &state.inner.pool).await?;
+  super::process::delete_instances(
+    &processes
+      .into_iter()
+      .map(|p| p.key)
+      .collect::<Vec<String>>(),
+    state,
+  )
+  .await?;
+  utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
+  VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  state
+    .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
+    .await;
+  Ok(())
+}
+
+/// Update the VM
+///
+pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
+  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  let container_name = format!("{}.v", &vm.spec.vm_key);
+  let image =
+    VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
+  super::process::delete_instances(&[container_name], state).await?;
+  create_instance(&vm, &image, false, state).await?;
+  super::process::start_instances(key, &ProcessKind::Vm, state).await?;
+  Ok(())
 }
