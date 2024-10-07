@@ -1,4 +1,4 @@
-use nanocl_error::http::HttpResult;
+use nanocl_error::io::IoResult;
 use nanocl_stubs::{
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
@@ -19,7 +19,7 @@ pub async fn emit(
   kind: &ProcessKind,
   action: NativeEventAction,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   match kind {
     ProcessKind::Vm => {
       let vm = VmDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
@@ -96,7 +96,7 @@ pub async fn emit_starting(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   log::debug!("starting {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
@@ -124,7 +124,7 @@ pub async fn emit_stopping(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   log::debug!("stopping {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;

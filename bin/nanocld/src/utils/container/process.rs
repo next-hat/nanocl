@@ -4,10 +4,7 @@ use bollard_next::container::{
 };
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use nanocl_error::{
-  http::{HttpError, HttpResult},
-  io::FromIo,
-};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   cargo::CargoKillOptions,
   process::{Process, ProcessKind, ProcessPartial},
@@ -26,7 +23,7 @@ pub async fn create(
   kind_key: &str,
   item: &Config,
   state: &SystemState,
-) -> HttpResult<Process> {
+) -> IoResult<Process> {
   let mut config = item.clone();
   let mut labels = item.labels.to_owned().unwrap_or_default();
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
@@ -42,12 +39,14 @@ pub async fn create(
       }),
       config,
     )
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
   let inspect = state
     .inner
     .docker_api
     .inspect_container(&res.id, None::<InspectContainerOptions>)
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
   let created_at = inspect.created.clone().unwrap_or_default();
   let new_instance = ProcessPartial {
     key: res.id,
@@ -63,13 +62,17 @@ pub async fn create(
         "%Y-%m-%dT%H:%M:%S%.fZ",
       )
       .map_err(|err| {
-        HttpError::internal_server_error(format!("Unable to parse date {err}"))
+        IoError::interrupted(
+          "CreateProcess",
+          &format!("Error while creating process {err}"),
+        )
       })?,
     ),
   };
   let process =
     ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
-  Process::try_from(process).map_err(HttpError::from)
+  Process::try_from(process)
+    .map_err(|err| err.map_err_context(|| "CreateProcess"))
 }
 
 /// Delete a single instance (container) by his name
@@ -77,7 +80,7 @@ pub async fn delete_instance(
   pk: &str,
   opts: Option<RemoveContainerOptions>,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   match state.inner.docker_api.remove_container(pk, opts).await {
     Ok(_) => {}
     Err(err) => match &err {
@@ -87,12 +90,18 @@ pub async fn delete_instance(
       } => {
         log::error!("Error while deleting container {pk}: {err}");
         if *status_code != 404 {
-          return Err(err.into());
+          return Err(IoError::interrupted(
+            "DeleteProcess",
+            &format!("Error while deleting container {pk}: {err}"),
+          ));
         }
       }
       _ => {
         log::error!("Error while deleting container {pk}: {err}");
-        return Err(err.into());
+        return Err(IoError::interrupted(
+          "DeleteProcess",
+          &format!("Error while deleting container {pk}: {err}"),
+        ));
       }
     },
   };
@@ -104,7 +113,7 @@ pub async fn delete_instance(
 pub async fn delete_instances(
   instances: &[String],
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   instances
     .iter()
     .map(|id| async {
@@ -119,10 +128,10 @@ pub async fn delete_instances(
       .await
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<HttpResult<()>>>()
+    .collect::<Vec<IoResult<()>>>()
     .await
     .into_iter()
-    .collect::<HttpResult<()>>()
+    .collect::<IoResult<()>>()
 }
 
 /// Kill instances (containers) by their kind key
@@ -131,14 +140,15 @@ pub async fn kill_by_kind_key(
   pk: &str,
   opts: &CargoKillOptions,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
       .docker_api
       .kill_container(&process.key, Some(opts.clone().into()))
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "KillProcess"))?;
   }
   Ok(())
 }
@@ -150,14 +160,15 @@ pub async fn restart_instances(
   pk: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
       .docker_api
       .restart_container(&process.key, None)
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "RestartProcess"))?;
   }
   super::generic::emit(pk, kind, NativeEventAction::Restart, state).await?;
   Ok(())
@@ -170,7 +181,7 @@ pub async fn stop_instances(
   kind_pk: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   let processes =
     ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");
@@ -182,7 +193,8 @@ pub async fn stop_instances(
         &process.data.id.unwrap_or_default(),
         None::<StopContainerOptions>,
       )
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "StopProcess"))?;
   }
   ObjPsStatusDb::update_actual_status(
     kind_pk,
@@ -201,7 +213,7 @@ pub async fn start_instances(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> IoResult<()> {
   let processes =
     ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
   for process in processes {
@@ -212,7 +224,8 @@ pub async fn start_instances(
         &process.data.id.unwrap_or_default(),
         None::<StartContainerOptions<String>>,
       )
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "StartProcess"))?;
   }
   ObjPsStatusDb::update_actual_status(
     kind_key,
