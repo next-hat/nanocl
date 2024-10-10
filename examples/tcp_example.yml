@@ -9,13 +9,13 @@ Resources:
   Kind: ncproxy.io/rule
   Data:
     Rules:
-    - Network: Internal
+    - Network: Local
       Protocol: Tcp
       Port: 9000
       Target:
         Key: tcp-example.global.c
         Port: 9000
-    - Network: Internal
+    - Network: Local
       Protocol: Tcp
       Port: 9001
       Target:

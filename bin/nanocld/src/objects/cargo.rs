@@ -92,7 +92,8 @@ impl ObjDelByPk for CargoDb {
     let processes =
       ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
         .await?;
-    let (_, _, _, running) = utils::container::count_status(&processes);
+    let (_, _, _, running) =
+      utils::container::generic::count_status(&processes);
     if running > 0 && !opts.force.unwrap_or(false) {
       return Err(HttpError::bad_request(
         "Unable to delete cargo with running instances without force option",
@@ -273,7 +274,7 @@ impl ObjInspectByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
     let (_, _, _, running_instances) =
-      utils::container::count_status(&processes);
+      utils::container::generic::count_status(&processes);
     let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     Ok(CargoInspect {
       created_at: cargo.created_at,

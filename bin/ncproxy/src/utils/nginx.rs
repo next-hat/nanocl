@@ -146,12 +146,18 @@ pub async fn add_rule(
       }
       ProxyRule::Http(http_rule) => {
         let mut locations = vec![];
-        let listen =
-          super::rule::get_network_addr(&http_rule.network, 80, &state.client)
-            .await?;
-        let listen_https =
-          super::rule::get_network_addr(&http_rule.network, 443, &state.client)
-            .await?;
+        let listen = super::rule::get_network_addr(
+          &http_rule.network,
+          http_rule.port.unwrap_or(80),
+          &state.client,
+        )
+        .await?;
+        let listen_https = super::rule::get_network_addr(
+          &http_rule.network,
+          http_rule.port.unwrap_or(443),
+          &state.client,
+        )
+        .await?;
         let ssl = match &http_rule.ssl {
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {

@@ -161,7 +161,7 @@ impl JobDb {
           instance_failed,
           instance_success,
           instance_running,
-        ) = utils::container::count_status(&instances);
+        ) = utils::container::generic::count_status(&instances);
         Ok::<_, HttpError>(JobSummary {
           instance_total,
           instance_success,

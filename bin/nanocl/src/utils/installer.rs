@@ -15,10 +15,10 @@ async fn get() -> HttpClientResult<String> {
   })?;
   let status = res.status();
   if status.is_server_error() || status.is_client_error() {
-    return Err(HttpClientError::HttpError(HttpError {
+    return Err(HttpClientError::HttpError(HttpError::new(
       status,
-      msg: "Unable to fetch installer template".into(),
-    }));
+      "Unable to fetch installer template",
+    )));
   }
   let body = res.body().await.map_err(|err| {
     err.map_err_context(|| "Unable to fetch installer template")
