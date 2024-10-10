@@ -6,6 +6,8 @@ use bollard_next::{
   secret::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
 };
 use futures::{stream::FuturesUnordered, StreamExt};
+use ntex::rt;
+
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
@@ -14,7 +16,6 @@ use nanocl_stubs::{
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
 };
-use ntex::rt;
 
 use crate::{
   models::{CargoDb, ObjPsStatusDb, ProcessDb, SecretDb, SystemState},
@@ -24,17 +25,23 @@ use crate::{
 
 /// Function that execute the init container before the main cargo container
 ///
-async fn init_container(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
+async fn init_container(
+  cargo: &Cargo,
+  state: &SystemState,
+) -> IoResult<Option<Process>> {
   match cargo.spec.init_container.clone() {
     Some(mut before) => {
       let image = before
         .image
         .clone()
         .unwrap_or(cargo.spec.container.image.clone().unwrap());
+      let host_config = before.host_config.unwrap_or_default();
       before.image = Some(image.clone());
       before.host_config = Some(HostConfig {
-        network_mode: Some("nanoclbr0".to_owned()),
-        ..before.host_config.unwrap_or_default()
+        network_mode: Some(
+          host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
+        ),
+        ..host_config
       });
       super::image::download(
         &image,
@@ -58,7 +65,7 @@ async fn init_container(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
         "init-{}-{}.{}.c",
         cargo.spec.name, short_id, cargo.namespace_name
       );
-      super::process::create(
+      let process = super::process::create(
         &ProcessKind::Cargo,
         &name,
         &cargo.spec.cargo_key,
@@ -89,22 +96,22 @@ async fn init_container(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
                 None => "Unknown error".to_owned(),
               };
               return Err(IoError::interrupted(
-                "Cargo",
-                &format!("Error while waiting for init container: {error}"),
+                "InitContainer",
+                &format!("{error} {}", wait_status.status_code),
               ));
             }
           }
           Err(err) => {
             return Err(IoError::interrupted(
-              "Cargo",
-              &format!("Error while waiting for init container: {err}"),
+              "InitContainer",
+              &format!("{err}"),
             ));
           }
         }
       }
-      Ok(())
+      Ok(Some(process))
     }
-    None => Ok(()),
+    None => Ok(None),
   }
 }
 
@@ -116,7 +123,7 @@ pub async fn create(
   number: usize,
   state: &SystemState,
 ) -> IoResult<Vec<Process>> {
-  init_container(cargo, state).await?;
+  let init_instance = init_container(cargo, state).await?;
   super::image::download(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo.spec.image_pull_secret.clone(),
@@ -141,7 +148,7 @@ pub async fn create(
     // Flatten the secrets to have envs in a single vector
     secret_envs = secrets.into_iter().flatten().collect();
   }
-  (0..number)
+  let mut instances = (0..number)
     .collect::<Vec<usize>>()
     .into_iter()
     .map(move |current| {
@@ -227,7 +234,11 @@ pub async fn create(
     .collect::<Vec<IoResult<Process>>>()
     .await
     .into_iter()
-    .collect::<IoResult<Vec<Process>>>()
+    .collect::<IoResult<Vec<Process>>>()?;
+  if let Some(init_instance) = init_instance {
+    instances.insert(0, init_instance);
+  }
+  Ok(instances)
 }
 
 /// Start cargo instances
@@ -313,6 +324,7 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     }
     Ok(instances) => instances,
   };
+  log::debug!("cargo new instances {new_instances:?}");
   // start created containers
   match super::process::start_instances(key, &ProcessKind::Cargo, state).await {
     Err(err) => {
