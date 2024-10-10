@@ -15,14 +15,32 @@ async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
   Ok(info.host_gateway)
 }
 
+/// Get address of nanoclbr0 network
+async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
+  let info = client
+    .info()
+    .await
+    .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
+  let ipam = info.network.ipam.unwrap_or_default();
+  let ipam_config = ipam.config.unwrap_or_default();
+  let Some(network) = ipam_config.first() else {
+    return Err(IoError::invalid_data(
+      "Network",
+      "No network found for nanoclbr0",
+    ));
+  };
+  Ok(network.gateway.clone().unwrap_or_default())
+}
+
 /// Get network address of given network
 async fn get_network_addr(
   network: &str,
   client: &NanocldClient,
 ) -> IoResult<String> {
   let addr = match network {
-    "Private" => "127.0.0.1".into(),
+    "Local" => "127.0.0.1".to_owned(),
     "Public" => get_host_addr(client).await?,
+    "Internal" => get_bridge_addr(client).await?,
     _ => {
       return Err(IoError::invalid_input(
         "Network",
@@ -76,6 +94,7 @@ pub(crate) async fn update_entries(
     let ip_address = match entry.ip_address.as_str() {
       "Public" => get_host_addr(client).await?,
       "Private" => "127.0.0.1".into(),
+      "Internal" => get_bridge_addr(client).await?,
       _ => entry.ip_address.clone(),
     };
     let entry = &format!("address=/{}/{}", entry.name, ip_address);
@@ -94,7 +113,7 @@ pub(crate) async fn remove_entries(
   client: &NanocldClient,
 ) -> IoResult<()> {
   let content = dnsmasq.read_config(&dns_rule.network).await?;
-  println!("{}", content);
+  log::debug!("{}", content);
   let mut file_content = String::new();
   let lines = content.lines();
   let listen_address = get_network_addr(&dns_rule.network, client).await?;
@@ -104,7 +123,7 @@ pub(crate) async fn remove_entries(
     for entry in &dns_rule.entries {
       if line.starts_with(&format!("address=/{}/", entry.name)) {
         found = true;
-        println!("Found {}", line);
+        log::debug!("Found {}", line);
         break;
       }
     }
@@ -112,7 +131,7 @@ pub(crate) async fn remove_entries(
       file_content.push_str(&format!("{line}\n"));
     }
   }
-  println!("{}", file_content);
+  log::debug!("{}", file_content);
   if file_content == empty_entries {
     dnsmasq.remove_config(&dns_rule.network).await?;
     return Ok(());

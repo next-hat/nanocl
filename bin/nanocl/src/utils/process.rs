@@ -71,10 +71,11 @@ pub async fn wait_process_state(
   let fut = rt::spawn(async move {
     while let Some(event) = stream.next().await {
       let event = event?;
-      let Some(actor) = event.actor else {
+      let Some(actor) = &event.actor else {
         continue;
       };
-      if event.kind == EventKind::Error && actor.key.unwrap_or_default() == key
+      if event.kind == EventKind::Error
+        && actor.key.clone().unwrap_or_default() == key
       {
         return Err(IoError::interrupted(
           "Error",

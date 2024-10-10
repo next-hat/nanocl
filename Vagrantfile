@@ -1,6 +1,9 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+
+num_node = 3
+
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
@@ -9,10 +12,25 @@ Vagrant.configure("2") do |config|
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
+
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
+  config.vm.box = "debian/bullseye64"
 
-  config.vm.synced_folder ".", "/vagrant"
+  config.vm.provider :virtualbox do |domain|
+    domain.memory = 4096
+    domain.cpus = 4
+  end
+
+  config.vm.provider :libvirt do |domain|
+    domain.memory = 4069
+    domain.cpus = 4
+  end
+
+  # config.vm.synced_folder ".", "/vagrant"
+
+  config.vm.synced_folder "./", "/vagrant", type: "rsync", rsync__auto: true, rsync__exclude: ['target']
+
 
   # Setup docker and build tools
   config.vm.provision "shell", inline: <<-SHELL
@@ -37,30 +55,14 @@ Vagrant.configure("2") do |config|
     echo "export PATH=$PATH:$HOME/.cargo/bin" >> ~/.bashrc
   SHELL
 
-  config.vm.define "node1" do |node1|
-    node1.vm.box = "debian/bullseye64"
-    config.vm.hostname = "nanocl-n1"
-    node1.vm.provider :libvirt do |domain|
-      domain.memory = 8096
-      domain.cpus = 4
-    end
-  end
-
-  config.vm.define "node2" do |node2|
-    node2.vm.box = "debian/bullseye64"
-    config.vm.hostname = "nanocl-n2"
-    node2.vm.provider :libvirt do |domain|
-      domain.memory = 8096
-      domain.cpus = 4
-    end
-  end
-
-  config.vm.define "node3" do |node3|
-    node3.vm.box = "debian/bullseye64"
-    config.vm.hostname = "nanocl-n3"
-    node3.vm.provider :libvirt do |domain|
-      domain.memory = 8096
-      domain.cpus = 4
+  (1..num_node) .each do |n|
+    #a lAB in the 192.168.56.0/24range
+    lan_ip = "192.168.56.#{n+40}"
+    port_forwarded = 9494 + n
+    config.vm.define "node#{n}" do |config|
+      config.vm.hostname = "nanocl-n#{n}"
+      config.vm.network "private_network", ip: lan_ip, virtualbox__intnet: "true"
+      config.vm.network "forwarded_port", guest: 8585, host: port_forwarded, protocol: "tcp"
     end
   end
 end

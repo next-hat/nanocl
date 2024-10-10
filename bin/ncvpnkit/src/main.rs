@@ -8,7 +8,8 @@ use vpnkitrc::stubs::*;
 
 use nanocl_utils::logger;
 use nanocld_client::stubs::proxy::{
-  ProxyRule, ProxyRuleStream, ProxyStreamProtocol, ResourceProxyRule,
+  ProxyNetwork, ProxyRule, ProxyRuleStream, ProxyStreamProtocol,
+  ResourceProxyRule,
 };
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::system::{Event, EventActorKind, NativeEventAction};
@@ -120,8 +121,8 @@ async fn on_event(
       let r_proxy_rule = resource_to_proxy_rule(&resource)?;
       for rule in r_proxy_rule.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
-          match stream.network.as_str() {
-            "Public" | "All" => {}
+          match stream.network {
+            ProxyNetwork::All | ProxyNetwork::Public => {}
             _ => continue,
           }
           let port = rule_stream_to_vpnkit_port(&stream);
@@ -138,8 +139,8 @@ async fn on_event(
         .map_err(|err| err.map_err_context(|| "ncproxy.io/rule"))?;
       for rule in resource.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
-          match stream.network.as_str() {
-            "Public" | "All" => {}
+          match stream.network {
+            ProxyNetwork::All | ProxyNetwork::Public => {}
             _ => continue,
           }
           let port = rule_stream_to_vpnkit_port(&stream);

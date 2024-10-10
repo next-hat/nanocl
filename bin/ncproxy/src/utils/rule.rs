@@ -4,7 +4,8 @@ use nanocld_client::{
   stubs::{
     process::Process,
     proxy::{
-      ProxySsl, ProxySslConfig, StreamTarget, UnixTarget, UpstreamTarget,
+      ProxyNetwork, ProxySsl, ProxySslConfig, StreamTarget, UnixTarget,
+      UpstreamTarget,
     },
   },
   NanocldClient,
@@ -21,6 +22,23 @@ async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
     .await
     .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
   Ok(info.host_gateway)
+}
+
+/// Get address of nanoclbr0 network
+async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
+  let info = client
+    .info()
+    .await
+    .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
+  let ipam = info.network.ipam.unwrap_or_default();
+  let ipam_config = ipam.config.unwrap_or_default();
+  let Some(network) = ipam_config.first() else {
+    return Err(IoError::invalid_data(
+      "Network",
+      "No network found for nanoclbr0",
+    ));
+  };
+  Ok(network.gateway.clone().unwrap_or_default())
 }
 
 fn parse_upstream_target(key: &str) -> IoResult<(String, String, String)> {
@@ -76,21 +94,22 @@ pub async fn get_addresses(
 }
 
 pub async fn get_network_addr(
-  network: &str,
+  network: &ProxyNetwork,
   port: u16,
   client: &NanocldClient,
 ) -> IoResult<String> {
   match network {
-    "All" => Ok(format!("{port}")),
-    "Public" => {
+    ProxyNetwork::All => Ok(format!("{port}")),
+    ProxyNetwork::Public => {
       let ip = get_host_addr(client).await?;
       Ok(format!("{ip}:{port}"))
     }
-    "Private" => Ok(format!("127.0.0.1:{port}")),
-    _ => Err(IoError::invalid_data(
-      "Network",
-      &format!("invalid network {network}"),
-    )),
+    ProxyNetwork::Local => Ok(format!("127.0.0.1:{port}")),
+    ProxyNetwork::Internal => {
+      let ip = get_bridge_addr(client).await?;
+      Ok(format!("{ip}:{port}"))
+    }
+    ProxyNetwork::Other(ip) => Ok(format!("{ip}:{port}")),
   }
 }
 
