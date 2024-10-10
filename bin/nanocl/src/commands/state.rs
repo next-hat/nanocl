@@ -655,8 +655,8 @@ async fn state_apply(
         waiter.await??;
         pg.set_message("(cleared)");
       }
-      client.create_job(&job).await?;
       pg.set_message("(creating)");
+      client.create_job(&job).await?;
       let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
