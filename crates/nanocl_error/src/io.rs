@@ -1,6 +1,15 @@
 use std::sync::{PoisonError, TryLockError};
 
 #[derive(Debug)]
+#[cfg(feature = "backtrace")]
+pub struct IoError {
+  pub backtrace: std::backtrace::Backtrace,
+  pub context: Option<String>,
+  pub inner: std::io::Error,
+}
+
+#[cfg(not(feature = "backtrace"))]
+#[derive(Debug)]
 pub struct IoError {
   pub context: Option<String>,
   pub inner: std::io::Error,
@@ -8,36 +17,44 @@ pub struct IoError {
 
 impl Clone for IoError {
   fn clone(&self) -> Self {
-    Self {
-      context: self.context.clone(),
-      inner: std::io::Error::new(self.inner.kind(), self.inner.to_string()),
-    }
+    Self::new(
+      self.context.clone(),
+      std::io::Error::new(self.inner.kind(), self.inner.to_string()),
+    )
   }
 }
 
 impl IoError {
-  pub fn new<T>(context: T, inner: std::io::Error) -> Self
-  where
-    T: Into<String>,
-  {
+  #[cfg(feature = "backtrace")]
+  pub fn new(context: Option<String>, inner: std::io::Error) -> Self {
     Self {
-      context: Some(context.into()),
+      backtrace: std::backtrace::Backtrace::capture(),
+      context,
       inner,
     }
   }
 
+  #[cfg(not(feature = "backtrace"))]
+  pub fn new(context: Option<String>, inner: std::io::Error) -> Self {
+    Self { context, inner }
+  }
+
+  pub fn with_context<T>(context: T, inner: std::io::Error) -> Self
+  where
+    T: Into<String>,
+  {
+    Self::new(Some(context.into()), inner)
+  }
+
   pub fn without_context(inner: std::io::Error) -> Self {
-    Self {
-      context: None,
-      inner,
-    }
+    Self::new(None, inner)
   }
 
   pub fn invalid_data<M>(context: M, message: M) -> Self
   where
     M: ToString + std::fmt::Display,
   {
-    Self::new(
+    Self::with_context(
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::InvalidData, message.to_string()),
     )
@@ -47,7 +64,7 @@ impl IoError {
   where
     M: ToString + std::fmt::Display,
   {
-    Self::new(
+    Self::with_context(
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::Other, message.to_string()),
     )
@@ -57,7 +74,7 @@ impl IoError {
   where
     M: ToString + std::fmt::Display,
   {
-    Self::new(
+    Self::with_context(
       context.to_string(),
       std::io::Error::new(
         std::io::ErrorKind::InvalidInput,
@@ -70,7 +87,7 @@ impl IoError {
   where
     M: ToString + std::fmt::Display,
   {
-    Self::new(
+    Self::with_context(
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::NotFound, message.to_string()),
     )
@@ -80,7 +97,7 @@ impl IoError {
   where
     M: ToString + std::fmt::Display,
   {
-    Self::new(
+    Self::with_context(
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::Interrupted, message.to_string()),
     )
@@ -98,6 +115,13 @@ impl IoError {
     std::process::exit(self.inner.raw_os_error().unwrap_or(1));
   }
 
+  #[cfg(feature = "backtrace")]
+  pub fn print_and_exit(&self) -> ! {
+    eprintln!("{:#?}", self);
+    self.exit();
+  }
+
+  #[cfg(not(feature = "backtrace"))]
   pub fn print_and_exit(&self) -> ! {
     eprintln!("{}", self);
     self.exit();
@@ -223,10 +247,7 @@ impl FromIo<IoError> for IoError {
   where
     C: ToString + std::fmt::Display,
   {
-    IoError {
-      context: Some((context)().to_string()),
-      inner: self.into_inner(),
-    }
+    IoError::with_context((context)().to_string(), self.into_inner())
   }
 }
 
@@ -235,10 +256,7 @@ impl FromIo<Box<IoError>> for std::io::Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: self,
-    })
+    Box::new(IoError::with_context((context)().to_string(), self))
   }
 }
 
@@ -247,10 +265,10 @@ impl FromIo<Box<IoError>> for std::string::FromUtf8Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    ))
   }
 }
 
@@ -262,10 +280,7 @@ impl From<Box<IoError>> for IoError {
 
 impl From<std::io::Error> for IoError {
   fn from(f: std::io::Error) -> Self {
-    Self {
-      context: None,
-      inner: f,
-    }
+    Self::new(None, f)
   }
 }
 
@@ -281,10 +296,10 @@ impl FromIo<Box<IoError>> for serde_json::Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    ))
   }
 }
 
@@ -301,10 +316,10 @@ impl FromIo<Box<IoError>> for serde_yaml::Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    ))
   }
 }
 
@@ -314,13 +329,10 @@ impl FromIo<Box<IoError>> for serde_urlencoded::ser::Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        format!("{self}"),
-      ),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
   }
 }
 
@@ -330,20 +342,20 @@ impl FromIo<Box<IoError>> for bollard_next::errors::Error {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    ))
   }
 }
 
 #[cfg(feature = "http")]
 impl From<crate::http::HttpError> for IoError {
   fn from(f: crate::http::HttpError) -> Self {
-    Self {
-      context: None,
-      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, f),
-    }
+    Self::without_context(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      f,
+    ))
   }
 }
 
@@ -371,10 +383,7 @@ impl FromIo<Box<IoError>> for diesel::result::Error {
       },
       _ => std::io::Error::new(std::io::ErrorKind::InvalidData, self),
     };
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner,
-    })
+    Box::new(IoError::with_context((context)().to_string(), inner))
   }
 }
 
@@ -421,10 +430,7 @@ impl FromIo<Box<IoError>> for ntex::http::client::error::SendRequestError {
         std::io::Error::new(std::io::ErrorKind::Interrupted, format!("{self}"))
       }
     };
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner,
-    })
+    Box::new(IoError::with_context((context)().to_string(), inner))
   }
 }
 
@@ -434,13 +440,10 @@ impl FromIo<Box<IoError>> for ntex::http::client::error::JsonPayloadError {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        format!("{self}"),
-      ),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
   }
 }
 
@@ -450,13 +453,10 @@ impl FromIo<Box<IoError>> for ntex::http::error::PayloadError {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        format!("{self}"),
-      ),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
   }
 }
 
@@ -466,13 +466,10 @@ impl FromIo<Box<IoError>> for ntex::ws::error::WsClientBuilderError {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        format!("{self}"),
-      ),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
   }
 }
 
@@ -482,13 +479,10 @@ impl FromIo<Box<IoError>> for ntex::ws::error::WsClientError {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        format!("{self}"),
-      ),
-    })
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
   }
 }
 
@@ -498,19 +492,13 @@ impl FromIo<Box<IoError>> for tokio::task::JoinError {
   where
     C: ToString + std::fmt::Display,
   {
-    Box::new(IoError {
-      context: Some((context)().to_string()),
-      inner: self.into(),
-    })
+    Box::new(IoError::with_context((context)().to_string(), self.into()))
   }
 }
 
 #[cfg(feature = "tokio")]
 impl From<tokio::task::JoinError> for IoError {
   fn from(f: tokio::task::JoinError) -> Self {
-    Self {
-      context: None,
-      inner: f.into(),
-    }
+    Self::without_context(f.into())
   }
 }

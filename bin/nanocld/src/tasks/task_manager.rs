@@ -37,14 +37,15 @@ impl TaskManager {
     Self::default()
   }
 
-  pub async fn add_task<EC>(
+  pub async fn add_task<EC, F>(
     &self,
     key: &str,
     kind: NativeEventAction,
     task: ObjTaskFuture,
     on_error: EC,
   ) where
-    EC: FnOnce(IoError) + 'static,
+    EC: FnOnce(IoError) -> F + 'static,
+    F: Future<Output = IoResult<()>> + 'static,
   {
     let key = key.to_owned();
     let key_ptr = key.clone();
@@ -54,7 +55,10 @@ impl TaskManager {
       if let Err(err) = task.await {
         log::error!("Task failed: {kind} {key_ptr} {}", err);
         tasks.lock().await.remove(&key_ptr);
-        on_error(err.clone());
+        if let Err(err) = on_error(err.clone()).await {
+          log::error!("on_error failed: {kind} {key_ptr} {}", err);
+          return Err(err);
+        }
         return Err(err);
       };
       log::debug!("Task completed: {kind} {key_ptr}");

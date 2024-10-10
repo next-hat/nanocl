@@ -241,7 +241,8 @@ impl CargoDb {
       let processes =
         ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
           .await?;
-      let (_, _, _, running) = utils::container::count_status(&processes);
+      let (_, _, _, running) =
+        utils::container::generic::count_status(&processes);
       cargo_summaries.push(CargoSummary {
         created_at: cargo.created_at,
         status: cargo.status,

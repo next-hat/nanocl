@@ -66,7 +66,9 @@ services:
 
   nproxy:
     container_name: nproxy.system.c
-    image: nproxy:dev
+    build:
+      context: .
+      dockerfile: ./bin/nproxy/Dockerfile
     tty: true
     network_mode: host
     profiles:
@@ -114,7 +116,9 @@ services:
 
   ndns:
     container_name: ndns.system.c
-    image: ndns:dev
+    build:
+      context: .
+      dockerfile: ./bin/ndns/Dockerfile
     tty: true
     profiles:
       - dns
@@ -164,11 +168,11 @@ services:
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
-    networks:
-      - nanoclbr0
+    # network_mode: host
     ports:
       - 8585:8585
-      - 9443:9443
+    networks:
+      - nanoclbr0
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo

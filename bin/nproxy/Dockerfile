@@ -16,7 +16,7 @@ COPY ./bin/nproxy/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
-LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
-LABEL org.opencontainers.image.description Nanocl Proxy
+LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
+LABEL org.opencontainers.image.description="Nanocl Proxy"
 
 ENTRYPOINT ["/entrypoint.sh"]
