@@ -18,10 +18,10 @@ pub(crate) async fn is_api_error(
       .unwrap_or(&default)
       .as_str()
       .unwrap_or_default();
-    return Err(HttpClientError::HttpError(HttpError {
-      status: *status,
-      msg: msg.to_owned(),
-    }));
+    return Err(HttpClientError::HttpError(HttpError::new(
+      *status,
+      msg.to_owned(),
+    )));
   }
   Ok(())
 }

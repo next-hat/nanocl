@@ -78,7 +78,7 @@ chrono = { version = "0.4", default-features = false, features = [
   "clock",
   "serde",
 ] }
-jsonschema = { version = "0.18", default-features = false }
+jsonschema = { version = "0.22", default-features = false }
 nanocld_client = { version = "0.16", features = ["tokio"] }
 metrsd_client = "0.5"
 nanocl_stubs = { version = "0.16", features = ["serde", "clap"] }
@@ -88,5 +88,5 @@ notify = "6.1"
 ntex-cors = "2"
 rand = "0.8"
 openssl = { version = "0.10" }
-ipnet = { version = "2.9.0", features = ["serde"] }
+ipnet = { version = "2.10.0", features = ["serde"] }
 num_cpus = "1.16.0"

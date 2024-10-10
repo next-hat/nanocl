@@ -2,21 +2,49 @@ use ntex::http;
 use ntex::web;
 
 /// An http response error
-#[derive(Clone, Debug)]
+#[cfg(not(feature = "backtrace"))]
+#[derive(Debug)]
 pub struct HttpError {
   pub msg: String,
   pub status: http::StatusCode,
+}
+
+#[cfg(feature = "backtrace")]
+#[derive(Debug)]
+pub struct HttpError {
+  pub backtrace: std::backtrace::Backtrace,
+  pub msg: String,
+  pub status: http::StatusCode,
+}
+
+impl Clone for HttpError {
+  fn clone(&self) -> Self {
+    Self::new(self.status, self.msg.clone())
+  }
 }
 
 pub type HttpResult<T, E = HttpError> = Result<T, E>;
 
 impl HttpError {
   /// Create a new HttpError
+  #[cfg(not(feature = "backtrace"))]
   pub fn new<T>(status: http::StatusCode, msg: T) -> Self
   where
     T: ToString,
   {
     Self {
+      status,
+      msg: msg.to_string(),
+    }
+  }
+
+  #[cfg(feature = "backtrace")]
+  pub fn new<T>(status: http::StatusCode, msg: T) -> Self
+  where
+    T: ToString,
+  {
+    Self {
+      backtrace: std::backtrace::Backtrace::capture(),
       status,
       msg: msg.to_string(),
     }
@@ -132,15 +160,15 @@ impl From<bollard_next::errors::Error> for HttpError {
       bollard_next::errors::Error::DockerResponseServerError {
         status_code,
         message,
-      } => HttpError {
-        msg: message,
-        status: http::StatusCode::from_u16(status_code)
+      } => HttpError::new(
+        http::StatusCode::from_u16(status_code)
           .unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR),
-      },
-      _ => HttpError {
-        msg: format!("{err}"),
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      },
+        message,
+      ),
+      _ => HttpError::new(
+        http::StatusCode::INTERNAL_SERVER_ERROR,
+        format!("{err}"),
+      ),
     }
   }
 }
