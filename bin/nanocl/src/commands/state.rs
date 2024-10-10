@@ -655,8 +655,8 @@ async fn state_apply(
         waiter.await??;
         pg.set_message("(cleared)");
       }
+      pg.set_message("(creating)");
       client.create_job(&job).await?;
-      pg.set_message("(created)");
       let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
@@ -680,15 +680,36 @@ async fn state_apply(
       cargo.metadata = Some(metadata);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {
+          pg.set_message("(creating)");
           client.create_cargo(&cargo, Some(&namespace)).await?;
-          pg.set_message("(created)");
+          let waiter = utils::process::wait_process_state(
+            &format!("{}.{namespace}", cargo.name),
+            EventActorKind::Cargo,
+            vec![NativeEventAction::Start],
+            client,
+          )
+          .await?;
+          pg.set_message("(starting)");
+          client
+            .start_process("cargo", &cargo.name, Some(&namespace))
+            .await?;
+          waiter.await??;
         }
         Ok(inspect) => {
           let cmp: CargoSpecPartial = inspect.spec.into();
           if (cmp != cargo) || opts.reload {
+            pg.set_message("(updating)");
+            let waiter = utils::process::wait_process_state(
+              &format!("{}.{namespace}", cargo.name),
+              EventActorKind::Cargo,
+              vec![NativeEventAction::Start],
+              client,
+            )
+            .await?;
             client
               .put_cargo(&cargo.name, &cargo, Some(&namespace))
               .await?;
+            waiter.await??;
             pg.set_message("(updated)");
           } else if inspect.status.actual == ObjPsStatusKind::Start {
             pg.finish_with_message("(unchanged)");
@@ -696,18 +717,6 @@ async fn state_apply(
           }
         }
       }
-      pg.set_message("(starting)");
-      let waiter = utils::process::wait_process_state(
-        &format!("{}.{namespace}", cargo.name),
-        EventActorKind::Cargo,
-        vec![NativeEventAction::Start],
-        client,
-      )
-      .await?;
-      client
-        .start_process("cargo", &cargo.name, Some(&namespace))
-        .await?;
-      waiter.await??;
       pg.finish_with_message("(running)");
     }
   }
@@ -721,14 +730,35 @@ async fn state_apply(
       vm.metadata = Some(metadata);
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
+          pg.set_message("(creating)");
           client.create_vm(&vm, Some(&namespace)).await?;
-          pg.set_message("(created)");
+          let waiter = utils::process::wait_process_state(
+            &format!("{}.{namespace}", vm.name),
+            EventActorKind::Vm,
+            vec![NativeEventAction::Start],
+            client,
+          )
+          .await?;
+          pg.set_message("(starting)");
+          client
+            .start_process("vm", &vm.name, Some(&namespace))
+            .await?;
+          waiter.await??;
         }
         Ok(inspect) => {
           let cmp: VmSpecPartial = inspect.spec.into();
           if (cmp != vm) || opts.reload {
             let update: VmSpecUpdate = vm.clone().into();
+            pg.set_message("(updating)");
+            let waiter = utils::process::wait_process_state(
+              &format!("{}.{namespace}", vm.name),
+              EventActorKind::Cargo,
+              vec![NativeEventAction::Start],
+              client,
+            )
+            .await?;
             client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
+            waiter.await??;
             pg.set_message("(updated)");
           } else if inspect.status.actual == ObjPsStatusKind::Start {
             pg.finish_with_message("(unchanged)");
@@ -736,18 +766,6 @@ async fn state_apply(
           }
         }
       }
-      pg.set_message("(starting)");
-      let waiter = utils::process::wait_process_state(
-        &format!("{}.{namespace}", vm.name),
-        EventActorKind::Vm,
-        vec![NativeEventAction::Start],
-        client,
-      )
-      .await?;
-      client
-        .start_process("vm", &vm.name, Some(&namespace))
-        .await?;
-      waiter.await??;
       pg.finish_with_message("(running)");
     }
   }

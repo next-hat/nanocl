@@ -1,6 +1,6 @@
 use bollard_next::auth::DockerCredentials;
 use futures::StreamExt;
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   generic::ImagePullPolicy,
   system::{
@@ -15,21 +15,24 @@ use crate::{
 };
 
 /// Get the docker credentials to authenticate with the registry from the secret
+///
 async fn get_credentials(
   secret: Option<String>,
   state: &SystemState,
-) -> HttpResult<Option<DockerCredentials>> {
+) -> IoResult<Option<DockerCredentials>> {
   Ok(match secret {
     Some(secret) => {
       let secret = SecretDb::read_by_pk(&secret, &state.inner.pool).await?;
       serde_json::from_value::<DockerCredentials>(secret.data)
         .map(Some)
-        .map_err(|err| HttpError::bad_request(err.to_string()))?
+        .map_err(|err| err.map_err_context(|| "GetCredentials"))?
     }
     None => None,
   })
 }
 
+/// Emit an event for the download status
+///
 fn emit_download_status(
   actor: Option<EventActor>,
   related: Option<EventActor>,
@@ -54,24 +57,26 @@ fn emit_download_status(
 }
 
 /// Get the image name and tag from a string
-pub fn parse_name(name: &str) -> HttpResult<(String, String)> {
+///
+pub fn parse_name(name: &str) -> IoResult<(String, String)> {
   let image_info: Vec<&str> = name.split(':').collect();
   if image_info.len() != 2 {
-    return Err(HttpError::bad_request("Missing tag in image name"));
+    return Err(IoError::invalid_input("ParseName", "Invalid image name"));
   }
   let image_name = image_info[0].to_ascii_lowercase();
   let image_tag = image_info[1].to_ascii_lowercase();
   Ok((image_name, image_tag))
 }
 
-/// Download the image
+/// Download the container image depending on the policy
+///
 pub async fn download<A>(
   image: &str,
   secret: Option<String>,
   policy: ImagePullPolicy,
   actor: &A,
   state: &SystemState,
-) -> HttpResult<()>
+) -> IoResult<()>
 where
   A: Into<EventActor> + Clone,
 {
@@ -115,7 +120,7 @@ where
           None,
           state,
         );
-        return Err(err.into());
+        return Err(*err.map_err_context(|| "DownloadImage"));
       }
       Ok(chunk) => chunk,
     };
