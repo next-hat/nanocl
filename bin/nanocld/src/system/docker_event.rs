@@ -107,7 +107,7 @@ async fn exec_docker(
       }
     }
     "die" => {
-      if !name.starts_with("tmp-") {
+      if !name.starts_with("tmp-") && !name.starts_with("init-") {
         let actual_status =
           ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
         log::debug!("Event status wanted {}", actual_status.wanted);
@@ -125,7 +125,7 @@ async fn exec_docker(
             let cargo =
               CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
                 .await?;
-            state.emit_warning_native_action(
+            state.emit_error_native_action(
               &cargo,
               NativeEventAction::Fail,
               Some(format!("Process {name}")),
@@ -142,7 +142,7 @@ async fn exec_docker(
             .await?;
             let vm =
               VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-            state.emit_warning_native_action(
+            state.emit_error_native_action(
               &vm,
               NativeEventAction::Fail,
               Some(format!("Process {name}")),

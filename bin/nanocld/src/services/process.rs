@@ -223,7 +223,7 @@ pub async fn start_processes(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::emit_starting(&kind_key, &kind, &state).await?;
+  utils::container::generic::emit_starting(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -250,7 +250,7 @@ pub async fn restart_processes(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::restart_instances(&kind_pk, &kind, &state).await?;
+  utils::container::process::restart_instances(&kind_pk, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -277,7 +277,7 @@ pub async fn stop_processes(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::emit_stopping(&kind_key, &kind, &state).await?;
+  utils::container::generic::emit_stopping(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -306,7 +306,8 @@ pub async fn kill_processes(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::kill_by_kind_key(&kind_pk, &payload, &state).await?;
+  utils::container::process::kill_by_kind_key(&kind_pk, &payload, &state)
+    .await?;
   Ok(web::HttpResponse::Ok().into())
 }
 

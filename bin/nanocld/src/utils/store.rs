@@ -37,7 +37,7 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
     Ok(conn) => conn,
     Err(err) => {
-      return Err(IoError::new(
+      return Err(IoError::with_context(
         "CockroachDB connection",
         std::io::Error::new(std::io::ErrorKind::NotConnected, err),
       ))

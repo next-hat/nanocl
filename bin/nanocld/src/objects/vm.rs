@@ -213,7 +213,7 @@ impl ObjInspectByPk for VmDb {
     let processes =
       ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
     let (total, _, _, running_instances) =
-      utils::container::count_status(&processes);
+      utils::container::generic::count_status(&processes);
     Ok(VmInspect {
       created_at: vm.created_at,
       namespace_name: vm.namespace_name,
