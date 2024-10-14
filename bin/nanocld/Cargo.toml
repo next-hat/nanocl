@@ -83,7 +83,7 @@ nanocld_client = { version = "0.16", features = ["tokio"] }
 metrsd_client = "0.5"
 nanocl_stubs = { version = "0.16", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.7", features = ["unix", "ntex", "logger"] }
-utoipa = { version = "4.2", features = ["yaml"], optional = true }
+utoipa = { version = "5.0", features = ["yaml"], optional = true }
 notify = "6.1"
 ntex-cors = "2"
 rand = "0.8"

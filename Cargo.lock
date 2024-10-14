@@ -429,7 +429,7 @@ dependencies = [
  "tokio-util",
  "tower-service",
  "url",
- "utoipa",
+ "utoipa 4.2.3",
  "winapi",
 ]
 
@@ -443,7 +443,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "serde_with",
- "utoipa",
+ "utoipa 4.2.3",
 ]
 
 [[package]]
@@ -2158,7 +2158,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 5.0.0",
  "uuid",
 ]
 
@@ -2176,7 +2176,7 @@ dependencies = [
  "ntex",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 5.0.0",
  "utoipa-swagger-ui",
 ]
 
@@ -2214,7 +2214,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa",
+ "utoipa 5.0.0",
  "uuid",
 ]
 
@@ -2261,7 +2261,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 5.0.0",
 ]
 
 [[package]]
@@ -2286,7 +2286,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 5.0.0",
 ]
 
 [[package]]
@@ -4097,8 +4097,20 @@ dependencies = [
  "indexmap 2.6.0",
  "serde",
  "serde_json",
+ "utoipa-gen 4.3.1",
+]
+
+[[package]]
+name = "utoipa"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e2b34fc58a72021914a5745832024b2baa638fe771df5a35f3d1b69266bd92c"
+dependencies = [
+ "indexmap 2.6.0",
+ "serde",
+ "serde_json",
  "serde_yaml",
- "utoipa-gen",
+ "utoipa-gen 5.0.0",
 ]
 
 [[package]]
@@ -4108,6 +4120,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20c24e8ab68ff9ee746aad22d39b5535601e6416d1b0feeabf78be986a5c4392"
 dependencies = [
  "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
+name = "utoipa-gen"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "866f11b33be38a747542f435578a164674b8922d958cc065d7f19319c19d4784"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.79",
@@ -4127,7 +4150,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "utoipa",
+ "utoipa 4.2.3",
  "zip",
 ]
 
