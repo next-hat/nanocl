@@ -22,14 +22,14 @@ jobs:
 
     steps:
       # Clone project
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Install buildx
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       # Set buildx cache
       - name: Cache register
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/buildx-cache
           key: buildx-cache
@@ -96,7 +96,7 @@ jobs:
         run: cargo make covgenci
       # Upload it to codecov
       - name: Codecov
-        uses: codecov/codecov-action@v3.1.1
+        uses: codecov/codecov-action@v4.6.0
         with:
           token: ${{ secrets.CODECOV }}
           files: ./lcov.info
