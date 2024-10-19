@@ -1,7 +1,7 @@
 use bollard_next::{
   container::{
-    RemoveContainerOptions, RenameContainerOptions, StartContainerOptions,
-    StopContainerOptions, WaitContainerOptions,
+    Config, RemoveContainerOptions, RenameContainerOptions,
+    StartContainerOptions, StopContainerOptions, WaitContainerOptions,
   },
   secret::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
 };
@@ -25,105 +25,105 @@ use crate::{
 
 /// Function that execute the init container before the main cargo container
 ///
-async fn init_container(
-  cargo: &Cargo,
+async fn start_init_container(
+  process: &Process,
   state: &SystemState,
-) -> IoResult<Option<Process>> {
-  match cargo.spec.init_container.clone() {
-    Some(mut before) => {
-      let image = before
-        .image
-        .clone()
-        .unwrap_or(cargo.spec.container.image.clone().unwrap());
-      let host_config = before.host_config.unwrap_or_default();
-      before.image = Some(image.clone());
-      before.host_config = Some(HostConfig {
-        network_mode: Some(
-          host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
-        ),
-        ..host_config
-      });
-      super::image::download(
-        &image,
-        cargo.spec.image_pull_secret.clone(),
-        cargo.spec.image_pull_policy.clone().unwrap_or_default(),
-        cargo,
-        state,
-      )
-      .await?;
-      let mut labels = before.labels.to_owned().unwrap_or_default();
-      labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
-      labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
-      labels.insert("io.nanocl.init-c".to_owned(), "true".to_owned());
-      labels.insert(
-        "com.docker.compose.project".into(),
-        format!("nanocl_{}", cargo.namespace_name),
-      );
-      before.labels = Some(labels);
-      let short_id = utils::key::generate_short_id(6);
-      let name = format!(
-        "init-{}-{}.{}.c",
-        cargo.spec.name, short_id, cargo.namespace_name
-      );
-      let process = super::process::create(
-        &ProcessKind::Cargo,
-        &name,
-        &cargo.spec.cargo_key,
-        &before,
-        state,
-      )
-      .await?;
-      state
-        .inner
-        .docker_api
-        .start_container(&name, None::<StartContainerOptions<String>>)
-        .await
-        .map_err(|err| err.map_err_context(|| "InitContainer"))?;
-      let options = Some(WaitContainerOptions {
-        condition: "not-running",
-      });
-      let mut stream = state.inner.docker_api.wait_container(&name, options);
-      while let Some(wait_status) = stream.next().await {
-        log::trace!("init_container: wait {wait_status:?}");
-        match wait_status {
-          Ok(wait_status) => {
-            log::debug!("Wait status: {wait_status:?}");
-            if wait_status.status_code != 0 {
-              let error = match wait_status.error {
-                Some(error) => {
-                  error.message.unwrap_or("Unknown error".to_owned())
-                }
-                None => "Unknown error".to_owned(),
-              };
-              return Err(IoError::interrupted(
-                "InitContainer",
-                &format!("{error} {}", wait_status.status_code),
-              ));
-            }
-          }
-          Err(err) => {
-            return Err(IoError::interrupted(
-              "InitContainer",
-              &format!("{err}"),
-            ));
-          }
+) -> IoResult<()> {
+  state
+    .inner
+    .docker_api
+    .start_container(&process.name, None::<StartContainerOptions<String>>)
+    .await
+    .map_err(|err| err.map_err_context(|| "InitContainer"))?;
+  let options = Some(WaitContainerOptions {
+    condition: "not-running",
+  });
+  let mut stream = state
+    .inner
+    .docker_api
+    .wait_container(&process.name, options);
+  while let Some(wait_status) = stream.next().await {
+    log::trace!("init_container: wait {wait_status:?}");
+    match wait_status {
+      Ok(wait_status) => {
+        log::debug!("Wait status: {wait_status:?}");
+        if wait_status.status_code != 0 {
+          let error = match wait_status.error {
+            Some(error) => error.message.unwrap_or("Unknown error".to_owned()),
+            None => "Unknown error".to_owned(),
+          };
+          return Err(IoError::interrupted(
+            "InitContainer",
+            &format!("{error} {}", wait_status.status_code),
+          ));
         }
       }
-      Ok(Some(process))
+      Err(err) => {
+        return Err(IoError::interrupted("InitContainer", &format!("{err}")));
+      }
     }
-    None => Ok(None),
   }
+  Ok(())
+}
+
+async fn create_init_container(
+  cargo: &Cargo,
+  init_container: &Config,
+  state: &SystemState,
+) -> IoResult<Process> {
+  let mut init_container = init_container.clone();
+  let image = init_container
+    .image
+    .clone()
+    .unwrap_or(cargo.spec.container.image.clone().unwrap());
+  let host_config = init_container.host_config.unwrap_or_default();
+  init_container.image = Some(image.clone());
+  init_container.host_config = Some(HostConfig {
+    network_mode: Some(
+      host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
+    ),
+    ..host_config
+  });
+  super::image::download(
+    &image,
+    cargo.spec.image_pull_secret.clone(),
+    cargo.spec.image_pull_policy.clone().unwrap_or_default(),
+    cargo,
+    state,
+  )
+  .await?;
+  let mut labels = init_container.labels.to_owned().unwrap_or_default();
+  labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
+  labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
+  labels.insert("io.nanocl.init-c".to_owned(), "true".to_owned());
+  labels.insert(
+    "com.docker.compose.project".into(),
+    format!("nanocl_{}", cargo.namespace_name),
+  );
+  init_container.labels = Some(labels);
+  let short_id = utils::key::generate_short_id(6);
+  let name = format!(
+    "init-{}-{}.{}.c",
+    cargo.spec.name, short_id, cargo.namespace_name
+  );
+  let process = super::process::create(
+    &ProcessKind::Cargo,
+    &name,
+    &cargo.spec.cargo_key,
+    &init_container,
+    state,
+  )
+  .await?;
+  Ok(process)
 }
 
 /// Execute the cargo spec to create the cargo container
-/// If the cargo has a init container, it will be executed before the main cargo container
 ///
 pub async fn create(
   cargo: &Cargo,
   number: usize,
   state: &SystemState,
 ) -> IoResult<Vec<Process>> {
-  let init_instance = init_container(cargo, state).await?;
   super::image::download(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo.spec.image_pull_secret.clone(),
@@ -148,7 +148,7 @@ pub async fn create(
     // Flatten the secrets to have envs in a single vector
     secret_envs = secrets.into_iter().flatten().collect();
   }
-  let mut instances = (0..number)
+  let instances = (0..number)
     .collect::<Vec<usize>>()
     .into_iter()
     .map(move |current| {
@@ -173,8 +173,9 @@ pub async fn create(
           .insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
         labels
           .insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
+        labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
         labels.insert(
-          "com.docker.compose.project".into(),
+          "com.docker.compose.project".to_owned(),
           format!("nanocl_{}", cargo.namespace_name),
         );
         let auto_remove = host_config.auto_remove.unwrap_or(false);
@@ -235,9 +236,6 @@ pub async fn create(
     .await
     .into_iter()
     .collect::<IoResult<Vec<Process>>>()?;
-  if let Some(init_instance) = init_instance {
-    instances.insert(0, init_instance);
-  }
   Ok(instances)
 }
 
@@ -245,9 +243,51 @@ pub async fn create(
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
-      .await?;
+  let filter = GenericFilter::new().r#where(
+    "data",
+    GenericClause::Contains(serde_json::json!({
+      "Config": {
+        "Labels": {
+          "io.nanocl.not-init-c": "true"
+        }
+      }
+    })),
+  );
+  let processes = ProcessDb::read_by_kind_key(
+    &cargo.spec.cargo_key,
+    Some(filter),
+    &state.inner.pool,
+  )
+  .await?;
+  log::debug!(
+    "processes {:?}",
+    processes.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
+  );
+  let filter = GenericFilter::new().r#where(
+    "data",
+    GenericClause::Contains(serde_json::json!({
+      "Config": {
+        "Labels": {
+          "io.nanocl.init-c": "true"
+        }
+      }
+    })),
+  );
+  let init_process = ProcessDb::read_by_kind_key(
+    &cargo.spec.cargo_key,
+    Some(filter),
+    &state.inner.pool,
+  )
+  .await?;
+  if let Some(init_container) = &cargo.spec.init_container {
+    if init_process.is_empty() {
+      let process =
+        create_init_container(&cargo, init_container, state).await?;
+      start_init_container(&process, state).await?;
+    } else {
+      start_init_container(&init_process[0], state).await?;
+    }
+  }
   // TODO: FIND BEST NODES TO RUN WORKLOAD
   // let nodes =
   //   MetricDb::find_best_nodes(90.0, 90.0, 100, &state.inner.pool).await?;
@@ -273,7 +313,8 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes = ProcessDb::read_by_kind_key(key, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   // rename old instances to flag them for deletion
   processes
     .iter()
@@ -314,6 +355,10 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     _ => 1,
   };
   // Create instance with the new spec
+  if let Some(init_container) = &cargo.spec.init_container {
+    let process = create_init_container(&cargo, init_container, state).await?;
+    start_init_container(&process, state).await?;
+  }
   let new_instances = match create(&cargo, number, state).await {
     Err(err) => {
       log::error!(
@@ -396,7 +441,8 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete cargo instances and the cargo itself in the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
-  let processes = ProcessDb::read_by_kind_key(key, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   for process in processes {
     let _ = state
       .inner
