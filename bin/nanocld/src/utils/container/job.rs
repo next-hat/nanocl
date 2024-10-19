@@ -74,7 +74,7 @@ pub async fn create_instances(
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let job = JobDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let mut processes =
-    ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool).await?;
   if processes.is_empty() {
     processes = create_instances(&job, state).await?;
   }
@@ -115,7 +115,8 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
   let job = JobDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes = ProcessDb::read_by_kind_key(key, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   super::process::delete_instances(
     &processes
       .iter()

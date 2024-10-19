@@ -142,7 +142,8 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let image =
     VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
   let processes =
-    ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
+      .await?;
   if processes.is_empty() {
     create_instance(&vm, &image, true, state).await?;
   }
@@ -155,7 +156,8 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes = ProcessDb::read_by_kind_key(key, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   super::process::delete_instances(
     &processes
       .into_iter()

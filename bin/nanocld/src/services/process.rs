@@ -76,7 +76,7 @@ async fn logs_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes =
-    ProcessDb::read_by_kind_key(&kind_key, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool).await?;
   log::debug!("process::logs_process: {kind_key}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
@@ -337,7 +337,7 @@ pub async fn wait_processes(
     condition: qs.condition.clone().unwrap_or_default(),
   };
   let processes =
-    ProcessDb::read_by_kind_key(&kind_pk, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&kind_pk, None, &state.inner.pool).await?;
   let mut streams = Vec::new();
   for process in processes {
     let options = Some(opts.clone());
@@ -410,7 +410,7 @@ pub async fn stats_processes(
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let opts: StatsOptions = qs.clone().into();
   let processes =
-    ProcessDb::read_by_kind_key(&kind_key, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool).await?;
   let streams =
     processes
       .into_iter()

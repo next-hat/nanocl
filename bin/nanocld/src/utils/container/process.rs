@@ -7,6 +7,7 @@ use futures_util::stream::FuturesUnordered;
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   cargo::CargoKillOptions,
+  generic::{GenericClause, GenericFilter},
   process::{Process, ProcessKind, ProcessPartial},
   system::{NativeEventAction, ObjPsStatusKind},
 };
@@ -141,7 +142,8 @@ pub async fn kill_by_kind_key(
   opts: &CargoKillOptions,
   state: &SystemState,
 ) -> IoResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(pk, None, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
@@ -161,7 +163,8 @@ pub async fn restart_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(pk, None, &state.inner.pool).await?;
   for process in processes {
     state
       .inner
@@ -183,7 +186,7 @@ pub async fn stop_instances(
   state: &SystemState,
 ) -> IoResult<()> {
   let processes =
-    ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(kind_pk, None, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");
   for process in processes {
     state
@@ -214,9 +217,21 @@ pub async fn start_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
+  let filter = GenericFilter::new().r#where(
+    "data",
+    GenericClause::Contains(serde_json::json!({
+      "Config": {
+        "Labels": {
+          "io.nanocl.not-init-c": true
+        }
+      }
+    })),
+  );
   let processes =
-    ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(kind_key, Some(filter), &state.inner.pool)
+      .await?;
   for process in processes {
+    log::debug!("starting process {}", process.name);
     state
       .inner
       .docker_api

@@ -173,7 +173,7 @@ impl VmDb {
         .await?
         .try_to_vm_spec()?;
       let processes =
-        ProcessDb::read_by_kind_key(&vm.spec.vm_key, pool).await?;
+        ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, pool).await?;
       let (_, _, _, running_instances) =
         utils::container::generic::count_status(&processes);
       vm_summaries.push(VmSummary {
