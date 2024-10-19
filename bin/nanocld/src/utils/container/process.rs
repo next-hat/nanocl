@@ -222,7 +222,7 @@ pub async fn start_instances(
     GenericClause::Contains(serde_json::json!({
       "Config": {
         "Labels": {
-          "io.nanocl.not-init-c": true
+          "io.nanocl.not-init-c": "true"
         }
       }
     })),
