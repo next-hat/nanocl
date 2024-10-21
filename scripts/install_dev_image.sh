@@ -8,7 +8,7 @@ if [ ! -f "tests/ubuntu-24.04-minimal-cloudimg-amd64.img" ]; then
 fi
 
 echo "Downloading container images.."
-docker pull docker.io/cockroachdb/cockroach:v24.1.0
+docker pull docker.io/cockroachdb/cockroach:v24.2.0
 docker pull ghcr.io/next-hat/metrsd:0.5.4
 docker pull ghcr.io/next-hat/nanocl-get-started:latest
 docker pull ghcr.io/next-hat/nanocl-dev:dev
