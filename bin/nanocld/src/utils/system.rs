@@ -110,6 +110,8 @@ pub async fn register_namespace(
   Ok(())
 }
 
+/// Sync the cargo status with the container status.
+/// We use it at startup to be sure that the cargo status is up to date.
 async fn sync_cargo_status(
   cargo: &Cargo,
   container: &ContainerInspectResponse,
