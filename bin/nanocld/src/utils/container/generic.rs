@@ -1,4 +1,5 @@
-use nanocl_error::io::IoResult;
+use bollard_next::network::InspectNetworkOptions;
+use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
@@ -141,4 +142,31 @@ pub async fn emit_stopping(
   ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
   emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
   Ok(())
+}
+
+/// Inject data into the payload
+/// eg: $$INTERNAL_GATEWAY
+pub async fn inject_data(data: &str, state: &SystemState) -> IoResult<String> {
+  let network_gateway = state
+    .inner
+    .docker_api
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Network",
+        &format!("Unable to inspect network nanoclbr0 {err}"),
+      )
+    })?;
+  let ipam = network_gateway.ipam.unwrap_or_default();
+  let ipam_config = ipam.config.unwrap_or_default();
+  let Some(network) = ipam_config.first() else {
+    return Err(IoError::invalid_data(
+      "Network",
+      "No network found for nanoclbr0",
+    ));
+  };
+  let gateway_addr = network.gateway.clone().unwrap_or_default();
+  let new_data = data.replace("$$INTERNAL_GATEWAY", &gateway_addr);
+  Ok(new_data)
 }

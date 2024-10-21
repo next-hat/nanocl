@@ -112,9 +112,11 @@ impl RepositoryReadByTransform for ProcessDb {
 impl ProcessDb {
   pub async fn read_by_kind_key(
     kind_key: &str,
+    filter: Option<GenericFilter>,
     pool: &Pool,
   ) -> IoResult<Vec<Process>> {
-    let filter = GenericFilter::new()
+    let filter = filter
+      .unwrap_or_default()
       .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()));
     ProcessDb::transform_read_by(&filter, pool).await
   }
