@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  job::JobPartial,
+  job::{Job, JobInspect, JobPartial, JobSummary},
 };
 
 use crate::{

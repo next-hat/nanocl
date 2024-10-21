@@ -9,7 +9,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
   proxy::ProxySslConfig,
-  secret::{SecretPartial, SecretUpdate},
+  secret::{Secret, SecretPartial, SecretUpdate},
 };
 
 use crate::{
@@ -18,6 +18,9 @@ use crate::{
   repositories::generic::*,
   utils,
 };
+
+#[cfg(feature = "dev")]
+use super::openapi::ApiError;
 
 /// List secret
 #[cfg_attr(feature = "dev", utoipa::path(

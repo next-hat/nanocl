@@ -119,23 +119,23 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   spawn_crond();
   set_uds_perm();
-  ensure_state_dir(&conf.state_dir).await?;
+  // ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
   let system_ptr = system_state.clone();
   NodeDb::register(&system_ptr).await?;
   utils::system::register_namespace("global", &system_ptr).await?;
   utils::system::register_namespace("system", &system_ptr).await?;
-  rt::spawn(async move {
-    let fut = async move {
-      utils::system::sync_processes(&system_ptr).await?;
-      utils::system::sync_vm_images(&system_ptr).await?;
-      Ok::<_, IoError>(())
-    };
-    if let Err(err) = fut.await {
-      log::warn!("boot::init: {err}");
-    }
-    Ok::<_, IoError>(())
-  });
+  // rt::spawn(async move {
+  //   let fut = async move {
+  //     utils::system::sync_processes(&system_ptr).await?;
+  //     utils::system::sync_vm_images(&system_ptr).await?;
+  //     Ok::<_, IoError>(())
+  //   };
+  //   if let Err(err) = fut.await {
+  //     log::warn!("boot::init: {err}");
+  //   }
+  //   Ok::<_, IoError>(())
+  // });
   super::docker_event::analyze(&system_state);
   super::metric::spawn(&system_state);
   Ok(system_state)

@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  system::EventCondition,
+  system::{Event, EventCondition},
 };
 
 use crate::{

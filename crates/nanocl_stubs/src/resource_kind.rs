@@ -1,6 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use super::generic::Any;
+
 /// Specification of a resource kind.
 /// Depending on the spec it will validate a JSONSchema or call a service.
 #[derive(Clone, Debug)]

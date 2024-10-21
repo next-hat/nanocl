@@ -5,7 +5,6 @@ use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslVerifyMode};
 use nanocl_utils::ntex::middlewares;
 
 use crate::{models::SystemState, services, vars};
-
 /// This function will generate the HTTP server with the given configuration.
 /// It will also bind the server to the given address.
 /// The server will be returned.

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::system::{EventActor, EventActorKind};
 
+use super::generic::Any;
+
 /// Payload used to create a new resource
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]

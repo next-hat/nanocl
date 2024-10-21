@@ -13,8 +13,8 @@ use nanocl_stubs::{
   cargo::CargoKillOptions,
   generic::{GenericCount, GenericListQuery, GenericNspQuery},
   process::{
-    ProcessLogQuery, ProcessOutputLog, ProcessStats, ProcessStatsQuery,
-    ProcessWaitQuery, ProcessWaitResponse,
+    Process, ProcessLogQuery, ProcessOutputLog, ProcessStats,
+    ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
   },
 };
 

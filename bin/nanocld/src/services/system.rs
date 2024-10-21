@@ -3,7 +3,7 @@ use ntex::web;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::system::HostInfo;
+use nanocl_stubs::system::{BinaryInfo, HostInfo};
 
 use crate::models::SystemState;
 use crate::vars;

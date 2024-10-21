@@ -4,7 +4,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  metric::MetricPartial,
+  metric::{Metric, MetricPartial},
 };
 
 use crate::{

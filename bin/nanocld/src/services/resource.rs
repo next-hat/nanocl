@@ -7,7 +7,7 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericCount, GenericFilter, GenericListQuery},
-  resource::{ResourcePartial, ResourceSpec, ResourceUpdate},
+  resource::{Resource, ResourcePartial, ResourceSpec, ResourceUpdate},
 };
 
 use crate::{
@@ -16,6 +16,9 @@ use crate::{
   repositories::generic::*,
   utils,
 };
+
+#[cfg(feature = "dev")]
+use super::openapi::ApiError;
 
 /// List resources
 #[cfg_attr(feature = "dev", utoipa::path(

@@ -12,7 +12,10 @@ use ntex::{
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::generic::{GenericCount, GenericListQuery};
+use nanocl_stubs::{
+  generic::{GenericCount, GenericListQuery},
+  node::Node,
+};
 
 use crate::{
   models::{NodeDb, SystemState, WsConState},

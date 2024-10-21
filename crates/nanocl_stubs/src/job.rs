@@ -6,6 +6,8 @@ use crate::generic::ImagePullPolicy;
 use crate::process::Process;
 use crate::system::{EventActor, EventActorKind, ObjPsStatus};
 
+use super::generic::Any;
+
 /// Job partial is used to create a new job
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]

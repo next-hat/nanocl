@@ -1,6 +1,4 @@
 use bollard_next::secret::GraphDriverData;
-use ntex::util::HashMap;
-use serde::{Deserialize, Serialize};
 use utoipa::{Modify, OpenApi, ToSchema};
 
 use bollard_next::container::{
@@ -15,7 +13,7 @@ use bollard_next::service::{
   ContainerSummary, ContainerSummaryHostConfig,
   ContainerSummaryNetworkSettings, DeviceMapping, DeviceRequest, Driver,
   EndpointIpamConfig, EndpointSettings, ExecInspectResponse,
-  GenericResourcesInner, GenericResourcesInnerDiscreteResourceSpec,
+  GenericResourcesInnerDiscreteResourceSpec,
   GenericResourcesInnerNamedResourceSpec, Health, HealthConfig,
   HealthStatusEnum, HealthcheckResult, HostConfig, HostConfigCgroupnsModeEnum,
   HostConfigIsolationEnum, HostConfigLogConfig, IndexInfo, Ipam, IpamConfig,
@@ -45,7 +43,8 @@ use nanocl_stubs::cargo_spec::{
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::dns::{DnsEntry, ResourceDnsRule};
 use nanocl_stubs::generic::{
-  GenericClause, GenericCount, GenericFilter, GenericWhere, ImagePullPolicy,
+  Any, BollardDate, EmptyObject, GenericClause, GenericCount, GenericFilter,
+  GenericResources, GenericWhere, ImagePullPolicy, PortMap,
 };
 use nanocl_stubs::job::{Job, JobInspect, JobPartial, JobSummary};
 use nanocl_stubs::metric::{Metric, MetricPartial};
@@ -95,112 +94,8 @@ use super::{
 /// field set to the error message.
 #[allow(dead_code)]
 #[derive(ToSchema)]
-struct ApiError {
+pub struct ApiError {
   msg: String,
-}
-
-/// Helper to generate have Any type for [OpenApi](OpenApi) useful for dynamic json objects like [ResourceSpec](ResourceSpec)
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(untagged)]
-enum Any {
-  String(String),
-  Number(f64),
-  Bool(bool),
-  Array(Vec<Any>),
-  Object(HashMap<String, Any>),
-}
-
-struct EmptyObject;
-
-impl<'__s> utoipa::ToSchema<'__s> for EmptyObject {
-  fn schema() -> (
-    &'__s str,
-    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
-  ) {
-    (
-      "EmptyObject",
-      utoipa::openapi::ObjectBuilder::new()
-        .nullable(true)
-        .title(Some("EmptyObject"))
-        .description(Some("EmptyObject"))
-        .schema_type(utoipa::openapi::schema::SchemaType::Object)
-        .build()
-        .into(),
-    )
-  }
-}
-
-struct GenericResources;
-
-impl<'__s> utoipa::ToSchema<'__s> for GenericResources {
-  fn schema() -> (
-    &'__s str,
-    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
-  ) {
-    ("GenericResources", GenericResourcesInner::schema().1)
-  }
-}
-
-struct BollardDate;
-
-impl<'__s> utoipa::ToSchema<'__s> for BollardDate {
-  fn schema() -> (
-    &'__s str,
-    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
-  ) {
-    (
-      "BollardDate",
-      utoipa::openapi::ObjectBuilder::new()
-        .nullable(true)
-        .title(Some("BollardDate"))
-        .description(Some("BollardDate"))
-        .schema_type(utoipa::openapi::schema::SchemaType::String)
-        .example(Some("2021-01-01T00:00:00.000000000Z".into()))
-        .build()
-        .into(),
-    )
-  }
-}
-
-struct PortMap;
-
-impl<'__s> utoipa::ToSchema<'__s> for PortMap {
-  fn schema() -> (
-    &'__s str,
-    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
-  ) {
-    (
-      "PortMap",
-      utoipa::openapi::ObjectBuilder::new()
-        .nullable(true)
-        .title(Some("PortMap"))
-        .description(Some("PortMap"))
-        .schema_type(utoipa::openapi::schema::SchemaType::Object)
-        .property(
-          "<port/tcp|udp>",
-          utoipa::openapi::ArrayBuilder::new()
-            .items(
-              utoipa::openapi::ObjectBuilder::new()
-                .property(
-                  "HostPort",
-                  utoipa::openapi::ObjectBuilder::new()
-                    .schema_type(utoipa::openapi::schema::SchemaType::String)
-                    .build(),
-                )
-                .property(
-                  "HostIp",
-                  utoipa::openapi::ObjectBuilder::new()
-                    .schema_type(utoipa::openapi::schema::SchemaType::String)
-                    .build(),
-                )
-                .build(),
-            )
-            .build(),
-        )
-        .into(),
-    )
-  }
 }
 
 /// Helper to generate the versioned OpenAPI documentation
@@ -532,17 +427,17 @@ impl Modify for VersionModifier {
     NativeEventAction,
   )),
   tags(
-    (name = "Namespaces", description = "Namespaces management endpoints."),
-    (name = "Nodes", description = "Nodes management endpoints."),
-    (name = "Resources", description = "Resources management endpoints."),
-    (name = "System", description = "General system endpoints."),
-    (name = "VmImages", description = "Virtual machine images management endpoints."),
-    (name = "Vms", description = "Virtual machines management endpoints."),
-    (name = "Metrics", description = "Metrics management endpoints."),
-    (name = "Processes", description = "Processes management endpoints."),
-    (name = "Secrets", description = "Secrets management endpoints."),
-    (name = "Jobs", description = "Jobs management endpoints."),
-    (name = "Events", description = "Events management endpoints."),
+    // (name = "Namespaces", description = "Namespaces management endpoints."),
+    // (name = "Nodes", description = "Nodes management endpoints."),
+    // (name = "Resources", description = "Resources management endpoints."),
+    // (name = "System", description = "General system endpoints."),
+    // (name = "VmImages", description = "Virtual machine images management endpoints."),
+    // (name = "Vms", description = "Virtual machines management endpoints."),
+    // (name = "Metrics", description = "Metrics management endpoints."),
+    // (name = "Processes", description = "Processes management endpoints."),
+    // (name = "Secrets", description = "Secrets management endpoints."),
+    // (name = "Jobs", description = "Jobs management endpoints."),
+    // (name = "Events", description = "Events management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

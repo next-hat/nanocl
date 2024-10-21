@@ -3,8 +3,8 @@ use ntex::web;
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
-  cargo::CargoDeleteQuery,
-  cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
+  cargo::{Cargo, CargoDeleteQuery, CargoInspect, CargoSummary},
+  cargo_spec::{CargoSpec, CargoSpecPartial, CargoSpecUpdate},
   generic::{
     GenericClause, GenericCount, GenericListQueryNsp, GenericNspQuery,
   },
@@ -19,6 +19,9 @@ use crate::{
   repositories::generic::*,
   utils,
 };
+
+#[cfg(feature = "dev")]
+use super::openapi::ApiError;
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(

@@ -173,6 +173,8 @@ services:
       - 8585:8585
     networks:
       - nanoclbr0
+    environment:
+      - RUST_BACKTRACE=full
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo

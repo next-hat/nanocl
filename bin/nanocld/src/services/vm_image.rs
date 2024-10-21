@@ -7,7 +7,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  vm_image::VmImageResizePayload,
+  vm_image::{VmImage, VmImageResizePayload},
 };
 
 use crate::{

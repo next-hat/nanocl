@@ -27,13 +27,13 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       api_doc.to_yaml().expect("Unable to convert ApiDoc to yaml"),
     )
     .expect("Unable to write swagger.yaml");
-    let swagger_conf =
-      swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
-    config.service(
-      web::scope("/explorer/")
-        .state(swagger_conf)
-        .configure(swagger::register),
-    );
+    // let swagger_conf =
+    //   swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
+    // config.service(
+    //   web::scope("/explorer/")
+    //     .state(swagger_conf)
+    //     .configure(swagger::register),
+    // );
   }
   let versioning = middlewares::Versioning::new(vars::VERSION).finish();
   config.service(

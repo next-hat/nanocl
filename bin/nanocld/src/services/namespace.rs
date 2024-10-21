@@ -4,7 +4,9 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  namespace::NamespacePartial,
+  namespace::{
+    Namespace, NamespaceInspect, NamespacePartial, NamespaceSummary,
+  },
 };
 
 use crate::{
@@ -13,6 +15,9 @@ use crate::{
   repositories::generic::*,
   utils,
 };
+
+#[cfg(feature = "dev")]
+use super::openapi::ApiError;
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(

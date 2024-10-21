@@ -4,7 +4,9 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
   generic::{GenericCount, GenericListQuery},
-  resource_kind::{ResourceKindPartial, ResourceKindVersion},
+  resource_kind::{
+    ResourceKind, ResourceKindInspect, ResourceKindPartial, ResourceKindVersion,
+  },
 };
 
 use crate::{

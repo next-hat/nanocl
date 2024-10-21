@@ -3,10 +3,10 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
+use bollard_next::secret::ExecInspectResponse;
 use nanocl_stubs::generic::GenericNspQuery;
 
-use crate::models::SystemState;
-use crate::utils;
+use crate::{models::SystemState, utils};
 
 /// Inspect a command executed in a cargo
 #[cfg_attr(feature = "dev", utoipa::path(

@@ -4,22 +4,28 @@ use ntex::{util::Bytes, web};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-pub struct SwaggerConfig<'a> {
-  definition: utoipa::openapi::OpenApi,
-  config: Arc<utoipa_swagger_ui::Config<'a>>,
+pub struct SwaggerConfig {
+  config: Arc<utoipa_swagger_ui::Config<'static>>,
+  spec: Box<utoipa::openapi::OpenApi>,
 }
 
-impl<'a> SwaggerConfig<'a> {
-  pub fn new(definition: utoipa::openapi::OpenApi, def_url: &'a str) -> Self {
+impl SwaggerConfig {
+  pub fn new(
+    spec: Box<utoipa::openapi::OpenApi>,
+    def_url: &'static str,
+  ) -> Self {
     Self {
-      definition,
       config: Arc::new(
         utoipa_swagger_ui::Config::new([def_url]).use_base_layout(),
       ),
+      spec,
     }
   }
 
-  pub fn config(&mut self, config: utoipa_swagger_ui::Config<'a>) -> &mut Self {
+  pub fn config(
+    &mut self,
+    config: utoipa_swagger_ui::Config<'static>,
+  ) -> &mut Self {
     self.config = Arc::new(config);
     self
   }
@@ -27,11 +33,12 @@ impl<'a> SwaggerConfig<'a> {
 
 #[web::get("/swagger.json")]
 async fn get_specs(
-  openapi_conf: web::types::State<SwaggerConfig<'static>>,
+  openapi_conf: web::types::State<SwaggerConfig>,
 ) -> HttpResult<web::HttpResponse> {
-  let spec = openapi_conf.definition.to_json().map_err(|err| {
+  let spec = openapi_conf.spec.to_json().map_err(|err| {
     HttpError::internal_server_error(format!(
-      "Error generating OpenAPI spec: {err}",
+      "Failed to serialize OpenAPI: {}",
+      err
     ))
   })?;
   return Ok(
@@ -44,7 +51,7 @@ async fn get_specs(
 #[web::get("/{tail}*")]
 async fn get_swagger(
   tail: web::types::Path<String>,
-  openapi_conf: web::types::State<SwaggerConfig<'static>>,
+  openapi_conf: web::types::State<SwaggerConfig>,
 ) -> HttpResult<web::HttpResponse> {
   match utoipa_swagger_ui::serve(&tail, openapi_conf.config.clone())
     .map_err(|err| HttpError::internal_server_error(err.to_string()))?

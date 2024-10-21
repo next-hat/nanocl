@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: Nanocl Controller Proxy
   description: |
@@ -82,15 +82,50 @@ components:
           type: string
           description: Url to target
         Redirect:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/UrlRedirect'
-          nullable: true
+            description: Redirect type if it's a redirect
+      additionalProperties: false
+    LimitReq:
+      type: object
+      required:
+      - Burst
+      properties:
+        Burst:
+          type: integer
+          description: The burst size
+          minimum: 0
+        Delay:
+          type:
+          - integer
+          - 'null'
+          description: The delay to wait before retrying
+          minimum: 0
+      additionalProperties: false
+    LimitReqZone:
+      type: object
+      required:
+      - Size
+      - Rate
+      properties:
+        Size:
+          type: integer
+          description: The max size of the cache in megabytes
+          minimum: 0
+        Rate:
+          type: integer
+          description: The max number of request per second
+          minimum: 0
       additionalProperties: false
     LocationTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
+        description: Target an existing cargo
       - $ref: '#/components/schemas/HttpTarget'
+        description: Target a specific http url
       - $ref: '#/components/schemas/UnixTarget'
+        description: Target a specific unix socket
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
@@ -103,32 +138,59 @@ components:
           description: The path
         Target:
           $ref: '#/components/schemas/LocationTarget'
+          description: The target cargo
         LimitReq:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/LimitReq'
-          nullable: true
+            description: Setup limit request for this location
         AllowedIps:
-          type: array
+          type:
+          - array
+          - 'null'
           items:
             type: string
           description: Allowed ip addr
-          nullable: true
         Headers:
-          type: array
+          type:
+          - array
+          - 'null'
           items:
             type: string
           description: Extras header to add
-          nullable: true
         Version:
-          type: number
+          type:
+          - number
+          - 'null'
           format: double
           description: Http version to use
-          nullable: true
       additionalProperties: false
+    ProxyNetwork:
+      oneOf:
+      - type: string
+        enum:
+        - All
+      - type: string
+        enum:
+        - Local
+      - type: string
+        enum:
+        - Public
+      - type: string
+        enum:
+        - Internal
+      - type: object
+        required:
+        - Other
+        properties:
+          Other:
+            type: string
     ProxyRule:
       oneOf:
       - $ref: '#/components/schemas/ProxyRuleHttp'
+        description: Redirect http traffic
       - $ref: '#/components/schemas/ProxyRuleStream'
+        description: Redirect tcp and udp traffic
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
@@ -138,36 +200,42 @@ components:
       - Locations
       properties:
         Domain:
-          type: string
+          type:
+          - string
+          - 'null'
           description: The domain
-          nullable: true
         Port:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int32
           description: Port to listen on (default 80 or 443)
-          nullable: true
           minimum: 0
         Network:
           $ref: '#/components/schemas/ProxyNetwork'
+          description: Type of network binding
         LimitReqZone:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/LimitReqZone'
-          nullable: true
+            description: Optional limit request zone
         Locations:
           type: array
           items:
             $ref: '#/components/schemas/ProxyHttpLocation'
           description: The locations to handle multiple paths
         Ssl:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
-          nullable: true
+            description: The ssl configuration
         Includes:
-          type: array
+          type:
+          - array
+          - 'null'
           items:
             type: string
           description: Path to extra config file to include
-          nullable: true
       additionalProperties: false
     ProxyRuleStream:
       type: object
@@ -180,19 +248,23 @@ components:
       properties:
         Network:
           $ref: '#/components/schemas/ProxyNetwork'
+          description: Type of the network binding
         Protocol:
           $ref: '#/components/schemas/ProxyStreamProtocol'
+          description: Protocol to use Tcp | Udp
         Port:
           type: integer
           format: int32
           description: The port to open on nodes
           minimum: 0
         Ssl:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
-          nullable: true
+            description: The ssl configuration
         Target:
           $ref: '#/components/schemas/StreamTarget'
+          description: The target
       additionalProperties: false
     ProxySsl:
       oneOf:
@@ -211,17 +283,20 @@ components:
           type: string
           description: Path to the certificate key
         CertificateClient:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Path to the certificate client
-          nullable: true
         VerifyClient:
-          type: boolean
+          type:
+          - boolean
+          - 'null'
           description: Enable or disable client verification
-          nullable: true
         Dhparam:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Path to the dhparam file
-          nullable: true
       additionalProperties: false
     ProxyStreamProtocol:
       type: string
@@ -244,8 +319,11 @@ components:
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
+        description: Target an existing cargo
       - $ref: '#/components/schemas/UriTarget'
+        description: Target a specific uri
       - $ref: '#/components/schemas/UnixTarget'
+        description: Target a specific unix socket
     UnixTarget:
       type: object
       required:
@@ -270,17 +348,20 @@ components:
           description: The port of the cargo or the vm to target
           minimum: 0
         Path:
-          type: string
+          type:
+          - string
+          - 'null'
           description: The http path to target when using http
-          nullable: true
         DisableLogging:
-          type: boolean
+          type:
+          - boolean
+          - 'null'
           description: Disable logging for this target
-          nullable: true
         Ssl:
-          allOf:
+          oneOf:
+          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
-          nullable: true
+            description: SSL configuration for this target
       additionalProperties: false
     UriTarget:
       type: object

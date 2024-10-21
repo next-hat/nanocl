@@ -26,6 +26,7 @@ pub enum ProxyNetwork {
   Local,
   Public,
   Internal,
+  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   Other(IpAddr),
 }
 

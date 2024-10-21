@@ -5,7 +5,8 @@ use bollard_next::{secret::Network, service::SystemInfo};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::config::DaemonConfig;
+use super::config::DaemonConfig;
+use super::generic::Any;
 
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]

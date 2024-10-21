@@ -22,7 +22,8 @@ use nanocl_stubs::{
     GenericClause, GenericCount, GenericListQueryNsp, GenericNspQuery,
   },
   process::OutputLog,
-  vm_spec::{VmSpecPartial, VmSpecUpdate},
+  vm::{Vm, VmInspect, VmSummary},
+  vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate},
 };
 
 use crate::{
@@ -33,6 +34,9 @@ use crate::{
   repositories::generic::*,
   utils,
 };
+
+#[cfg(feature = "dev")]
+use super::openapi::ApiError;
 
 /// List virtual machines
 #[cfg_attr(feature = "dev", utoipa::path(

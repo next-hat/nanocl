@@ -1,6 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use super::generic::Any;
+
 pub use bollard_next::container::Config;
 pub use bollard_next::models::HealthConfig;
 pub use bollard_next::models::HostConfig;
