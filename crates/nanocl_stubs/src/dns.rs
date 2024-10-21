@@ -1,6 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use crate::generic::NetworkKind;
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -11,7 +13,7 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct DnsEntry {
   pub name: String,
-  pub ip_address: String,
+  pub ip_address: NetworkKind,
 }
 
 #[derive(Clone, Debug)]
@@ -23,6 +25,6 @@ pub struct DnsEntry {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct ResourceDnsRule {
-  pub network: String,
+  pub network: NetworkKind,
   pub entries: Vec<DnsEntry>,
 }

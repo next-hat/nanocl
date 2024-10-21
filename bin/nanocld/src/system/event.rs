@@ -36,7 +36,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     _ => {}
   }
   let instances =
-    ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool).await?;
   let (_, instance_failed, _, running) =
     utils::container::generic::count_status(&instances);
   log::debug!(
