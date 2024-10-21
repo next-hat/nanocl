@@ -2,10 +2,10 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
   stubs::{
+    generic::NetworkKind,
     process::Process,
     proxy::{
-      ProxyNetwork, ProxySsl, ProxySslConfig, StreamTarget, UnixTarget,
-      UpstreamTarget,
+      ProxySsl, ProxySslConfig, StreamTarget, UnixTarget, UpstreamTarget,
     },
   },
   NanocldClient,
@@ -94,22 +94,22 @@ pub async fn get_addresses(
 }
 
 pub async fn get_network_addr(
-  network: &ProxyNetwork,
+  network: &NetworkKind,
   port: u16,
   client: &NanocldClient,
 ) -> IoResult<String> {
   match network {
-    ProxyNetwork::All => Ok(format!("{port}")),
-    ProxyNetwork::Public => {
+    NetworkKind::All => Ok(format!("{port}")),
+    NetworkKind::Public => {
       let ip = get_host_addr(client).await?;
       Ok(format!("{ip}:{port}"))
     }
-    ProxyNetwork::Local => Ok(format!("127.0.0.1:{port}")),
-    ProxyNetwork::Internal => {
+    NetworkKind::Local => Ok(format!("127.0.0.1:{port}")),
+    NetworkKind::Internal => {
       let ip = get_bridge_addr(client).await?;
       Ok(format!("{ip}:{port}"))
     }
-    ProxyNetwork::Other(ip) => Ok(format!("{ip}:{port}")),
+    NetworkKind::Other(ip) => Ok(format!("{ip}:{port}")),
   }
 }
 
