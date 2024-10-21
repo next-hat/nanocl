@@ -211,7 +211,8 @@ impl ObjInspectByPk for VmDb {
   ) -> HttpResult<Self::ObjInspectOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let processes =
-      ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
+      ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
+        .await?;
     let (total, _, _, running_instances) =
       utils::container::generic::count_status(&processes);
     Ok(VmInspect {
