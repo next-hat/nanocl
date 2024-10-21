@@ -238,17 +238,30 @@ impl CargoDb {
       let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
         .await?
         .try_to_cargo_spec()?;
-      let processes =
-        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
-          .await?;
+      let filter = GenericFilter::new().r#where(
+        "data",
+        GenericClause::Contains(serde_json::json!({
+          "Config": {
+            "Labels": {
+              "io.nanocl.not-init-c": "true"
+            }
+          }
+        })),
+      );
+      let processes = ProcessDb::read_by_kind_key(
+        &cargo.spec.cargo_key,
+        Some(filter),
+        &state.inner.pool,
+      )
+      .await?;
       let (_, _, _, running) =
         utils::container::generic::count_status(&processes);
       cargo_summaries.push(CargoSummary {
         created_at: cargo.created_at,
         status: cargo.status,
         namespace_name: cargo.namespace_name,
-        instance_total: processes.len(),
         instance_running: running,
+        instance_total: processes.len(),
         spec: spec.clone(),
       });
     }

@@ -89,9 +89,12 @@ impl ObjDelByPk for CargoDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
-    let processes =
-      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
-        .await?;
+    let processes = ProcessDb::read_by_kind_key(
+      &cargo.spec.cargo_key,
+      None,
+      &state.inner.pool,
+    )
+    .await?;
     let (_, _, _, running) =
       utils::container::generic::count_status(&processes);
     if running > 0 && !opts.force.unwrap_or(false) {
@@ -272,7 +275,8 @@ impl ObjInspectByPk for CargoDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjInspectOut> {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
-    let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
+    let processes =
+      ProcessDb::read_by_kind_key(pk, None, &state.inner.pool).await?;
     let (_, _, _, running_instances) =
       utils::container::generic::count_status(&processes);
     let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;

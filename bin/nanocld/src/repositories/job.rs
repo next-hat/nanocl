@@ -155,7 +155,8 @@ impl JobDb {
       .iter()
       .map(|job| async {
         let instances =
-          ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
+          ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool)
+            .await?;
         let (
           instance_total,
           instance_failed,

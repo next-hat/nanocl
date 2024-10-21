@@ -7,12 +7,12 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 use vpnkitrc::stubs::*;
 
 use nanocl_utils::logger;
-use nanocld_client::stubs::proxy::{
-  ProxyNetwork, ProxyRule, ProxyRuleStream, ProxyStreamProtocol,
-  ResourceProxyRule,
-};
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::system::{Event, EventActorKind, NativeEventAction};
+use nanocld_client::stubs::{
+  generic::NetworkKind,
+  proxy::{ProxyRule, ProxyRuleStream, ProxyStreamProtocol, ResourceProxyRule},
+};
 use nanocld_client::NanocldClient;
 
 mod vars;
@@ -122,7 +122,7 @@ async fn on_event(
       for rule in r_proxy_rule.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
           match stream.network {
-            ProxyNetwork::All | ProxyNetwork::Public => {}
+            NetworkKind::All | NetworkKind::Public => {}
             _ => continue,
           }
           let port = rule_stream_to_vpnkit_port(&stream);
@@ -140,7 +140,7 @@ async fn on_event(
       for rule in resource.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
           match stream.network {
-            ProxyNetwork::All | ProxyNetwork::Public => {}
+            NetworkKind::All | NetworkKind::Public => {}
             _ => continue,
           }
           let port = rule_stream_to_vpnkit_port(&stream);

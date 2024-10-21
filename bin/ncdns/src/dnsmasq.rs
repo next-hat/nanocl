@@ -63,6 +63,7 @@ no-poll
 no-hosts
 proxy-dnssec
 except-interface=lo
+interface=nanoclbr0
 conf-dir={}/dnsmasq.d,*.conf
 ",
       &self.config_dir

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::IpAddr};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -284,4 +284,30 @@ pub enum ImagePullPolicy {
   /// Pull the image only if it not exist on the node
   #[default]
   IfNotPresent,
+}
+
+/// Network binding kinds
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum NetworkKind {
+  All,
+  Local,
+  Public,
+  Internal,
+  Other(IpAddr),
+}
+
+impl std::fmt::Display for NetworkKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      NetworkKind::All => write!(f, "All"),
+      NetworkKind::Local => write!(f, "Local"),
+      NetworkKind::Public => write!(f, "Public"),
+      NetworkKind::Internal => write!(f, "Internal"),
+      NetworkKind::Other(ip) => write!(f, "Ip({})", ip),
+    }
+  }
 }
