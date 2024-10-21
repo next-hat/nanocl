@@ -1,6 +1,6 @@
 Network: Internal
 Entries:
 - Name: test.com
-  IpAddress: 127.0.0.1
+  IpAddress: Local
 - Name: test1.com
   IpAddress: Internal
