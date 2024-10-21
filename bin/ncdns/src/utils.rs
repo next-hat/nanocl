@@ -1,7 +1,9 @@
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::{GenericClause, GenericFilter};
+use nanocld_client::stubs::generic::{
+  GenericClause, GenericFilter, NetworkKind,
+};
 use nanocld_client::NanocldClient;
 
 use crate::dnsmasq::Dnsmasq;
@@ -34,13 +36,13 @@ async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
 
 /// Get network address of given network
 async fn get_network_addr(
-  network: &str,
+  network: &NetworkKind,
   client: &NanocldClient,
 ) -> IoResult<String> {
   let addr = match network {
-    "Local" => "127.0.0.1".to_owned(),
-    "Public" => get_host_addr(client).await?,
-    "Internal" => get_bridge_addr(client).await?,
+    NetworkKind::Local => "127.0.0.1".to_owned(),
+    NetworkKind::Public => get_host_addr(client).await?,
+    NetworkKind::Internal => get_bridge_addr(client).await?,
     _ => {
       return Err(IoError::invalid_input(
         "Network",
@@ -91,18 +93,24 @@ pub(crate) async fn update_entries(
   let mut file_content =
     format!("bind-dynamic\nlisten-address={listen_address}\n");
   for entry in &entries {
-    let ip_address = match entry.ip_address.as_str() {
-      "Public" => get_host_addr(client).await?,
-      "Private" => "127.0.0.1".into(),
-      "Internal" => get_bridge_addr(client).await?,
-      _ => entry.ip_address.clone(),
+    let ip_address = match &entry.ip_address {
+      NetworkKind::Local => "127.0.0.1".to_owned(),
+      NetworkKind::Public => get_host_addr(client).await?,
+      NetworkKind::Internal => get_bridge_addr(client).await?,
+      NetworkKind::Other(ip) => ip.to_string(),
+      NetworkKind::All => {
+        return Err(IoError::invalid_input(
+          "Network",
+          "All network is not supported",
+        ))
+      }
     };
     let entry = &format!("address=/{}/{}", entry.name, ip_address);
     file_content += &format!("{entry}\n");
     log::debug!("utils::update_entries: {entry}");
   }
   dnsmasq
-    .write_config(&dns_rule.network, &file_content)
+    .write_config(&dns_rule.network.to_string(), &file_content)
     .await?;
   Ok(())
 }
@@ -112,7 +120,7 @@ pub(crate) async fn remove_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  let content = dnsmasq.read_config(&dns_rule.network).await?;
+  let content = dnsmasq.read_config(&dns_rule.network.to_string()).await?;
   log::debug!("{}", content);
   let mut file_content = String::new();
   let lines = content.lines();
@@ -133,11 +141,11 @@ pub(crate) async fn remove_entries(
   }
   log::debug!("{}", file_content);
   if file_content == empty_entries {
-    dnsmasq.remove_config(&dns_rule.network).await?;
+    dnsmasq.remove_config(&dns_rule.network.to_string()).await?;
     return Ok(());
   }
   dnsmasq
-    .write_config(&dns_rule.network, &file_content)
+    .write_config(&dns_rule.network.to_string(), &file_content)
     .await?;
   Ok(())
 }
