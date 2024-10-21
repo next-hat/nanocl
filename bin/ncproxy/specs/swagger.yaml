@@ -148,7 +148,7 @@ components:
           nullable: true
           minimum: 0
         Network:
-          $ref: '#/components/schemas/ProxyNetwork'
+          $ref: '#/components/schemas/NetworkKind'
         LimitReqZone:
           allOf:
           - $ref: '#/components/schemas/LimitReqZone'
@@ -179,7 +179,7 @@ components:
       - Target
       properties:
         Network:
-          $ref: '#/components/schemas/ProxyNetwork'
+          $ref: '#/components/schemas/NetworkKind'
         Protocol:
           $ref: '#/components/schemas/ProxyStreamProtocol'
         Port:

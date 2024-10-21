@@ -46,10 +46,7 @@ impl UserConfig {
       Ok(s) => s,
       Err(_) => return UserConfig::default(),
     };
-    match serde_yaml::from_str::<UserConfig>(&s) {
-      Ok(config) => config,
-      Err(_) => UserConfig::default(),
-    }
+    serde_yaml::from_str::<UserConfig>(&s).unwrap_or_default()
   }
 }
 

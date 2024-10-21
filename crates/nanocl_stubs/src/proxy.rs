@@ -1,7 +1,7 @@
-use std::net::IpAddr;
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use crate::generic::NetworkKind;
 
 /// Proxy rules modes
 #[derive(Debug, Clone)]
@@ -14,19 +14,6 @@ pub enum ProxyRule {
   Http(ProxyRuleHttp),
   /// Redirect tcp and udp traffic
   Stream(ProxyRuleStream),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum ProxyNetwork {
-  All,
-  Local,
-  Public,
-  Internal,
-  Other(IpAddr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -243,7 +230,7 @@ impl std::fmt::Display for ProxyStreamProtocol {
 )]
 pub struct ProxyRuleStream {
   /// Type of the network binding
-  pub network: ProxyNetwork,
+  pub network: NetworkKind,
   /// Protocol to use Tcp | Udp
   pub protocol: ProxyStreamProtocol,
   /// The port to open on nodes
@@ -347,7 +334,7 @@ pub struct ProxyRuleHttp {
   /// Port to listen on (default 80 or 443)
   pub port: Option<u16>,
   /// Type of network binding
-  pub network: ProxyNetwork,
+  pub network: NetworkKind,
   /// Optional limit request zone
   #[cfg_attr(
     feature = "serde",

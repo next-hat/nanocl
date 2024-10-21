@@ -79,7 +79,7 @@ components:
         Name:
           type: string
         IpAddress:
-          type: string
+          $ref: '#/components/schemas/NetworkKind'
       additionalProperties: false
     ResourceDnsRule:
       type: object
@@ -88,7 +88,7 @@ components:
       - Entries
       properties:
         Network:
-          type: string
+          $ref: '#/components/schemas/NetworkKind'
         Entries:
           type: array
           items:
