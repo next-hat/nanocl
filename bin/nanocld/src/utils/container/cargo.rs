@@ -23,7 +23,7 @@ use crate::{
   utils,
 };
 
-/// Function that execute the init container before the main cargo container
+/// Function that start and wait the status of the init container before the main cargo container
 ///
 async fn start_init_container(
   process: &Process,
@@ -66,6 +66,8 @@ async fn start_init_container(
   Ok(())
 }
 
+/// Function that create the init container of the cargo
+///
 async fn create_init_container(
   cargo: &Cargo,
   init_container: &Config,
@@ -124,11 +126,14 @@ pub async fn create(
   number: usize,
   state: &SystemState,
 ) -> IoResult<Vec<Process>> {
+  let data = serde_json::to_string(&cargo)?;
+  let new_data = super::generic::inject_data(&data, state).await?;
+  let cargo = serde_json::from_str::<Cargo>(&new_data)?;
   super::image::download(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo.spec.image_pull_secret.clone(),
     cargo.spec.image_pull_policy.clone().unwrap_or_default(),
-    cargo,
+    &cargo,
     state,
   )
   .await?;
@@ -152,6 +157,7 @@ pub async fn create(
     .collect::<Vec<usize>>()
     .into_iter()
     .map(move |current| {
+      let cargo = cargo.clone();
       let secret_envs = secret_envs.clone();
       async move {
         let ordinal_index = if current > 0 {
