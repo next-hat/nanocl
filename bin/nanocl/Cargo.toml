@@ -54,7 +54,6 @@ chrono = { version = "0.4", default-features = false, features = [
   "clock",
 ] }
 dialoguer = "0.11"
-termios = "0.3"
 liquid = { version = "0.26", features = ["stdlib"] }
 regex = "1.10"
 nanocld_client = { version = "0.16", features = ["tokio", "openssl"] }
@@ -66,13 +65,19 @@ nanocl_error = { version = "0.5", features = [
   "bollard",
   "serde_yaml",
 ] }
-nanocl_utils = { version = "0.7", features = ["unix"] }
 ctrlc = "3.4"
 toml = "0.8"
 ring = "0.17"
-nix = { version = "0.29", features = ["user"] }
 dotenvy = "0.15"
 openssl = "0.10"
 async-recursion = "1.1"
 url = "2.5"
 colored = "2.1.0"
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+nix = { version = "0.29", features = ["user"] }
+nanocl_utils = { version = "0.7", features = ["unix"] }
+termios = "0.3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+nanocl_utils = { version = "0.7" }
