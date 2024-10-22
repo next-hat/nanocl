@@ -15,7 +15,7 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: docker.io/cockroachdb/cockroach:v24.1.0
+    image: docker.io/cockroachdb/cockroach:v24.2.0
     entrypoint: /bin/sh
     tty: true
     networks:
