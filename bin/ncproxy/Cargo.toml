@@ -57,7 +57,7 @@ notify = { version = "6.1", default-features = false, features = [
 ] }
 nanocld_client = { version = "0.16", features = ["tokio"] }
 nanocl_utils = { version = "0.7", features = ["ntex", "logger", "versioning"] }
-utoipa = { version = "4.2", features = ["yaml"], optional = true }
+utoipa = { version = "5.1", features = ["yaml"], optional = true }
 chrono = { version = "0.4", default-features = false, features = [
   "std",
   "clock",
