@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.16.1"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48d9ce66a99d0104240e2d3e0c42ceb4afaa54e0039dfed072bb3ef04baadc83"
+checksum = "ff59bd469d346765ed5426af8360e3ee61f8298b1ed4d4caf5b87ee87aa2ab75"
 dependencies = [
  "base64",
  "bollard-next-stubs",
@@ -415,7 +415,7 @@ dependencies = [
  "hyper",
  "hyper-named-pipe",
  "hyper-util",
- "hyperlocal-next",
+ "hyperlocal",
  "log",
  "pin-project-lite",
  "schemars",
@@ -429,21 +429,21 @@ dependencies = [
  "tokio-util",
  "tower-service",
  "url",
- "utoipa",
+ "utoipa 5.1.1",
  "winapi",
 ]
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.44.0-rc.26.0.0"
+version = "1.45.1-rc.26.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7b7ba887e79a327b3eea9086f0c054eda4aa826a62f7ab113b8216c04da40bd"
+checksum = "0a2336d186d0a990753384ac6de5a689011ef584bdd01bdff04ceb8e9f852bde"
 dependencies = [
  "schemars",
  "serde",
  "serde_repr",
  "serde_with",
- "utoipa",
+ "utoipa 5.1.1",
 ]
 
 [[package]]
@@ -1449,6 +1449,7 @@ dependencies = [
  "http",
  "http-body",
  "httparse",
+ "httpdate",
  "itoa",
  "pin-project-lite",
  "smallvec",
@@ -1509,10 +1510,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyperlocal-next"
-version = "0.9.0"
+name = "hyperlocal"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acf569d43fa9848e510358c07b80f4adf34084ddc28c6a4a651ee8474c070dcc"
+checksum = "986c5ce3b994526b3cd75578e62554abd09f0899d6206de48b3e96ab34ccc8c7"
 dependencies = [
  "hex",
  "http-body-util",
@@ -2156,7 +2157,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 4.2.3",
  "uuid",
 ]
 
@@ -2174,7 +2175,7 @@ dependencies = [
  "ntex",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 4.2.3",
  "utoipa-swagger-ui",
 ]
 
@@ -2212,7 +2213,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa",
+ "utoipa 4.2.3",
  "uuid",
 ]
 
@@ -2259,7 +2260,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 4.2.3",
 ]
 
 [[package]]
@@ -2284,7 +2285,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 4.2.3",
 ]
 
 [[package]]
@@ -4094,7 +4095,19 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "utoipa-gen",
+ "utoipa-gen 4.3.1",
+]
+
+[[package]]
+name = "utoipa"
+version = "5.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8861811f7213bb866cd02319acb69a15b0ef8ca46874e805bd92d488c779036a"
+dependencies = [
+ "indexmap 2.6.0",
+ "serde",
+ "serde_json",
+ "utoipa-gen 5.1.1",
 ]
 
 [[package]]
@@ -4111,6 +4124,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "utoipa-gen"
+version = "5.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fadf94f07d67df4b15e6490dd9a9d59d7374849413e7f137eafe52fdcbd0db5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
 name = "utoipa-swagger-ui"
 version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4123,7 +4147,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "utoipa",
+ "utoipa 4.2.3",
  "zip",
 ]
 
