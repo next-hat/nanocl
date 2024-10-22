@@ -78,7 +78,7 @@ chrono = { version = "0.4", default-features = false, features = [
   "clock",
   "serde",
 ] }
-jsonschema = { version = "0.23", default-features = false }
+jsonschema = { version = "0.24", default-features = false }
 nanocld_client = { version = "0.16", features = ["tokio"] }
 metrsd_client = "0.5"
 nanocl_stubs = { version = "0.16", features = ["serde", "clap"] }
