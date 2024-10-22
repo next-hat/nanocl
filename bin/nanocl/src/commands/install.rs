@@ -22,6 +22,7 @@ use crate::{
 
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
+///
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   let home_dir = std::env::var("HOME").map_err(|err| {
     IoError::interrupted("Unable to get $HOME env variable", &err.to_string())

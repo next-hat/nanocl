@@ -4,6 +4,7 @@ pub mod ntex;
 #[cfg(feature = "logger")]
 pub mod logger;
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(feature = "unix")]
 pub mod unix;
 
