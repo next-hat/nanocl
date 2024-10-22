@@ -111,20 +111,30 @@ pub async fn install_image(
 pub fn connect(docker_host: &str) -> IoResult<Docker> {
   let docker = match &docker_host {
     docker_host if docker_host.starts_with("unix://") => {
-      let path = docker_host.trim_start_matches("unix://");
-      if !std::path::Path::new(&path).exists() {
-        return Err(IoError::not_found(
-          "Unix socket file can't be found at",
-          path,
+      #[cfg(not(target_os = "windows"))]
+      {
+        let path = docker_host.trim_start_matches("unix://");
+        if !std::path::Path::new(&path).exists() {
+          return Err(IoError::not_found(
+            "Unix socket file can't be found at",
+            path,
+          ));
+        }
+        Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(
+          |err| {
+            err.map_err_context(|| {
+              format!("Unable to connect to docker at {path}")
+            })
+          },
+        )?
+      }
+      #[cfg(target_os = "windows")]
+      {
+        return Err(IoError::invalid_data(
+          "Url",
+          "Unix socket file is not supported on windows",
         ));
       }
-      Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(
-        |err| {
-          err.map_err_context(|| {
-            format!("Unable to connect to docker at {path}")
-          })
-        },
-      )?
     }
     docker_host
       if docker_host.starts_with("http://")
