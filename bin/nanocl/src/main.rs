@@ -90,8 +90,28 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Version => commands::exec_version(&cli_conf).await,
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
-    Command::Install(args) => commands::exec_install(args).await,
-    Command::Uninstall(args) => commands::exec_uninstall(args).await,
+    Command::Install(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        commands::exec_install(args).await
+      }
+      #[cfg(target_os = "windows")]
+      {
+        println!("Install is not supported on windows yet");
+        Ok(())
+      }
+    }
+    Command::Uninstall(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        commands::exec_uninstall(args).await
+      }
+      #[cfg(target_os = "windows")]
+      {
+        println!("Uninstall is not supported on windows yet");
+        Ok(())
+      }
+    }
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
     Command::Context(args) => commands::exec_context(&cli_conf, args).await,
     Command::Info => commands::exec_info(&cli_conf).await,
