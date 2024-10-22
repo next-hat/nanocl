@@ -15,6 +15,7 @@ use crate::{
 
 /// Internal utils to emit an event when the state of a process kind changes
 /// Eg: (job, cargo, vm)
+///
 pub async fn emit(
   kind_key: &str,
   kind: &ProcessKind,
@@ -50,6 +51,7 @@ pub async fn emit(
 
 /// Count the status for the given instances
 /// Return a tuple with the total, failed, success and running instances
+///
 pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
@@ -93,6 +95,7 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
 /// Emit a starting event to the system for the related process object (job, cargo, vm)
 /// This will update the status of the process and emit a event
 /// So the system start to start the group of processes in the background
+///
 pub async fn emit_starting(
   kind_key: &str,
   kind: &ProcessKind,
@@ -121,6 +124,7 @@ pub async fn emit_starting(
 /// Emit a stopping event to the system for the related process object (job, cargo, vm)
 /// This will update the status of the process and emit a event
 /// So the system start to stop the group of processes in the background
+///
 pub async fn emit_stopping(
   kind_key: &str,
   kind: &ProcessKind,
@@ -144,9 +148,13 @@ pub async fn emit_stopping(
   Ok(())
 }
 
-/// Inject data into the payload
+/// Inject internal data into the payload
 /// eg: $$INTERNAL_GATEWAY
-pub async fn inject_data(data: &str, state: &SystemState) -> IoResult<String> {
+///
+pub async fn inject_data(
+  payload: &str,
+  state: &SystemState,
+) -> IoResult<String> {
   let network_gateway = state
     .inner
     .docker_api
@@ -167,6 +175,6 @@ pub async fn inject_data(data: &str, state: &SystemState) -> IoResult<String> {
     ));
   };
   let gateway_addr = network.gateway.clone().unwrap_or_default();
-  let new_data = data.replace("$$INTERNAL_GATEWAY", &gateway_addr);
+  let new_data = payload.replace("$$INTERNAL_GATEWAY", &gateway_addr);
   Ok(new_data)
 }

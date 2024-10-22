@@ -1,6 +1,7 @@
+#[cfg(not(target_os = "windows"))]
+use std::os::fd::AsRawFd;
 use std::{
   io::{Read, Write},
-  os::fd::AsRawFd,
   thread,
   time::Duration,
 };
@@ -10,6 +11,7 @@ use futures::{
   {SinkExt, StreamExt},
 };
 use ntex::{rt, time, util::Bytes, ws};
+#[cfg(not(target_os = "windows"))]
 use termios::{tcsetattr, Termios, ECHO, ICANON, TCSANOW};
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -112,7 +114,14 @@ pub async fn exec_vm_run(
     .await?;
   waiter.await??;
   if options.attach {
-    exec_vm_attach(cli_conf, args, &options.name).await?;
+    #[cfg(not(target_os = "windows"))]
+    {
+      exec_vm_attach(cli_conf, args, &options.name).await?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+      println!("Attach is not supported on windows yet");
+    }
   }
   Ok(())
 }
@@ -138,6 +147,7 @@ pub async fn exec_vm_patch(
 
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
+#[cfg(not(target_os = "windows"))]
 pub async fn exec_vm_attach(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -259,6 +269,16 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
-    VmCommand::Attach { name } => exec_vm_attach(cli_conf, args, name).await,
+    VmCommand::Attach { name } => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        exec_vm_attach(cli_conf, args, name).await
+      }
+      #[cfg(target_os = "windows")]
+      {
+        println!("Attach is not supported on windows yet");
+        Ok(())
+      }
+    }
   }
 }
