@@ -357,7 +357,7 @@ paths:
     get:
       tags:
       - Events
-      summary: Get events of all peer nodes
+      summary: List events with optional filter
       operationId: list_event
       parameters:
       - name: filter
