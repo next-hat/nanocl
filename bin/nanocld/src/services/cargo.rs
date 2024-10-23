@@ -39,7 +39,6 @@ pub async fn list_cargo(
   qs: web::types::Query<GenericListQueryNsp>,
 ) -> HttpResult<web::HttpResponse> {
   let query = utils::query_string::parse_qs_nsp_filter(&qs)?;
-  log::debug!("got query {query:#?}");
   let cargoes = CargoDb::list(&query, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
@@ -122,7 +121,6 @@ pub async fn delete_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("service::delete_cargo: {key}");
   CargoDb::del_obj_by_pk(&key, &qs, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }

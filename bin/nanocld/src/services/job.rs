@@ -32,7 +32,6 @@ pub async fn list_job(
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;
-  log::debug!("job filter {filter:#?}");
   let jobs = JobDb::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&jobs))
 }
