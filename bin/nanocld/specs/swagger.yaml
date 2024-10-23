@@ -866,7 +866,7 @@ paths:
     get:
       tags:
       - Processes
-      summary: List process (Vm, Job, Cargo)
+      summary: List all processes (Vm, Job, Cargo)
       operationId: list_processes
       parameters:
       - name: filter

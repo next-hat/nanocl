@@ -234,7 +234,7 @@ async fn ws_attach_service(
       let output = match output {
         Ok(output) => output,
         Err(e) => {
-          log::error!("Error reading from container: {}", e);
+          log::error!("Error reading output from process: {e}");
           break;
         }
       };
@@ -243,7 +243,7 @@ async fn ws_attach_service(
       let mut output = match output {
         Ok(output) => output,
         Err(e) => {
-          log::error!("Error serializing output: {}", e);
+          log::error!("Error serializing output: {e}");
           break;
         }
       };
@@ -260,7 +260,7 @@ async fn ws_attach_service(
       let cmd = match cmd {
         Ok(cmd) => cmd,
         Err(e) => {
-          log::error!("Error reading from container: {}", e);
+          log::error!("Error input for process: {e}");
           break;
         }
       };

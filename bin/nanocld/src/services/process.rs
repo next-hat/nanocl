@@ -24,7 +24,7 @@ use crate::{
   utils,
 };
 
-/// List process (Vm, Job, Cargo)
+/// List all processes (Vm, Job, Cargo)
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -77,7 +77,6 @@ async fn logs_processes(
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes =
     ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool).await?;
-  log::debug!("process::logs_process: {kind_key}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
     .into_iter()
