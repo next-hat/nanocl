@@ -45,7 +45,7 @@ paths:
     get:
       tags:
       - Cargoes
-      summary: List cargoes
+      summary: List cargoes with optional filter
       operationId: list_cargo
       parameters:
       - name: filter
@@ -58,7 +58,7 @@ paths:
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       - name: namespace
         in: query
-        description: Namespace where the cargoes are
+        description: Namespace where the cargoes are default to global namespace
         required: false
         schema:
           type: string
@@ -75,7 +75,7 @@ paths:
     post:
       tags:
       - Cargoes
-      summary: Create a new cargo
+      summary: Create a new cargo by it specification
       operationId: create_cargo
       parameters:
       - name: namespace
@@ -102,7 +102,7 @@ paths:
     get:
       tags:
       - Cargoes
-      summary: Count cargoes
+      summary: Count cargoes with optional filter
       operationId: count_cargo
       parameters:
       - name: filter
@@ -161,7 +161,7 @@ paths:
     put:
       tags:
       - Cargoes
-      summary: Create a new cargo spec and add history entry
+      summary: Update a cargo by it's new specification and create a history record
       operationId: put_cargo
       parameters:
       - name: name
@@ -195,7 +195,7 @@ paths:
     delete:
       tags:
       - Cargoes
-      summary: Delete a cargo
+      summary: Delete a cargo by it's name
       operationId: delete_cargo
       parameters:
       - name: name
@@ -206,14 +206,14 @@ paths:
           type: string
       - name: namespace
         in: query
-        description: Namespace where the cargo belongs
+        description: Namespace where the cargo belongs default to global namespace
         required: false
         schema:
           type: string
           nullable: true
       - name: force
         in: query
-        description: If true forces the delete operation
+        description: If true forces the delete operation even if the cargo is started
         required: true
         schema:
           type: boolean
@@ -225,7 +225,7 @@ paths:
     patch:
       tags:
       - Cargoes
-      summary: Patch a cargo spec meaning merging current spec with the new one and add history entry
+      summary: Patch a cargo with it's specification meaning merging current spec with the new one and add history record
       operationId: patch_cargo
       parameters:
       - name: name
@@ -236,7 +236,7 @@ paths:
           type: string
       - name: namespace
         in: query
-        description: Namespace where the cargo belongs
+        description: Namespace where the cargo belongs default to global namespace
         required: false
         schema:
           type: string
@@ -291,7 +291,7 @@ paths:
     patch:
       tags:
       - Cargoes
-      summary: Revert a cargo to a specific history
+      summary: Revert a cargo to a specific history record
       operationId: revert_cargo
       parameters:
       - name: name
@@ -308,7 +308,7 @@ paths:
           type: string
       - name: namespace
         in: query
-        description: Namespace where the cargo belongs
+        description: Namespace where the cargo belongs default to global namespace
         required: false
         schema:
           type: string
@@ -330,7 +330,7 @@ paths:
     get:
       tags:
       - Cargoes
-      summary: Get detailed information about a cargo
+      summary: Get detailed information about a cargo by its name
       operationId: inspect_cargo
       parameters:
       - name: name
