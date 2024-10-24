@@ -9,7 +9,7 @@ use crate::{
   utils,
 };
 
-/// Count metrics
+/// Count metrics with optional filter
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Metrics",

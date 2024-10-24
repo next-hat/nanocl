@@ -9,7 +9,7 @@ use crate::{
   utils,
 };
 
-/// Count events
+/// Count events with optional filter
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Events",
