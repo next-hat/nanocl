@@ -1,32 +1,32 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::generic::{GenericCount, GenericListQuery};
+use nanocl_stubs::generic::GenericListQuery;
 
 use crate::{
-  models::{EventDb, SystemState},
+  models::{MetricDb, SystemState},
   repositories::generic::*,
   utils,
 };
 
-/// Count events with optional filter
+/// List metrics with optional filter
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
-  tag = "Events",
-  path = "/events/count",
+  tag = "Metrics",
+  path = "/metrics",
   params(
     ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"kind\": { \"eq\": \"CPU\" } } } }"),
   ),
   responses(
-    (status = 200, description = "Count result", body = GenericCount),
+    (status = 200, description = "List of metrics", body = Vec<Metric>),
   ),
 ))]
-#[web::get("/events/count")]
-pub async fn count_event(
+#[web::get("/metrics")]
+pub async fn list_metric(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;
-  let count = EventDb::count_by(&filter, &state.inner.pool).await?;
-  Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
+  let metrics = MetricDb::read_by(&filter, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&metrics))
 }
