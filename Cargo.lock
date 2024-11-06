@@ -2326,9 +2326,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "2.7.0"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "223834e688405dcc46b5c28bc9225648c603e64d7b61e8903da33064b6f1464e"
+checksum = "d7b2a207ac0bec11a1cc6b44b2dcbcab3991b0482337f62a78c919bf13e1b4f2"
 dependencies = [
  "base64",
  "bitflags 2.6.0",
@@ -2461,9 +2461,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "2.7.1"
+version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80c49628e35ff52f36137a8e732261f392de621406a163571888f6163e3f6b10"
+checksum = "2ab41a7f7a96c6d1f9736d71efae9eb91c59274cb35757986eae9bd1fd76b052"
 dependencies = [
  "bitflags 2.6.0",
  "log",
@@ -2536,9 +2536,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-server"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b9c3f4b038d1bcc3aff4e457a4b8258828b8e119c9ef4fd1e42c8df5e732cee"
+checksum = "300921ed1f8626d7bfb06813ff839945eed08f763fbc1296590f878b8ee7f9e3"
 dependencies = [
  "async-broadcast",
  "async-channel 2.3.1",
@@ -2557,18 +2557,18 @@ dependencies = [
 
 [[package]]
 name = "ntex-service"
-version = "3.2.1"
+version = "3.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "690a43ea671c928c2bc5265abc5edae5b95f92a37efefa501013880c361d77d8"
+checksum = "62351b99deeb128baafbd71fc22e8ef93bef643fc60fbb51db8a45006f03cda1"
 dependencies = [
  "slab",
 ]
 
 [[package]]
 name = "ntex-tls"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e08948d9a1d27d11c474c374e6b8c0eee7e2dd4a288967d5dcce13d7adbd80e"
+checksum = "5b6df536ec6f8f2499f5e3a2e2893cfc1b775408ee0c917d0570821025dc22e3"
 dependencies = [
  "log",
  "ntex-bytes",
@@ -2594,9 +2594,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-util"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b95f0cf57859407e61c61a7e131cd339b05537046580b65abbf0a817f46917be"
+checksum = "10fc97836b6bf4044897370725b7fbcfecef9a8be29c352c35f8c0a587e2e721"
 dependencies = [
  "bitflags 2.6.0",
  "futures-core",
