@@ -95,13 +95,6 @@ jobs:
       # Run coverage
       - name: Run tests
         run: cargo make covgenci
-      # Upload it to codecov
-      - name: Codecov
-        uses: codecov/codecov-action@v4.6.0
-        with:
-          token: ${{ secrets.CODECOV }}
-          files: ./lcov.info
-          flags: unittests # optional
       # Fix permissions to upload artifacts
       - name: Fix perms
         run: |

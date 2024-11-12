@@ -21,7 +21,7 @@ ARG channel=stable
 ## Build our nanocl daemon binary
 COPY --from=planner /app /app
 WORKDIR /app
-RUN export ARCH=$(uname -m) && \
+RUN export ARCH=$(uname -m) &&
   rustup target add $ARCH-unknown-linux-musl
 RUN apk add --no-cache --upgrade \
   build-base \
@@ -53,15 +53,15 @@ COPY ./bin/ncdns/src ./bin/ncdns/src
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN export ARCH=$(uname -m) && \
+RUN export ARCH=$(uname -m) &&
   cargo build --release --target=$ARCH-unknown-linux-musl --features vendored --features release --bin nanocl
-RUN export ARCH=$(uname -m) && \
+RUN export ARCH=$(uname -m) &&
   cp /app/target/$ARCH-unknown-linux-musl/release/nanocl /bin/nanocl
 
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
 
-LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
+LABEL org.opencontainers.image.source=https://github.com/anonkey/nanocl
 LABEL org.opencontainers.image.description="Nanocl Cli"
 
 COPY --from=builder /bin/nanocl /bin/nanocl
