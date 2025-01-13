@@ -48,6 +48,7 @@ jobs:
           sudo chmod +x /usr/bin/nanocl
           sudo groupadd nanocl
           sudo usermod -aG nanocl $USER
+          sudo gpasswd -r nanocl
           newgrp nanocl
           nanocl install -t installer.yml
           sleep 20
@@ -59,4 +60,4 @@ jobs:
       # Run E2E tests
       - name: E2E
         run: |
-          bats ./tests/e2e.bats
+          bats --verbose-run ./tests/e2e.bats
