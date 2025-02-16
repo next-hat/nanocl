@@ -86,7 +86,7 @@ nanocl_utils = { version = "0.7", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "5", features = ["yaml"], optional = true }
 notify = "8.0"
 ntex-cors = "2"
-rand = "0.8"
+rand = "0.9"
 openssl = { version = "0.10" }
 ipnet = { version = "2.10.0", features = ["serde"] }
 num_cpus = "1.16.0"
