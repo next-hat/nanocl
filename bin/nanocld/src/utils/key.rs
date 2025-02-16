@@ -3,7 +3,7 @@
 /// or on the key of the parent for relational purpose.
 /// For example if we create a cargo `get-started` in the default namespace `global`
 /// The cargo key will be `get-started.global`
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distr::Alphanumeric, rng, Rng};
 
 use nanocl_error::{
   http::{HttpError, HttpResult},
@@ -44,7 +44,7 @@ pub fn validate_name(name: &str) -> HttpResult<()> {
 
 /// Generate a short id based on the length
 pub fn generate_short_id(length: usize) -> String {
-  let rng = thread_rng();
+  let rng = rng();
   let short_id: String = rng
     .sample_iter(&Alphanumeric)
     .take(length)
