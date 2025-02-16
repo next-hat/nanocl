@@ -20,7 +20,7 @@ pub struct Template<'a> {
   pub data: &'a str,
 }
 
-impl<'a> Template<'a> {
+impl Template<'_> {
   /// Compile a template with given object using liquid syntax
   pub fn compile(&self, obj: &dyn liquid::ObjectView) -> IoResult<String> {
     let template = liquid::ParserBuilder::with_stdlib()

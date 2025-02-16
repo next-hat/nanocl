@@ -24,12 +24,13 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.16.1
+    identifier: MIT OR Apache-2.0
+  version: v0.16.2
 servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.16.1
+      default: v0.16.2
       description: API version
 paths:
   /_ping:
@@ -53,18 +54,14 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       - name: namespace
         in: query
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: List of cargoes
@@ -85,9 +82,7 @@ paths:
         description: Namespace where to create the cargo default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -119,18 +114,14 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "my-cargo" } } } }'
       - name: namespace
         in: query
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Count result
@@ -155,9 +146,7 @@ paths:
         description: Namespace of the cargo
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -193,9 +182,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -238,9 +225,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '202':
           description: Cargo deleted
@@ -267,9 +252,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -307,9 +290,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: List of cargo histories
@@ -349,9 +330,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Cargo revert
@@ -383,9 +362,7 @@ paths:
         description: Namespace where the cargoes belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Cargo details
@@ -405,9 +382,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "kind": { "eq": "normal" } } } }'
       responses:
         '200':
@@ -430,9 +405,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "namespace_name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -563,9 +536,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "job-example" } } } }'
       responses:
         '200':
@@ -612,9 +583,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "key": { "eq": "job-example" } } } }'
       responses:
         '200':
@@ -677,9 +646,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "kind": { "eq": "CPU" } } } }'
       responses:
         '200':
@@ -726,9 +693,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "kind": { "eq": "ncproxy.io/http" } } } }'
       responses:
         '200':
@@ -775,9 +740,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
@@ -824,9 +787,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -897,9 +858,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
@@ -922,9 +881,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
@@ -956,9 +913,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "where": { "name": { "eq": "test" } } }'
       responses:
         '200':
@@ -981,9 +936,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -1018,9 +971,7 @@ paths:
         description: Namespace where the process belongs if needed
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -1056,51 +1007,39 @@ paths:
         description: Namespace of the process
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       - name: since
         in: query
         description: Only logs returned since timestamp
         required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: until
         in: query
         description: Only logs returned until timestamp
         required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: timestamps
         in: query
         description: Add timestamps to every log line
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       - name: follow
         in: query
         description: Boolean to return a stream or not
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       - name: tail
         in: query
         description: Only return the n last (integer) or all ('all') logs
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Process instances logs
@@ -1132,9 +1071,7 @@ paths:
         description: Namespace where the process belongs if needed
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '202':
           description: Process instances restarted
@@ -1164,9 +1101,7 @@ paths:
         description: Namespace where the process belongs if needed
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '202':
           description: Process instances started
@@ -1196,25 +1131,19 @@ paths:
         description: Namespace where the process belongs if needed
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       - name: stream
         in: query
         description: Return a stream of stats
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       - name: one_shot
         in: query
         description: Return stats only once
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       responses:
         '200':
           description: Process stats
@@ -1254,9 +1183,7 @@ paths:
         description: Namespace where the process belongs if needed
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '202':
           description: Process instances stopped
@@ -1336,43 +1263,33 @@ paths:
         description: Only logs returned since timestamp
         required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: until
         in: query
         description: Only logs returned until timestamp
         required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: timestamps
         in: query
         description: Add timestamps to every log line
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       - name: follow
         in: query
         description: Boolean to return a stream or not
         required: false
         schema:
-          type:
-          - boolean
-          - 'null'
+          type: boolean
       - name: tail
         in: query
         description: Only return the n last (integer) or all ('all') logs
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Process instances logs
@@ -1407,9 +1324,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       responses:
         '200':
@@ -1456,9 +1371,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -1577,9 +1490,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "kind": { "eq": "ncproxy.io/rule" } } } }'
       responses:
         '200':
@@ -1626,9 +1537,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -1788,9 +1697,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "kind": { "eq": "Env" } } } }'
       responses:
         '200':
@@ -1837,9 +1744,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
       responses:
         '200':
@@ -1952,18 +1857,14 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "my-vm" } } } }'
       - name: namespace
         in: query
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: List of virtual machine
@@ -1984,9 +1885,7 @@ paths:
         description: The namespace of the virtual machine
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -2018,9 +1917,7 @@ paths:
         description: Generic filter
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
         example: '{ "filter": { "where": { "name": { "eq": "my-image" } } } }'
       responses:
         '200':
@@ -2189,9 +2086,7 @@ paths:
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: The virtual machine has been deleted
@@ -2218,9 +2113,7 @@ paths:
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       requestBody:
         content:
           application/json:
@@ -2258,9 +2151,7 @@ paths:
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '101':
           description: Websocket connection
@@ -2282,9 +2173,7 @@ paths:
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: The virtual machine histories have been listed
@@ -2318,9 +2207,7 @@ paths:
         description: Namespace where the virtual machine belongs default to 'global'
         required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Detailed information about a virtual machine

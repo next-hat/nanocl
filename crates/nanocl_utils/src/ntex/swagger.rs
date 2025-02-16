@@ -34,11 +34,11 @@ async fn get_specs(
       "Error generating OpenAPI spec: {err}",
     ))
   })?;
-  return Ok(
+  Ok(
     web::HttpResponse::Ok()
       .content_type("application/json")
       .body(spec),
-  );
+  )
 }
 
 #[web::get("/{tail}*")]

@@ -226,7 +226,7 @@ mod tests {
       )
       .finish();
     let mut res = client
-      .get("https://0.0.0.0:6443/v0.14/version")
+      .get("https://0.0.0.0:6443/v0.16/version")
       .timeout(Duration::from_secs(10))
       .send()
       .await
@@ -257,7 +257,7 @@ mod tests {
       .connector(Connector::default().openssl(builder.build()).finish())
       .finish();
     let res = client
-      .get("https://0.0.0.0:4443/v0.14/version")
+      .get("https://0.0.0.0:4443/v0.16/version")
       .send()
       .await;
     assert!(res.is_err());
