@@ -1,7 +1,6 @@
 use ntex::web;
 
 use nanocl_error::http::HttpError;
-
 use nanocld_client::stubs::proxy::ResourceProxyRule;
 
 use crate::{models::SystemStateRef, utils};

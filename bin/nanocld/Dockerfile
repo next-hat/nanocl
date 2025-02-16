@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-FROM --platform=$BUILDPLATFORM rust:1.82.0-alpine3.20 as planner
+FROM --platform=$BUILDPLATFORM rust:1.84.1-alpine3.21 as planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -15,7 +15,7 @@ COPY ./bin/ncvpnkit/Cargo.toml ./bin/ncvpnkit/Cargo.toml
 COPY ./bin/ncdns/Cargo.toml ./bin/ncdns/Cargo.toml
 
 # stage 2 - Build our project
-FROM --platform=$BUILDPLATFORM rust:1.82.0-alpine3.20 as builder
+FROM --platform=$BUILDPLATFORM rust:1.84.1-alpine3.21 as builder
 
 ARG channel=stable
 ## Build our nanocl daemon binary
@@ -48,7 +48,7 @@ RUN cargo build --release --features release --bin nanocld
 RUN cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.20.3
+FROM --platform=$BUILDPLATFORM alpine:3.21.3
 
 ## Install dependencies
 RUN apk --update add libgcc \

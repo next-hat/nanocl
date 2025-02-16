@@ -75,8 +75,7 @@ mod tests {
 
   use super::ntex_config;
 
-  use crate::utils::tests::*;
-  use crate::vars;
+  use crate::{utils::tests::*, vars};
 
   #[ntex::test]
   pub async fn get_version() {
