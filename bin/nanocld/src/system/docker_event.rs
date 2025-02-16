@@ -110,10 +110,15 @@ async fn exec_docker(
       if !name.starts_with("tmp-") && !name.starts_with("init-") {
         let actual_status =
           ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
-        log::debug!("Event status wanted {}", actual_status.wanted);
-        match (&kind, &actual_status.wanted) {
-          (EventActorKind::Cargo, status)
-            if status != &ObjPsStatusKind::Stop.to_string() =>
+        log::debug!(
+          "Event status wanted/prev_actual {}/{}",
+          actual_status.wanted,
+          actual_status.prev_actual
+        );
+        match (&kind, &actual_status.wanted, &actual_status.prev_actual) {
+          (EventActorKind::Cargo, wanted, prev_actual)
+            if wanted != &ObjPsStatusKind::Stop.to_string()
+              && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
           {
             log::debug!("Set cargo status to fail");
             ObjPsStatusDb::update_actual_status(
@@ -131,8 +136,9 @@ async fn exec_docker(
               Some(format!("process {name} die but should be alive")),
             );
           }
-          (EventActorKind::Vm, status)
-            if status != &ObjPsStatusKind::Stop.to_string() =>
+          (EventActorKind::Vm, wanted, prev_actual)
+            if wanted != &ObjPsStatusKind::Stop.to_string()
+              && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
           {
             ObjPsStatusDb::update_actual_status(
               &kind_key,

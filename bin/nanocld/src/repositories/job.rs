@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use futures_util::stream::FuturesUnordered;
+use futures::stream::FuturesOrdered;
 use futures_util::StreamExt;
 
 use nanocl_error::{
@@ -73,10 +73,12 @@ impl RepositoryReadBy for JobDb {
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
+    log::debug!("job filter: {:?}", filter);
     query = gen_sql_query!(query, filter, columns);
     if let Some(orders) = &filter.order_by {
       query = gen_sql_order_by!(query, orders, columns);
     } else {
+      log::debug!("job default order by created_at.desc()");
       query = query.order(jobs::created_at.desc());
     }
     if is_multiple {
@@ -171,7 +173,7 @@ impl JobDb {
           spec: job.clone(),
         })
       })
-      .collect::<FuturesUnordered<_>>()
+      .collect::<FuturesOrdered<_>>()
       .collect::<Vec<HttpResult<_>>>()
       .await
       .into_iter()
