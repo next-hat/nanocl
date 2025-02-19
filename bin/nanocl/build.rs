@@ -7,8 +7,6 @@ use nanocl_utils::build_tools::*;
 
 include!("./src/models/mod.rs");
 
-/// ## MAN PATH
-///
 /// Path where to render the man pages
 ///
 const MAN_PATH: &str = "./target/man";
@@ -25,8 +23,6 @@ fn generate_man_recurr(base_name: &str, app: &clap::Command) -> Result<()> {
   Ok(())
 }
 
-/// ## Generate man pages
-///
 /// Generate manpage for nanocl and all subcommands
 /// and write them inside [MAN_PATH](MAN_PATH)
 ///
@@ -38,8 +34,6 @@ pub fn generate_man_pages() -> Result<()> {
   Ok(())
 }
 
-/// ## Main
-///
 /// Main entrypoint of the build script
 /// The build script will add some environment variables for the production build.
 /// In order to track bug in a better way, the channel,

@@ -2076,7 +2076,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.16.2"
+version = "0.16.3"
 dependencies = [
  "async-recursion",
  "bollard-next",
@@ -2157,7 +2157,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld"
-version = "0.16.2"
+version = "0.16.3"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2220,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "ncdns"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2241,7 +2241,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2266,7 +2266,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "futures-util",
  "log",
@@ -3058,9 +3058,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b08f3c9802962f7e1b25113931d94f43ed9725bebc59db9d0c3e9a23b67e15ff"
+checksum = "a88e0da7a2c97baa202165137c158d0a2e824ac465d13d81046727b34cb247d3"
 dependencies = [
  "getrandom 0.3.1",
  "zerocopy 0.8.18",
@@ -3593,9 +3593,9 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.16.0"
+version = "3.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38c246215d7d24f48ae091a2902398798e05d978b24315d6efbc00ede9a8bb91"
+checksum = "22e5a0acb1f3f55f65cc4a866c361b2fb2a0ff6366785ae6fbb5f85df07ba230"
 dependencies = [
  "cfg-if",
  "fastrand 2.3.0",
@@ -3803,9 +3803,9 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "typenum"
-version = "1.17.0"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "ucd-trie"
@@ -3923,9 +3923,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.13.1"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced87ca4be083373936a67f8de945faa23b6b42384bd5b64434850802c6dccd0"
+checksum = "8c1f41ffb7cf259f1ecc2876861a17e7142e63ead296f671f81f6ae85903e0d6"
 dependencies = [
  "getrandom 0.3.1",
  "serde",

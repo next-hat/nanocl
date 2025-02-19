@@ -118,6 +118,7 @@ async fn exec_docker(
         match (&kind, &actual_status.wanted, &actual_status.prev_actual) {
           (EventActorKind::Cargo, wanted, prev_actual)
             if wanted != &ObjPsStatusKind::Stop.to_string()
+              && wanted != &ObjPsStatusKind::Destroy.to_string()
               && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
           {
             log::debug!("Set cargo status to fail");
@@ -138,6 +139,7 @@ async fn exec_docker(
           }
           (EventActorKind::Vm, wanted, prev_actual)
             if wanted != &ObjPsStatusKind::Stop.to_string()
+              && wanted != &ObjPsStatusKind::Destroy.to_string()
               && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
           {
             ObjPsStatusDb::update_actual_status(
