@@ -992,7 +992,9 @@ async fn state_remove(
   };
   if let Some(jobs) = &state_file.data.jobs {
     gen_rm_opts.keys = jobs.iter().map(|job| job.name.clone()).collect();
-    let _ = JobArg::exec_rm(client, &gen_rm_opts, None).await;
+    if let Err(err) = JobArg::exec_rm(client, &gen_rm_opts, None).await {
+      eprintln!("Error while removing jobs {err}");
+    }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
@@ -1000,24 +1002,35 @@ async fn state_remove(
       skip_confirm: true,
       others: GenericRemoveForceOpts { force: true },
     };
-    let _ = CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
+    if let Err(err) =
+      CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await
+    {
+      eprintln!("Error while removing cargoes {err}");
+    }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
     gen_rm_opts.keys = vms.iter().map(|vm| vm.name.clone()).collect();
-    let _ =
-      VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await;
+    if let Err(err) =
+      VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await
+    {
+      eprintln!("Error while removing vms {err}");
+    }
   }
   if let Some(resources) = &state_file.data.resources {
     gen_rm_opts.keys = resources
       .iter()
       .map(|resource| resource.name.clone())
       .collect();
-    let _ = ResourceArg::exec_rm(client, &gen_rm_opts, None).await;
+    if let Err(err) = ResourceArg::exec_rm(client, &gen_rm_opts, None).await {
+      eprintln!("Error while removing resources {err}");
+    }
   }
   if let Some(secrets) = &state_file.data.secrets {
     gen_rm_opts.keys =
       secrets.iter().map(|secret| secret.name.clone()).collect();
-    let _ = SecretArg::exec_rm(client, &gen_rm_opts, None).await;
+    if let Err(err) = SecretArg::exec_rm(client, &gen_rm_opts, None).await {
+      eprintln!("Error while removing secrets {err}");
+    }
   }
   Ok(())
 }
