@@ -91,7 +91,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.82.0-aarch64-apple-darwin
+          toolchain: 1.84.1-aarch64-apple-darwin
       - name: Set info
         run: |
           echo "CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
