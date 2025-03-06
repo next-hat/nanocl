@@ -136,6 +136,7 @@ impl Modify for VersionModifier {
     process::count_processes,
     process::inspect_process,
     process::start_process_by_pk,
+    process::process_stats_by_name,
     // Event
     event::list_event,
     event::watch_event,

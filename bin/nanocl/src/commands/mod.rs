@@ -14,6 +14,7 @@ mod process;
 mod resource;
 mod secret;
 mod state;
+mod stats;
 #[cfg(not(target_os = "windows"))]
 mod uninstall;
 mod version;
@@ -37,6 +38,7 @@ pub use process::{exec_process, inspect_process, logs_process};
 pub use resource::exec_resource;
 pub use secret::exec_secret;
 pub use state::exec_state;
+pub use stats::exec_stats;
 #[cfg(not(target_os = "windows"))]
 pub use uninstall::exec_uninstall;
 pub use version::exec_version;

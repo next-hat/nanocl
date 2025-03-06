@@ -213,6 +213,18 @@ impl NanocldClient {
       .await?;
     Ok(Self::res_stream(res).await)
   }
+  /// The stats are streamed as a [Receiver](Receiver) of [stats](Stats)
+  /// It get the stats by key name(returned by nanocl ps) instead of name and kind
+  pub async fn stats_process_by_name(
+    &self,
+    name: &str,
+  ) -> HttpClientResult<Receiver<HttpResult<ProcessStats>>> {
+    let query: Option<&ProcessStatsQuery> = None;
+    let res = self
+      .send_get(&format!("/process/{name}/stats"), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
+  }
 
   /// Inspect a process by it's name
   ///
@@ -259,6 +271,17 @@ mod tests {
       )
       .await
       .unwrap();
+    let _out = rx.next().await.unwrap().unwrap();
+  }
+
+  #[ntex::test]
+  async fn process_stats_by_name() { 
+    let client = NanocldClient::connect_to(&ConnectOpts{
+        url: "http://nanocl.internal:8585".into(),
+        ..Default::default()
+        })
+        .expect("Failed to create a nanocl client");
+    let mut rx = client.stats_process_by_name("nstore.system.c").await.unwrap();
     let _out = rx.next().await.unwrap().unwrap();
   }
 
