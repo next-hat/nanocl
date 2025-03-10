@@ -17,7 +17,7 @@ info:
     All responses have a wildcard same-origin which makes them completely public and accessible to everyone, including any code on any site.
   license:
     name: ''
-  version: v0.8.2
+  version: v0.8.3
 servers:
 - url: /{Version}
   variables:
