@@ -3980,9 +3980,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vpnkitrc"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb13eb8fca6597c54abd81f00a71c38dd4ffeb6952910a50a35a8235cca8fb8b"
+checksum = "92793f2a0a2e1ae5e16260dc5207f595e14085e9a2c73055f0f9eeef1bb2e893"
 dependencies = [
  "ntex",
  "serde",
