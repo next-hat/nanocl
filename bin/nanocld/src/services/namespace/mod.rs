@@ -82,6 +82,24 @@ mod test_namespace {
       .await;
     assert!(res.status().is_success(), "Expect success on delete");
   }
+  async fn forbidden_delete(client: &TestClient) {
+    let global_del_res = client
+      .send_delete(&format!("{ENDPOINT}/global"), None::<String>)
+      .await;
+    let system_del_res = client
+      .send_delete(&format!("{ENDPOINT}/system"), None::<String>)
+      .await;
+    assert_eq!(
+      global_del_res.status(),
+      ntex::http::StatusCode::FORBIDDEN,
+      "Expect deletion of global namespace to be forbidden"
+    );
+    assert_eq!(
+      system_del_res.status(),
+      ntex::http::StatusCode::FORBIDDEN,
+      "Expect deletion of system namespace to be forbidden"
+    );
+  }
 
   #[ntex::test]
   async fn basic() {
@@ -92,6 +110,7 @@ mod test_namespace {
     inspect_by_id(&client).await;
     list(&client).await;
     delete(&client).await;
+    forbidden_delete(&client).await;
     system.state.wait_event_loop().await;
   }
 }
