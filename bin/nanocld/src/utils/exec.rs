@@ -1,10 +1,9 @@
 use ntex::web;
 
-use bollard_next::service::ExecInspectResponse;
-
 use bollard_next::{
   container::LogOutput,
   exec::{CreateExecResults, StartExecOptions, StartExecResults},
+  service::ExecInspectResponse,
 };
 
 use nanocl_error::http::HttpResult;
@@ -53,7 +52,7 @@ pub async fn start_exec_command(
   }
 }
 
-/// Inspect a command runned in a cargo instance and return the exec infos
+/// Inspect a command running in a cargo instance and return the exec infos
 pub async fn inspect_exec_command(
   exec_id: &str,
   state: &SystemState,

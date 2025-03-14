@@ -812,6 +812,12 @@ paths:
       responses:
         '202':
           description: Namespace have been deleted
+        '403':
+          description: Deletion of this namespace is forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: Namespace is not existing
           content:
