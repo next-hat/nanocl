@@ -10,7 +10,7 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: docker.io/cockroachdb/cockroach:v24.2.4
+    Image: docker.io/cockroachdb/cockroach:v24.3.8
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:
@@ -38,7 +38,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/metrsd:0.5.6
     # {% else %}
-    Image: ghcr.io/next-hat/metrsd:0.5.5
+    Image: ghcr.io/next-hat/metrsd:0.5.6
     # {% endif %}
     Tty: true
     Cmd:
@@ -57,7 +57,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nproxy:1.26.0-n0.13.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/nproxy:1.26.0-n0.13
+    Image: ghcr.io/next-hat/nproxy:1.26.0-n0.13.3
     # {% endif %}
     Tty: true
     Env:
@@ -78,7 +78,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncproxy:0.13.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncproxy:0.13.2
+    Image: ghcr.io/next-hat/ncproxy:0.13.3
     # {% endif %}
     Tty: true
     Cmd:
@@ -98,7 +98,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ndns:2.90.0-n0.8.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ndns:2.90.0-n0.8
+    Image: ghcr.io/next-hat/ndns:2.90.0-n0.8.3
     # {% endif %}
     Env:
     - STATE_DIR=${{ state_dir }}/dns
@@ -112,7 +112,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncdns:0.8.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncdns:0.8.2
+    Image: ghcr.io/next-hat/ncdns:0.8.3
     # {% endif %}
     Tty: true
     Cmd:
@@ -136,7 +136,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nanocld:0.16.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/nanocld:0.16.2
+    Image: ghcr.io/next-hat/nanocld:0.16.3
     # {% endif %}
     Tty: true
     Hostname: nanocl.internal
@@ -183,7 +183,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncvpnkit:0.6.3-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncvpnkit:0.6.2
+    Image: ghcr.io/next-hat/ncvpnkit:0.6.3
     # {% endif %}
     Tty: true
     Hostname: ncvpnkit.nanocl.internal
