@@ -1,5 +1,5 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.84.1-alpine3.21
+FROM --platform=$BUILDPLATFORM rust:1.85.0-alpine3.21
 
 RUN apk add --update \
   gcc \

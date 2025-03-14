@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Endpoint `GET /process/{name}/stats` to get process stats by it's name by [n0tank3sh](https://github.com/n0tank3sh)
 
+### Fixed
+
+- Fixed vulnerability that allowed deletion of critical namespaces (global and system) by [n0tank3sh](https://github.com/n0tank3sh)
+
+## [0.16.3] - unreleased
+
+### Fixed
+
+- Fix docker event error handling when an container die
+
 ## [0.16.2] - 2024-11-24
 
 ### Changed

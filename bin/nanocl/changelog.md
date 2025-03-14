@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [untagged] - yyyy-mm-dd 
 
 ### Added
+
 - `nanocl stats` to get stats of multiple processes by name [n0tank3sh](https://github.com/n0tank3sh) 
+
+## [0.16.3] - unreleased
+
+### Fixed
+
+- Fix `nanocl state rm` error handling.
 
 ## [0.16.2] - 2024-11-24
 

@@ -25,12 +25,12 @@ info:
   license:
     name: MIT OR Apache-2.0
     identifier: MIT OR Apache-2.0
-  version: v0.16.2
+  version: v0.16.3
 servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.16.2
+      default: v0.16.3
       description: API version
 paths:
   /_ping:
@@ -812,6 +812,12 @@ paths:
       responses:
         '202':
           description: Namespace have been deleted
+        '403':
+          description: Deletion of this namespace is forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: Namespace is not existing
           content:
