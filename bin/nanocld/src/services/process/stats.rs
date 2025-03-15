@@ -70,7 +70,9 @@ pub async fn stats_processes(
   tag = "Processes",
   path = "/process/{name}/stats",
   params(
-    ("name" = String, Path, description = "Name of the process", example = "deploy-example")
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
+    ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
   ),
   responses(
     (status = 200, description = "Process stats", content_type = "application/vdn.nanocl.raw-stream", body = ProcessStats),
@@ -81,13 +83,15 @@ pub async fn stats_processes(
 pub async fn process_stats_by_name(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
+  qs: web::types::Query<ProcessStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, process) = path.into_inner();
+  let opts: StatsOptions = qs.clone().into();
   let stream =
     state
       .inner
       .docker_api
-      .stats(&process, None)
+      .stats(&process, Some(opts))
       .map(move |elem| match elem {
         Ok(stats) => Ok(ProcessStats {
           name: process.clone(),

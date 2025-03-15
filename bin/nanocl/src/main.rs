@@ -820,7 +820,9 @@ mod tests {
 
   #[ntex::test]
   async fn stats() {
-    assert_cli_ok!("stats", "nstore.system.c");
+    ntex::rt::spawn(async {
+      assert_cli_ok!("stats", "nstore.system.c");
+    });
   }
 
   #[ntex::test]

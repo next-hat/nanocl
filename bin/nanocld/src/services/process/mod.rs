@@ -74,11 +74,17 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
   }
   #[ntex::test]
-  async fn test_process_stats_by_name() { 
+  async fn test_process_stats_by_name() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let res =  client.send_get("/process/nstore.system.c/stats", None::<String>).await;
-    test_status_code!(res.status(), http::StatusCode::OK, "process by name stats");
+    let res = client
+      .send_get("/process/nstore.system.c/stats", None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "process by name stats"
+    );
   }
   #[ntex::test]
   async fn list_by() {
