@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `nanocl stats` to get stats of multiple processes by name [n0tank3sh](https://github.com/n0tank3sh) 
 
-## [0.16.3] - unreleased
+## [0.16.3] - 2025-03-14
 
 ### Fixed
 
