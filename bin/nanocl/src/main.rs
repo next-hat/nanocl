@@ -92,6 +92,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Secret(args) => commands::exec_secret(&cli_conf, args).await,
     Command::Event(args) => commands::exec_event(&cli_conf, args).await,
     Command::State(args) => commands::exec_state(&cli_conf, args).await,
+    Command::Stats(args) => commands::exec_stats(&cli_conf, args).await,
     Command::Version => commands::exec_version(&cli_conf).await,
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
     Command::Logs(args) => commands::logs_process(&cli_conf, args).await,
@@ -815,6 +816,13 @@ mod tests {
     assert_cli_ok!("vm", "run", "test-cli-vm", "test-cli-image");
     assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
     assert_cli_ok!("vm", "image", "rm", "-y", "test-cli-image");
+  }
+
+  #[ntex::test]
+  async fn stats() {
+    ntex::rt::spawn(async {
+      assert_cli_ok!("stats", "nstore.system.c");
+    });
   }
 
   #[ntex::test]

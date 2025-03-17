@@ -16,6 +16,7 @@ mod process;
 mod resource;
 mod secret;
 mod state;
+mod stats;
 mod uninstall;
 mod version;
 mod vm;
@@ -35,6 +36,7 @@ pub use process::*;
 pub use resource::*;
 pub use secret::*;
 pub use state::*;
+pub use stats::*;
 pub use uninstall::*;
 pub use vm::*;
 pub use vm_image::*;
@@ -129,6 +131,8 @@ pub enum Command {
   Uninstall(UninstallOpts),
   /// Backup the current state
   Backup(BackupOpts),
+  /// Stats of the process
+  Stats(StatsOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

@@ -63,3 +63,47 @@ pub async fn stats_processes(
       ),
   )
 }
+
+/// Get stats of a process by it's key name
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/process/{name}/stats",
+  params(
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
+    ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
+  ),
+  responses(
+    (status = 200, description = "Process stats", content_type = "application/vdn.nanocl.raw-stream", body = ProcessStats),
+    (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
+  )
+))]
+#[web::get("/process/{name}/stats")]
+pub async fn process_stats_by_name(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<ProcessStatsQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, process) = path.into_inner();
+  let opts: StatsOptions = qs.clone().into();
+  let stream =
+    state
+      .inner
+      .docker_api
+      .stats(&process, Some(opts))
+      .map(move |elem| match elem {
+        Ok(stats) => Ok(ProcessStats {
+          name: process.clone(),
+          stats,
+        }),
+        Err(err) => Err(err),
+      });
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(
+        utils::stream::transform_stream::<ProcessStats, ProcessStats>(stream),
+      ),
+  )
+}
