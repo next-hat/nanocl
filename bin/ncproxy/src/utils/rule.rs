@@ -5,7 +5,8 @@ use nanocld_client::{
     generic::NetworkKind,
     process::Process,
     proxy::{
-      ProxySsl, ProxySslConfig, StreamTarget, UnixTarget, UpstreamTarget,
+      Hsts, HstsConfig, ProxySsl, ProxySslConfig, StreamTarget, UnixTarget,
+      UpstreamTarget,
     },
   },
   NanocldClient,
@@ -111,6 +112,30 @@ pub async fn get_network_addr(
     }
     NetworkKind::Other(ip) => Ok(format!("{ip}:{port}")),
   }
+}
+
+// Generate the hsts config
+pub async fn gen_hsts_config(hsts: Option<Hsts>) -> Option<HstsConfig> {
+  let config = if let Some(opt) = hsts {
+    match opt {
+      Hsts::Recommended => HstsConfig {
+        max_age: 31536000,
+        always: true,
+        preload: false,
+        include_sub_domains: false,
+      },
+      Hsts::Strict => HstsConfig {
+        max_age: 63072000,
+        always: true,
+        preload: true,
+        include_sub_domains: true,
+      },
+      Hsts::Config(hsts_config) => hsts_config,
+    }
+  } else {
+    return None
+  };
+  Some(config)
 }
 
 pub async fn gen_ssl_config(

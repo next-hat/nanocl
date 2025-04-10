@@ -2,7 +2,7 @@ use utoipa::OpenApi;
 
 use nanocld_client::stubs::proxy::{
   HttpTarget, LocationTarget, ProxyHttpLocation, ProxyRule, ProxyRuleHttp,
-  ProxyRuleStream, ProxySsl, ProxySslConfig, ProxyStreamProtocol,
+  ProxyRuleStream, ProxySsl, ProxySslConfig, ProxyStreamProtocol, Hsts,
   ResourceProxyRule, StreamTarget, UnixTarget, UpstreamTarget, UriTarget,
   UrlRedirect,
 };
@@ -41,6 +41,7 @@ impl utoipa::Modify for VersionModifier {
   components(schemas(
     ResourceProxyRule,
     ProxyRule,
+    Hsts,
     ProxyRuleHttp,
     ProxyRuleStream,
     ProxyHttpLocation,
