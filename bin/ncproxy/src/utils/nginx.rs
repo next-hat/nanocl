@@ -169,6 +169,7 @@ pub async fn add_rule(
           },
           None => None,
         };
+        let hsts_config = super::rule::gen_hsts_config(http_rule.hsts.clone()).await;       
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
@@ -258,6 +259,7 @@ pub async fn add_rule(
           "domain": http_rule.domain,
           "locations": locations,
           "ssl": ssl,
+          "hsts": hsts_config,
           "hide_upstream": http_rule.ssl.is_some() && ssl.is_none(),
         }))?;
         http_conf += &data;
