@@ -169,7 +169,8 @@ pub async fn add_rule(
           },
           None => None,
         };
-        let hsts_config = super::rule::gen_hsts_config(http_rule.hsts.clone()).await;       
+        let hsts_config =
+          super::rule::gen_hsts_config(http_rule.hsts.clone()).await;
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {

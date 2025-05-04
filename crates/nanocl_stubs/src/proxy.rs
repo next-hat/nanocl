@@ -338,10 +338,7 @@ pub struct HstsConfig {
 pub enum Hsts {
   Recommended,
   Strict,
-  #[cfg_attr(
-    feature = "serde",
-    serde(rename_all = "PascalCase")
-  )]
+  #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
   Config(HstsConfig),
 }
 

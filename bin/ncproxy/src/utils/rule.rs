@@ -133,7 +133,7 @@ pub async fn gen_hsts_config(hsts: Option<Hsts>) -> Option<HstsConfig> {
       Hsts::Config(hsts_config) => hsts_config,
     }
   } else {
-    return None
+    return None;
   };
   Some(config)
 }
