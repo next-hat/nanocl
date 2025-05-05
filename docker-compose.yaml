@@ -216,7 +216,7 @@ services:
 
   dbeaver:
     container_name: dbeaver.system.c
-    image: dbeaver/cloudbeaver:23.2.4
+    image: dbeaver/cloudbeaver:25.0
     tty: true
     user: root
     hostname: dbeaver.nanocl.internal

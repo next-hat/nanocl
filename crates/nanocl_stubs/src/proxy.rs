@@ -315,6 +315,33 @@ pub struct ProxyHttpLocation {
   pub version: Option<f64>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct HstsConfig {
+  pub max_age: u64,
+  pub preload: bool,
+  pub always: bool,
+  pub include_sub_domains: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum Hsts {
+  Recommended,
+  Strict,
+  #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+  Config(HstsConfig),
+}
+
 /// Defines a proxy rule http config
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -333,6 +360,8 @@ pub struct ProxyRuleHttp {
   pub domain: Option<String>,
   /// Port to listen on (default 80 or 443)
   pub port: Option<u16>,
+  /// Hsts configuration
+  pub hsts: Option<Hsts>,
   /// Type of network binding
   pub network: NetworkKind,
   /// Optional limit request zone
