@@ -74,6 +74,39 @@ paths:
           description: Rule has been deleted
 components:
   schemas:
+    Hsts:
+      oneOf:
+      - type: string
+        enum:
+        - Recommended
+      - type: string
+        enum:
+        - Strict
+      - type: object
+        required:
+        - Config
+        properties:
+          Config:
+            $ref: '#/components/schemas/HstsConfig'
+    HstsConfig:
+      type: object
+      required:
+      - MaxAge
+      - Preload
+      - Always
+      - IncludeSubDomains
+      properties:
+        MaxAge:
+          type: integer
+          format: int64
+          minimum: 0
+        Preload:
+          type: boolean
+        Always:
+          type: boolean
+        IncludeSubDomains:
+          type: boolean
+      additionalProperties: false
     HttpTarget:
       type: object
       required:
@@ -219,6 +252,11 @@ components:
           format: int32
           description: Port to listen on (default 80 or 443)
           minimum: 0
+        Hsts:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Hsts'
+            description: Hsts configuration
         Network:
           $ref: '#/components/schemas/NetworkKind'
           description: Type of network binding

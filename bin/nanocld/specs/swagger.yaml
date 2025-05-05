@@ -907,6 +907,45 @@ paths:
       responses:
         '101':
           description: Websocket connection
+  /process/{name}/stats:
+    get:
+      tags:
+      - Processes
+      summary: Get stats of a process by it's key name
+      operationId: process_stats_by_name
+      parameters:
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: stream
+        in: query
+        description: Return a stream of stats
+        required: false
+        schema:
+          type: boolean
+      - name: one_shot
+        in: query
+        description: Return stats only once
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Process stats
+          content:
+            application/vdn.nanocl.raw-stream:
+              schema:
+                $ref: '#/components/schemas/ProcessStats'
+        '404':
+          description: Process does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /processes:
     get:
       tags:
@@ -4435,6 +4474,39 @@ components:
             $ref: '#/components/schemas/DaemonConfig'
             description: Daemon configuration
       description: HostInfo contains information about the host and the docker daemon
+    Hsts:
+      oneOf:
+      - type: string
+        enum:
+        - Recommended
+      - type: string
+        enum:
+        - Strict
+      - type: object
+        required:
+        - Config
+        properties:
+          Config:
+            $ref: '#/components/schemas/HstsConfig'
+    HstsConfig:
+      type: object
+      required:
+      - MaxAge
+      - Preload
+      - Always
+      - IncludeSubDomains
+      properties:
+        MaxAge:
+          type: integer
+          format: int64
+          minimum: 0
+        Preload:
+          type: boolean
+        Always:
+          type: boolean
+        IncludeSubDomains:
+          type: boolean
+      additionalProperties: false
     HttpTarget:
       type: object
       required:
@@ -6123,6 +6195,11 @@ components:
           format: int32
           description: Port to listen on (default 80 or 443)
           minimum: 0
+        Hsts:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Hsts'
+            description: Hsts configuration
         Network:
           $ref: '#/components/schemas/NetworkKind'
           description: Type of network binding
