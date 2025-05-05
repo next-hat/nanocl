@@ -69,7 +69,7 @@ pub(crate) async fn update_entries(
   client: &NanocldClient,
 ) -> IoResult<()> {
   let filter = GenericFilter::new()
-    .r#where("kind", GenericClause::Eq("DnsRule".to_owned()))
+    .r#where("kind", GenericClause::Eq("ncdns.io/rule".to_owned()))
     .r#where("key", GenericClause::Ne(key.to_owned()))
     .r#where(
       "data",
