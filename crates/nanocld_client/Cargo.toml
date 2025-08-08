@@ -15,8 +15,6 @@ bench = false
 [features]
 default = ["tokio"]
 tokio = ["ntex/tokio"]
-glommio = ["ntex/glommio"]
-async-std = ["ntex/async-std"]
 utoipa = ["nanocl_stubs/utoipa"]
 openssl = ["dep:openssl"]
 
