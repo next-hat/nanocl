@@ -8,4 +8,3 @@ Namespace: "toto"
 Cargoes:
 #{% render relative, name:"include-test-file-absolute" %}
 #{% render absolute, name:"include-test-file-relative" %}
-#{% render url, name:"include-test-file-url" %}
