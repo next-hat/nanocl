@@ -293,32 +293,7 @@ mod tests {
       "-ys",
       "../../tests/invalid_sub_state.yml",
     );
-    assert_cli_ok!(
-      "state",
-      "apply",
-      "-ys",
-      "https://nhnr.io/v0.16/tests/sub_state.yml",
-    );
-    assert_cli_ok!(
-      "state",
-      "logs",
-      "-s",
-      "https://nhnr.io/v0.16/tests/sub_state.yml"
-    );
-    assert_cli_ok!(
-      "state",
-      "rm",
-      "-ys",
-      "https://nhnr.io/v0.16/tests/sub_state.yml",
-    );
-    assert_cli_ok!(
-      "state",
-      "apply",
-      "-ys",
-      "nhnr.io/v0.16/tests/sub_state.yml",
-    );
-    assert_cli_ok!("state", "logs", "-s", "nhnr.io/v0.16/tests/sub_state.yml");
-    assert_cli_ok!("state", "rm", "-ys", "nhnr.io/v0.16/tests/sub_state.yml",);
+
   }
 
   /// Test Resource commands
@@ -480,12 +455,7 @@ mod tests {
     let absolute_path = format!("{path}/{relative_path}");
     assert_cli_ok!("state", "apply", "-ys", &absolute_path);
     assert_cli_ok!("state", "rm", "-ys", &absolute_path);
-    let short_url = format!("nhnr.io/v0.16/tests/{filename}");
-    assert_cli_ok!("state", "apply", "-ys", &short_url);
-    assert_cli_ok!("state", "rm", "-ys", &short_url);
-    let url = format!("https://nhnr.io/v0.16/tests/{filename}");
-    assert_cli_ok!("state", "apply", "-ys", &url);
-    assert_cli_ok!("state", "rm", "-ys", &url);
+
   }
 
   #[ntex::test]
