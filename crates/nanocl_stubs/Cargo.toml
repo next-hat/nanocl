@@ -16,7 +16,7 @@ bench = false
 default = ["serde"]
 serde = ["dep:serde", "uuid/serde", "chrono/serde"]
 utoipa = ["dep:utoipa", "bollard-next/utoipa"]
-schemars = ["dep:schemars", "bollard-next/schemars"]
+schemars = ["dep:schemars", "bollard-next/schemars", "ipnet/schemars"]
 clap = ["dep:clap"]
 test = []
 

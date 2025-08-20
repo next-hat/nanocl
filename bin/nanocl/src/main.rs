@@ -293,7 +293,6 @@ mod tests {
       "-ys",
       "../../tests/invalid_sub_state.yml",
     );
-
   }
 
   /// Test Resource commands
@@ -455,7 +454,6 @@ mod tests {
     let absolute_path = format!("{path}/{relative_path}");
     assert_cli_ok!("state", "apply", "-ys", &absolute_path);
     assert_cli_ok!("state", "rm", "-ys", &absolute_path);
-
   }
 
   #[ntex::test]
