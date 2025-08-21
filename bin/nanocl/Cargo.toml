@@ -75,7 +75,7 @@ url = "2.5"
 colored = "3.0.0"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-nix = { version = "0.29", features = ["user"] }
+nix = { version = "0.30", features = ["user"] }
 nanocl_utils = { version = "0.7", features = ["unix"] }
 termios = "0.3"
 
