@@ -24,7 +24,7 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Extract branch info
       - name: Set info
         run: |
@@ -87,7 +87,7 @@ jobs:
     runs-on: macOS-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -158,7 +158,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
