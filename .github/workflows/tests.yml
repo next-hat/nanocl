@@ -97,7 +97,7 @@ jobs:
         run: cargo make covgenci
       # Upload it to codecov
       - name: Codecov
-        uses: codecov/codecov-action@v5.4.2
+        uses: codecov/codecov-action@v5.4.3
         with:
           token: ${{ secrets.CODECOV }}
           files: ./lcov.info
