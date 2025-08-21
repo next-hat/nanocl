@@ -33,13 +33,7 @@ pub mod tests {
   /// Set the log level to info and build a test env logger for tests purpose
   pub fn before() {
     // Build a test env logger
-    if std::env::var("LOG_LEVEL").is_err() {
-      std::env::set_var("LOG_LEVEL", "nanocld=info,warn,error,nanocld=debug");
-    }
-    let _ = env_logger::Builder::new()
-      .parse_env("LOG_LEVEL")
-      .is_test(true)
-      .try_init();
+    std::env::set_var("TEST", "true");
   }
 
   pub async fn gen_test_system(routes: Config, version: &str) -> TestSystem {
