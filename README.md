@@ -14,6 +14,7 @@
 [![Tests](https://github.com/next-hat/nanocl/actions/workflows/tests.yml/badge.svg)](https://github.com/next-hat/nanocl/actions/workflows/tests.yml)
 [![Clippy](https://github.com/next-hat/nanocl/actions/workflows/clippy.yml/badge.svg)](https://github.com/next-hat/nanocl/actions/workflows/clippy.yml)
 [![codecov](https://codecov.io/gh/next-hat/nanocl/branch/nightly/graph/badge.svg?token=4I60HOW6HM)](https://codecov.io/gh/next-hat/nanocl)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnext-hat%2Fnanocl.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnext-hat%2Fnanocl?ref=badge_shield)
 
   </p>
 </div>
@@ -214,3 +215,7 @@ People that sponsor us will have their **name** or **logo displayed here**, and 
 [docker]: https://www.docker.com
 [discord]: https://discord.gg/WV4Aac8uZg
 [documentation_repository]: https://github.com/next-hat/documentation
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnext-hat%2Fnanocl.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnext-hat%2Fnanocl?ref=badge_large)
