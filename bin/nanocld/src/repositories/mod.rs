@@ -1,4 +1,5 @@
 mod cargo;
+mod distributed_mutex;
 mod event;
 mod job;
 mod metric;

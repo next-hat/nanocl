@@ -50,7 +50,7 @@ async fn main() -> std::io::Result<()> {
     Ok(daemon_state) => daemon_state,
   };
   // Start http server
-  match utils::server::gen(daemon_state).await {
+  match utils::server::gen(&daemon_state).await {
     Err(err) => {
       err.map_err_context(|| "Http server").print_and_exit();
     }
@@ -62,6 +62,6 @@ async fn main() -> std::io::Result<()> {
       }
     }
   }
-  log::info!("main: shutdown");
+  log::info!("Node {} shutdown", daemon_state.inner.config.hostname);
   Ok(())
 }

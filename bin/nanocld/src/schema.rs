@@ -12,6 +12,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    distributed_mutexes (key) {
+        key -> Uuid,
+        action -> Text,
+        resource_kind -> Text,
+        resource_key -> Text,
+        node_key -> Text,
+        acquired_by -> Text,
+        acquired_at -> Timestamptz,
+        expires_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     events (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -190,20 +203,21 @@ diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargoes,
-  events,
-  jobs,
-  metrics,
-  namespaces,
-  node_group_links,
-  node_groups,
-  nodes,
-  object_process_statuses,
-  processes,
-  resource_kinds,
-  resources,
-  secrets,
-  specs,
-  vm_images,
-  vms,
+    cargoes,
+    distributed_mutexes,
+    events,
+    jobs,
+    metrics,
+    namespaces,
+    node_group_links,
+    node_groups,
+    nodes,
+    object_process_statuses,
+    processes,
+    resource_kinds,
+    resources,
+    secrets,
+    specs,
+    vm_images,
+    vms,
 );

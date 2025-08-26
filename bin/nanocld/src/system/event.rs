@@ -12,7 +12,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState, VmDb},
+  models::{
+    CargoDb, DistributedMutexDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState,
+    VmDb,
+  },
   objects::generic::*,
   repositories::generic::*,
   tasks::generic::*,
@@ -232,6 +235,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
   let action = NativeEventAction::from_str(e.action.as_str())?;
+  // Check if the task already exists
   match (&actor.kind, &action) {
     (EventActorKind::Cargo | EventActorKind::Vm, _) => {
       state.inner.task_manager.wait_task(&task_key).await;
@@ -261,7 +265,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   state
     .inner
     .task_manager
-    .add_task(&task_key, action.clone(), task, |err| async move {
+    .add_task(&task_key, action.clone(), task, move |err| async move {
       log::error!(
         "exec_event add_task: error {action} {} {:#?} {err}",
         actor.kind,
@@ -276,6 +280,15 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
       };
       let state = state_ptr.clone();
       let key = actor.key.clone().unwrap_or_default();
+      if let Err(err) = DistributedMutexDb::del_lock(
+        &actor.kind.to_string(),
+        &key,
+        &state.inner.pool,
+      )
+      .await
+      {
+        log::error!("Failed to release lock for {} {key}: {err}", actor.kind);
+      }
       ObjPsStatusDb::update_actual_status(
         &key,
         &ObjPsStatusKind::Fail,

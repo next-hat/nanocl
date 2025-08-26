@@ -8,12 +8,20 @@ use crate::{
 
 use super::generic::*;
 
+impl ObjTask for CargoDb {
+  fn get_kind() -> String {
+    "cargo".to_owned()
+  }
+}
+
 impl ObjTaskStart for CargoDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
+      let mutex = CargoDb::create_mutex(&key, "start", &state).await?;
       utils::container::cargo::start(&key, &state).await?;
+      CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })
   }
@@ -24,7 +32,9 @@ impl ObjTaskDelete for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
+      let mutex = CargoDb::create_mutex(&key, "delete", &state).await?;
       utils::container::cargo::delete(&key, &state).await?;
+      CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })
   }
@@ -35,7 +45,9 @@ impl ObjTaskUpdate for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
+      let mutex = CargoDb::create_mutex(&key, "update", &state).await?;
       utils::container::cargo::update(&key, &state).await?;
+      CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })
   }
@@ -46,12 +58,14 @@ impl ObjTaskStop for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
+      let mutex = CargoDb::create_mutex(&key, "stop", &state).await?;
       utils::container::process::stop_instances(
         &key,
         &ProcessKind::Cargo,
         &state,
       )
       .await?;
+      CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })
   }

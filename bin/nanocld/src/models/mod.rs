@@ -20,10 +20,13 @@ pub use namespace::*;
 mod cargo;
 pub use cargo::*;
 
-pub mod vm;
+mod distributed_mutex;
+pub use distributed_mutex::*;
+
+mod vm;
 pub use vm::*;
 
-pub mod vm_image;
+mod vm_image;
 pub use vm_image::*;
 
 mod resource;
