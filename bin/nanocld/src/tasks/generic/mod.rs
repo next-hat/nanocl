@@ -2,11 +2,40 @@ use std::pin::Pin;
 
 use futures_util::Future;
 
-use nanocl_error::io::IoError;
+use nanocl_error::io::{IoError, IoResult};
 
-use crate::models::SystemState;
+use crate::{
+  models::{DistributedMutexDb, DistributedMutexPartial, SystemState},
+  repositories::generic::*,
+};
 
 pub type ObjTaskFuture = Pin<Box<dyn Future<Output = Result<(), IoError>>>>;
+
+pub trait ObjTask {
+  fn get_kind() -> String;
+
+  async fn create_mutex(
+    key: &str,
+    action: &str,
+    state: &SystemState,
+  ) -> IoResult<DistributedMutexDb> {
+    DistributedMutexDb::create_from(
+      DistributedMutexPartial {
+        action: action.to_owned(),
+        resource_kind: Self::get_kind(),
+        resource_key: key.to_owned(),
+        node_key: state.inner.config.hostname.clone(),
+        acquired_by: "daemon".to_owned(),
+      },
+      &state.inner.pool,
+    )
+    .await
+  }
+
+  async fn delete_mutex(pk: &uuid::Uuid, state: &SystemState) -> IoResult<()> {
+    DistributedMutexDb::del_by_pk(pk, &state.inner.pool).await
+  }
+}
 
 pub trait ObjTaskStart {
   /// Create a task (future) that will be run when a process object (job, cargo, vm) is starting

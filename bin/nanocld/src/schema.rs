@@ -12,6 +12,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    distributed_mutexes (key) {
+        key -> Uuid,
+        action -> Text,
+        resource_kind -> Text,
+        resource_key -> Text,
+        node_key -> Text,
+        acquired_by -> Text,
+        acquired_at -> Timestamptz,
+        expires_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     events (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -191,6 +204,7 @@ diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
   cargoes,
+  distributed_mutexes,
   events,
   jobs,
   metrics,

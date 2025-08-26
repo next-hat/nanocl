@@ -9,7 +9,6 @@ pub(crate) mod tests {
 
   use bollard_next::container::Config;
   use nanocl_error::io::{FromIo, IoResult};
-  use nanocl_utils::logger;
   pub use nanocl_utils::ntex::test_client::*;
 
   use nanocld_client::{
@@ -22,9 +21,8 @@ pub(crate) mod tests {
 
   use crate::{services, vars};
 
-  // Before a test
   pub fn before() {
-    // Build a test env logger
+    // Set test env to true to setup test logger
     std::env::set_var("TEST", "true");
   }
 
