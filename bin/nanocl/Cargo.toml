@@ -42,7 +42,7 @@ bollard-next = { version = "0.18.1" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.20"
-indicatif = "0.17"
+indicatif = "0.18"
 serde_json = "1.0"
 ntex = { version = "2", features = ["tokio", "openssl"] }
 serde = { version = "1.0", features = ["derive"] }
