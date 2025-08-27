@@ -10,9 +10,14 @@ use diesel_migrations::{
 use ntex::{rt, time, web};
 
 use nanocl_error::io::{IoError, IoResult};
-use nanocl_stubs::config::DaemonConfig;
+use nanocl_stubs::{
+  config::DaemonConfig, proxy::ProxySslConfig, secret::SecretPartial,
+};
 
-use crate::models::{DBConn, Pool};
+use crate::{
+  models::{DBConn, Pool, SecretDb},
+  repositories::generic::*,
+};
 
 /// Create a pool connection to the store `cockroachdb`
 pub async fn create_pool(store_addr: &str) -> IoResult<Pool> {
@@ -84,6 +89,53 @@ async fn wait(store_addr: &str) -> IoResult<()> {
   Ok(())
 }
 
+async fn save_db_cert(store_addr: &str, pool: &Pool) -> IoResult<()> {
+  if SecretDb::read_by_pk("cert.db.nanocl.io", pool)
+    .await
+    .is_ok()
+  {
+    return Ok(());
+  }
+  let url = url::Url::parse(store_addr).map_err(|err| {
+    IoError::invalid_data(
+      "Save DB cert",
+      &format!("invalid address format {err}"),
+    )
+  })?;
+  // extract sslcert sslkey sslrootcert from query params
+  let mut query_pairs = url.query_pairs();
+  let sslcert = query_pairs.find(|(k, _)| k == "sslcert").map(|(_, v)| v);
+  let sslkey = query_pairs.find(|(k, _)| k == "sslkey").map(|(_, v)| v);
+  let sslrootcert = query_pairs
+    .find(|(k, _)| k == "sslrootcert")
+    .map(|(_, v)| v);
+  match (sslcert, sslkey, sslrootcert) {
+    (Some(sslcert), Some(sslkey), Some(sslrootcert)) => {
+      SecretDb::create_from(
+        &SecretPartial {
+          name: "cert.db.nanocl.io".to_owned(),
+          kind: "nanocl.io/tls".to_owned(),
+          immutable: false,
+          metadata: None,
+          data: serde_json::to_value(ProxySslConfig {
+            certificate: sslcert.to_string(),
+            certificate_key: sslkey.to_string(),
+            certificate_client: Some(sslrootcert.to_string()),
+            verify_client: None,
+            dhparam: None,
+          })?,
+        },
+        pool,
+      )
+      .await?;
+    }
+    _ => {
+      log::warn!("store::save_db_cert: missing certs");
+    }
+  }
+  Ok(())
+}
+
 /// Ensure existence of a container for our store.
 /// We use cockroachdb with a postgresql connector.
 /// We also run latest migration on our database to have the latest schema.
@@ -107,6 +159,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
     IoError::interrupted("CockroachDB migration", &format!("{err}"))
   })?;
+  save_db_cert(store_addr, &pool).await?;
   log::info!("store::init: migrations success");
   Ok(pool)
 }
