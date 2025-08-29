@@ -263,9 +263,8 @@ pub async fn create_cargo_container(
 
 /// Detect docker host from docker config
 pub fn detect_docker_host() -> IoResult<(String, bool)> {
-  let home = std::env::var("HOME").map_err(|_| {
-    std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-  })?;
+  let home = std::env::var("HOME")
+    .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
   let path = format!("{home}/.docker/config.json");
   let Ok(str) = std::fs::read_to_string(path) else {
     return Ok(("unix:///var/run/docker.sock".into(), false));

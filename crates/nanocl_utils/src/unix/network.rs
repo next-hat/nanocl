@@ -45,11 +45,7 @@ pub fn get_default_ip() -> IoResult<IpAddr> {
   let mut ifa = ifaddrs;
   while !ifa.is_null() {
     let ifa_name = unsafe { CStr::from_ptr((*ifa).ifa_name) };
-    if ifa_name
-      .to_str()
-      .map_err(|err| Error::new(std::io::ErrorKind::Other, err))?
-      == default_interface
-    {
+    if ifa_name.to_str().map_err(Error::other)? == default_interface {
       let addr = unsafe { (*ifa).ifa_addr };
       if !addr.is_null() && unsafe { (*addr).sa_family } == 2 {
         let addr = unsafe { &*(addr as *const sockaddr_in) };
@@ -74,8 +70,6 @@ pub fn get_hostname() -> std::io::Result<String> {
     return Err(Error::last_os_error());
   }
   let c_str = unsafe { CStr::from_ptr(name.as_ptr()) };
-  let hostname = c_str
-    .to_str()
-    .map_err(|err| Error::new(std::io::ErrorKind::Other, err))?;
+  let hostname = c_str.to_str().map_err(Error::other)?;
   Ok(hostname.to_owned())
 }

@@ -88,8 +88,7 @@ pub async fn gen(
         "server::gen: {} invalid protocol [tcp:// | unix://] allowed",
         host
       );
-      return Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
+      return Err(std::io::Error::other(
         "invalid protocol [tcp:// | unix://] allowed",
       ));
     }
