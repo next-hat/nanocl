@@ -66,7 +66,7 @@ impl IoError {
   {
     Self::with_context(
       context.to_string(),
-      std::io::Error::new(std::io::ErrorKind::Other, message.to_string()),
+      std::io::Error::other(message.to_string()),
     )
   }
 

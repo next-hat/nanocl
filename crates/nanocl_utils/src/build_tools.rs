@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 
 /// Execute the git command to extract the hash of the current commit
 /// and set it as an environment variable for the produced binary
@@ -20,8 +20,7 @@ pub fn set_env_git_commit_hash() -> Result<()> {
 
 /// Set the target arch as an environment variable for the produced binary
 pub fn set_env_target_arch() -> Result<()> {
-  let arch = std::env::var("CARGO_CFG_TARGET_ARCH")
-    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+  let arch = std::env::var("CARGO_CFG_TARGET_ARCH").map_err(Error::other)?;
   println!("cargo:rustc-env=TARGET_ARCH={arch}");
   Ok(())
 }

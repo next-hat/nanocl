@@ -235,7 +235,7 @@ pub async fn exec_vm_attach(
         sink
           .send(ws::Message::Pong(msg))
           .await
-          .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+          .map_err(std::io::Error::other)?;
       }
       Err(_) => break,
       _ => (),

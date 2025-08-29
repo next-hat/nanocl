@@ -12,9 +12,8 @@ impl Context {
 
   /// Ensure that the contexts directory exists in $HOME/.nanocl/contexts
   pub fn ensure() -> IoResult<()> {
-    let home = std::env::var("HOME").map_err(|_| {
-      std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-    })?;
+    let home = std::env::var("HOME")
+      .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
     let path = format!("{home}/.nanocl/contexts");
     std::fs::create_dir_all(path)?;
     Ok(())
@@ -34,9 +33,8 @@ impl Context {
 
   /// Read a context by name
   pub fn read_by_name(name: &str) -> IoResult<Context> {
-    let home = std::env::var("HOME").map_err(|_| {
-      std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-    })?;
+    let home = std::env::var("HOME")
+      .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
     let path = format!("{home}/.nanocl/contexts/{name}.yml");
     let context = Self::read(&path)?;
     Ok(context)
@@ -44,9 +42,8 @@ impl Context {
 
   /// Write a context to a file
   pub fn write(context: &Context) -> IoResult<()> {
-    let home = std::env::var("HOME").map_err(|_| {
-      std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-    })?;
+    let home = std::env::var("HOME")
+      .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
     let path = format!("{home}/.nanocl/contexts/{}.yml", context.name);
     let s = serde_yaml::to_string(&context).map_err(|err| {
       std::io::Error::new(
@@ -60,9 +57,8 @@ impl Context {
 
   /// List all contexts
   pub fn list() -> IoResult<Vec<ContextRow>> {
-    let home = std::env::var("HOME").map_err(|_| {
-      std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-    })?;
+    let home = std::env::var("HOME")
+      .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
     let path = format!("{home}/.nanocl/contexts");
     let mut contexts = vec![ContextRow::from(Context::new())];
     for entry in std::fs::read_dir(path)? {
@@ -78,9 +74,8 @@ impl Context {
 
   /// Use a context
   pub fn r#use(name: &str) -> IoResult<()> {
-    let home = std::env::var("HOME").map_err(|_| {
-      std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
-    })?;
+    let home = std::env::var("HOME")
+      .map_err(|_| std::io::Error::other("Could not get $HOME"))?;
     if name != "default" {
       Context::read_by_name(name).map_err(|err| {
         std::io::Error::new(
