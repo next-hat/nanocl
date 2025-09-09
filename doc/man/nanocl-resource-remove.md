@@ -1,9 +1,13 @@
 ---
 title: Resource remove
-sidebar_position: 52
+sidebar_position: 51
 ---
 
 # Resource remove
+
+# NAME
+
+remove - Remove existing resource
 
 ## SYNOPSIS
 

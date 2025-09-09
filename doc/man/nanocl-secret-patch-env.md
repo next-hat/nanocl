@@ -1,13 +1,13 @@
 ---
-title: Secret create env
-sidebar_position: 55
+title: Secret patch env
+sidebar_position: 61
 ---
 
-# Secret create env
+# Secret patch env
 
 # NAME
 
-env - Create a new nanocl.io/env secret
+env - Update env secret values
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ env - Create a new nanocl.io/env secret
 
 ## DESCRIPTION
 
-Create a new nanocl.io/env secret
+Update env secret values
 
 ## OPTIONS
 

@@ -1,9 +1,13 @@
 ---
 title: Vm inspect
-sidebar_position: 77
+sidebar_position: 82
 ---
 
 # Vm inspect
+
+# NAME
+
+inspect - Inspect a vm
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a vm
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

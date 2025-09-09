@@ -1,9 +1,13 @@
 ---
 title: Vm
-sidebar_position: 68
+sidebar_position: 89
 ---
 
 # Vm
+
+# NAME
+
+vm - Manage virtual machines
 
 ## SYNOPSIS
 
@@ -16,7 +20,7 @@ Manage virtual machines
 
 ## OPTIONS
 
-**-n**, **--namespace**=*NAMESPACE*  
+**-n**, **--namespace** *\<NAMESPACE\>*  
 namespace to target by default global is used
 
 **-h**, **--help**  

@@ -4,7 +4,7 @@ use serde::Serialize;
 use tabled::Tabled;
 
 use nanocl_error::io::IoError;
-use nanocld_client::stubs::secret::{Secret, SecretPartial};
+use nanocld_client::stubs::secret::{Secret, SecretPartial, SecretUpdate};
 
 use super::{GenericInspectOpts, GenericListOpts, GenericRemoveOpts};
 
@@ -21,6 +21,8 @@ pub enum SecretCommand {
   Inspect(GenericInspectOpts),
   /// Create a new secret
   Create(SecretCreateOpts),
+  /// Update a secret data
+  Patch(SecretPatchOpts),
 }
 
 /// `nanocl secret` available arguments
@@ -157,6 +159,74 @@ pub struct SecretCreateOpts {
   /// Kind of secret
   #[clap(subcommand)]
   pub kind: SecretKindCreateCommand,
+}
+
+/// Kind for patching secret data
+#[derive(Clone, Subcommand)]
+pub enum SecretKindPatchCommand {
+  /// Update env secret values
+  Env(EnvCreateOpts),
+  /// Update TLS secret values
+  Tls(TlsCreateOpts),
+  /// Update container registry secret values
+  ContainerRegistry(ContainerRegistryCreateOpts),
+}
+
+/// `nanocl secret patch` available options
+#[derive(Clone, Parser)]
+pub struct SecretPatchOpts {
+  /// Name of your secret to update
+  pub name: String,
+  /// New data of the secret according to its kind
+  #[clap(subcommand)]
+  pub kind: SecretKindPatchCommand,
+}
+
+impl TryFrom<SecretPatchOpts> for SecretUpdate {
+  type Error = IoError;
+
+  fn try_from(opts: SecretPatchOpts) -> Result<Self, Self::Error> {
+    let data = match &opts.kind {
+      SecretKindPatchCommand::Env(env) => serde_json::to_value(&env.values)?,
+      SecretKindPatchCommand::Tls(tls) => {
+        let mut cert = tls.certificate.clone();
+        let mut cert_key = tls.certificate_key.clone();
+        let mut cert_client = tls.certificate_client.clone();
+        if cert.is_none() && tls.certificate_path.is_none() {
+          return Err(IoError::interrupted("Certificate", "is required"));
+        }
+        if cert_key.is_none() && tls.certificate_key_path.is_none() {
+          return Err(IoError::interrupted("Certificate key", "is required"));
+        }
+        if let Some(certificate_path) = &tls.certificate_path {
+          cert = Some(std::fs::read_to_string(certificate_path)?);
+        }
+        if let Some(certificate_key_path) = &tls.certificate_key_path {
+          cert_key = Some(std::fs::read_to_string(certificate_key_path)?);
+        }
+        if let Some(certificate_client_path) = &tls.certificate_client_path {
+          cert_client = Some(std::fs::read_to_string(certificate_client_path)?);
+        }
+        let tls = TlsCreateOpts {
+          certificate: cert,
+          certificate_key: cert_key,
+          certificate_client: cert_client,
+          certificate_path: None,
+          certificate_key_path: None,
+          certificate_client_path: None,
+          ..tls.clone()
+        };
+        serde_json::to_value(tls)?
+      }
+      SecretKindPatchCommand::ContainerRegistry(container_registry) => {
+        serde_json::to_value(container_registry)?
+      }
+    };
+    Ok(SecretUpdate {
+      metadata: None,
+      data,
+    })
+  }
 }
 
 /// A row of the secret table

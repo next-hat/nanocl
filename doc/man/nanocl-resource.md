@@ -1,9 +1,13 @@
 ---
 title: Resource
-sidebar_position: 48
+sidebar_position: 53
 ---
 
 # Resource
+
+# NAME
+
+resource - Manage resources
 
 ## SYNOPSIS
 

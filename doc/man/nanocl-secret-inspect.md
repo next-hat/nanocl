@@ -1,9 +1,13 @@
 ---
 title: Secret inspect
-sidebar_position: 59
+sidebar_position: 58
 ---
 
 # Secret inspect
+
+# NAME
+
+inspect - Inspect a secret
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a secret
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

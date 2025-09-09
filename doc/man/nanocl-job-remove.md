@@ -1,9 +1,13 @@
 ---
 title: Job remove
-sidebar_position: 33
+sidebar_position: 32
 ---
 
 # Job remove
+
+# NAME
+
+remove - Remove job by its name
 
 ## SYNOPSIS
 

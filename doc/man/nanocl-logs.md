@@ -5,6 +5,10 @@ sidebar_position: 36
 
 # Logs
 
+# NAME
+
+logs - Get logs of a process
+
 ## SYNOPSIS
 
 **logs** \[**-s **\] \[**-u **\] \[**-t **\] \[**--timestamps**\] \[**-f
@@ -16,13 +20,13 @@ Get logs of a process
 
 ## OPTIONS
 
-**-s**=*SINCE*  
+**-s** *\<SINCE\>*  
 Only include logs since unix timestamp
 
-**-u**=*UNTIL*  
+**-u** *\<UNTIL\>*  
 Only include logs until unix timestamp
 
-**-t**=*TAIL*  
+**-t** *\<TAIL\>*  
 If integer only return last n logs, if "all" returns all logs
 
 **--timestamps**  

@@ -750,6 +750,26 @@ mod tests {
     assert_cli_ok!("secret", "rm", "-y", "test-cli");
   }
 
+  /// Test Secret patch command for env secrets
+  #[ntex::test]
+  async fn secret_patch() {
+    // Create an env secret
+    assert_cli_ok!(
+      "secret",
+      "create",
+      "env.test",
+      "env",
+      "FOO=bar",
+      "HELLO=world"
+    );
+    // Patch the env secret with a new value for FOO
+    assert_cli_ok!("secret", "patch", "env.test", "env", "FOO=baz");
+    // Inspect the secret
+    assert_cli_ok!("secret", "inspect", "env.test");
+    // Cleanup
+    assert_cli_ok!("secret", "rm", "-y", "env.test");
+  }
+
   #[ntex::test]
   async fn virtual_machine() {
     assert_cli_ok!(

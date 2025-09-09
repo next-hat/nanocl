@@ -1,9 +1,13 @@
 ---
 title: Cargo logs
-sidebar_position: 9
+sidebar_position: 8
 ---
 
 # Cargo logs
+
+# NAME
+
+logs - Show logs
 
 ## SYNOPSIS
 
@@ -16,13 +20,13 @@ Show logs
 
 ## OPTIONS
 
-**-s**=*SINCE*  
+**-s** *\<SINCE\>*  
 Only include logs since unix timestamp
 
-**-u**=*UNTIL*  
+**-u** *\<UNTIL\>*  
 Only include logs until unix timestamp
 
-**-t**=*TAIL*  
+**-t** *\<TAIL\>*  
 If integer only return last n logs, if "all" returns all logs
 
 **--timestamps**  

@@ -1,9 +1,13 @@
 ---
 title: Vm patch
-sidebar_position: 79
+sidebar_position: 84
 ---
 
 # Vm patch
+
+# NAME
+
+patch - Patch a vm
 
 ## SYNOPSIS
 
@@ -17,28 +21,28 @@ Patch a vm
 
 ## OPTIONS
 
-**--user**=*USER*  
+**--user** *\<USER\>*  
 Default user of the VM
 
-**--password**=*PASSWORD*  
+**--password** *\<PASSWORD\>*  
 Default password of the VM
 
-**--ssh-key**=*SSH_KEY*  
+**--ssh-key** *\<SSH_KEY\>*  
 Ssh key for the user
 
-**--hostname**=*HOSTNAME*  
+**--hostname** *\<HOSTNAME\>*  
 hostname of the vm
 
-**--cpu**=*CPU*  
+**--cpu** *\<CPU\>*  
 Cpu of the vm default to 1
 
-**--mem**=*MEMORY*  
+**--mem** *\<MEMORY\>*  
 Memory of the vm in MB default to 512
 
 **--kvm**  
 Enable KVM
 
-**--net-iface**=*NET_IFACE*  
+**--net-iface** *\<NET_IFACE\>*  
 network interface of the vm
 
 **-h**, **--help**  

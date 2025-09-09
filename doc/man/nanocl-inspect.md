@@ -5,6 +5,10 @@ sidebar_position: 27
 
 # Inspect
 
+# NAME
+
+inspect - Inspect a process
+
 ## SYNOPSIS
 
 **inspect** \[**--display**\] \[**-h**\|**--help**\] \<*KEY*\>
@@ -15,7 +19,7 @@ Inspect a process
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

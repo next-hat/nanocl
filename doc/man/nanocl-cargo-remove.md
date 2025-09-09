@@ -1,9 +1,13 @@
 ---
 title: Cargo remove
-sidebar_position: 11
+sidebar_position: 10
 ---
 
 # Cargo remove
+
+# NAME
+
+remove - Remove cargo by its name
 
 ## SYNOPSIS
 

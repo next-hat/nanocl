@@ -1,9 +1,13 @@
 ---
 title: Cargo stats
-sidebar_position: 16
+sidebar_position: 15
 ---
 
 # Cargo stats
+
+# NAME
+
+stats - Show stats of cargo
 
 ## SYNOPSIS
 

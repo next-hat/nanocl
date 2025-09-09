@@ -1,13 +1,13 @@
 ---
-title: Secret create tls
-sidebar_position: 56
+title: Secret patch tls
+sidebar_position: 62
 ---
 
-# Secret create tls
+# Secret patch tls
 
 # NAME
 
-tls - Create a new nanocl.io/tls secret
+tls - Update TLS secret values
 
 ## SYNOPSIS
 
@@ -18,7 +18,7 @@ tls - Create a new nanocl.io/tls secret
 
 ## DESCRIPTION
 
-Create a new nanocl.io/tls secret
+Update TLS secret values
 
 ## OPTIONS
 

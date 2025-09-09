@@ -1,9 +1,13 @@
 ---
 title: Event watch
-sidebar_position: 25
+sidebar_position: 24
 ---
 
 # Event watch
+
+# NAME
+
+watch - Watch for new events in real time
 
 ## SYNOPSIS
 

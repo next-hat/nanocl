@@ -1,9 +1,13 @@
 ---
 title: Secret remove
-sidebar_position: 61
+sidebar_position: 64
 ---
 
 # Secret remove
+
+# NAME
+
+remove - Remove existing secret
 
 ## SYNOPSIS
 

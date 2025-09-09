@@ -1,9 +1,13 @@
 ---
 title: Cargo inspect
-sidebar_position: 7
+sidebar_position: 6
 ---
 
 # Cargo inspect
+
+# NAME
+
+inspect - Inspect a cargo by its name
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a cargo by its name
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

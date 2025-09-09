@@ -1,9 +1,13 @@
 ---
 title: Job list
-sidebar_position: 31
+sidebar_position: 30
 ---
 
 # Job list
+
+# NAME
+
+list - List existing job
 
 ## SYNOPSIS
 
@@ -19,13 +23,13 @@ List existing job
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
 **-h**, **--help**  

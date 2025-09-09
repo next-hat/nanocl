@@ -1,9 +1,13 @@
 ---
 title: Secret create
-sidebar_position: 55
+sidebar_position: 57
 ---
 
 # Secret create
+
+# NAME
+
+create - Create a new secret
 
 ## SYNOPSIS
 

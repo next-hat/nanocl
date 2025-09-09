@@ -1,9 +1,13 @@
 ---
 title: Namespace create
-sidebar_position: 41
+sidebar_position: 40
 ---
 
 # Namespace create
+
+# NAME
+
+create - Create new namespace
 
 ## SYNOPSIS
 

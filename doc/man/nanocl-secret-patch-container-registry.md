@@ -1,13 +1,13 @@
 ---
-title: Secret create container registry
-sidebar_position: 54
+title: Secret patch container registry
+sidebar_position: 60
 ---
 
-# Secret create container registry
+# Secret patch container registry
 
 # NAME
 
-container-registry - Create a new nanocl.io/container-registry secret
+container-registry - Update container registry secret values
 
 ## SYNOPSIS
 
@@ -17,7 +17,7 @@ container-registry - Create a new nanocl.io/container-registry secret
 
 ## DESCRIPTION
 
-Create a new nanocl.io/container-registry secret
+Update container registry secret values
 
 ## OPTIONS
 

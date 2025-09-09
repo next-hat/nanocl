@@ -1,9 +1,13 @@
 ---
 title: Job inspect
-sidebar_position: 30
+sidebar_position: 29
 ---
 
 # Job inspect
+
+# NAME
+
+inspect - Inspect a job by its name
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a job by its name
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

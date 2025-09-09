@@ -1,9 +1,13 @@
 ---
 title: Cargo revert
-sidebar_position: 13
+sidebar_position: 12
 ---
 
 # Cargo revert
+
+# NAME
+
+revert - Revert cargo to a specific history
 
 ## SYNOPSIS
 
