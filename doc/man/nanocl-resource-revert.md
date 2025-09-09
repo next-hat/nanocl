@@ -1,9 +1,13 @@
 ---
 title: Resource revert
-sidebar_position: 53
+sidebar_position: 52
 ---
 
 # Resource revert
+
+# NAME
+
+revert - Revert a resource to a specific history
 
 ## SYNOPSIS
 

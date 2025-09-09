@@ -1,9 +1,13 @@
 ---
 title: Event
-sidebar_position: 22
+sidebar_position: 25
 ---
 
 # Event
+
+# NAME
+
+event - Show or watch events
 
 ## SYNOPSIS
 

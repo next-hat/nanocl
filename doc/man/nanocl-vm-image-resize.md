@@ -1,9 +1,13 @@
 ---
 title: Vm image resize
-sidebar_position: 76
+sidebar_position: 80
 ---
 
 # Vm image resize
+
+# NAME
+
+resize - Resize a VM image
 
 ## SYNOPSIS
 

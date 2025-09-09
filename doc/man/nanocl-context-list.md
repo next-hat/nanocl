@@ -1,9 +1,13 @@
 ---
 title: Context list
-sidebar_position: 20
+sidebar_position: 19
 ---
 
 # Context list
+
+# NAME
+
+list - List contexts
 
 ## SYNOPSIS
 

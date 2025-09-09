@@ -1,9 +1,13 @@
 ---
 title: Namespace
-sidebar_position: 40
+sidebar_position: 44
 ---
 
 # Namespace
+
+# NAME
+
+namespace - Manage namespaces
 
 ## SYNOPSIS
 

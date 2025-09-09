@@ -1,9 +1,13 @@
 ---
 title: State
-sidebar_position: 62
+sidebar_position: 70
 ---
 
 # State
+
+# NAME
+
+state - Apply or Remove a Statefile
 
 ## SYNOPSIS
 

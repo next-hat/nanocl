@@ -1,9 +1,13 @@
 ---
 title: Context use
-sidebar_position: 21
+sidebar_position: 20
 ---
 
 # Context use
+
+# NAME
+
+use - Set current context
 
 ## SYNOPSIS
 

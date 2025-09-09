@@ -1,9 +1,13 @@
 ---
 title: Vm image clone
-sidebar_position: 72
+sidebar_position: 76
 ---
 
 # Vm image clone
+
+# NAME
+
+clone - Clone a VM image
 
 ## SYNOPSIS
 

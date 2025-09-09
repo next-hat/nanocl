@@ -4,8 +4,8 @@ use nanocld_client::stubs::secret::Secret;
 use crate::{
   config::CliConfig,
   models::{
-  GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts,
-  SecretPatchOpts, SecretRow,
+    GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts,
+    SecretPatchOpts, SecretRow,
   },
 };
 
@@ -69,6 +69,6 @@ pub async fn exec_secret(
       SecretArg::exec_inspect(cli_conf, opts, None).await
     }
     SecretCommand::Create(opts) => exec_secret_create(cli_conf, opts).await,
-  SecretCommand::Patch(opts) => exec_secret_patch(cli_conf, opts).await,
+    SecretCommand::Patch(opts) => exec_secret_patch(cli_conf, opts).await,
   }
 }

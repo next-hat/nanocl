@@ -1,9 +1,13 @@
 ---
 title: Cargo stop
-sidebar_position: 17
+sidebar_position: 16
 ---
 
 # Cargo stop
+
+# NAME
+
+stop - Stop cargoes by names
 
 ## SYNOPSIS
 

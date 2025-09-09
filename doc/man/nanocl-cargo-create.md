@@ -1,9 +1,13 @@
 ---
 title: Cargo create
-sidebar_position: 4
+sidebar_position: 2
 ---
 
 # Cargo create
+
+# NAME
+
+create - Create a new cargo
 
 ## SYNOPSIS
 
@@ -16,10 +20,10 @@ Create a new cargo
 
 ## OPTIONS
 
-**-v**, **--volume**=*VOLUMES*  
+**-v**, **--volume** *\<VOLUMES\>*  
 Volumes of the cargo
 
-**-e**, **--env**=*ENV*  
+**-e**, **--env** *\<ENV\>*  
 Environment variables of the cargo
 
 **-h**, **--help**  

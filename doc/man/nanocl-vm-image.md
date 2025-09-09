@@ -1,9 +1,13 @@
 ---
 title: Vm image
-sidebar_position: 71
+sidebar_position: 81
 ---
 
 # Vm image
+
+# NAME
+
+image - Manage vm images
 
 ## SYNOPSIS
 

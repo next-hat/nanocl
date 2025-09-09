@@ -1,9 +1,13 @@
 ---
 title: Cargo restart
-sidebar_position: 12
+sidebar_position: 11
 ---
 
 # Cargo restart
+
+# NAME
+
+restart - Restart a cargo by its name
 
 ## SYNOPSIS
 

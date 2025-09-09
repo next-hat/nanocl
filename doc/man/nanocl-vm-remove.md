@@ -1,9 +1,13 @@
 ---
 title: Vm remove
-sidebar_position: 80
+sidebar_position: 85
 ---
 
 # Vm remove
+
+# NAME
+
+remove - Remove vms
 
 ## SYNOPSIS
 

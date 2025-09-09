@@ -1,9 +1,13 @@
 ---
 title: Context
-sidebar_position: 18
+sidebar_position: 21
 ---
 
 # Context
+
+# NAME
+
+context - Manage contexts
 
 ## SYNOPSIS
 

@@ -1,9 +1,13 @@
 ---
 title: Secret
-sidebar_position: 54
+sidebar_position: 65
 ---
 
 # Secret
+
+# NAME
+
+secret - Manage secrets
 
 ## SYNOPSIS
 
@@ -31,6 +35,9 @@ Inspect a secret
 
 secret-create(1)  
 Create a new secret
+
+secret-patch(1)  
+Update a secret data
 
 secret-help(1)  
 Print this message or the help of the given subcommand(s)

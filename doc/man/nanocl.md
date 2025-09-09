@@ -1,9 +1,13 @@
 ---
 title: Nanocl
-sidebar_position: 1
+sidebar_position: 90
 ---
 
 # Nanocl
+
+# NAME
+
+nanocl - Container and virtual machine orchestrator
 
 ## SYNOPSIS
 
@@ -12,15 +16,22 @@ sidebar_position: 1
 
 ## DESCRIPTION
 
-The Self-Sufficient Orchestrator CLI
+Nanocl is a modern, self-sufficient orchestrator for containers and
+virtual machines. It delivers a clean dev→prod workflow with declarative
+Statefiles (YAML/TOML/JSON) and opinionated, predictable defaults. Built
+in Rust for performance and safety, it keeps operational overhead low
+while remaining powerful and extensible. Manage cargoes, resources,
+jobs, and VMs with dynamic routing, DNS, and end-to-end TLS. Start local
+on a single node and scale out when ready — simple to learn,
+production-grade by design.
 
 ## OPTIONS
 
-**-H**, **--host**=*HOST*  
+**-H**, **--host** *\<HOST\>*  
 Nanocld host default: unix://run/nanocl/nanocl.sock
 
 **-h**, **--help**  
-Print help
+Print help (see a summary with -h)
 
 **-V**, **--version**  
 Print version
@@ -84,9 +95,12 @@ Uninstall components
 nanocl-backup(1)  
 Backup the current state
 
+nanocl-stats(1)  
+Stats of the process
+
 nanocl-help(1)  
 Print this message or the help of the given subcommand(s)
 
 # VERSION
 
-v0.16.0
+v0.16.3

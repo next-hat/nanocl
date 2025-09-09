@@ -1,9 +1,13 @@
 ---
 title: Namespace remove
-sidebar_position: 44
+sidebar_position: 43
 ---
 
 # Namespace remove
+
+# NAME
+
+remove - Remove a namespace
 
 ## SYNOPSIS
 

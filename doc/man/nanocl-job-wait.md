@@ -1,9 +1,13 @@
 ---
 title: Job wait
-sidebar_position: 35
+sidebar_position: 34
 ---
 
 # Job wait
+
+# NAME
+
+wait - Wait for a job to finish
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Wait for a job to finish
 
 ## OPTIONS
 
-**-c**=*CONDITION*  
+**-c** *\<CONDITION\>*  
 State to wait
 
 **-h**, **--help**  

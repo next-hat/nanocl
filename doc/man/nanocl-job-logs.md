@@ -1,9 +1,13 @@
 ---
 title: Job logs
-sidebar_position: 32
+sidebar_position: 31
 ---
 
 # Job logs
+
+# NAME
+
+logs - Show logs of a job
 
 ## SYNOPSIS
 
@@ -16,13 +20,13 @@ Show logs of a job
 
 ## OPTIONS
 
-**-s**=*SINCE*  
+**-s** *\<SINCE\>*  
 Only include logs since unix timestamp
 
-**-u**=*UNTIL*  
+**-u** *\<UNTIL\>*  
 Only include logs until unix timestamp
 
-**-t**=*TAIL*  
+**-t** *\<TAIL\>*  
 If integer only return last n logs, if "all" returns all logs
 
 **--timestamps**  

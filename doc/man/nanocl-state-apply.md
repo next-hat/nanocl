@@ -1,9 +1,13 @@
 ---
 title: State apply
-sidebar_position: 63
+sidebar_position: 67
 ---
 
 # State apply
+
+# NAME
+
+apply - Create or Update elements from a Statefile
 
 ## SYNOPSIS
 
@@ -17,7 +21,7 @@ Create or Update elements from a Statefile
 
 ## OPTIONS
 
-**-s**, **--state-location**=*STATE_LOCATION*  
+**-s**, **--state-location** *\<STATE_LOCATION\>*  
 Path or Url to the Statefile
 
 **-f**, **--follow**  

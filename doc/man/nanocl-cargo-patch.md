@@ -1,9 +1,13 @@
 ---
 title: Cargo patch
-sidebar_position: 10
+sidebar_position: 9
 ---
 
 # Cargo patch
+
+# NAME
+
+patch - Update a cargo by its name
 
 ## SYNOPSIS
 
@@ -17,16 +21,16 @@ Update a cargo by its name
 
 ## OPTIONS
 
-**-n**, **--name**=*NEW_NAME*  
+**-n**, **--name** *\<NEW_NAME\>*  
 New name of cargo
 
-**-i**, **--image**=*IMAGE*  
+**-i**, **--image** *\<IMAGE\>*  
 New image of cargo
 
-**-e**, **--env**=*ENV*  
+**-e**, **--env** *\<ENV\>*  
 New environment variables of cargo
 
-**-v**, **--volume**=*VOLUMES*  
+**-v**, **--volume** *\<VOLUMES\>*  
 New volumes of cargo
 
 **-h**, **--help**  

@@ -1,9 +1,13 @@
 ---
 title: Cargo history
-sidebar_position: 6
+sidebar_position: 4
 ---
 
 # Cargo history
+
+# NAME
+
+history - List cargo history
 
 ## SYNOPSIS
 

@@ -49,5 +49,9 @@ for file in $(ls ./doc/man/*); do
   if [ "$file_name" = "readme.md" ]; then
     continue
   fi
-  echo "* [${file_name}](./${file_name})" >> ./doc/man/readme.md
+  # remove .md from the file_name
+  basename="${file_name%.md}"
+  # replace _ and - with a space in the file name
+  title=$(echo ${basename} | sed 's/_/ /g' | sed 's/-/ /g' | sed 's/.*/\u&/')
+  echo "* [${title}](./${file_name})" >> ./doc/man/readme.md
 done

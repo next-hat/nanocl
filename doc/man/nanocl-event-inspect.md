@@ -1,9 +1,13 @@
 ---
 title: Event inspect
-sidebar_position: 23
+sidebar_position: 22
 ---
 
 # Event inspect
+
+# NAME
+
+inspect - Inspect a specific event
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a specific event
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

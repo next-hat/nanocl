@@ -1,9 +1,13 @@
 ---
 title: Context from
-sidebar_position: 19
+sidebar_position: 18
 ---
 
 # Context from
+
+# NAME
+
+from - Create a new context from a file
 
 ## SYNOPSIS
 

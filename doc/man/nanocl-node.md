@@ -1,9 +1,13 @@
 ---
 title: Node
-sidebar_position: 45
+sidebar_position: 46
 ---
 
 # Node
+
+# NAME
+
+node - Manage nodes (experimental)
 
 ## SYNOPSIS
 

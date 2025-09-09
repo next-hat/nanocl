@@ -5,6 +5,10 @@ sidebar_position: 26
 
 # Info
 
+# NAME
+
+info - Show nanocl host information
+
 ## SYNOPSIS
 
 **info** \[**-h**\|**--help**\]

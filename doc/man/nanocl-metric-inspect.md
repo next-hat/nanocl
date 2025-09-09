@@ -1,9 +1,13 @@
 ---
 title: Metric inspect
-sidebar_position: 38
+sidebar_position: 37
 ---
 
 # Metric inspect
+
+# NAME
+
+inspect - Inspect a metric
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a metric
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

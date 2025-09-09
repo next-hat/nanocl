@@ -1,9 +1,13 @@
 ---
 title: Cargo run
-sidebar_position: 14
+sidebar_position: 13
 ---
 
 # Cargo run
+
+# NAME
+
+run - Run a cargo
 
 ## SYNOPSIS
 
@@ -16,10 +20,10 @@ Run a cargo
 
 ## OPTIONS
 
-**-v**, **--volume**=*VOLUMES*  
+**-v**, **--volume** *\<VOLUMES\>*  
 Volumes of the cargo
 
-**-e**, **--env**=*ENV*  
+**-e**, **--env** *\<ENV\>*  
 Environment variables of the cargo
 
 **--rm**  

@@ -1,9 +1,13 @@
 ---
 title: Uninstall
-sidebar_position: 66
+sidebar_position: 72
 ---
 
 # Uninstall
+
+# NAME
+
+uninstall - Uninstall components
 
 ## SYNOPSIS
 
@@ -16,11 +20,11 @@ Uninstall components
 
 ## OPTIONS
 
-**--docker-host**=*DOCKER_HOST*  
+**--docker-host** *\<DOCKER_HOST\>*  
 The docker host where nanocl is installed default is
 unix:///var/run/docker.sock
 
-**-t**, **--template**=*TEMPLATE*  
+**-t**, **--template** *\<TEMPLATE\>*  
 Uninstall template to use for nanocl by default its detected
 
 **--docker-desktop**  

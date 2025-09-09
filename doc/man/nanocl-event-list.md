@@ -1,9 +1,13 @@
 ---
 title: Event list
-sidebar_position: 24
+sidebar_position: 23
 ---
 
 # Event list
+
+# NAME
+
+list - List existing events
 
 ## SYNOPSIS
 
@@ -19,13 +23,13 @@ List existing events
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
 **-h**, **--help**  

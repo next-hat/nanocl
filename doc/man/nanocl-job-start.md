@@ -1,9 +1,13 @@
 ---
 title: Job start
-sidebar_position: 34
+sidebar_position: 33
 ---
 
 # Job start
+
+# NAME
+
+start - Start a job
 
 ## SYNOPSIS
 

@@ -1,9 +1,13 @@
 ---
 title: Cargo exec
-sidebar_position: 5
+sidebar_position: 3
 ---
 
 # Cargo exec
+
+# NAME
+
+exec - Execute a command inside a cargo
 
 ## SYNOPSIS
 
@@ -20,19 +24,19 @@ Execute a command inside a cargo
 **-t**, **--tty**  
 Allocate a pseudo-TTY
 
-**--detach-keys**=*DETACH_KEYS*  
+**--detach-keys** *\<DETACH_KEYS\>*  
 Override the key sequence for detaching a container
 
-**-e**=*ENV*  
+**-e** *\<ENV\>*  
 Set environment variables
 
 **--privileged**  
 Give extended privileges to the command
 
-**-u**=*USER*  
+**-u** *\<USER\>*  
 Username or UID (format: "\<name\|uid\>\[:\<group\|gid\>\]")
 
-**-w**, **--workdir**=*WORKING_DIR*  
+**-w**, **--workdir** *\<WORKING_DIR\>*  
 Working directory inside the container
 
 **-h**, **--help**  

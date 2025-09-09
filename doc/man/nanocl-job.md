@@ -1,9 +1,13 @@
 ---
 title: Job
-sidebar_position: 29
+sidebar_position: 35
 ---
 
 # Job
+
+# NAME
+
+job - Manage jobs
 
 ## SYNOPSIS
 

@@ -5,6 +5,10 @@ sidebar_position: 47
 
 # Ps
 
+# NAME
+
+ps - Show processes
+
 ## SYNOPSIS
 
 **ps** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
@@ -20,19 +24,19 @@ Show processes
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
-**-n**, **--namespace**=*NAMESPACE*  
+**-n**, **--namespace** *\<NAMESPACE\>*  
 Show all processes for the given namespace
 
-**-k**, **--kind**=*KIND*  
+**-k**, **--kind** *\<KIND\>*  
 Show all processes for the given kind
 
 **-a**, **--all**  

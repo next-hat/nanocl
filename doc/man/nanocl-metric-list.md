@@ -1,9 +1,13 @@
 ---
 title: Metric list
-sidebar_position: 39
+sidebar_position: 38
 ---
 
 # Metric list
+
+# NAME
+
+list - List existing metrics
 
 ## SYNOPSIS
 
@@ -19,13 +23,13 @@ List existing metrics
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
 **-h**, **--help**  

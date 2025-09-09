@@ -1,9 +1,13 @@
 ---
 title: Resource history
-sidebar_position: 49
+sidebar_position: 48
 ---
 
 # Resource history
+
+# NAME
+
+history - Browse history of a resource
 
 ## SYNOPSIS
 

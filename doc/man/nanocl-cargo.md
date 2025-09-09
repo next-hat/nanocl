@@ -1,9 +1,13 @@
 ---
 title: Cargo
-sidebar_position: 3
+sidebar_position: 17
 ---
 
 # Cargo
+
+# NAME
+
+cargo - Manage cargoes
 
 ## SYNOPSIS
 
@@ -16,7 +20,7 @@ Manage cargoes
 
 ## OPTIONS
 
-**-n**, **--namespace**=*NAMESPACE*  
+**-n**, **--namespace** *\<NAMESPACE\>*  
 namespace to target by default global is used
 
 **-h**, **--help**  

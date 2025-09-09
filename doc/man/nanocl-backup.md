@@ -1,9 +1,13 @@
 ---
 title: Backup
-sidebar_position: 2
+sidebar_position: 1
 ---
 
 # Backup
+
+# NAME
+
+backup - Backup the current state
 
 ## SYNOPSIS
 
@@ -16,7 +20,7 @@ Backup the current state
 
 ## OPTIONS
 
-**-o**, **--output-dir**=*OUTPUT_DIR*  
+**-o**, **--output-dir** *\<OUTPUT_DIR\>*  
 Directory where to write the backup default to the current directory
 
 **-y**, **--yes**  

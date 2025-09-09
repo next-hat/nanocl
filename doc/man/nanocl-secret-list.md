@@ -1,9 +1,13 @@
 ---
 title: Secret list
-sidebar_position: 60
+sidebar_position: 59
 ---
 
 # Secret list
+
+# NAME
+
+list - List existing secret
 
 ## SYNOPSIS
 
@@ -19,13 +23,13 @@ List existing secret
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
 **-h**, **--help**  

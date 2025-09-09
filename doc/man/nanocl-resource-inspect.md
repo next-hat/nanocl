@@ -1,9 +1,13 @@
 ---
 title: Resource inspect
-sidebar_position: 50
+sidebar_position: 49
 ---
 
 # Resource inspect
+
+# NAME
+
+inspect - Inspect a resource
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a resource
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   

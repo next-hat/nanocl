@@ -1,9 +1,13 @@
 ---
 title: Resource list
-sidebar_position: 51
+sidebar_position: 50
 ---
 
 # Resource list
+
+# NAME
+
+list - List existing namespaces
 
 ## SYNOPSIS
 
@@ -19,13 +23,13 @@ List existing namespaces
 **-q**, **--quiet**  
 Only show keys
 
-**-l**, **--limit**=*LIMIT*  
+**-l**, **--limit** *\<LIMIT\>*  
 Limit the number of results default to 100
 
-**-o**, **--offset**=*OFFSET*  
+**-o**, **--offset** *\<OFFSET\>*  
 Offset the results to navigate through the results
 
-**--filters**=*FILTERS*  
+**--filters** *\<FILTERS\>*  
 Filters
 
 **-h**, **--help**  

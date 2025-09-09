@@ -1,9 +1,13 @@
 ---
 title: Namespace inspect
-sidebar_position: 42
+sidebar_position: 41
 ---
 
 # Namespace inspect
+
+# NAME
+
+inspect - Inspect a namespace
 
 ## SYNOPSIS
 
@@ -15,7 +19,7 @@ Inspect a namespace
 
 ## OPTIONS
 
-**--display**=*DISPLAY*  
+**--display** *\<DISPLAY\>*  
 Display format  
 
   
