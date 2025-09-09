@@ -41,9 +41,15 @@ pub use uninstall::*;
 pub use vm::*;
 pub use vm_image::*;
 
+const LONG_ABOUT: &str = r#"Nanocl is a modern, self-sufficient orchestrator for containers and virtual machines.
+It delivers a clean dev→prod workflow with declarative Statefiles (YAML/TOML/JSON) and opinionated, predictable defaults.
+Built in Rust for performance and safety, it keeps operational overhead low while remaining powerful and extensible.
+Manage cargoes, resources, jobs, and VMs with dynamic routing, DNS, and end-to-end TLS.
+Start local on a single node and scale out when ready — simple to learn, production-grade by design."#;
+
 /// Cli available options and commands
 #[derive(Parser)]
-#[clap(about, version, name = "nanocl")]
+#[clap(name = "nanocl", version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
   /// Nanocld host default: unix://run/nanocl/nanocl.sock
   #[clap(long, short = 'H')]

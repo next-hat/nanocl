@@ -30,7 +30,12 @@ nanocl_utils = { version = "0.7", features = ["build_tools"] }
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_error = { version = "0.5", features = ["io", "http", "http_client"] }
+nanocl_error = { version = "0.5", features = [
+  "io",
+  "http",
+  "http_client",
+  "serde_json",
+] }
 log = "0.4"
 clap = { version = "4.5", features = ["derive"] }
 ntex = { version = "2", features = ["tokio", "openssl"] }
