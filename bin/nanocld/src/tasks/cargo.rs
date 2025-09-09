@@ -1,5 +1,5 @@
 use nanocl_error::io::IoError;
-use nanocl_stubs::process::ProcessKind;
+use nanocl_stubs::{process::ProcessKind, system::EventActorKind};
 
 use crate::{
   models::{CargoDb, SystemState},
@@ -10,7 +10,7 @@ use super::generic::*;
 
 impl ObjTask for CargoDb {
   fn get_kind() -> String {
-    "cargo".to_owned()
+    EventActorKind::Cargo.to_string()
   }
 }
 
