@@ -1,5 +1,5 @@
 use nanocl_error::io::IoError;
-use nanocl_stubs::process::ProcessKind;
+use nanocl_stubs::{process::ProcessKind, system::EventActorKind};
 
 use crate::{
   models::{JobDb, SystemState},
@@ -10,7 +10,7 @@ use super::generic::*;
 
 impl ObjTask for JobDb {
   fn get_kind() -> String {
-    "job".to_owned()
+    EventActorKind::Job.to_string()
   }
 }
 

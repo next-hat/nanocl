@@ -1,5 +1,5 @@
 use nanocl_error::io::IoError;
-use nanocl_stubs::process::ProcessKind;
+use nanocl_stubs::{process::ProcessKind, system::EventActorKind};
 
 use crate::{
   models::{SystemState, VmDb},
@@ -10,7 +10,7 @@ use super::generic::*;
 
 impl ObjTask for VmDb {
   fn get_kind() -> String {
-    "vm".to_owned()
+    EventActorKind::Vm.to_string()
   }
 }
 

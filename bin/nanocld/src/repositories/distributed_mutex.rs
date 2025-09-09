@@ -22,7 +22,7 @@ impl RepositoryBase for DistributedMutexDb {
       ),
       (
         "resource_key",
-        (ColumnType::Uuid, "distributed_mutexes.resource_key"),
+        (ColumnType::Text, "distributed_mutexes.resource_key"),
       ),
       (
         "node_key",
@@ -124,8 +124,8 @@ impl DistributedMutexDb {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let query = diesel::delete(
         distributed_mutexes::table
-          .filter(distributed_mutexes::resource_kind.eq(resource_kind))
-          .filter(distributed_mutexes::resource_key.eq(resource_key)),
+          .filter(distributed_mutexes::resource_kind.eq(&resource_kind))
+          .filter(distributed_mutexes::resource_key.eq(&resource_key)),
       );
       query.execute(&mut conn).map_err(Self::map_err)?;
       Ok(())

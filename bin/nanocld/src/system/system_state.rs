@@ -61,12 +61,9 @@ impl SystemState {
           if let Err(err) = super::exec_event(&e, &self).await {
             log::error!("system::run: exec_event {err}");
           }
-          let event_emitter_raw = self.inner.event_emitter_raw.clone();
-          rt::spawn(async move {
-            if let Err(err) = event_emitter_raw.emit(&e) {
-              log::error!("system::run: emit {err}");
-            }
-          });
+          if let Err(err) = self.inner.event_emitter_raw.emit(&e) {
+            log::error!("system::run: emit {err}");
+          }
         }
       });
     });
