@@ -3,12 +3,16 @@ ApiVersion: v0.16
 Args:
   - Name: name
     Kind: String
+    Required: true
   - Name: domain
     Kind: String
+    Required: true
   - Name: image
     Kind: String
+    Required: true
   - Name: port
     Kind: Number
+    Required: true
   - Name: ssl_enabled
     Kind: Boolean
 

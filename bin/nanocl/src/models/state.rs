@@ -56,6 +56,23 @@ pub struct StateLogsOpts {
   pub follow: bool,
 }
 
+/// `nanocl state render` available options
+#[derive(Parser, Clone)]
+pub struct StateRenderOpts {
+  /// Path or Url to the Statefile
+  #[clap(long, short = 's')]
+  pub source: Option<String>,
+  /// Output path for the rendered statefile
+  #[clap(long, short = 'o')]
+  pub output: String,
+  /// Skip the confirmation prompt
+  #[clap(long = "yes", short = 'y')]
+  pub skip_confirm: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 /// `nanocl state rm` available options
 #[derive(Parser)]
 pub struct StateRemoveOpts {
@@ -84,6 +101,8 @@ pub enum StateCommand {
   Man(StateManOpts),
   /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
+  /// Render a Statefile with args to an output file
+  Render(StateRenderOpts),
   /// Logs elements from a Statefile
   Logs(StateLogsOpts),
   /// Remove elements from a Statefile
