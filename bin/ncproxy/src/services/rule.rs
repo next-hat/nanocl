@@ -82,4 +82,49 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
     clean_test_cargo().await.unwrap();
   }
+
+  #[ntex::test]
+  async fn http3_template() {
+    use nanocld_client::stubs::{generic::NetworkKind, proxy::*};
+    let name = "ncproxy-io-test-http3";
+    let client = gen_default_test_client().await;
+    ensure_test_cargo().await.unwrap();
+    let rule = ResourceProxyRule {
+      rules: vec![ProxyRule::Http(ProxyRuleHttp {
+        domain: Some("h3.test".into()),
+        port: Some(443),
+        hsts: None,
+        network: NetworkKind::All,
+        limit_req_zone: None,
+        locations: vec![ProxyHttpLocation {
+          path: "/".into(),
+          target: LocationTarget::Upstream(UpstreamTarget {
+            key: "ncproxy-test.global.c".into(),
+            port: 9000,
+            path: None,
+            disable_logging: None,
+            ssl: None,
+          }),
+          limit_req: None,
+          allowed_ips: None,
+          headers: None,
+          version: None,
+        }],
+        ssl: Some(ProxySsl::Secret("tls.secret".into())),
+        http3: Some(ProxyHttp3::Bool(true)),
+        includes: None,
+      })],
+    };
+    let mut res = client
+      .send_put(&format!("/rules/{name}"), Some(&rule), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "put h3 rule");
+    let body = res.body().await.unwrap();
+    println!("{}", String::from_utf8_lossy(&body));
+    let res = client
+      .send_delete(&format!("/rules/{name}"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "delete h3 rule");
+    clean_test_cargo().await.unwrap();
+  }
 }

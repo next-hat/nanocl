@@ -6130,6 +6130,58 @@ components:
           type: string
         Stats:
           $ref: '#/components/schemas/Stats'
+    ProxyHttp3:
+      oneOf:
+      - type: boolean
+        description: Enables HTTP/3 with default settings
+      - $ref: '#/components/schemas/ProxyHttp3Config'
+        description: Detailed HTTP/3 configuration
+    ProxyHttp3Config:
+      type: object
+      properties:
+        Hq:
+          type:
+          - boolean
+          - 'null'
+          description: Enables HTTP/0.9 protocol negotiation used in QUIC interop tests
+        MaxConcurrentStreams:
+          type:
+          - integer
+          - 'null'
+          description: Maximum concurrent HTTP/3 streams per connection
+          minimum: 0
+        StreamBufferSize:
+          type:
+          - string
+          - 'null'
+          description: Buffer size for QUIC streams (e.g., "64k", "8k")
+        ActiveConnectionIdLimit:
+          type:
+          - integer
+          - 'null'
+          description: QUIC active_connection_id_limit transport parameter
+          minimum: 0
+        Bpf:
+          type:
+          - boolean
+          - 'null'
+          description: Enable routing of QUIC packets using eBPF (Linux 5.7+)
+        Gso:
+          type:
+          - boolean
+          - 'null'
+          description: Enable Generic Segmentation Offload for QUIC (Linux with UDP_SEGMENT)
+        HostKey:
+          type:
+          - string
+          - 'null'
+          description: File path to the QUIC host key
+        Retry:
+          type:
+          - boolean
+          - 'null'
+          description: Enable QUIC address validation (retry)
+      additionalProperties: false
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
@@ -6218,6 +6270,11 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
             description: The ssl configuration
+        Http3:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProxyHttp3'
+            description: HTTP/3 configuration
         Includes:
           type:
           - array

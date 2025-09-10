@@ -261,6 +261,7 @@ pub async fn add_rule(
           "locations": locations,
           "ssl": ssl,
           "hsts": hsts_config,
+          "http3": http_rule.http3,
           "hide_upstream": http_rule.ssl.is_some() && ssl.is_none(),
         }))?;
         http_conf += &data;
