@@ -1,0 +1,10 @@
+Rules:
+- Domain: h3.example.com
+  Network: All
+  Ssl: tls.secret
+  Http3: true
+  Locations:
+  - Path: /
+    Target:
+      Key: ncproxy-test.global.c
+      Port: 9000
