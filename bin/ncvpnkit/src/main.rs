@@ -7,13 +7,13 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 use vpnkitrc::stubs::*;
 
 use nanocl_utils::logger;
+use nanocld_client::NanocldClient;
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::system::{Event, EventActorKind, NativeEventAction};
 use nanocld_client::stubs::{
   generic::NetworkKind,
   proxy::{ProxyRule, ProxyRuleStream, ProxyStreamProtocol, ResourceProxyRule},
 };
-use nanocld_client::NanocldClient;
 
 mod vars;
 

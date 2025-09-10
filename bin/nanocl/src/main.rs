@@ -2,7 +2,7 @@ use clap::Parser;
 use dotenvy::dotenv;
 
 use nanocl_error::io::{IoError, IoResult};
-use nanocld_client::{stubs::system::SslConfig, ConnectOpts, NanocldClient};
+use nanocld_client::{ConnectOpts, NanocldClient, stubs::system::SslConfig};
 
 mod commands;
 mod config;

@@ -1,6 +1,7 @@
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     generic::NetworkKind,
     process::Process,
@@ -9,7 +10,6 @@ use nanocld_client::{
       UpstreamTarget,
     },
   },
-  NanocldClient,
 };
 
 use crate::models::{
@@ -221,7 +221,7 @@ pub async fn gen_upstream(
       return Err(IoError::invalid_data(
         "UpstreamTarget",
         &format!("Unknown Kind {}", target_kind),
-      ))
+      ));
     }
   };
   state.store.write_conf_file(&key, &content, kind).await?;

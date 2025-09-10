@@ -6,14 +6,14 @@ use ntex::web;
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::{
+  NanocldClient,
   bollard_next::exec::{CreateExecOptions, StartExecOptions},
   stubs::proxy::{LocationTarget, ProxyRule, ResourceProxyRule},
-  NanocldClient,
 };
 
 use crate::models::{
-  LocationTemplate, NginxRuleKind, SystemStateRef, CONF_TEMPLATE,
-  HTTP_TEMPLATE, STREAM_TEMPLATE,
+  CONF_TEMPLATE, HTTP_TEMPLATE, LocationTemplate, NginxRuleKind,
+  STREAM_TEMPLATE, SystemStateRef,
 };
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {

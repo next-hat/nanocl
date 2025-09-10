@@ -7,7 +7,7 @@ use ntex::time;
 use ntex::util;
 use ntex::ws;
 
-use crate::models::{WsConState, CLIENT_TIMEOUT, HEARTBEAT_INTERVAL};
+use crate::models::{CLIENT_TIMEOUT, HEARTBEAT_INTERVAL, WsConState};
 
 /// ## Heartbeat
 ///

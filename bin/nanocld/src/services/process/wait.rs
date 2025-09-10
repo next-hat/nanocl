@@ -1,4 +1,4 @@
-use futures::{stream::select_all, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream::select_all};
 use ntex::web;
 
 use bollard_next::{

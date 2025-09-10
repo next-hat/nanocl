@@ -9,7 +9,7 @@ use bollard_next::service::{
   ContainerCreateResponse, HostConfig, ProgressDetail, RestartPolicy,
   RestartPolicyNameEnum,
 };
-use bollard_next::{Docker, API_DEFAULT_VERSION};
+use bollard_next::{API_DEFAULT_VERSION, Docker};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
@@ -152,7 +152,7 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
       return Err(IoError::invalid_data(
         "Url",
         &format!("{docker_host} have invalid schema"),
-      ))
+      ));
     }
   };
   Ok(docker)

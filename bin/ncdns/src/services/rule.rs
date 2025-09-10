@@ -2,8 +2,8 @@ use ntex::web;
 
 use nanocl_error::http::HttpError;
 
-use nanocld_client::stubs::dns::ResourceDnsRule;
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::dns::ResourceDnsRule;
 
 use crate::{dnsmasq, utils};
 

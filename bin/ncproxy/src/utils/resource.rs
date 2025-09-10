@@ -1,13 +1,13 @@
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     generic::{GenericClause, GenericFilter},
     proxy::ResourceProxyRule,
     resource::{Resource, ResourcePartial},
   },
-  NanocldClient,
 };
 
 use crate::{models::SystemStateRef, vars};

@@ -1,11 +1,11 @@
 use std::{net::ToSocketAddrs, time::Duration};
 
 use diesel::{
-  r2d2::{ConnectionManager, Pool as R2D2Pool},
   PgConnection,
+  r2d2::{ConnectionManager, Pool as R2D2Pool},
 };
 use diesel_migrations::{
-  embed_migrations, EmbeddedMigrations, MigrationHarness,
+  EmbeddedMigrations, MigrationHarness, embed_migrations,
 };
 use ntex::{rt, time, web};
 
@@ -45,7 +45,7 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
       return Err(IoError::with_context(
         "CockroachDB connection",
         std::io::Error::new(std::io::ErrorKind::NotConnected, err),
-      ))
+      ));
     }
   };
   Ok(conn)
@@ -147,7 +147,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
       return Err(IoError::invalid_data(
         "Store",
         "Store address not specified",
-      ))
+      ));
     }
     Some(addr) => addr,
   };

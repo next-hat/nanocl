@@ -46,7 +46,10 @@ impl ObjCreate for VmDb {
     let image =
       VmImageDb::read_by_pk(&vm.disk.image, &state.inner.pool).await?;
     if image.kind.as_str() != "Base" {
-      return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
+      return Err(HttpError::bad_request(format!(
+        "Image {} is not a base image please convert the snapshot into a base image first",
+        &vm.disk.image
+      )));
     }
     let snap_name = format!("{}.{vm_key}", &image.name);
     let size = vm.disk.size.unwrap_or(20);

@@ -17,8 +17,8 @@ use ntex::{http, rt};
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
-  stubs::metric::{HttpMetric, MetricPartial},
   NanocldClient,
+  stubs::metric::{HttpMetric, MetricPartial},
 };
 
 use crate::models::SystemStateRef;
