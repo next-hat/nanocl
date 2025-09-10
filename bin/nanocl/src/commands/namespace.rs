@@ -1,5 +1,5 @@
 use nanocl_error::io::IoResult;
-use nanocld_client::{stubs::namespace::NamespaceInspect, NanocldClient};
+use nanocld_client::{NanocldClient, stubs::namespace::NamespaceInspect};
 
 use crate::{
   config::CliConfig,

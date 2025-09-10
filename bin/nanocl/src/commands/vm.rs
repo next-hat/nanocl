@@ -12,17 +12,17 @@ use futures::{
 };
 use ntex::{rt, time, util::Bytes, ws};
 #[cfg(not(target_os = "windows"))]
-use termios::{tcsetattr, Termios, ECHO, ICANON, TCSANOW};
+use termios::{ECHO, ICANON, TCSANOW, Termios, tcsetattr};
 
 use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     process::{OutputKind, OutputLog},
     system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
     vm_spec::VmSpecPartial,
   },
-  NanocldClient,
 };
 
 use crate::{
@@ -182,18 +182,20 @@ pub async fn exec_vm_attach(
   // Apply the new terminal settings
   tcsetattr(std::io::stdin().as_raw_fd(), TCSANOW, &termios)?;
   // start console read loop
-  thread::spawn(move || loop {
-    let mut input = [0; 1];
-    if std::io::stdin().read(&mut input).is_err() {
-      println!("Unable to read stdin");
-      return;
-    }
-    let s = std::str::from_utf8(&input).unwrap();
-    // send text to server
-    if futures::executor::block_on(tx.send(ws::Message::Text(s.into())))
-      .is_err()
-    {
-      return;
+  thread::spawn(move || {
+    loop {
+      let mut input = [0; 1];
+      if std::io::stdin().read(&mut input).is_err() {
+        println!("Unable to read stdin");
+        return;
+      }
+      let s = std::str::from_utf8(&input).unwrap();
+      // send text to server
+      if futures::executor::block_on(tx.send(ws::Message::Text(s.into())))
+        .is_err()
+      {
+        return;
+      }
     }
   });
   // read console commands

@@ -7,7 +7,7 @@ use nanocld_client::NanocldClient;
 use crate::dnsmasq::Dnsmasq;
 use crate::services;
 
-pub fn gen(
+pub fn generate(
   host: &str,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
@@ -35,7 +35,7 @@ pub fn gen(
       return Err(IoError::invalid_data(
         "Server",
         "invalid host format (must be unix:// or tcp://)",
-      ))
+      ));
     }
   }
   #[cfg(feature = "dev")]
@@ -62,9 +62,9 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    let server = gen("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
+    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
-    let server = gen("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
+    let server = generate("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
     server.stop(true).await;
     Ok(())
   }
@@ -76,7 +76,7 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    let server = gen("wrong://dsadsa", &dnsmasq, &client);
+    let server = generate("wrong://dsadsa", &dnsmasq, &client);
     assert!(server.is_err());
     Ok(())
   }

@@ -4,6 +4,7 @@ pub mod docker;
 pub mod hash;
 pub mod installer;
 pub mod liquid;
+pub mod markdown;
 pub mod math;
 pub mod print;
 pub mod process;

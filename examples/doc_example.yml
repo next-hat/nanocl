@@ -1,0 +1,60 @@
+ApiVersion: v0.16
+
+Metadata:
+  Name: Nginx with Certbot SSL
+  Tags:
+  - cargo
+  - nginx
+  - certbot
+  - ssl
+  - proxy
+  About: Example of an Nginx cargo with Certbot managed SSL certificates.
+  LongAbout: |
+    This example demonstrates how to create an Nginx cargo with SSL certificates
+    managed by Certbot. The cargo is configured to always pull the latest Nginx image
+    and automatically handle SSL certificate issuance and renewal.
+
+  # ManContent: |
+  #   ## Name
+  #   Nginx with Certbot SSL - Example of an Nginx cargo with Certbot managed SSL certificates.
+
+  #   ## Synopsis
+  #   nanocl state apply -s examples/doc_example.yml -- [--help] **ARGUMENT
+  #   nanocl state rm -s examples/doc_example.yml -- [--help] **ARGUMENTS**
+
+  #   ## Description
+  #   This example demonstrates how to create an Nginx cargo with SSL certificates
+  #   managed by Certbot. The cargo is configured to always pull the latest Nginx image
+  #   and automatically handle SSL certificate issuance and renewal.
+
+  #   ## Arguments
+  #   **--name** String **(required)** Name of the cargo to create.
+  #   **--testtt** String sample test (default: default-value)
+
+Args:
+- Name: name
+  Kind: String
+  Required: true
+  Description: Name of the cargo to create.
+- Name: testtt
+  Kind: String
+  Description: sample test
+- Name: multiple
+  Kind: String
+  Multiple: true
+  Description: sample multiple
+- Name: boolean
+  Kind: Boolean
+  Description: sample boolean
+
+Namespace: cargo-example
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/objects/cargo
+Cargoes:
+- Name: ${{ Args.name }}
+  ImagePullPolicy: Always
+  Metadata:
+    Certbot: managed
+  Container:
+    Image: nginx:latest

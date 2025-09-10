@@ -8,7 +8,7 @@ use nanocl_utils::ntex::middlewares;
 
 use crate::{models::SystemStateRef, services};
 
-pub fn gen(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
+pub fn generate(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
   let state = Arc::clone(state);
   let mut server = web::HttpServer::new(move || {
     web::App::new()

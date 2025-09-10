@@ -6,6 +6,48 @@ use crate::{
   secret::SecretPartial, vm_spec::VmSpecPartial,
 };
 
+/// Optional metadata to enrich a Statefile with documentation
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct StatefileMetadata {
+  /// Optional title for the statefile documentation
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub name: Option<String>,
+  /// About the statefile whill be use under the name section
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub about: Option<String>,
+  /// Long about of the statefile will be use under the description section
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub long_about: Option<String>,
+  /// Optional tags associated to this statefile
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub tags: Option<Vec<String>>,
+  /// Override the content of the manual page for this statefile
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub man_content: Option<String>,
+}
+
 /// Statefile argument definition to pass to the Statefile
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -66,7 +108,35 @@ pub struct StatefileArg {
   /// Kind of the build arg
   pub kind: StatefileArgKind,
   /// Default value of the build arg
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub default: Option<String>,
+  /// Required argument
+  #[cfg_attr(
+    feature = "serde",
+    serde(default, skip_serializing_if = "std::ops::Not::not")
+  )]
+  pub required: bool,
+  /// Multiple values accepted for the argument
+  #[cfg_attr(
+    feature = "serde",
+    serde(default, skip_serializing_if = "std::ops::Not::not")
+  )]
+  pub multiple: bool,
+  /// Short description of the argument
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub description: Option<String>,
+  /// Example value for the argument
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub example: Option<String>,
 }
 
 /// Statefile argument definition to pass to the Statefile
@@ -138,6 +208,12 @@ pub enum SubState {
 pub struct Statefile {
   /// Api version to use or remote url
   pub api_version: String,
+  /// Optional metadata about the statefile
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<StatefileMetadata>,
   /// Arguments to pass to the Statefile
   #[cfg_attr(
     feature = "serde",

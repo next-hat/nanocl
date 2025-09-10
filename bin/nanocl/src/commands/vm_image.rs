@@ -6,8 +6,8 @@ use tokio_util::codec;
 
 use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::{
-  stubs::vm_image::{VmImage, VmImageCloneStream},
   NanocldClient,
+  stubs::vm_image::{VmImage, VmImageCloneStream},
 };
 
 use crate::{

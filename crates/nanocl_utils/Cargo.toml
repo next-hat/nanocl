@@ -1,7 +1,7 @@
 [package]
 name = "nanocl_utils"
 version = "0.7.0"
-edition = "2021"
+edition = "2024"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Nanocl shared utils"
 readme = "readme.md"

@@ -11,7 +11,7 @@ use crate::{models::SystemState, services, vars};
 /// The server will be returned.
 /// NOTE: In development we bind the address to [http://0.0.0.0:8585](http://0.0.0.0:8585)
 ///       with an explorer on [http://0.0.0.0:8585/explorer/](http://0.0.0.0:8585/explorer/)
-pub async fn gen(
+pub async fn generate(
   daemon_state: &SystemState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("server::gen: start");
@@ -115,7 +115,7 @@ mod tests {
 
   use clap::Parser;
   use nanocl_stubs::system::BinaryInfo;
-  use ntex::http::{client::Connector, StatusCode};
+  use ntex::http::{StatusCode, client::Connector};
   use openssl::ssl::SslConnector;
 
   use super::*;
@@ -141,7 +141,7 @@ mod tests {
     let daemon_state = SystemState::new(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    gen(&daemon_state).await
+    generate(&daemon_state).await
   }
 
   async fn assert_config_ok(args: Cli) {

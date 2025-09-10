@@ -47,6 +47,7 @@ pub async fn exec_backup(
       .collect::<Vec<VmSpecPartial>>();
     pg.set_message(format!("(writing statefile: {}.yml)", namespace.name));
     let state_file = Statefile {
+      metadata: None,
       api_version: cli_conf.client.version.clone(),
       sub_states: None,
       args: None,
@@ -82,6 +83,7 @@ pub async fn exec_backup(
     utils::dialog::confirm("File already exist override ?")?;
   }
   let state_file = Statefile {
+    metadata: None,
     api_version: cli_conf.client.version.clone(),
     sub_states: None,
     args: None,
@@ -113,6 +115,7 @@ pub async fn exec_backup(
     utils::dialog::confirm("File already exist override ?")?;
   }
   let state_file = Statefile {
+    metadata: None,
     api_version: cli_conf.client.version.clone(),
     sub_states: None,
     args: None,
@@ -144,6 +147,7 @@ pub async fn exec_backup(
     utils::dialog::confirm("File already exist override ?")?;
   }
   let state_file = Statefile {
+    metadata: None,
     api_version: cli_conf.client.version.clone(),
     sub_states: None,
     args: None,

@@ -5,7 +5,7 @@ use bollard_next::{
   container::{LogOutput, LogsOptions, StartContainerOptions},
   network::{CreateNetworkOptions, InspectNetworkOptions},
 };
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use nix::unistd::Group;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
