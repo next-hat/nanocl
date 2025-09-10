@@ -320,27 +320,27 @@ fn parse_build_args(
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.into_boxed_str());
     let mut cmd_arg = Arg::new(arg).long(arg);
-    if let Some(description) = build_arg.description {
+    if let Some(description) = &build_arg.description {
+      let description = description.replace('\n', "");
       cmd_arg = cmd_arg.help(description);
     }
-    cmd_arg = cmd_arg.required(build_arg.required).action(ArgAction::Set);
-    if build_arg.multiple {
-      cmd_arg = cmd_arg.num_args(1..).action(ArgAction::Append);
+    println!("Processing arg: {:?}", build_arg);
+    if build_arg.kind == StatefileArgKind::Boolean {
+      println!("Boolean arg: {}", build_arg.name);
+      cmd_arg = cmd_arg.required(false).action(ArgAction::SetTrue);
     } else {
-      cmd_arg = cmd_arg.num_args(1);
+      cmd_arg = cmd_arg.action(ArgAction::Set).required(build_arg.required);
+      if build_arg.multiple {
+        cmd_arg = cmd_arg.num_args(1..).action(ArgAction::Append);
+      } else {
+        cmd_arg = cmd_arg.num_args(1);
+      }
     }
-    match build_arg.default {
-      Some(default) => {
-        if build_arg.kind != StatefileArgKind::Boolean {
-          let default_value: &'static str = Box::leak(default.into_boxed_str());
-          cmd_arg = cmd_arg.default_value(default_value);
-        }
-      }
-      None => {
-        if build_arg.kind == StatefileArgKind::Boolean {
-          cmd_arg = cmd_arg.action(ArgAction::SetTrue);
-        }
-      }
+    if let Some(default) = build_arg.default
+      && build_arg.kind != StatefileArgKind::Boolean
+    {
+      let default_value: &'static str = Box::leak(default.into_boxed_str());
+      cmd_arg = cmd_arg.default_value(default_value);
     }
     cmd = cmd.arg(cmd_arg);
   }
