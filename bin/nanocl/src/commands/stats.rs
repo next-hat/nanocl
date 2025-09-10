@@ -3,7 +3,7 @@ use crate::{
   models::{ProcessStatsRow, StatsOpts},
   utils,
 };
-use futures::{channel::mpsc, StreamExt};
+use futures::{StreamExt, channel::mpsc};
 use nanocl_error::io::IoResult;
 use std::collections::HashMap;
 

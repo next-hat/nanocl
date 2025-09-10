@@ -1,10 +1,10 @@
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
+use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 use nanocld_client::stubs::generic::{
   GenericClause, GenericFilter, NetworkKind,
 };
-use nanocld_client::NanocldClient;
 
 use crate::dnsmasq::Dnsmasq;
 
@@ -47,7 +47,7 @@ async fn get_network_addr(
       return Err(IoError::invalid_input(
         "Network",
         &format!("{network} is not supported"),
-      ))
+      ));
     }
   };
   Ok(addr)
@@ -102,7 +102,7 @@ pub(crate) async fn update_entries(
         return Err(IoError::invalid_input(
           "Network",
           "All network is not supported",
-        ))
+        ));
       }
     };
     let entry = &format!("address=/{}/{}", entry.name, ip_address);
@@ -160,7 +160,9 @@ pub mod tests {
   // Before a test
   pub fn before() {
     // Build a test env logger
-    std::env::set_var("TEST", "true");
+    unsafe {
+      std::env::set_var("TEST", "true");
+    }
   }
 
   // Generate a test server

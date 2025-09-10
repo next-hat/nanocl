@@ -12,18 +12,20 @@ pub(crate) mod tests {
   pub use nanocl_utils::ntex::test_client::*;
 
   use nanocld_client::{
+    ConnectOpts, NanocldClient,
     stubs::{
       cargo::CargoDeleteQuery, cargo_spec::CargoSpecPartial,
       proxy::ResourceProxyRule,
     },
-    ConnectOpts, NanocldClient,
   };
 
   use crate::{services, vars};
 
   pub fn before() {
     // Set test env to true to setup test logger
-    std::env::set_var("TEST", "true");
+    unsafe {
+      std::env::set_var("TEST", "true");
+    }
   }
 
   pub async fn ensure_test_cargo() -> IoResult<()> {

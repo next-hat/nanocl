@@ -5,7 +5,7 @@ use ntex::{rt, time::interval};
 
 use nanocl_error::io::IoResult;
 
-use metrsd_client::{stubs::MetrsdEvent, MetrsdClient};
+use metrsd_client::{MetrsdClient, stubs::MetrsdEvent};
 
 use crate::{
   models::{MetricDb, MetricNodePartial, Pool, SystemState},

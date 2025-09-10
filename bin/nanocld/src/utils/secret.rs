@@ -1,4 +1,4 @@
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{

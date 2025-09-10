@@ -33,7 +33,9 @@ pub mod tests {
   /// Set the log level to info and build a test env logger for tests purpose
   pub fn before() {
     // Build a test env logger
-    std::env::set_var("TEST", "true");
+    unsafe {
+      std::env::set_var("TEST", "true");
+    }
   }
 
   pub async fn gen_test_system(routes: Config, version: &str) -> TestSystem {

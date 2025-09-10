@@ -2,7 +2,9 @@ use env_logger;
 
 pub fn enable_logger(bin_name: &str) {
   if std::env::var("LOG_LEVEL").is_err() {
-    std::env::set_var("LOG_LEVEL", format!("{bin_name}=debug"));
+    unsafe {
+      std::env::set_var("LOG_LEVEL", format!("{bin_name}=debug"));
+    }
   }
   let is_test = std::env::var("TEST").is_ok();
   env_logger::Builder::new()

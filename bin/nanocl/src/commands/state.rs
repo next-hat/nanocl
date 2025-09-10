@@ -9,9 +9,8 @@ use std::{
 use async_recursion::async_recursion;
 use clap::{Arg, ArgAction, Command};
 use futures::{
-  join,
+  StreamExt, join,
   stream::{FuturesOrdered, FuturesUnordered},
-  StreamExt,
 };
 use serde_json::{Map, Value};
 use url::Url;
@@ -19,16 +18,17 @@ use url::Url;
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::{
+  ConnectOpts,
   stubs::{
     generic::{GenericClause, GenericFilter, GenericFilterNsp},
     process::Process,
     statefile::{StatefileArgKind, SubState, SubStateValue},
     system::{EventActorKind, ObjPsStatusKind},
   },
-  ConnectOpts,
 };
 
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     cargo_spec::CargoSpecPartial,
     job::JobPartial,
@@ -39,7 +39,6 @@ use nanocld_client::{
     system::NativeEventAction,
     vm_spec::{VmSpecPartial, VmSpecUpdate},
   },
-  NanocldClient,
 };
 
 use crate::{
@@ -280,14 +279,40 @@ fn gen_client(
   Ok(client)
 }
 
+pub enum ArgParseMode {
+  Apply,
+  Remove,
+  Logs,
+}
+
+impl std::fmt::Display for ArgParseMode {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
+      ArgParseMode::Apply => "apply",
+      ArgParseMode::Remove => "remove",
+      ArgParseMode::Logs => "logs",
+    };
+    write!(f, "{data}")
+  }
+}
+
 /// Parse `Args` from a Statefile and ask the user to input their values
 fn parse_build_args(
   state_file: &Statefile,
+  mode: ArgParseMode,
   args: &[String],
 ) -> IoResult<serde_json::Value> {
-  let mut cmd = Command::new("nanocl state args")
-    .about("Validate state args")
-    .bin_name("nanocl state args --");
+  let metadata = state_file.clone().metadata.unwrap_or_default();
+  let about = match metadata.about {
+    Some(about) => about,
+    None => "Validate state args".to_owned(),
+  };
+  let name = format!("nanocl state {mode} -s statefile --");
+  let name: &'static str = Box::leak(name.into_boxed_str());
+  let mut cmd = Command::new(name).about(about).bin_name(name);
+  if let Some(long_about) = metadata.long_about {
+    cmd = cmd.long_about(long_about);
+  }
   // Add string nanocl state args as first element of args
   let mut args = args.to_owned();
   args.insert(0, "nanocl state apply --".into());
@@ -295,20 +320,27 @@ fn parse_build_args(
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.into_boxed_str());
     let mut cmd_arg = Arg::new(arg).long(arg);
-    match build_arg.default {
-      Some(default) => {
-        if build_arg.kind != StatefileArgKind::Boolean {
-          let default_value: &'static str = Box::leak(default.into_boxed_str());
-          cmd_arg = cmd_arg.default_value(default_value);
-        }
+    if let Some(description) = &build_arg.description {
+      let description = description.replace('\n', "");
+      cmd_arg = cmd_arg.help(description);
+    }
+    println!("Processing arg: {:?}", build_arg);
+    if build_arg.kind == StatefileArgKind::Boolean {
+      println!("Boolean arg: {}", build_arg.name);
+      cmd_arg = cmd_arg.required(false).action(ArgAction::SetTrue);
+    } else {
+      cmd_arg = cmd_arg.action(ArgAction::Set).required(build_arg.required);
+      if build_arg.multiple {
+        cmd_arg = cmd_arg.num_args(1..).action(ArgAction::Append);
+      } else {
+        cmd_arg = cmd_arg.num_args(1);
       }
-      None => {
-        if build_arg.kind == StatefileArgKind::Boolean {
-          cmd_arg = cmd_arg.action(ArgAction::SetTrue);
-        } else {
-          cmd_arg = cmd_arg.required(true);
-        }
-      }
+    }
+    if let Some(default) = build_arg.default
+      && build_arg.kind != StatefileArgKind::Boolean
+    {
+      let default_value: &'static str = Box::leak(default.into_boxed_str());
+      cmd_arg = cmd_arg.default_value(default_value);
     }
     cmd = cmd.arg(cmd_arg);
   }
@@ -319,30 +351,44 @@ fn parse_build_args(
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
     match build_arg.kind {
       StatefileArgKind::String => {
-        let value =
-          matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
-            "BuildArg".into(),
-            format!("argument {arg} is missing"),
-          ))?;
-        args.insert(name, Value::String(value.to_owned()));
+        let value = matches.get_one::<String>(arg);
+        match value {
+          None if build_arg.required => {
+            return Err(IoError::invalid_data(
+              "BuildArg".into(),
+              format!("argument {arg} is missing"),
+            ));
+          }
+          Some(value) => {
+            args.insert(name, Value::String(value.to_owned()));
+          }
+          _ => {}
+        };
       }
       StatefileArgKind::Boolean => {
         let value = matches.get_flag(&name);
         args.insert(name, Value::Bool(value));
       }
       StatefileArgKind::Number => {
-        let value =
-          matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
-            "BuildArg".into(),
-            format!("argument {arg} is missing"),
-          ))?;
-        let value = value.parse::<usize>().map_err(|err| {
-          IoError::invalid_data(
-            "BuildArg".into(),
-            format!("argument {arg} is not a number: {err}"),
-          )
-        })?;
-        args.insert(name, Value::Number(value.into()));
+        let value = matches.get_one::<String>(arg);
+        match value {
+          None if build_arg.required => {
+            return Err(IoError::invalid_data(
+              "BuildArg".into(),
+              format!("argument {arg} is missing"),
+            ));
+          }
+          Some(value) => {
+            let value = value.parse::<usize>().map_err(|err| {
+              IoError::invalid_data(
+                "BuildArg".into(),
+                format!("argument {arg} is not a number: {err}"),
+              )
+            })?;
+            args.insert(name, Value::Number(value.into()));
+          }
+          _ => {}
+        };
       }
     }
   }
@@ -892,8 +938,9 @@ async fn exec_state_apply(
   opts: &StateApplyOpts,
 ) -> IoResult<()> {
   let format = cli_conf.user_config.display_format.clone();
-  let state_file = read_state_file(&opts.state_location, &format).await?;
-  let args = parse_build_args(&state_file.data, &opts.args)?;
+  let state_file = read_state_file(&opts.source, &format).await?;
+  let args =
+    parse_build_args(&state_file.data, ArgParseMode::Apply, &opts.args)?;
   let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   if !opts.skip_confirm {
     print_states(&states);
@@ -913,7 +960,7 @@ async fn exec_state_apply(
         state_logs(
           cli_conf,
           &StateLogsOpts {
-            state_location: Some(state.root.to_string()),
+            source: Some(state.root.to_string()),
             follow: true,
             ..Default::default()
           },
@@ -964,8 +1011,9 @@ async fn exec_state_logs(
   opts: &StateLogsOpts,
 ) -> IoResult<()> {
   let format = cli_conf.user_config.display_format.clone();
-  let state_file = read_state_file(&opts.state_location, &format).await?;
-  let args = parse_build_args(&state_file.data, &opts.args)?;
+  let state_file = read_state_file(&opts.source, &format).await?;
+  let args =
+    parse_build_args(&state_file.data, ArgParseMode::Logs, &opts.args)?;
   let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   states
     .iter()
@@ -1041,8 +1089,9 @@ async fn exec_state_remove(
   opts: &StateRemoveOpts,
 ) -> IoResult<()> {
   let format = cli_conf.user_config.display_format.clone();
-  let state_file = read_state_file(&opts.state_location, &format).await?;
-  let args = parse_build_args(&state_file.data, &opts.args)?;
+  let state_file = read_state_file(&opts.source, &format).await?;
+  let args =
+    parse_build_args(&state_file.data, ArgParseMode::Remove, &opts.args)?;
   let state_files =
     parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   if !opts.skip_confirm {
@@ -1059,8 +1108,112 @@ async fn exec_state_remove(
 /// Function called when running `nanocl state` with correct arguments
 pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
   match &args.command {
+    StateCommand::Man(opts) => execute_man(&opts.source).await,
     StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
     StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,
   }
+}
+
+/// Display statefile documentation in terminal
+pub async fn execute_man(source: &str) -> IoResult<()> {
+  let (location, raw) =
+    if let Ok(path) = std::path::Path::new(source).canonicalize() {
+      let data = std::fs::read_to_string(&path)?;
+      let loc = path.to_string_lossy().to_string();
+      (loc, data)
+    } else {
+      let (url, data) = utils::state::download_statefile(source).await?;
+      (url, data)
+    };
+  let ext = std::path::Path::new(&location)
+    .extension()
+    .and_then(|e| e.to_str())
+    .unwrap_or("yaml");
+  let (state, ext) = match ext {
+    "yaml" | "yml" => (
+      serde_yaml::from_str::<Statefile>(&raw)
+        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?,
+      DisplayFormat::Yaml,
+    ),
+    "json" => (
+      serde_json::from_str::<Statefile>(&raw)
+        .map_err(|err| IoError::invalid_data("JSON", &err.to_string()))?,
+      DisplayFormat::Json,
+    ),
+    "toml" => (
+      toml::from_str::<Statefile>(&raw)
+        .map_err(|err| IoError::invalid_data("TOML", &err.to_string()))?,
+      DisplayFormat::Toml,
+    ),
+    _ => (
+      serde_yaml::from_str::<Statefile>(&raw)
+        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?,
+      DisplayFormat::Yaml,
+    ),
+  };
+  let mut striped_state = state.clone();
+  striped_state.metadata = None;
+  striped_state.args = None;
+  let raw = match ext {
+    DisplayFormat::Yaml => serde_yaml::to_string(&striped_state)
+      .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?,
+    DisplayFormat::Json => serde_json::to_string_pretty(&striped_state)
+      .map_err(|err| IoError::invalid_data("JSON", &err.to_string()))?,
+    DisplayFormat::Toml => toml::to_string_pretty(&striped_state)
+      .map_err(|err| IoError::invalid_data("TOML", &err.to_string()))?,
+  };
+  let metadata = state.metadata.unwrap_or_default();
+  let mut name = metadata.name.unwrap_or_else(|| source.to_string());
+  if let Some(about) = &metadata.about {
+    name.push_str(&format!(" - {about}"));
+  }
+  let mut markdown = String::new();
+  markdown.push_str("# Statefile Manual\n\n");
+  if let Some(man_content) = &metadata.man_content {
+    markdown.push_str(man_content);
+    markdown.push_str(&format!("\n## Content\n```{ext}\n{raw}\n```\n"));
+    utils::markdown::display(&markdown)?;
+    return Ok(());
+  }
+  markdown.push_str(&format!("## Name\n{name}\n\n"));
+  if let Some(tags) = metadata.tags
+    && !tags.is_empty()
+  {
+    let tags = tags.join(", ");
+    markdown.push_str(&format!("## Tags\n{tags}\n\n"));
+  }
+  markdown.push_str(&format!(
+    "## Synopsis\nnanocl state apply -s {source} -- [--help] **ARGUMENTS**\nnanocl state rm -s {source} -- [--help] **ARGUMENTS**\n\n"
+  ));
+  if let Some(long_about) = &metadata.long_about {
+    markdown.push_str(&format!("## Description\n{long_about}\n"));
+  } else if let Some(about) = &metadata.about {
+    markdown.push_str(&format!("## Description\n{about}\n"));
+  }
+  if let Some(args) = state.args
+    && !args.is_empty()
+  {
+    markdown.push_str("## Arguments\n");
+    for a in args.iter() {
+      let name = &a.name;
+      let kind = &a.kind;
+      let required = if a.required { " (required)" } else { "" };
+      let multiple = if a.multiple { " (multiple)" } else { "" };
+      let description = match &a.description {
+        Some(d) => &format!("\n{d}"),
+        None => "",
+      };
+      let default = match &a.default {
+        Some(d) => &format!("\nDefault: {d}"),
+        None => "",
+      };
+      markdown.push_str(&format!(
+        "**--{name}** {kind}{required}{multiple}{description}{default}\n\n"
+      ));
+    }
+  }
+  markdown.push_str(&format!("## Content\n```{ext}\n{raw}\n```\n"));
+  utils::markdown::display(&markdown)?;
+  Ok(())
 }

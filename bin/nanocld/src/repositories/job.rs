@@ -26,8 +26,8 @@ use crate::{
 use super::generic::*;
 
 impl RepositoryBase for JobDb {
-  fn get_columns<'a>(
-  ) -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
+  fn get_columns<'a>()
+  -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
     HashMap::from([
       ("key", (ColumnType::Text, "jobs.key")),
       ("data", (ColumnType::Json, "jobs.data")),

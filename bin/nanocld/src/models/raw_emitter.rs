@@ -8,7 +8,7 @@ use std::{
 use futures::Stream;
 
 use ntex::{rt, time, util::Bytes, web};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_error::io::{IoError, IoResult};
 

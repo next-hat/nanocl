@@ -12,7 +12,7 @@ use super::DisplayFormat;
 pub struct StateApplyOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
-  pub state_location: Option<String>,
+  pub source: Option<String>,
   /// Follow logs of the deployed cargo
   #[clap(long, short = 'f')]
   pub follow: bool,
@@ -35,7 +35,7 @@ pub struct StateApplyOpts {
 pub struct StateLogsOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
-  pub state_location: Option<String>,
+  pub source: Option<String>,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
@@ -61,7 +61,7 @@ pub struct StateLogsOpts {
 pub struct StateRemoveOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
-  pub state_location: Option<String>,
+  pub source: Option<String>,
   /// Skip the confirmation prompt
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
@@ -70,9 +70,18 @@ pub struct StateRemoveOpts {
   pub args: Vec<String>,
 }
 
+#[derive(Parser)]
+pub struct StateManOpts {
+  /// Path or URL to the statefile
+  #[clap(long, short = 's')]
+  pub source: String,
+}
+
 /// `nanocl state` available commands
 #[derive(Subcommand)]
 pub enum StateCommand {
+  /// Display documentation for a statefile
+  Man(StateManOpts),
   /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
   /// Logs elements from a Statefile

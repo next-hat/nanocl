@@ -25,7 +25,9 @@ async fn main() -> std::io::Result<()> {
   let cli = cli::Cli::parse();
   #[cfg(feature = "dev")]
   {
-    std::env::set_var("LOG_LEVEL", "ncproxy=trace");
+    unsafe {
+      std::env::set_var("LOG_LEVEL", "ncproxy=trace");
+    }
   }
   logger::enable_logger("ncproxy");
   log::info!(
@@ -39,7 +41,7 @@ async fn main() -> std::io::Result<()> {
     Err(err) => err.print_and_exit(),
     Ok(state) => state,
   };
-  match utils::server::gen(&state) {
+  match utils::server::generate(&state) {
     Err(err) => err.print_and_exit(),
     Ok(srv) => srv.await,
   }

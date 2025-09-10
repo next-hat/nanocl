@@ -4,13 +4,13 @@ use ntex::rt;
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     generic::GenericNspQuery,
     system::{
       EventActorKind, EventCondition, EventKind, NativeEventAction, ObjPsStatus,
     },
   },
-  NanocldClient,
 };
 
 use crate::models::GenericProcessStatus;

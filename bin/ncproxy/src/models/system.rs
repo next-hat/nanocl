@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, channel::mpsc};
 use ntex::rt;
 
 use nanocl_error::io::{IoError, IoResult};

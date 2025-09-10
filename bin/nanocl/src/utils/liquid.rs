@@ -40,15 +40,15 @@ impl StateSource {
     root: Option<RootPath>,
   ) -> Option<Cow<'a, str>> {
     let mut path = Path::new(&name).to_path_buf();
-    if let Some(ref dir) = root {
-      if !path.has_root() {
-        let new_path =
-          Path::new(dir.as_ref()).join(path.clone()).canonicalize();
-        if let Ok(new_path) = new_path {
-          if new_path.exists() && new_path.is_file() {
-            path = new_path;
-          }
-        }
+    if let Some(ref dir) = root
+      && !path.has_root()
+    {
+      let new_path = Path::new(dir.as_ref()).join(path.clone()).canonicalize();
+      if let Ok(new_path) = new_path
+        && new_path.exists()
+        && new_path.is_file()
+      {
+        path = new_path;
       }
     }
     match path.as_path().canonicalize() {

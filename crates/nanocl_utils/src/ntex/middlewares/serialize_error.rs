@@ -1,8 +1,8 @@
 use futures::StreamExt;
 use ntex::util::BytesMut;
 use ntex::web::{Error, ErrorRenderer, WebRequest, WebResponse};
-use ntex::{http, web};
 use ntex::{Middleware, Service, ServiceCtx};
+use ntex::{http, web};
 
 /// Middleware to convert default ntex SerializeError from text/plain to application/json
 pub struct SerializeError;
@@ -38,20 +38,20 @@ where
     let mut res = ctx.call(&self.service, req).await?;
     if res.status() == http::StatusCode::BAD_REQUEST {
       let content_type = res.headers().get(http::header::CONTENT_TYPE);
-      if let Some(content_type) = content_type {
-        if content_type == "text/plain; charset=utf-8" {
-          let mut payload = BytesMut::new();
-          let mut body = res.take_body();
-          while let Some(chunk) = body.next().await {
-            let chunk = chunk.unwrap_or_default();
-            payload.extend_from_slice(&chunk);
-          }
-          res = res.into_response(web::HttpResponse::BadRequest().json(
+      if let Some(content_type) = content_type
+        && content_type == "text/plain; charset=utf-8"
+      {
+        let mut payload = BytesMut::new();
+        let mut body = res.take_body();
+        while let Some(chunk) = body.next().await {
+          let chunk = chunk.unwrap_or_default();
+          payload.extend_from_slice(&chunk);
+        }
+        res = res.into_response(web::HttpResponse::BadRequest().json(
               &serde_json::json!({
                 "msg": &String::from_utf8_lossy(&payload).replace("Json deserialize error:", "payload"),
               }),
             ));
-        }
       }
     }
     Ok(res)

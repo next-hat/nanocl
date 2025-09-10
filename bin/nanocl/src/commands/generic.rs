@@ -6,13 +6,13 @@ use nanocl_error::{
   io::{FromIo, IoResult},
 };
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     generic::{GenericFilter, GenericListQuery, GenericNspQuery},
     system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
   },
-  NanocldClient,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
   config::CliConfig,
@@ -164,11 +164,11 @@ where
         )
         .await
       {
-        if let HttpClientError::HttpError(err) = &err {
-          if err.status == StatusCode::NOT_FOUND {
-            pg.finish_with_message("(unchanged)");
-            continue;
-          }
+        if let HttpClientError::HttpError(err) = &err
+          && err.status == StatusCode::NOT_FOUND
+        {
+          pg.finish_with_message("(unchanged)");
+          continue;
         }
         pg.finish();
         eprintln!("{name}: {err}");

@@ -1,13 +1,13 @@
 use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
-use futures::{future::ready, StreamExt};
+use futures::{StreamExt, future::ready};
 use ntex::{
-  chain,
+  Service, chain,
   channel::{mpsc, oneshot},
   fn_service, rt,
   service::{fn_factory_with_config, fn_shutdown, map_config},
   util::Bytes,
-  web, ws, Service,
+  web, ws,
 };
 use tokio::io::AsyncWriteExt;
 

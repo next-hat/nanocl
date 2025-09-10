@@ -32,7 +32,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
     })?;
   }
   event::spawn(&client);
-  let server = server::gen(&cli.host, &dnsmasq, &client)?;
+  let server = server::generate(&cli.host, &dnsmasq, &client)?;
   server.await?;
   Ok(())
 }

@@ -78,10 +78,10 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
         instance_failed += 1;
       }
     }
-    if let Some(error) = state.error {
-      if !error.is_empty() {
-        instance_failed += 1;
-      }
+    if let Some(error) = state.error
+      && !error.is_empty()
+    {
+      instance_failed += 1;
     }
   }
   (

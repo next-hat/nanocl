@@ -1,9 +1,9 @@
 use futures::StreamExt;
 use futures::stream::select_all;
 use ntex::channel::mpsc::Receiver;
+use tabled::Table;
 use tabled::settings::object::Segment;
 use tabled::settings::{Alignment, Modify, Padding, Style};
-use tabled::Table;
 
 use nanocl_error::http::HttpError;
 use nanocl_error::io::{FromIo, IoError, IoResult};

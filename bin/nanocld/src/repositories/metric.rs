@@ -12,8 +12,8 @@ use crate::{
 use super::generic::*;
 
 impl RepositoryBase for MetricDb {
-  fn get_columns<'a>(
-  ) -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
+  fn get_columns<'a>()
+  -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
     std::collections::HashMap::from([
       ("key", (ColumnType::Uuid, "metrics.key")),
       ("node_name", (ColumnType::Text, "metrics.node_name")),
