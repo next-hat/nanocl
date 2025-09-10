@@ -1,4 +1,5 @@
 use futures::StreamExt;
+use futures::stream::select_all;
 use ntex::channel::mpsc::Receiver;
 use tabled::settings::object::Segment;
 use tabled::settings::{Alignment, Modify, Padding, Style};
@@ -93,6 +94,28 @@ pub(crate) async fn logs_process_stream(
       OutputKind::StdErr => {
         eprint!("{output}");
       }
+      OutputKind::Console => print!("{output}"),
+      _ => {}
+    }
+  }
+  Ok(())
+}
+
+/// Merge and print logs from multiple process streams concurrently.
+/// Each stream item is prefixed with the process name already by the server.
+pub(crate) async fn logs_process_streams(
+  streams: Vec<Receiver<Result<ProcessOutputLog, HttpError>>>,
+) -> IoResult<()> {
+  let mut merged = select_all(streams);
+  while let Some(s) = merged.next().await {
+    let s = match s {
+      Ok(s) => s,
+      Err(e) => return Err(e.map_err_context(|| "Stream").into()),
+    };
+    let output = format!("[{}] {}", &s.name, &s.log.data);
+    match s.log.kind {
+      OutputKind::StdOut => print!("{output}"),
+      OutputKind::StdErr => eprint!("{output}"),
       OutputKind::Console => print!("{output}"),
       _ => {}
     }
