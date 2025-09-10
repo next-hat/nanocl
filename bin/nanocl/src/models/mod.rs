@@ -62,8 +62,8 @@ pub struct Cli {
 /// `nanocl logs` available options
 #[derive(Clone, Parser)]
 pub struct LogsOpts {
-  /// Name of process to show logs
-  pub name: String,
+  /// Name(s) of processes to show logs
+  pub names: Vec<String>,
   /// Only include logs since unix timestamp
   #[clap(short = 's')]
   pub since: Option<i64>,

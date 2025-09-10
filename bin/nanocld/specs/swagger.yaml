@@ -6960,6 +6960,11 @@ components:
         ApiVersion:
           type: string
           description: Api version to use or remote url
+        Metadata:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/StatefileMetadata'
+            description: Optional metadata about the statefile
         Args:
           type:
           - array
@@ -7038,6 +7043,22 @@ components:
           - string
           - 'null'
           description: Default value of the build arg
+        Required:
+          type: boolean
+          description: Required argument
+        Multiple:
+          type: boolean
+          description: Multiple values accepted for the argument
+        Description:
+          type:
+          - string
+          - 'null'
+          description: Short description of the argument
+        Example:
+          type:
+          - string
+          - 'null'
+          description: Example value for the argument
       additionalProperties: false
     StatefileArgKind:
       type: string
@@ -7046,6 +7067,38 @@ components:
       - String
       - Number
       - Boolean
+    StatefileMetadata:
+      type: object
+      description: Optional metadata to enrich a Statefile with documentation
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: Optional title for the statefile documentation
+        About:
+          type:
+          - string
+          - 'null'
+          description: About the statefile whill be use under the name section
+        LongAbout:
+          type:
+          - string
+          - 'null'
+          description: Long about of the statefile will be use under the description section
+        Tags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Optional tags associated to this statefile
+        ManContent:
+          type:
+          - string
+          - 'null'
+          description: Override the content of the manual page for this statefile
+      additionalProperties: false
     Stats:
       type: object
       description: Statistics for the container.

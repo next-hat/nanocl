@@ -38,11 +38,14 @@ pub async fn logs_process(
   opts: &LogsOpts,
 ) -> IoResult<()> {
   let query: ProcessLogQuery = opts.clone().into();
-  let stream = cli_conf
-    .client
-    .logs_process(&opts.name, Some(&query))
-    .await?;
-  utils::print::logs_process_stream(stream).await?;
+  let mut streams = Vec::with_capacity(opts.names.len());
+  for name in &opts.names {
+    match cli_conf.client.logs_process(name, Some(&query)).await {
+      Ok(stream) => streams.push(stream),
+      Err(err) => eprintln!("WARN: cannot stream logs for {name}: {err}"),
+    }
+  }
+  utils::print::logs_process_streams(streams).await?;
   Ok(())
 }
 
