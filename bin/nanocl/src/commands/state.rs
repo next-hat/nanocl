@@ -1110,6 +1110,7 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
   match &args.command {
     StateCommand::Man(opts) => execute_man(&opts.source).await,
     StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,
+    StateCommand::Render(opts) => exec_state_render(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
     StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,
   }
@@ -1215,5 +1216,72 @@ pub async fn execute_man(source: &str) -> IoResult<()> {
   }
   markdown.push_str(&format!("## Content\n```{ext}\n{raw}\n```\n"));
   utils::markdown::display(&markdown)?;
+  Ok(())
+}
+
+/// Function called when running `nanocl state render`
+async fn exec_state_render(
+  cli_conf: &CliConfig,
+  opts: &crate::models::StateRenderOpts,
+) -> IoResult<()> {
+  let display_format = cli_conf.user_config.display_format.clone();
+  let state_ref = read_state_file(&opts.source, &display_format).await?;
+  let args =
+    parse_build_args(&state_ref.data, ArgParseMode::Apply, &opts.args)?;
+  let client = gen_client(cli_conf, &state_ref)?;
+  let mut namespace = state_ref
+    .data
+    .namespace
+    .clone()
+    .unwrap_or_else(|| "global".to_owned());
+  namespace = inject_namespace(&namespace, &args)?;
+  let mut rendered =
+    inject_data(&state_ref, &args, &cli_conf.context, &client).await?;
+  rendered.data.namespace = Some(namespace);
+  if let Some(cargoes) = rendered.data.cargoes.clone() {
+    let hooked_cargoes = hook_cargoes(cargoes)?;
+    rendered.data.cargoes = Some(hooked_cargoes);
+  }
+  let out_path = std::path::Path::new(&opts.output);
+  let ext = out_path
+    .extension()
+    .and_then(|e| e.to_str())
+    .unwrap_or("yaml")
+    .to_lowercase();
+  let content = match ext.as_str() {
+    "yaml" | "yml" => {
+      rendered.format = DisplayFormat::Yaml;
+      serde_yaml::to_string(&rendered.data)
+        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?
+    }
+    "toml" => {
+      rendered.format = DisplayFormat::Toml;
+      toml::to_string_pretty(&rendered.data)
+        .map_err(|err| IoError::invalid_data("TOML", &err.to_string()))?
+    }
+    "json" => {
+      rendered.format = DisplayFormat::Json;
+      serde_json::to_string_pretty(&rendered.data)
+        .map_err(|err| IoError::invalid_data("JSON", &err.to_string()))?
+    }
+    _ => {
+      // No or unknown extension -> default yaml
+      rendered.format = DisplayFormat::Yaml;
+      serde_yaml::to_string(&rendered.data)
+        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?
+    }
+  };
+  if !opts.skip_confirm {
+    println!("{}", content);
+    utils::dialog::confirm("Are you sure to write this rendered state ?")
+      .map_err(|err| err.map_err_context(|| "StateRender"))?;
+  }
+  if let Some(parent) = out_path.parent()
+    && !parent.as_os_str().is_empty()
+  {
+    std::fs::create_dir_all(parent)?;
+  }
+  std::fs::write(out_path, content)?;
+  println!("Rendered statefile written to {}", out_path.display());
   Ok(())
 }

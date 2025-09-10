@@ -580,6 +580,72 @@ mod tests {
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.json");
   }
 
+  /// Test state render command for different formats and with args
+  #[ntex::test]
+  async fn state_render() {
+    // YAML output
+    assert_cli_ok!(
+      "state",
+      "render",
+      "-ys",
+      "../../examples/deploy_example.yml",
+      "-o",
+      "/tmp/nanocl_tests/render_example.yml"
+    );
+    assert!(
+      Path::new("/tmp/nanocl_tests/render_example.yml").exists(),
+      "Rendered YAML file not found"
+    );
+    // TOML output
+    assert_cli_ok!(
+      "state",
+      "render",
+      "-ys",
+      "../../examples/deploy_example.yml",
+      "-o",
+      "/tmp/nanocl_tests/render_example.toml"
+    );
+    assert!(
+      Path::new("/tmp/nanocl_tests/render_example.toml").exists(),
+      "Rendered TOML file not found"
+    );
+    // JSON output
+    assert_cli_ok!(
+      "state",
+      "render",
+      "-ys",
+      "../../examples/deploy_example.yml",
+      "-o",
+      "/tmp/nanocl_tests/render_example.json"
+    );
+    assert!(
+      Path::new("/tmp/nanocl_tests/render_example.json").exists(),
+      "Rendered JSON file not found"
+    );
+    // No extension (defaults to YAML) and args usage
+    assert_cli_ok!(
+      "state",
+      "render",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "-o",
+      "/tmp/nanocl_tests/render_args_output",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
+      "--port",
+      "9000"
+    );
+    assert!(
+      Path::new("/tmp/nanocl_tests/render_args_output").exists(),
+      "Rendered default YAML file (no extension) not found"
+    );
+  }
+
   #[ntex::test]
   async fn state() {
     assert_cli_ok!(
