@@ -1,4 +1,5 @@
 use liquid::ObjectView;
+use nanocld_client::stubs::statefile::Statefile;
 use regex::Regex;
 
 use crate::models::{DisplayFormat, StateRef, StateRoot};
@@ -23,12 +24,17 @@ pub async fn download_statefile(url: &str) -> IoResult<(String, String)> {
   let url = if url.starts_with("http://") || url.starts_with("https://") {
     url.to_owned()
   } else {
-    format!("http://{url}")
+    format!("https://{url}")
   };
   let client = ntex::http::Client::default();
-  let mut res = client.get(&url).send().await.map_err(|err| {
-    err.map_err_context(|| "Unable to get Statefile from url")
-  })?;
+  let mut res = client
+    .get(&url)
+    .header("User-Agent", "nanocl")
+    .send()
+    .await
+    .map_err(|err| {
+      err.map_err_context(|| "Unable to get Statefile from url")
+    })?;
   if res.status().is_redirection() {
     let location = res
       .headers()
@@ -156,4 +162,19 @@ pub fn compile(
     IoError::invalid_data("Template rendering", &format!("{err}"))
   })?;
   Ok(output)
+}
+
+pub fn stringify_state_for_format(
+  statefile: &Statefile,
+  format: &DisplayFormat,
+) -> IoResult<String> {
+  let content = match format {
+    DisplayFormat::Yaml => serde_yaml::to_string(statefile)
+      .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?,
+    DisplayFormat::Toml => toml::to_string_pretty(statefile)
+      .map_err(|err| IoError::invalid_data("TOML", &err.to_string()))?,
+    DisplayFormat::Json => serde_json::to_string_pretty(statefile)
+      .map_err(|err| IoError::invalid_data("JSON", &err.to_string()))?,
+  };
+  Ok(content)
 }

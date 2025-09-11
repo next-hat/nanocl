@@ -3,6 +3,7 @@ use std::{
   env::{consts, vars_os},
   fs,
   path::{Path, PathBuf},
+  str::FromStr,
   time::Duration,
 };
 
@@ -324,9 +325,7 @@ fn parse_build_args(
       let description = description.replace('\n', "");
       cmd_arg = cmd_arg.help(description);
     }
-    println!("Processing arg: {:?}", build_arg);
     if build_arg.kind == StatefileArgKind::Boolean {
-      println!("Boolean arg: {}", build_arg.name);
       cmd_arg = cmd_arg.required(false).action(ArgAction::SetTrue);
     } else {
       cmd_arg = cmd_arg.action(ArgAction::Set).required(build_arg.required);
@@ -1242,46 +1241,42 @@ async fn exec_state_render(
     let hooked_cargoes = hook_cargoes(cargoes)?;
     rendered.data.cargoes = Some(hooked_cargoes);
   }
-  let out_path = std::path::Path::new(&opts.output);
-  let ext = out_path
-    .extension()
-    .and_then(|e| e.to_str())
-    .unwrap_or("yaml")
-    .to_lowercase();
-  let content = match ext.as_str() {
-    "yaml" | "yml" => {
-      rendered.format = DisplayFormat::Yaml;
-      serde_yaml::to_string(&rendered.data)
-        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?
+  match &opts.output {
+    None => {
+      // If output is not set, just print the rendered content
+      let content = utils::state::stringify_state_for_format(
+        &rendered.data,
+        &display_format,
+      )?;
+      println!("{content}");
+      Ok(())
     }
-    "toml" => {
-      rendered.format = DisplayFormat::Toml;
-      toml::to_string_pretty(&rendered.data)
-        .map_err(|err| IoError::invalid_data("TOML", &err.to_string()))?
+    Some(output) => {
+      let out_path = std::path::Path::new(&output);
+      let ext = out_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("yaml")
+        .to_lowercase();
+      let display_format =
+        DisplayFormat::from_str(&ext).unwrap_or(DisplayFormat::Yaml);
+      let content = utils::state::stringify_state_for_format(
+        &rendered.data,
+        &display_format,
+      )?;
+      if !opts.skip_confirm {
+        println!("{content}");
+        utils::dialog::confirm("Are you sure to write this rendered state ?")
+          .map_err(|err| err.map_err_context(|| "StateRender"))?;
+      }
+      if let Some(parent) = out_path.parent()
+        && !parent.as_os_str().is_empty()
+      {
+        std::fs::create_dir_all(parent)?;
+      }
+      std::fs::write(out_path, content)?;
+      println!("Rendered statefile written to {}", out_path.display());
+      Ok(())
     }
-    "json" => {
-      rendered.format = DisplayFormat::Json;
-      serde_json::to_string_pretty(&rendered.data)
-        .map_err(|err| IoError::invalid_data("JSON", &err.to_string()))?
-    }
-    _ => {
-      // No or unknown extension -> default yaml
-      rendered.format = DisplayFormat::Yaml;
-      serde_yaml::to_string(&rendered.data)
-        .map_err(|err| IoError::invalid_data("YAML", &err.to_string()))?
-    }
-  };
-  if !opts.skip_confirm {
-    println!("{}", content);
-    utils::dialog::confirm("Are you sure to write this rendered state ?")
-      .map_err(|err| err.map_err_context(|| "StateRender"))?;
   }
-  if let Some(parent) = out_path.parent()
-    && !parent.as_os_str().is_empty()
-  {
-    std::fs::create_dir_all(parent)?;
-  }
-  std::fs::write(out_path, content)?;
-  println!("Rendered statefile written to {}", out_path.display());
-  Ok(())
 }
