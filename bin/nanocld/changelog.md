@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [untagged] - yyyy-mm-dd
+## [0.17.0] - 2025-09-11
 
 ### Added
 
 - Endpoint `GET /process/{name}/stats` to get process stats by it's name by [n0tank3sh](https://github.com/n0tank3sh)
+- Save database cert into a secret for multinode exchange and sync.
+- Distributed mutex lock to avoid node to run the same task at the same time.
 
 ## [0.16.3] - 2025-03-14
 
