@@ -16,7 +16,7 @@ use nanocl_error::{
 
 use crate::error::is_api_error;
 
-pub const NANOCLD_DEFAULT_VERSION: &str = "0.16.0";
+pub const NANOCLD_DEFAULT_VERSION: &str = "0.17.0";
 
 #[derive(Clone, Debug)]
 pub struct ConnectOpts {
