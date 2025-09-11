@@ -312,7 +312,10 @@ pub struct ProcessWaitResponse {
   /// Exit code of the container
   pub status_code: i64,
   /// Wait error
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub error: Option<ContainerWaitExitError>,
 }
 

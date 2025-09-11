@@ -137,6 +137,7 @@ pub struct GenericListQuery {
   pub filter: Option<String>,
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericFilter> for GenericListQuery {
   type Error = serde_json::Error;
 
@@ -147,6 +148,7 @@ impl TryFrom<GenericFilter> for GenericListQuery {
   }
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericListQuery> for GenericFilter {
   type Error = serde_json::Error;
 
@@ -158,6 +160,7 @@ impl TryFrom<GenericListQuery> for GenericFilter {
   }
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericListQueryNsp> for GenericFilter {
   type Error = serde_json::Error;
 
@@ -204,6 +207,7 @@ impl GenericListQueryNsp {
   }
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericFilterNsp> for GenericListQueryNsp {
   type Error = serde_json::Error;
 
@@ -219,6 +223,7 @@ impl TryFrom<GenericFilterNsp> for GenericListQueryNsp {
   }
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericListQueryNsp> for GenericFilterNsp {
   type Error = serde_json::Error;
 
@@ -234,6 +239,7 @@ impl TryFrom<GenericListQueryNsp> for GenericFilterNsp {
   }
 }
 
+#[cfg(feature = "serde")]
 impl TryFrom<GenericFilter> for GenericListQueryNsp {
   type Error = serde_json::Error;
 

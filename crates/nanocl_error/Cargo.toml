@@ -1,6 +1,6 @@
 [package]
 name = "nanocl_error"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Nanocl error types"
