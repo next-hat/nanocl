@@ -5,11 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [untagged] - yyyy-mm-dd 
+## [0.17.0] - 2025-09-11
 
 ### Added
 
-- `nanocl stats` to get stats of multiple processes by name [n0tank3sh](https://github.com/n0tank3sh) 
+- `nanocl stats` to get stats of multiple processes by name [n0tank3sh](https://github.com/n0tank3sh)
+- `nanocl state man` to get the manual of the Statefile.
+- `nanocl state render` to render a Statefile with the current context variables.
+- `nanocl logs` now accept multiple names.
+- Better statefile arguments parsing with required, multiple and description fields.
+- Statefile metadata to enhance the manual of a statefile.
+- `nanocl secret patch` to update a secret without having to remove it.
 
 ## [0.16.3] - 2025-03-14
 
