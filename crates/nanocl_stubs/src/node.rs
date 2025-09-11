@@ -19,6 +19,9 @@ pub struct Node {
   /// Version of the node
   pub version: String,
   /// User defined metadata
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }

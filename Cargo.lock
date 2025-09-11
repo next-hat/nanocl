@@ -1090,15 +1090,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fxhash"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1839,7 +1830,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.16.3"
+version = "0.17.0"
 dependencies = [
  "async-recursion",
  "bollard-next",
@@ -1875,7 +1866,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_error"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bollard-next",
  "diesel",
@@ -1888,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.16.1"
+version = "0.17.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1903,7 +1894,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_utils"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -1921,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld"
-version = "0.16.3"
+version = "0.17.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1959,7 +1950,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.16.2"
+version = "0.17.0"
 dependencies = [
  "bollard-next",
  "futures",
@@ -1981,7 +1972,7 @@ checksum = "6e3d189da485332e96ba8a5ef646a311871abd7915bf06ac848a9117f19cf6e4"
 
 [[package]]
 name = "ncdns"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2002,7 +1993,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.13.3"
+version = "0.14.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2027,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "futures-util",
  "log",
@@ -2078,9 +2069,9 @@ checksum = "5e0826a989adedc2a244799e823aece04662b66609d96af8dff7ac6df9a8925d"
 
 [[package]]
 name = "ntex"
-version = "2.15.2"
+version = "2.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a01c0fce65d13a771d36b3a27d32edad8b5cedadbc57bb4c92120dca808cfcce"
+checksum = "d4b41d1af2e11a7c29499395c2505550507749c35b29fa4a31234130abdb2285"
 dependencies = [
  "base64",
  "bitflags 2.9.4",
@@ -2171,12 +2162,12 @@ dependencies = [
 
 [[package]]
 name = "ntex-http"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3102673534f57dbc7fc9e7f1aac4126f353366c67518eac0a7763bb2515f0a7a"
+checksum = "61da3d6c8bec83c5481d7e36ed4cf1a8cd0edee3e2fa411290932b17549d5cf2"
 dependencies = [
+ "ahash",
  "futures-core",
- "fxhash",
  "http",
  "itoa",
  "log",
@@ -2319,14 +2310,14 @@ dependencies = [
 
 [[package]]
 name = "ntex-util"
-version = "2.13.0"
+version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "546d60d666f713b18357d233aa9da7e38a30c934f0dbfe97526c7e475cd0f12e"
+checksum = "7811bcf3c3228631b0b20d12e5786c20c4cc76fb2d2b2733a6ab421641f81b6a"
 dependencies = [
+ "ahash",
  "bitflags 2.9.4",
  "futures-core",
  "futures-timer",
- "fxhash",
  "log",
  "ntex-bytes",
  "ntex-rt",
