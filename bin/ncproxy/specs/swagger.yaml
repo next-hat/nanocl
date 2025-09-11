@@ -21,7 +21,7 @@ info:
   license:
     name: MIT OR Apache-2.0
     identifier: MIT OR Apache-2.0
-  version: v0.13.3
+  version: v0.14.0
 servers:
 - url: /{Version}
   variables:

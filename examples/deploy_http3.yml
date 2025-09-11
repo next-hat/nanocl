@@ -2,6 +2,12 @@ ApiVersion: v0.16
 
 Namespace: global
 
+Args:
+- Name: name
+  Kind: String
+  Default: secret-tls
+  Description: The name of the deployment.
+
 Secrets:
 - Name: tls.secret
   Kind: nanocl.io/tls
@@ -57,24 +63,24 @@ Secrets:
       -----END PRIVATE KEY-----
 
 Resources:
-- Name: secret-tls.com
+- Name: ${{ Args.name }}.com
   Kind: ncproxy.io/rule
   Metadata:
     Cert: certbot
   Data:
     Rules:
-    - Domain: secret-tls.com
+    - Domain: ${{ Args.name }}.com
       Network: All
       Ssl: tls.secret
       Http3: true
       Locations:
       - Path: /
         Target:
-          Key: secret-tls.global.c
+          Key: ${{ Args.name }}.global.c
           Port: 9000
 
 Cargoes:
-- Name: secret-tls
+- Name: ${{ Args.name }}
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:

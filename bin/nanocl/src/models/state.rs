@@ -64,7 +64,7 @@ pub struct StateRenderOpts {
   pub source: Option<String>,
   /// Output path for the rendered statefile
   #[clap(long, short = 'o')]
-  pub output: String,
+  pub output: Option<String>,
   /// Skip the confirmation prompt
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,

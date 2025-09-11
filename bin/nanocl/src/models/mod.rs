@@ -167,3 +167,19 @@ impl std::fmt::Display for DisplayFormat {
     write!(f, "{data}")
   }
 }
+
+impl std::str::FromStr for DisplayFormat {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> std::io::Result<Self> {
+    match s {
+      "yaml" | "yml" => Ok(DisplayFormat::Yaml),
+      "toml" => Ok(DisplayFormat::Toml),
+      "json" => Ok(DisplayFormat::Json),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("Invalid display format {s}"),
+      )),
+    }
+  }
+}
