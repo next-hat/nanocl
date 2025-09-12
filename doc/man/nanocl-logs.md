@@ -12,7 +12,7 @@ logs - Get logs of a process
 ## SYNOPSIS
 
 **logs** \[**-s **\] \[**-u **\] \[**-t **\] \[**--timestamps**\] \[**-f
-**\] \[**-h**\|**--help**\] \<*NAME*\>
+**\] \[**-h**\|**--help**\] \[*NAMES*\]
 
 ## DESCRIPTION
 
@@ -38,5 +38,5 @@ Bool, if set open the log as stream
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of process to show logs
+\[*NAMES*\]  
+Name(s) of processes to show logs
