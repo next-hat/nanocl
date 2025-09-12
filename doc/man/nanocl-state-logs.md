@@ -1,6 +1,6 @@
 ---
 title: State logs
-sidebar_position: 68
+sidebar_position: 69
 ---
 
 # State logs
@@ -11,9 +11,8 @@ logs - Logs elements from a Statefile
 
 ## SYNOPSIS
 
-**logs** \[**-s**\|**--state-location**\] \[**--since**\] \[**-u **\]
-\[**-t **\] \[**--timestamps**\] \[**-f **\] \[**-h**\|**--help**\]
-\[*ARGS*\]
+**logs** \[**-s**\|**--source**\] \[**--since**\] \[**-u **\] \[**-t
+**\] \[**--timestamps**\] \[**-f **\] \[**-h**\|**--help**\] \[*ARGS*\]
 
 ## DESCRIPTION
 
@@ -21,7 +20,7 @@ Logs elements from a Statefile
 
 ## OPTIONS
 
-**-s**, **--state-location** *\<STATE_LOCATION\>*  
+**-s**, **--source** *\<SOURCE\>*  
 Path or Url to the Statefile
 
 **--since** *\<SINCE\>*  
