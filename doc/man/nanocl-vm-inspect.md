@@ -1,6 +1,6 @@
 ---
 title: Vm inspect
-sidebar_position: 82
+sidebar_position: 85
 ---
 
 # Vm inspect
