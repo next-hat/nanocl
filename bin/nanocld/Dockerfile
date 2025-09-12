@@ -48,7 +48,7 @@ RUN cargo build --release --features release --bin nanocld
 RUN cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.21.3
+FROM --platform=$BUILDPLATFORM alpine:3.22.1
 
 ## Install dependencies
 RUN apk --update add libgcc \

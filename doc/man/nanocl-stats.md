@@ -1,6 +1,6 @@
 ---
 title: Stats
-sidebar_position: 71
+sidebar_position: 74
 ---
 
 # Stats

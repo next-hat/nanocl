@@ -1,6 +1,6 @@
 ---
 title: Nanocl
-sidebar_position: 90
+sidebar_position: 93
 ---
 
 # Nanocl
@@ -103,4 +103,4 @@ Print this message or the help of the given subcommand(s)
 
 # VERSION
 
-v0.16.3
+v0.17.0

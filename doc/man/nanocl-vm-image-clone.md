@@ -1,6 +1,6 @@
 ---
 title: Vm image clone
-sidebar_position: 76
+sidebar_position: 79
 ---
 
 # Vm image clone
