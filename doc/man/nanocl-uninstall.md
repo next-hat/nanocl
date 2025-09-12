@@ -1,6 +1,6 @@
 ---
 title: Uninstall
-sidebar_position: 72
+sidebar_position: 75
 ---
 
 # Uninstall
