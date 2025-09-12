@@ -11,7 +11,7 @@ apply - Create or Update elements from a Statefile
 
 ## SYNOPSIS
 
-**apply** \[**-s**\|**--state-location**\] \[**-f**\|**--follow**\]
+**apply** \[**-s**\|**--source**\] \[**-f**\|**--follow**\]
 \[**-y**\|**--yes**\] \[**-r**\|**--reload**\] \[**--remove-orphans**\]
 \[**-h**\|**--help**\] \[*ARGS*\]
 
@@ -21,7 +21,7 @@ Create or Update elements from a Statefile
 
 ## OPTIONS
 
-**-s**, **--state-location** *\<STATE_LOCATION\>*  
+**-s**, **--source** *\<SOURCE\>*  
 Path or Url to the Statefile
 
 **-f**, **--follow**  
