@@ -1,6 +1,6 @@
 ---
 title: Vm image remove
-sidebar_position: 79
+sidebar_position: 82
 ---
 
 # Vm image remove
