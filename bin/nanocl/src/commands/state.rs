@@ -608,19 +608,21 @@ fn substate_default_args(
   statefile: &StateRef<Statefile>,
   compiled_values: &mut Map<String, Value>,
 ) -> IoResult<()> {
-  let args = statefile.data.args.clone().unwrap_or_default();
+  let Some(args) = &statefile.data.args else {
+    return Ok(());
+  };
   for arg in args {
-    match arg.default {
+    match &arg.default {
       None => {}
       Some(value) => match arg.kind {
         StatefileArgKind::String => {
-          compiled_values.insert(arg.name, serde_json::json!(value));
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
         }
         StatefileArgKind::Number => {
-          compiled_values.insert(arg.name, serde_json::json!(value));
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
         }
         StatefileArgKind::Boolean => {
-          compiled_values.insert(arg.name, serde_json::json!(value));
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
         }
       },
     }
