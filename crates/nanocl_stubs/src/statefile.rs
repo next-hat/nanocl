@@ -112,7 +112,7 @@ pub struct StatefileArg {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub default: Option<String>,
+  pub default: Option<StatefileArgsValue>,
   /// Required argument
   #[cfg_attr(
     feature = "serde",
@@ -152,7 +152,7 @@ pub struct SubStateArg {
   /// Name of the argument
   pub name: String,
   /// Value for the argument
-  pub value: SubStateValue,
+  pub value: StatefileArgsValue,
 }
 
 /// Statefile argument definition to pass to the Statefile
@@ -164,10 +164,42 @@ pub struct SubStateArg {
   feature = "serde",
   serde(untagged, deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub enum SubStateValue {
+pub enum StatefileArgsValue {
   Number(f64),
   String(String),
   Boolean(bool),
+  MultipleNumber(Vec<f64>),
+  MultipleString(Vec<String>),
+}
+
+impl std::fmt::Display for StatefileArgsValue {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      StatefileArgsValue::Number(v) => write!(f, "{v}"),
+      StatefileArgsValue::String(v) => write!(f, "{v}"),
+      StatefileArgsValue::Boolean(v) => write!(f, "{v}"),
+      StatefileArgsValue::MultipleNumber(v) => {
+        write!(f, "[")?;
+        for (i, val) in v.iter().enumerate() {
+          if i > 0 {
+            write!(f, ", ")?;
+          }
+          write!(f, "{val}")?;
+        }
+        write!(f, "]")
+      }
+      StatefileArgsValue::MultipleString(v) => {
+        write!(f, "[")?;
+        for (i, val) in v.iter().enumerate() {
+          if i > 0 {
+            write!(f, ", ")?;
+          }
+          write!(f, "{val}")?;
+        }
+        write!(f, "]")
+      }
+    }
+  }
 }
 
 #[derive(Debug, Clone)]

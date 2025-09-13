@@ -7282,6 +7282,13 @@ components:
         format: double
       - type: string
       - type: boolean
+      - type: array
+        items:
+          type: number
+          format: double
+      - type: array
+        items:
+          type: string
       description: Statefile argument definition to pass to the Statefile
     SwarmInfo:
       type: object
