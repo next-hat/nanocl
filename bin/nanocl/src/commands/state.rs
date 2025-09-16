@@ -611,7 +611,6 @@ fn substate_default_args(
   let Some(args) = &statefile.data.args else {
     return Ok(());
   };
-  println!("Substate default args:");
   for arg in args {
     match &arg.default {
       None => {}
@@ -628,7 +627,6 @@ fn substate_default_args(
       },
     }
   }
-  println!("{compiled_values:?}");
   Ok(())
 }
 
