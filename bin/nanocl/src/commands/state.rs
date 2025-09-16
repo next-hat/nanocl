@@ -23,7 +23,7 @@ use nanocld_client::{
   stubs::{
     generic::{GenericClause, GenericFilter, GenericFilterNsp},
     process::Process,
-    statefile::{StatefileArgKind, SubState, SubStateValue},
+    statefile::{StatefileArgKind, StatefileArgsValue, SubState},
     system::{EventActorKind, ObjPsStatusKind},
   },
 };
@@ -338,8 +338,45 @@ fn parse_build_args(
     if let Some(default) = build_arg.default
       && build_arg.kind != StatefileArgKind::Boolean
     {
-      let default_value: &'static str = Box::leak(default.into_boxed_str());
-      cmd_arg = cmd_arg.default_value(default_value);
+      match default {
+        StatefileArgsValue::String(s) => {
+          let leaked: &'static str = Box::leak(s.into_boxed_str());
+          cmd_arg = cmd_arg.default_value(leaked);
+        }
+        StatefileArgsValue::Number(n) => {
+          let s = n.to_string();
+          let leaked: &'static str = Box::leak(s.into_boxed_str());
+          cmd_arg = cmd_arg.default_value(leaked);
+        }
+        StatefileArgsValue::MultipleString(v) => {
+          if build_arg.multiple {
+            let leaked: Vec<&'static str> = v
+              .into_iter()
+              .map(|s| Box::leak(s.into_boxed_str()) as &'static str)
+              .collect();
+            cmd_arg = cmd_arg.default_values(leaked);
+          } else if let Some(first) = v.into_iter().next() {
+            let leaked: &'static str = Box::leak(first.into_boxed_str());
+            cmd_arg = cmd_arg.default_value(leaked);
+          }
+        }
+        StatefileArgsValue::MultipleNumber(v) => {
+          if build_arg.multiple {
+            let leaked: Vec<&'static str> = v
+              .into_iter()
+              .map(|n| {
+                Box::leak(n.to_string().into_boxed_str()) as &'static str
+              })
+              .collect();
+            cmd_arg = cmd_arg.default_values(leaked);
+          } else if let Some(first) = v.into_iter().next() {
+            let leaked: &'static str =
+              Box::leak(first.to_string().into_boxed_str());
+            cmd_arg = cmd_arg.default_value(leaked);
+          }
+        }
+        StatefileArgsValue::Boolean(_) => { /* ignored for non-boolean kind */ }
+      }
     }
     cmd = cmd.arg(cmd_arg);
   }
@@ -350,44 +387,105 @@ fn parse_build_args(
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
     match build_arg.kind {
       StatefileArgKind::String => {
-        let value = matches.get_one::<String>(arg);
-        match value {
-          None if build_arg.required => {
-            return Err(IoError::invalid_data(
-              "BuildArg".into(),
-              format!("argument {arg} is missing"),
-            ));
+        if build_arg.multiple {
+          let values = matches.get_many::<String>(arg);
+          match values {
+            None if build_arg.required => {
+              return Err(IoError::invalid_data(
+                "BuildArg".into(),
+                format!("argument {arg} is missing"),
+              ));
+            }
+            Some(vals) => {
+              let arr = vals
+                .map(|v| Value::String(v.to_owned()))
+                .collect::<Vec<_>>();
+              args.insert(name, Value::Array(arr));
+            }
+            _ => {}
           }
-          Some(value) => {
-            args.insert(name, Value::String(value.to_owned()));
+        } else {
+          let value = matches.get_one::<String>(arg);
+          match value {
+            None if build_arg.required => {
+              return Err(IoError::invalid_data(
+                "BuildArg".into(),
+                format!("argument {arg} is missing"),
+              ));
+            }
+            Some(value) => {
+              args.insert(name, Value::String(value.to_owned()));
+            }
+            _ => {}
           }
-          _ => {}
-        };
+        }
       }
       StatefileArgKind::Boolean => {
         let value = matches.get_flag(&name);
         args.insert(name, Value::Bool(value));
       }
       StatefileArgKind::Number => {
-        let value = matches.get_one::<String>(arg);
-        match value {
-          None if build_arg.required => {
-            return Err(IoError::invalid_data(
-              "BuildArg".into(),
-              format!("argument {arg} is missing"),
-            ));
-          }
-          Some(value) => {
-            let value = value.parse::<usize>().map_err(|err| {
-              IoError::invalid_data(
+        if build_arg.multiple {
+          let values = matches.get_many::<String>(arg);
+          match values {
+            None if build_arg.required => {
+              return Err(IoError::invalid_data(
                 "BuildArg".into(),
-                format!("argument {arg} is not a number: {err}"),
-              )
-            })?;
-            args.insert(name, Value::Number(value.into()));
+                format!("argument {arg} is missing"),
+              ));
+            }
+            Some(vals) => {
+              let mut arr = Vec::new();
+              for v in vals {
+                let parsed = v.parse::<f64>().map_err(|err| {
+                  IoError::invalid_data(
+                    "BuildArg".into(),
+                    format!(
+                      "argument {arg} contains a non-number value: {err}"
+                    ),
+                  )
+                })?;
+                let num =
+                  serde_json::Number::from_f64(parsed).ok_or_else(|| {
+                    IoError::invalid_data(
+                      "BuildArg".into(),
+                      format!("argument {arg} contains an invalid number"),
+                    )
+                  })?;
+                arr.push(Value::Number(num));
+              }
+              args.insert(name, Value::Array(arr));
+            }
+            _ => {}
           }
-          _ => {}
-        };
+        } else {
+          let value = matches.get_one::<String>(arg);
+          match value {
+            None if build_arg.required => {
+              return Err(IoError::invalid_data(
+                "BuildArg".into(),
+                format!("argument {arg} is missing"),
+              ));
+            }
+            Some(value) => {
+              let parsed = value.parse::<f64>().map_err(|err| {
+                IoError::invalid_data(
+                  "BuildArg".into(),
+                  format!("argument {arg} is not a number: {err}"),
+                )
+              })?;
+              let num =
+                serde_json::Number::from_f64(parsed).ok_or_else(|| {
+                  IoError::invalid_data(
+                    "BuildArg".into(),
+                    format!("argument {arg} is not a valid number"),
+                  )
+                })?;
+              args.insert(name, Value::Number(num));
+            }
+            _ => {}
+          }
+        }
       }
     }
   }
@@ -506,6 +604,32 @@ async fn render_template(
   Ok(state_ref)
 }
 
+fn substate_default_args(
+  statefile: &StateRef<Statefile>,
+  compiled_values: &mut Map<String, Value>,
+) -> IoResult<()> {
+  let Some(args) = &statefile.data.args else {
+    return Ok(());
+  };
+  for arg in args {
+    match &arg.default {
+      None => {}
+      Some(value) => match arg.kind {
+        StatefileArgKind::String => {
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
+        }
+        StatefileArgKind::Number => {
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
+        }
+        StatefileArgKind::Boolean => {
+          compiled_values.insert(arg.name.clone(), serde_json::json!(value));
+        }
+      },
+    }
+  }
+  Ok(())
+}
+
 #[async_recursion(?Send)]
 async fn parse_state_file_recurr(
   cli_conf: &CliConfig,
@@ -527,20 +651,32 @@ async fn parse_state_file_recurr(
             (&sub_state.path, sub_state.args.clone())
           }
         };
-        let compiled_values = match sub_state_args {
+        let mut compiled_values = match sub_state_args {
           Some(sub_state_args) => {
             sub_state_args
               .iter()
               .try_fold(Map::new(), |mut init, arg| {
                 match &arg.value {
-                  SubStateValue::String(value) => {
+                  StatefileArgsValue::String(value) => {
                     init.insert(arg.name.clone(), Value::String(value.clone()));
                   }
-                  SubStateValue::Number(value) => {
+                  StatefileArgsValue::Number(value) => {
                     init.insert(arg.name.clone(), serde_json::json!(value));
                   }
-                  SubStateValue::Boolean(value) => {
+                  StatefileArgsValue::Boolean(value) => {
                     init.insert(arg.name.clone(), Value::Bool(*value));
+                  }
+                  StatefileArgsValue::MultipleNumber(values) => {
+                    init.insert(
+                      arg.name.clone(),
+                      serde_json::json!(values.clone()),
+                    );
+                  }
+                  StatefileArgsValue::MultipleString(values) => {
+                    init.insert(
+                      arg.name.clone(),
+                      serde_json::json!(values.clone()),
+                    );
                   }
                 }
                 Ok::<_, IoError>(init)
@@ -554,6 +690,7 @@ async fn parse_state_file_recurr(
             &cli_conf.user_config.display_format,
           )
           .await?;
+          substate_default_args(&state_file, &mut compiled_values)?;
           return parse_state_file_recurr(
             cli_conf,
             &state_file,
@@ -590,6 +727,7 @@ async fn parse_state_file_recurr(
           &cli_conf.user_config.display_format,
         )
         .await?;
+        substate_default_args(&state_file, &mut compiled_values)?;
         parse_state_file_recurr(
           cli_conf,
           &state_file,

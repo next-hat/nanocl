@@ -15,6 +15,32 @@ Args:
     Required: true
   - Name: ssl_enabled
     Kind: Boolean
+  # Optional single-value with default string
+  - Name: env
+    Kind: String
+    Default: dev
+  # Optional single-value with default number
+  - Name: retries
+    Kind: Number
+    Default: 3
+  # Multiple strings with default array (tests default_values)
+  - Name: tags
+    Kind: String
+    Multiple: true
+    Default: ["one", "two"]
+  # Multiple numbers with default array (tests default_values)
+  - Name: extra_ports
+    Kind: Number
+    Multiple: true
+    Default: [8080, 8081]
+  # Array default provided while Multiple is false -> should pick first
+  - Name: color
+    Kind: String
+    Default: ["red", "blue"]
+  # Array number default while Multiple is false -> should pick first
+  - Name: scale
+    Kind: Number
+    Default: [1, 2]
 
 Namespace: global
 
@@ -34,14 +60,6 @@ Resources:
     Rules:
     - Domain: ${{ Args.domain }}
       Network: All
-      # {% if Args.ssl_enabled %}
-      Ssl:
-        Certificate: /etc/letsencrypt/live/${{ Args.domain }}/fullchain.pem
-        CertificateKey: /etc/letsencrypt/live/${{ Args.domain }}/privkey.pem
-        Dhparam: /etc/letsencrypt/ssl-dhparams.pem
-      Includes:
-        - /etc/letsencrypt/options-ssl-nginx.conf
-      # {% endif %}
       Locations:
       - Path: /
         Target:
