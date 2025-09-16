@@ -7096,10 +7096,10 @@ components:
           $ref: '#/components/schemas/StatefileArgKind'
           description: Kind of the build arg
         Default:
-          type:
-          - string
-          - 'null'
-          description: Default value of the build arg
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/StatefileArgsValue'
+            description: Default value of the build arg
         Required:
           type: boolean
           description: Required argument
@@ -7124,6 +7124,20 @@ components:
       - String
       - Number
       - Boolean
+    StatefileArgsValue:
+      oneOf:
+      - type: number
+        format: double
+      - type: string
+      - type: boolean
+      - type: array
+        items:
+          type: number
+          format: double
+      - type: array
+        items:
+          type: string
+      description: Statefile argument definition to pass to the Statefile
     StatefileMetadata:
       type: object
       description: Optional metadata to enrich a Statefile with documentation
@@ -7259,7 +7273,7 @@ components:
           type: string
           description: Name of the argument
         Value:
-          $ref: '#/components/schemas/SubStateValue'
+          $ref: '#/components/schemas/StatefileArgsValue'
           description: Value for the argument
       additionalProperties: false
     SubStateDef:
@@ -7276,20 +7290,6 @@ components:
           items:
             $ref: '#/components/schemas/SubStateArg'
       additionalProperties: false
-    SubStateValue:
-      oneOf:
-      - type: number
-        format: double
-      - type: string
-      - type: boolean
-      - type: array
-        items:
-          type: number
-          format: double
-      - type: array
-        items:
-          type: string
-      description: Statefile argument definition to pass to the Statefile
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.

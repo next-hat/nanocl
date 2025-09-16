@@ -458,6 +458,7 @@ mod tests {
 
   #[ntex::test]
   async fn state_apply_args_advanced() {
+    // Case 1: Apply with required args only (defaults kick in for others)
     assert_cli_ok!(
       "state",
       "apply",
@@ -473,6 +474,8 @@ mod tests {
       "--port",
       "9000",
     );
+
+    // Case 2: Apply overriding defaults including multi-value args
     assert_cli_ok!(
       "state",
       "apply",
@@ -487,7 +490,32 @@ mod tests {
       "ghcr.io/next-hat/nanocl-get-started:latest",
       "--port",
       "9000",
+      // boolean flag
+      "--ssl_enabled",
+      // override single default
+      "--env",
+      "prod",
+      // override number default
+      "--retries",
+      "5",
+      // override multi string defaults
+      "--tags",
+      "alpha",
+      "--tags",
+      "beta",
+      // override multi number defaults
+      "--extra_ports",
+      "7000",
+      "--extra_ports",
+      "7001",
+      // provide value for fields with array defaults but Multiple=false
+      "--color",
+      "green",
+      "--scale",
+      "4",
     );
+
+    // Case 3: Remove using the same required identification
     assert_cli_ok!(
       "state",
       "rm",
