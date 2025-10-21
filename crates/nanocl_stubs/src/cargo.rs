@@ -139,7 +139,15 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CargoDeleteQuery {
   /// Name of the namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
   /// Delete cargo even if it is running
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub force: Option<bool>,
 }

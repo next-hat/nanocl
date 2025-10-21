@@ -272,6 +272,10 @@ pub struct LimitReq {
   /// The burst size
   pub burst: usize,
   /// The delay to wait before retrying
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub delay: Option<usize>,
 }
 
@@ -359,8 +363,16 @@ pub struct ProxyRuleHttp {
   )]
   pub domain: Option<String>,
   /// Port to listen on (default 80 or 443)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub port: Option<u16>,
   /// Hsts configuration
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hsts: Option<Hsts>,
   /// Type of network binding
   pub network: NetworkKind,

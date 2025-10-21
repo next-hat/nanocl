@@ -47,6 +47,10 @@ pub struct VmHostConfig {
   )]
   pub net_iface: Option<String>,
   /// Network interface to link the vm (default: eth0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub link_net_iface: Option<String>,
   /// Enable KVM acceleration (default: false)
   #[cfg_attr(
@@ -73,6 +77,10 @@ pub struct VmHostConfig {
   )]
   pub runtime_network: Option<String>,
   /// Use host tun device
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub host_tun: Option<bool>,
 }
 
