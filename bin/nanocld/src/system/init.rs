@@ -1,8 +1,10 @@
-use std::{os::unix::prelude::PermissionsExt, path::Path, process::Command};
+use std::{os::unix::prelude::PermissionsExt, path::Path, process::Stdio};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use ntex::rt;
 use tokio::fs;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command as TokioCommand;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::config::DaemonConfig;
@@ -86,18 +88,60 @@ fn spawn_crond() {
   log::trace!("boot::spawn_crond: start thread");
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
-      let task = ntex::web::block(move || {
-        match Command::new("crond").args(["-f"]).spawn() {
-          Ok(mut child) => {
-            child.wait()?;
-            Ok(())
+      // Spawn crond in foreground with piped stdout/stderr
+      match TokioCommand::new("crond")
+        .args(["-f", "-d", "8", "-l", "8", "-L", "/dev/stdout"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+      {
+        Ok(mut child) => {
+          // Stream stdout
+          if let Some(stdout) = child.stdout.take() {
+            rt::spawn(async move {
+              let mut lines = BufReader::new(stdout).lines();
+              loop {
+                match lines.next_line().await {
+                  Ok(Some(line)) => log::info!("crond: {line}"),
+                  Ok(None) => break,
+                  Err(err) => {
+                    log::warn!("crond stdout read error: {err}");
+                    break;
+                  }
+                }
+              }
+            });
           }
-          Err(err) => Err(err),
+          // Stream stderr
+          if let Some(stderr) = child.stderr.take() {
+            rt::spawn(async move {
+              let mut lines = BufReader::new(stderr).lines();
+              loop {
+                match lines.next_line().await {
+                  Ok(Some(line)) => log::warn!("crond: {line}"),
+                  Ok(None) => break,
+                  Err(err) => {
+                    log::warn!("crond stderr read error: {err}");
+                    break;
+                  }
+                }
+              }
+            });
+          }
+          // Wait for crond to exit
+          match child.wait().await {
+            Ok(status) => {
+              log::info!("boot::spawn_crond: crond exited with {status}");
+            }
+            Err(err) => {
+              log::error!("boot::spawn_crond: wait error: {err}");
+            }
+          }
         }
-      })
-      .await;
-      if let Err(err) = task {
-        log::error!("boot::spawn_crond: {err}");
+        Err(err) => {
+          log::error!("boot::spawn_crond: spawn error: {err}");
+        }
       }
       log::trace!("boot::spawn_crond: stop thread");
       rt::Arbiter::current().stop();
