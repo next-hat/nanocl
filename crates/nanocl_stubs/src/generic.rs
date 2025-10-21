@@ -11,6 +11,10 @@ use bollard_next::secret::GenericResourcesInner;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericNspQuery {
   /// Name of the namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
 }
 
@@ -80,6 +84,10 @@ pub enum GenericClause {
 pub struct GenericWhere {
   #[cfg_attr(feature = "serde", serde(flatten))]
   pub conditions: HashMap<String, GenericClause>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub or: Option<Vec<HashMap<String, GenericClause>>>,
 }
 
@@ -117,13 +125,28 @@ impl std::str::FromStr for GenericOrder {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericFilter {
   /// Where clause
-  #[cfg_attr(feature = "serde", serde(rename = "where"))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(rename = "where", skip_serializing_if = "Option::is_none")
+  )]
   pub r#where: Option<GenericWhere>,
   /// Limit number of items default (100)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub limit: Option<usize>,
   /// Offset to navigate through items
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub offset: Option<usize>,
   /// Order by
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub order_by: Option<Vec<String>>,
 }
 
@@ -134,6 +157,10 @@ pub struct GenericFilter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericListQuery {
   /// A json as string as GenericFilter
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub filter: Option<String>,
 }
 
@@ -180,7 +207,16 @@ impl TryFrom<GenericListQueryNsp> for GenericFilter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericListQueryNsp {
   /// A json as string as GenericFilter
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub filter: Option<String>,
+  /// Name of the namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
 }
 
@@ -189,7 +225,15 @@ pub struct GenericListQueryNsp {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericFilterNsp {
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub filter: Option<GenericFilter>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
 }
 

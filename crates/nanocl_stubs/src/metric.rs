@@ -22,6 +22,10 @@ pub struct Metric {
   /// The data of the metric
   pub data: serde_json::Value,
   /// Optional note about the metric
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub note: Option<String>,
 }
 
@@ -37,6 +41,10 @@ pub struct MetricPartial {
   /// The data of the metric
   pub data: serde_json::Value,
   /// Optional note about the metric
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub note: Option<String>,
 }
 
@@ -140,49 +148,73 @@ pub struct HttpMetric {
   /// The proxy host of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub proxy_host: Option<String>,
   /// The upstream address of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub upstream_addr: Option<String>,
   /// The query string of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub query_string: Option<String>,
   /// The body of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub request_body: Option<String>,
   /// The content type of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub content_type: Option<String>,
   /// The http user agent of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub http_user_agent: Option<String>,
   /// The http referrer of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub http_referrer: Option<String>,
   /// The http accept language of the request
   #[cfg_attr(
     feature = "serde",
-    serde(deserialize_with = "deserialize_empty_string")
+    serde(
+      deserialize_with = "deserialize_empty_string",
+      skip_serializing_if = "Option::is_none",
+    )
   )]
   pub http_accept_language: Option<String>,
 }
@@ -197,6 +229,10 @@ pub struct StreamMetric {
   pub date_gmt: DateTime<FixedOffset>,
   pub remote_addr: String,
   pub upstream_addr: String,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub protocol: Option<String>,
   #[cfg_attr(
     feature = "serde",

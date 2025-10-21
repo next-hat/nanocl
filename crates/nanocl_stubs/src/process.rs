@@ -90,6 +90,10 @@ pub struct ProcessPartial {
   /// Key of the related kind
   pub kind_key: String,
   /// The created at date
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub created_at: Option<chrono::NaiveDateTime>,
 }
 
@@ -189,20 +193,52 @@ pub struct ProcessOutputLog {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessLogQuery {
   /// Name of the namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
   /// Only include logs since unix timestamp
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub since: Option<i64>,
   /// Only include logs until unix timestamp
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub until: Option<i64>,
   /// Bool, if set include timestamp to ever log line
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub timestamps: Option<bool>,
   /// Bool, if set open the log as stream
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub follow: Option<bool>,
   /// If integer only return last n logs, if "all" returns all logs
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub tail: Option<String>,
   /// Include stderr in response
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub stderr: Option<bool>,
   /// Include stdout in response
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub stdout: Option<bool>,
 }
 
@@ -295,8 +331,16 @@ impl std::str::FromStr for WaitCondition {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessWaitQuery {
   // Wait condition
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub condition: Option<WaitCondition>,
   /// Namespace where belong the process
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
 }
 
@@ -337,10 +381,22 @@ impl ProcessWaitResponse {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessStatsQuery {
   /// Name of the namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub namespace: Option<String>,
   /// Stream the output. If false, the stats will be output once and then it will disconnect.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub stream: Option<bool>,
   /// Only get a single stat instead of waiting for 2 cycles. Must be used with `stream=false`.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub one_shot: Option<bool>,
 }
 

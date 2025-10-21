@@ -18,6 +18,10 @@ pub struct DaemonConfig {
   #[cfg_attr(feature = "serde", serde(default = "default_host"))]
   pub docker_host: String,
   /// Store address to connect to
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub store_addr: Option<String>,
   /// Host gateway automatically detected to host default gateway if not set
   pub gateway: String,
@@ -32,6 +36,10 @@ pub struct DaemonConfig {
   /// Group id
   pub gid: u32,
   /// Optional ssl configuration
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssl: Option<SslConfig>,
 }
 
@@ -41,16 +49,40 @@ pub struct DaemonConfig {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DaemonConfigFile {
   /// List of hosts to listen on
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hosts: Option<Vec<String>>,
   /// Path to the state directory
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub state_dir: Option<String>,
   /// Docker host to use
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub docker_host: Option<String>,
   /// Store address to connect to
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub store_addr: Option<String>,
   /// Host gateway automatically detected to host default gateway if not set
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub gateway: Option<String>,
   /// Hostname to use for the node automatically detected if not set
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hostname: Option<String>,
 }
 
