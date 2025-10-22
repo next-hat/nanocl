@@ -152,7 +152,8 @@ impl SpecDb {
       init_container: p.init_container,
       secrets: p.secrets,
       container: p.container,
-      replication: p.replication,
+      placement: p.placement,
+      resource_requirement: p.resource_requirement,
       image_pull_secret: p.image_pull_secret,
       image_pull_policy: p.image_pull_policy,
     };

@@ -103,7 +103,7 @@ fn spawn_crond() {
               let mut lines = BufReader::new(stdout).lines();
               loop {
                 match lines.next_line().await {
-                  Ok(Some(line)) => log::info!("crond: {line}"),
+                  Ok(Some(line)) => log::info!("{line}"),
                   Ok(None) => break,
                   Err(err) => {
                     log::warn!("crond stdout read error: {err}");
@@ -119,7 +119,7 @@ fn spawn_crond() {
               let mut lines = BufReader::new(stderr).lines();
               loop {
                 match lines.next_line().await {
-                  Ok(Some(line)) => log::warn!("crond: {line}"),
+                  Ok(Some(line)) => log::warn!("{line}"),
                   Ok(None) => break,
                   Err(err) => {
                     log::warn!("crond stderr read error: {err}");
