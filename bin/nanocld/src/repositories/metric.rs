@@ -168,7 +168,7 @@ impl MetricDb {
       );
       // Append dynamic constraints via JSONB arrays of {path, value}
       sql_txt.push_str(
-        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($10::jsonb) c\n              WHERE NOT (\n                COALESCE(jsonb_extract_path_text(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) = (c->>'value'), FALSE)\n                OR COALESCE(jsonb_extract_path(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value'), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($11::jsonb) c\n              WHERE NOT (\n                COALESCE(jsonb_extract_path_text(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT (jsonb_extract_path(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), TRUE)\n              )\n            )",
+        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($10::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) = (c->>'value'), FALSE)\n                OR COALESCE(((n.metadata #> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($11::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT ((n.metadata #> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), TRUE)\n              )\n            )",
       );
       // Order and limit
       sql_txt.push_str(
@@ -178,6 +178,8 @@ impl MetricDb {
             avg_cpu ASC
           LIMIT $7",
       );
+  // Debug: log the generated SQL for troubleshooting (no parameters included)
+  log::debug!("[balanced] capacity SQL:\n{}", sql_txt);
   let sql = sql_query(sql_txt);
       let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
       use diesel::sql_types::{BigInt, Float, Jsonb, Nullable};
@@ -309,10 +311,12 @@ impl MetricDb {
       );
       // Append dynamic constraints through JSONB arrays ($8 eq, $9 ne)
       sql_txt.push_str(
-        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($8::jsonb) c\n              WHERE NOT (\n                COALESCE(jsonb_extract_path_text(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) = (c->>'value'), FALSE)\n                OR COALESCE(jsonb_extract_path(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value'), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($9::jsonb) c\n              WHERE NOT (\n                COALESCE(jsonb_extract_path_text(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT (jsonb_extract_path(n.metadata, VARIADIC ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), TRUE)\n              )\n            )",
+        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($8::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) = (c->>'value'), FALSE)\n                OR COALESCE(((n.metadata #> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($9::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT ((n.metadata #> ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ? (c->>'value')), TRUE)\n              )\n            )",
       );
       // Order and limit
       sql_txt.push_str("\n          ORDER BY avg_cpu ASC NULLS LAST\n          LIMIT $5");
+  // Debug: log the generated SQL for troubleshooting (no parameters included)
+  log::debug!("[least-loaded] capacity SQL:\n{}", sql_txt);
   let sql = sql_query(sql_txt);
       let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
       use diesel::sql_types::{BigInt, Float, Jsonb, Nullable};
