@@ -2646,19 +2646,43 @@ components:
       description: |
         Resource requirements for the cargo
       properties:
-        Cpu:
+        CpuCores:
           type:
           - integer
           - 'null'
           description: CPU requirement in number of cores
           minimum: 0
-        Memory:
+        CpuUtilizationCap:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Maximum allowed average CPU utilization on a target node (0.0 - 1.0)
+        MemoryBytes:
           type:
           - integer
           - 'null'
           description: Memory requirement in bytes
           minimum: 0
-        Storage:
+        MemoryUtilizationCap:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Maximum allowed average Memory utilization on a target node (0.0 - 1.0)
+        CpuWeight:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Optional weight for CPU in balanced placement (0.0 - 1.0)
+        MemoryWeight:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Optional weight for Memory in balanced placement (0.0 - 1.0)
+        StorageBytes:
           type:
           - integer
           - 'null'

@@ -263,7 +263,11 @@ pub async fn create(
 
 /// Start cargo instances
 ///
-pub async fn start(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
+pub async fn start(
+  cargo: &Cargo,
+  replicas: usize,
+  state: &SystemState,
+) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
     "data",
     GenericClause::Contains(serde_json::json!({
@@ -309,7 +313,7 @@ pub async fn start(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
     }
   }
   if processes.is_empty() {
-    create(cargo, 1, state).await?;
+    create(cargo, replicas, state).await?;
   }
   super::process::start_instances(
     &cargo.spec.cargo_key,

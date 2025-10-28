@@ -23,15 +23,19 @@ impl ObjTaskStart for CargoDb {
       let mutex = CargoDb::create_mutex(&key, "start", &state).await?;
       let cargo =
         CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-      let selected_nodes =
+      let plan =
         utils::container::generic::plan_selection(&cargo, &state).await?;
-      for node_selected in selected_nodes {
+      for assignment in plan.assignments {
+        let node_selected = assignment.node;
+        let replicas = assignment.replicas;
         if node_selected.name == state.inner.config.hostname {
-          utils::container::cargo::start(&cargo, &state).await?;
+          utils::container::cargo::start(&cargo, replicas, &state).await?;
         } else {
           log::warn!(
-            "Call a remote node to start cargo {} not yet implemented",
-            &key
+            "Call a remote node to start {} replicas of cargo {} on node {} not yet implemented",
+            replicas,
+            &key,
+            node_selected.name
           );
         }
       }

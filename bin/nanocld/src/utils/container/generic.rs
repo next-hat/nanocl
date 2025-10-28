@@ -8,8 +8,8 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    CargoDb, JobDb, JobUpdateDb, MetricDb, NodeDb, ObjPsStatusDb,
-    ObjPsStatusUpdate, SystemState, VmDb,
+    BalanceWeights, CapacityQuery, CargoDb, JobDb, JobUpdateDb, MetricDb,
+    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, SystemState, VmDb,
   },
   repositories::generic::*,
 };
@@ -183,10 +183,24 @@ pub async fn inject_data(
 /// Plan node selection for a cargo based on placement and resource requirements.
 /// This function relies on SQL queries over metrics to avoid loading all nodes in memory.
 /// Returns a list of candidate nodes ordered by the chosen strategy (currently least-loaded first).
+#[derive(Debug, Clone)]
+pub struct SelectionAssignment {
+  pub node: NodeDb,
+  pub replicas: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectionPlan {
+  pub total_replicas: usize,
+  pub assignments: Vec<SelectionAssignment>,
+}
+
 pub async fn plan_selection(
   cargo: &Cargo,
   state: &SystemState,
-) -> IoResult<Vec<NodeDb>> {
+) -> IoResult<SelectionPlan> {
+  // Default metrics recency window (in seconds) to consider a node's metrics as fresh
+  const METRIC_RECENCY_DEFAULT_SECS: i64 = 300;
   // Determine desired replicas (default: 1)
   let replicas = cargo
     .spec
@@ -195,13 +209,38 @@ pub async fn plan_selection(
     .and_then(|p| p.replicas)
     .unwrap_or(1)
     .max(1);
-  // Extract minimal resource requirements (CPU cores, memory bytes)
-  let (cpu_req, mem_req) = cargo
+  // Extract and normalize minimal resource requirements and caps
+  let (cpu_req, mem_req, storage_req, cpu_cap, mem_cap) = cargo
     .spec
     .resource_requirement
     .as_ref()
-    .map(|r| (r.cpu, r.memory))
-    .unwrap_or((None, None));
+    .map(|r| {
+      (
+        r.cpu_cores,
+        r.memory_bytes,
+        r.storage_bytes,
+        r.cpu_utilization_cap,
+        r.memory_utilization_cap,
+      )
+    })
+    .unwrap_or((None, None, None, None, None));
+  // Validate caps if provided
+  if let Some(c) = cpu_cap
+    && !(0.0..=1.0).contains(&c)
+  {
+    return Err(IoError::invalid_data(
+      "PlanSelection",
+      "cpu_utilization_cap must be between 0.0 and 1.0",
+    ));
+  }
+  if let Some(c) = mem_cap
+    && !(0.0..=1.0).contains(&c)
+  {
+    return Err(IoError::invalid_data(
+      "PlanSelection",
+      "memory_utilization_cap must be between 0.0 and 1.0",
+    ));
+  }
   // Extract placement selectors (regions) for require/prefer
   let placement = cargo.spec.placement.as_ref();
   let require_regions: Option<Vec<String>> = placement
@@ -212,16 +251,67 @@ pub async fn plan_selection(
     .and_then(|p| p.prefer.as_ref())
     .and_then(|s| s.regions.clone());
   // Strategy hook (future): we can extend to Balanced/Distinct/UserDefined
-  // For now, we select least-loaded nodes that satisfy capacity using SQL.
+  // Select nodes via SQL with either least-loaded or balanced strategy.
   // We fetch a small buffer above replicas to allow post-filtering by regions.
   let prelimit = replicas.saturating_mul(5).max(5);
-  let mut nodes = MetricDb::select_nodes_for_capacity(
-    cpu_req,
-    mem_req,
-    prelimit,
-    &state.inner.pool,
-  )
-  .await?;
+  let mut nodes = {
+    let strategy = cargo
+      .spec
+      .placement
+      .as_ref()
+      .and_then(|p| p.strategy.clone())
+      .unwrap_or(nanocl_stubs::cargo_spec::CargoPlacementStrategy::LeastLoaded);
+
+    match strategy {
+      nanocl_stubs::cargo_spec::CargoPlacementStrategy::Balanced => {
+        // Derive and normalize weights from spec or defaults
+        let (w_cpu, w_mem) = cargo
+          .spec
+          .resource_requirement
+          .as_ref()
+          .map(|r| {
+            let cpu_w = r.cpu_weight.unwrap_or(0.6);
+            let mem_w = r.memory_weight.unwrap_or(0.4);
+            let sum = cpu_w + mem_w;
+            if sum > 0.0 {
+              (cpu_w / sum, mem_w / sum)
+            } else {
+              (0.5, 0.5)
+            }
+          })
+          .unwrap_or((0.6, 0.4));
+        let q = CapacityQuery {
+          cpu_cores_required: cpu_req,
+          mem_bytes_required: mem_req,
+          storage_bytes_required: storage_req,
+          cpu_utilization_cap: cpu_cap,
+          mem_utilization_cap: mem_cap,
+          recency_seconds: Some(METRIC_RECENCY_DEFAULT_SECS),
+          limit: prelimit,
+          weights: Some(BalanceWeights {
+            cpu_weight: w_cpu,
+            mem_weight: w_mem,
+          }),
+        };
+        MetricDb::select_nodes_for_capacity_balanced(&q, &state.inner.pool)
+          .await?
+      }
+      _ => {
+        // LeastLoaded and other strategies fallback to CPU-focused ordering
+        let q = CapacityQuery {
+          cpu_cores_required: cpu_req,
+          mem_bytes_required: mem_req,
+          storage_bytes_required: storage_req,
+          cpu_utilization_cap: cpu_cap,
+          mem_utilization_cap: mem_cap,
+          recency_seconds: Some(METRIC_RECENCY_DEFAULT_SECS),
+          limit: prelimit,
+          weights: None,
+        };
+        MetricDb::select_nodes_for_capacity(&q, &state.inner.pool).await?
+      }
+    }
+  };
   // Hard filter by required regions if provided (based on node metadata)
   if let Some(req_regions) = &require_regions {
     let req_set: std::collections::HashSet<String> =
@@ -262,9 +352,35 @@ pub async fn plan_selection(
       if is_pref { 0 } else { 1 }
     });
   }
-  // Truncate to replicas count
+  // Truncate to at most replicas nodes (we can place multiple replicas per node)
   if nodes.len() > replicas {
     nodes.truncate(replicas);
   }
-  Ok(nodes)
+
+  // Compute round-robin assignments across selected nodes
+  let n = nodes.len();
+  if n == 0 {
+    return Err(IoError::not_found(
+      "PlanSelection",
+      "No nodes available after filtering",
+    ));
+  }
+  let base = replicas / n;
+  let extra = replicas % n;
+  let mut assignments = Vec::with_capacity(n);
+  for (idx, node) in nodes.into_iter().enumerate() {
+    let mut count = base;
+    if idx < extra {
+      count += 1;
+    }
+    assignments.push(SelectionAssignment {
+      node,
+      replicas: count,
+    });
+  }
+
+  Ok(SelectionPlan {
+    total_replicas: replicas,
+    assignments,
+  })
 }

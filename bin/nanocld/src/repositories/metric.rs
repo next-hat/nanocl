@@ -4,7 +4,10 @@ use nanocl_stubs::generic::{GenericClause, GenericFilter};
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, MetricDb, MetricNodeDb, NodeDb, Pool},
+  models::{
+    BalanceWeights, CapacityQuery, ColumnType, MetricDb, MetricNodeDb, NodeDb,
+    Pool,
+  },
   schema::metrics,
   utils,
 };
@@ -70,29 +73,38 @@ impl RepositoryCountBy for MetricDb {
 }
 
 impl MetricDb {
-  /// Select least-loaded nodes that can satisfy optional CPU (cores) and Memory (bytes) requirements.
-  /// Uses latest metrics per node and performs filtering/sorting in SQL to avoid loading all nodes.
-  pub async fn select_nodes_for_capacity(
-    cpu_cores_required: Option<usize>,
-    mem_bytes_required: Option<usize>,
-    limit: usize,
+  /// Select nodes using a balanced composite score between CPU and Memory pressure.
+  /// Applies capacity filters (cpu cores, memory bytes) and utilization caps, and orders by score.
+  pub async fn select_nodes_for_capacity_balanced(
+    query: &CapacityQuery,
     pool: &Pool,
   ) -> IoResult<Vec<NodeDb>> {
     let pool_ptr = pool.clone();
+    // Extract values outside of the blocking closure to avoid lifetime issues
+    let cpu_opt: Option<f32> = query.cpu_cores_required.map(|x| x as f32);
+    let mem_opt: Option<i64> = query.mem_bytes_required.map(|x| x as i64);
+    let cpu_cap_opt: Option<f32> = query.cpu_utilization_cap;
+    let mem_cap_opt: Option<f32> = query.mem_utilization_cap;
+    let (w_cpu, w_mem) = match &query.weights {
+      Some(BalanceWeights {
+        cpu_weight,
+        mem_weight,
+      }) => (*cpu_weight, *mem_weight),
+      None => (0.6, 0.4),
+    };
+    let limit_i64: i64 = query.limit as i64;
+    let recency = query.recency_seconds;
+    let storage_opt: Option<i64> =
+      query.storage_bytes_required.map(|x| x as i64);
     let node_names = ntex::rt::spawn_blocking(move || {
-      // SQL notes:
-      // - Latest picks last metric row per node for kind 'nanocl.io/metrs'
-      // - Stats computes cores, average CPU usage across cores, and optional memory stats
-      // - Filter ensures enough free CPU headroom: (1 - avg_cpu) >= cpu_required/cores
-      // - Filter ensures enough free memory if provided
-      // - Order by least loaded (avg_cpu ASC) and limit to requested number
-      let query = sql_query(
+      let sql = sql_query(
         "
           WITH Latest AS (
             SELECT node_name, data,
                    ROW_NUMBER() OVER(PARTITION BY node_name ORDER BY created_at DESC) AS rn
             FROM metrics
             WHERE kind = 'nanocl.io/metrs'
+              AND ($9::bigint IS NULL OR created_at >= NOW() - make_interval(secs => $9::double precision))
           ), Stats AS (
             SELECT
               node_name,
@@ -102,7 +114,123 @@ impl MetricDb {
                 FROM jsonb_array_elements(data->'Cpus') c
               ) AS avg_cpu,
               (data->'Memory'->>'Total')::bigint AS mem_total,
-              (data->'Memory'->>'Used')::bigint AS mem_used
+              (data->'Memory'->>'Used')::bigint AS mem_used,
+              (
+                SELECT COALESCE(SUM((d->>'AvailableSpace')::bigint), 0)
+                FROM jsonb_array_elements(data->'Disks') d
+              ) AS disks_avail_total
+            FROM Latest
+            WHERE rn = 1
+          ), Enriched AS (
+            SELECT
+              node_name,
+              cores,
+              avg_cpu,
+              mem_total,
+              mem_used,
+              disks_avail_total,
+              CASE WHEN mem_total IS NULL OR mem_total = 0 THEN NULL
+                   ELSE (mem_used::double precision / NULLIF(mem_total::double precision, 0.0))
+              END AS mem_used_ratio
+            FROM Stats
+          )
+          SELECT node_name
+          FROM Enriched
+          WHERE
+            ($1::double precision IS NULL OR ((1.0 - COALESCE(avg_cpu, 0.0)) * GREATEST(cores, 1)::double precision) >= $1::double precision)
+            AND ($2::bigint IS NULL OR (mem_total IS NOT NULL AND mem_used IS NOT NULL AND (mem_total - mem_used) >= $2::bigint))
+            AND ($3::double precision IS NULL OR COALESCE(avg_cpu, 0.0) <= $3::double precision)
+            AND (
+              $4::double precision IS NULL OR (
+                mem_total IS NOT NULL AND mem_total > 0 AND
+                (COALESCE(mem_used, 0)::double precision / NULLIF(mem_total, 0)::double precision) <= $4::double precision
+              )
+            )
+            AND ($8::bigint IS NULL OR (disks_avail_total IS NOT NULL AND disks_avail_total >= $8::bigint))
+          ORDER BY
+            (COALESCE(avg_cpu, 0.0) * $5::double precision)
+            + (COALESCE(mem_used_ratio, 0.0) * $6::double precision) ASC,
+            avg_cpu ASC
+          LIMIT $7
+        ",
+      );
+      let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
+      use diesel::sql_types::{BigInt, Float, Nullable};
+      let node_names = sql
+        .bind::<Nullable<Float>, _>(cpu_opt)
+        .bind::<Nullable<BigInt>, _>(mem_opt)
+        .bind::<Nullable<Float>, _>(cpu_cap_opt)
+        .bind::<Nullable<Float>, _>(mem_cap_opt)
+        .bind::<Float, _>(w_cpu)
+        .bind::<Float, _>(w_mem)
+  .bind::<BigInt, _>(limit_i64)
+  .bind::<Nullable<BigInt>, _>(storage_opt)
+  .bind::<Nullable<BigInt>, _>(recency)
+        .get_results::<MetricNodeDb>(&mut conn)
+        .map_err(|err| IoError::interrupted("Select nodes for capacity balanced", &err.to_string()))?;
+      Ok::<_, IoError>(node_names)
+    })
+  .await
+  .map_err(|err| IoError::interrupted("Select nodes for capacity balanced", &err.to_string()))??;
+    let names: Vec<String> =
+      node_names.iter().map(|x| x.node_name.clone()).collect();
+    let filter = GenericFilter::new()
+      .r#where("node_name", GenericClause::In(names.clone()));
+    let mut nodes = NodeDb::read_by(&filter, pool).await?;
+    use std::collections::HashMap;
+    let mut by_name: HashMap<String, NodeDb> =
+      nodes.drain(..).map(|n| (n.name.clone(), n)).collect();
+    let ordered = names
+      .into_iter()
+      .filter_map(|n| by_name.remove(&n))
+      .collect::<Vec<_>>();
+    Ok(ordered)
+  }
+  /// Select least-loaded nodes that can satisfy optional CPU (cores) and Memory (bytes) requirements.
+  /// Uses latest metrics per node and performs filtering/sorting in SQL to avoid loading all nodes.
+  pub async fn select_nodes_for_capacity(
+    query: &CapacityQuery,
+    pool: &Pool,
+  ) -> IoResult<Vec<NodeDb>> {
+    let pool_ptr = pool.clone();
+    // Extract values outside of the blocking closure to avoid lifetime issues
+    let cpu_opt: Option<f32> = query.cpu_cores_required.map(|x| x as f32);
+    let mem_opt: Option<i64> = query.mem_bytes_required.map(|x| x as i64);
+    let cpu_cap_opt: Option<f32> = query.cpu_utilization_cap;
+    let mem_cap_opt: Option<f32> = query.mem_utilization_cap;
+    let limit_i64: i64 = query.limit as i64;
+    let recency = query.recency_seconds;
+    let storage_opt: Option<i64> =
+      query.storage_bytes_required.map(|x| x as i64);
+    let node_names = ntex::rt::spawn_blocking(move || {
+      // SQL notes:
+      // - Latest picks last metric row per node for kind 'nanocl.io/metrs'
+      // - Stats computes cores, average CPU usage across cores, and optional memory stats
+      // - Filter ensures enough free CPU headroom: (1 - avg_cpu) >= cpu_required/cores
+      // - Filter ensures enough free memory if provided
+      // - Order by least loaded (avg_cpu ASC) and limit to requested number
+      let sql = sql_query(
+        "
+          WITH Latest AS (
+            SELECT node_name, data,
+                   ROW_NUMBER() OVER(PARTITION BY node_name ORDER BY created_at DESC) AS rn
+            FROM metrics
+            WHERE kind = 'nanocl.io/metrs'
+              AND ($7::bigint IS NULL OR created_at >= NOW() - make_interval(secs => $7::double precision))
+          ), Stats AS (
+            SELECT
+              node_name,
+              jsonb_array_length(data->'Cpus') AS cores,
+              (
+                SELECT AVG((c->>'Usage')::double precision)
+                FROM jsonb_array_elements(data->'Cpus') c
+              ) AS avg_cpu,
+              (data->'Memory'->>'Total')::bigint AS mem_total,
+              (data->'Memory'->>'Used')::bigint AS mem_used,
+              (
+                SELECT COALESCE(SUM((d->>'AvailableSpace')::bigint), 0)
+                FROM jsonb_array_elements(data->'Disks') d
+              ) AS disks_avail_total
             FROM Latest
             WHERE rn = 1
           )
@@ -120,18 +248,34 @@ impl MetricDb {
               $2::bigint IS NULL OR
               (mem_total IS NOT NULL AND mem_used IS NOT NULL AND (mem_total - mem_used) >= $2::bigint)
             )
+            AND
+            -- CPU utilization cap (skipped when $3 is NULL)
+            (
+              $3::double precision IS NULL OR COALESCE(avg_cpu, 0.0) <= $3::double precision
+            )
+            AND
+            -- Memory utilization cap (skipped when $4 is NULL)
+            (
+              $4::double precision IS NULL OR (
+                mem_total IS NOT NULL AND mem_total > 0 AND
+                (COALESCE(mem_used, 0)::double precision / NULLIF(mem_total, 0)::double precision) <= $4::double precision
+              )
+            )
+            AND ($6::bigint IS NULL OR (disks_avail_total IS NOT NULL AND disks_avail_total >= $6::bigint))
           ORDER BY avg_cpu ASC NULLS LAST
-          LIMIT $3
+          LIMIT $5
         ",
       );
       let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
       use diesel::sql_types::{BigInt, Float, Nullable};
-      let cpu_opt: Option<f32> = cpu_cores_required.map(|x| x as f32);
-      let mem_opt: Option<i64> = mem_bytes_required.map(|x| x as i64);
-      let node_names = query
+      let node_names = sql
         .bind::<Nullable<Float>, _>(cpu_opt)
         .bind::<Nullable<BigInt>, _>(mem_opt)
-        .bind::<BigInt, _>(limit as i64)
+        .bind::<Nullable<Float>, _>(cpu_cap_opt)
+        .bind::<Nullable<Float>, _>(mem_cap_opt)
+  .bind::<BigInt, _>(limit_i64)
+  .bind::<Nullable<BigInt>, _>(storage_opt)
+  .bind::<Nullable<BigInt>, _>(recency)
         .get_results::<MetricNodeDb>(&mut conn)
         .map_err(|err| IoError::interrupted("Select nodes for capacity", &err.to_string()))?;
       Ok::<_, IoError>(node_names)

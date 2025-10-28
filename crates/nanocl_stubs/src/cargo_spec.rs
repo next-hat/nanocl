@@ -30,7 +30,7 @@ pub enum CargoPlacementStrategy {
 
 /// Resource requirements for the cargo
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -44,19 +44,43 @@ pub struct CargoResourceRequirementSpec {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub cpu: Option<usize>,
+  pub cpu_cores: Option<usize>,
+  /// Maximum allowed average CPU utilization on a target node (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu_utilization_cap: Option<f32>,
   /// Memory requirement in bytes
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub memory: Option<usize>,
+  pub memory_bytes: Option<usize>,
+  /// Maximum allowed average Memory utilization on a target node (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory_utilization_cap: Option<f32>,
+  /// Optional weight for CPU in balanced placement (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu_weight: Option<f32>,
+  /// Optional weight for Memory in balanced placement (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory_weight: Option<f32>,
   /// Storage requirement in bytes
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub storage: Option<usize>,
+  pub storage_bytes: Option<usize>,
 }
 
 /// Generic constraint operator for node selection
