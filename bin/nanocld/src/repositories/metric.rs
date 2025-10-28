@@ -120,7 +120,7 @@ impl MetricDb {
                    ROW_NUMBER() OVER(PARTITION BY node_name ORDER BY created_at DESC) AS rn
             FROM metrics
             WHERE kind = 'nanocl.io/metrs'
-              AND ($9::bigint IS NULL OR created_at >= NOW() - make_interval(secs => $9::double precision))
+              AND ($9::bigint IS NULL OR created_at >= NOW() - (($9::double precision)::text || ' seconds')::interval)
           ), Stats AS (
             SELECT
               node_name,
@@ -258,7 +258,7 @@ impl MetricDb {
                    ROW_NUMBER() OVER(PARTITION BY node_name ORDER BY created_at DESC) AS rn
             FROM metrics
             WHERE kind = 'nanocl.io/metrs'
-              AND ($7::bigint IS NULL OR created_at >= NOW() - make_interval(secs => $7::double precision))
+              AND ($7::bigint IS NULL OR created_at >= NOW() - (($7::double precision)::text || ' seconds')::interval)
           ), Stats AS (
             SELECT
               node_name,
