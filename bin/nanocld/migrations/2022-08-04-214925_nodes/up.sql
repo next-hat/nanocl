@@ -8,15 +8,6 @@ CREATE TABLE IF NOT EXISTS "nodes" (
   "metadata" JSONB
 );
 
-CREATE TABLE IF NOT EXISTS "node_groups" (
-  "name" VARCHAR NOT NULL UNIQUE PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS "node_group_links" (
-  "node_name" VARCHAR NOT NULL REFERENCES "nodes" ("name"),
-  "node_group_name" VARCHAR NOT NULL REFERENCES "node_groups" ("name")
-);
-
 CREATE INDEX "nodes_name_idx" ON "nodes" ("name");
 CREATE INDEX "nodes_created_at_idx" ON "nodes" ("created_at");
 CREATE INDEX "nodes_ip_address_idx" ON "nodes" ("ip_address");

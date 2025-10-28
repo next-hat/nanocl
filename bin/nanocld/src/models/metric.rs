@@ -103,4 +103,9 @@ pub struct CapacityQuery {
   pub limit: usize,
   /// When Some, indicates that balanced strategy should be used with these weights
   pub weights: Option<BalanceWeights>,
+  /// Generic metadata constraints (require): Eq on path segments -> value
+  /// Example: path ["regions"], value "eu-west-1"
+  pub require_constraints_eq: Vec<(Vec<String>, String)>,
+  /// Generic metadata constraints (require): Ne on path segments -> value
+  pub require_constraints_ne: Vec<(Vec<String>, String)>,
 }

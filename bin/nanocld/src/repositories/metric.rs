@@ -96,8 +96,24 @@ impl MetricDb {
     let recency = query.recency_seconds;
     let storage_opt: Option<i64> =
       query.storage_bytes_required.map(|x| x as i64);
+    // Clone dynamic constraints to move into blocking closure (as JSONB arrays)
+    let require_eq_json = serde_json::Value::Array(
+      query
+        .require_constraints_eq
+        .iter()
+        .map(|(path, val)| serde_json::json!({"path": path, "value": val}))
+        .collect(),
+    );
+    let require_ne_json = serde_json::Value::Array(
+      query
+        .require_constraints_ne
+        .iter()
+        .map(|(path, val)| serde_json::json!({"path": path, "value": val}))
+        .collect(),
+    );
     let node_names = ntex::rt::spawn_blocking(move || {
-      let sql = sql_query(
+      // Build SQL with dynamic metadata constraints pushed down
+      let mut sql_txt = String::from(
         "
           WITH Latest AS (
             SELECT node_name, data,
@@ -134,8 +150,9 @@ impl MetricDb {
               END AS mem_used_ratio
             FROM Stats
           )
-          SELECT node_name
-          FROM Enriched
+          SELECT n.name AS node_name
+          FROM Enriched e
+          JOIN nodes n ON n.name = e.node_name
           WHERE
             ($1::double precision IS NULL OR ((1.0 - COALESCE(avg_cpu, 0.0)) * GREATEST(cores, 1)::double precision) >= $1::double precision)
             AND ($2::bigint IS NULL OR (mem_total IS NOT NULL AND mem_used IS NOT NULL AND (mem_total - mem_used) >= $2::bigint))
@@ -147,26 +164,37 @@ impl MetricDb {
               )
             )
             AND ($8::bigint IS NULL OR (disks_avail_total IS NOT NULL AND disks_avail_total >= $8::bigint))
-          ORDER BY
+        ",
+      );
+      // Append dynamic constraints via JSONB arrays of {path, value}
+      sql_txt.push_str(
+        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($10::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> (ARRAY(SELECT jsonb_array_elements_text(c->'path')))) = (c->>'value'), FALSE)\n                OR COALESCE((n.metadata #> (ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ) ? (c->>'value'), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($11::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> (ARRAY(SELECT jsonb_array_elements_text(c->'path')))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT ((n.metadata #> (ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ) ? (c->>'value')), TRUE)\n              )\n            )",
+      );
+      // Order and limit
+      sql_txt.push_str(
+        "\n          ORDER BY
             (COALESCE(avg_cpu, 0.0) * $5::double precision)
             + (COALESCE(mem_used_ratio, 0.0) * $6::double precision) ASC,
             avg_cpu ASC
-          LIMIT $7
-        ",
+          LIMIT $7",
       );
+  let sql = sql_query(sql_txt);
       let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
-      use diesel::sql_types::{BigInt, Float, Nullable};
-      let node_names = sql
+      use diesel::sql_types::{BigInt, Float, Jsonb, Nullable};
+      // Static binds
+      let sql = sql
         .bind::<Nullable<Float>, _>(cpu_opt)
         .bind::<Nullable<BigInt>, _>(mem_opt)
         .bind::<Nullable<Float>, _>(cpu_cap_opt)
         .bind::<Nullable<Float>, _>(mem_cap_opt)
         .bind::<Float, _>(w_cpu)
         .bind::<Float, _>(w_mem)
-  .bind::<BigInt, _>(limit_i64)
-  .bind::<Nullable<BigInt>, _>(storage_opt)
-  .bind::<Nullable<BigInt>, _>(recency)
-        .get_results::<MetricNodeDb>(&mut conn)
+        .bind::<BigInt, _>(limit_i64)
+        .bind::<Nullable<BigInt>, _>(storage_opt)
+        .bind::<Nullable<BigInt>, _>(recency)
+        .bind::<Jsonb, _>(require_eq_json)
+        .bind::<Jsonb, _>(require_ne_json);
+      let node_names = sql.get_results::<MetricNodeDb>(&mut conn)
         .map_err(|err| IoError::interrupted("Select nodes for capacity balanced", &err.to_string()))?;
       Ok::<_, IoError>(node_names)
     })
@@ -202,6 +230,20 @@ impl MetricDb {
     let recency = query.recency_seconds;
     let storage_opt: Option<i64> =
       query.storage_bytes_required.map(|x| x as i64);
+    let require_eq_json = serde_json::Value::Array(
+      query
+        .require_constraints_eq
+        .iter()
+        .map(|(path, val)| serde_json::json!({"path": path, "value": val}))
+        .collect(),
+    );
+    let require_ne_json = serde_json::Value::Array(
+      query
+        .require_constraints_ne
+        .iter()
+        .map(|(path, val)| serde_json::json!({"path": path, "value": val}))
+        .collect(),
+    );
     let node_names = ntex::rt::spawn_blocking(move || {
       // SQL notes:
       // - Latest picks last metric row per node for kind 'nanocl.io/metrs'
@@ -209,7 +251,7 @@ impl MetricDb {
       // - Filter ensures enough free CPU headroom: (1 - avg_cpu) >= cpu_required/cores
       // - Filter ensures enough free memory if provided
       // - Order by least loaded (avg_cpu ASC) and limit to requested number
-      let sql = sql_query(
+      let mut sql_txt = String::from(
         "
           WITH Latest AS (
             SELECT node_name, data,
@@ -234,8 +276,9 @@ impl MetricDb {
             FROM Latest
             WHERE rn = 1
           )
-          SELECT node_name
-          FROM Stats
+          SELECT n.name AS node_name
+          FROM Stats s
+          JOIN nodes n ON n.name = s.node_name
           WHERE
             -- CPU headroom condition (skipped when $1 is NULL)
             (
@@ -262,21 +305,29 @@ impl MetricDb {
               )
             )
             AND ($6::bigint IS NULL OR (disks_avail_total IS NOT NULL AND disks_avail_total >= $6::bigint))
-          ORDER BY avg_cpu ASC NULLS LAST
-          LIMIT $5
         ",
       );
+      // Append dynamic constraints through JSONB arrays ($8 eq, $9 ne)
+      sql_txt.push_str(
+        "\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($8::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> (ARRAY(SELECT jsonb_array_elements_text(c->'path')))) = (c->>'value'), FALSE)\n                OR COALESCE((n.metadata #> (ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ) ? (c->>'value'), FALSE)\n              )\n            )\n            AND NOT EXISTS (\n              SELECT 1 FROM jsonb_array_elements($9::jsonb) c\n              WHERE NOT (\n                COALESCE((n.metadata #>> (ARRAY(SELECT jsonb_array_elements_text(c->'path')))) IS DISTINCT FROM (c->>'value'), TRUE)\n                AND COALESCE(NOT ((n.metadata #> (ARRAY(SELECT jsonb_array_elements_text(c->'path'))) ) ? (c->>'value')), TRUE)\n              )\n            )",
+      );
+      // Order and limit
+      sql_txt.push_str("\n          ORDER BY avg_cpu ASC NULLS LAST\n          LIMIT $5");
+  let sql = sql_query(sql_txt);
       let mut conn = utils::store::get_pool_conn(&pool_ptr)?;
-      use diesel::sql_types::{BigInt, Float, Nullable};
-      let node_names = sql
+      use diesel::sql_types::{BigInt, Float, Jsonb, Nullable};
+      // Static binds first in order
+      let sql = sql
         .bind::<Nullable<Float>, _>(cpu_opt)
         .bind::<Nullable<BigInt>, _>(mem_opt)
         .bind::<Nullable<Float>, _>(cpu_cap_opt)
         .bind::<Nullable<Float>, _>(mem_cap_opt)
-  .bind::<BigInt, _>(limit_i64)
-  .bind::<Nullable<BigInt>, _>(storage_opt)
-  .bind::<Nullable<BigInt>, _>(recency)
-        .get_results::<MetricNodeDb>(&mut conn)
+        .bind::<BigInt, _>(limit_i64)
+        .bind::<Nullable<BigInt>, _>(storage_opt)
+        .bind::<Nullable<BigInt>, _>(recency)
+        .bind::<Jsonb, _>(require_eq_json)
+        .bind::<Jsonb, _>(require_ne_json);
+      let node_names = sql.get_results::<MetricNodeDb>(&mut conn)
         .map_err(|err| IoError::interrupted("Select nodes for capacity", &err.to_string()))?;
       Ok::<_, IoError>(node_names)
     })

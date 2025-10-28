@@ -2,6 +2,7 @@ use bollard_next::network::InspectNetworkOptions;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
+  cargo_spec::{ConstraintOp, NodeConstraint},
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
 };
@@ -241,28 +242,89 @@ pub async fn plan_selection(
       "memory_utilization_cap must be between 0.0 and 1.0",
     ));
   }
-  // Extract placement selectors (regions) for require/prefer
+  // Extract placement selectors & normalize to NodeConstraints; keep prefer regions for ordering
   let placement = cargo.spec.placement.as_ref();
-  let require_regions: Option<Vec<String>> = placement
-    .and_then(|p| p.require.as_ref())
+  let require_selector = placement.and_then(|p| p.require.as_ref());
+  let prefer_selector = placement.and_then(|p| p.prefer.as_ref());
+  // Build a unified list of required constraints from convenience fields + explicit constraints
+  let mut require_constraints: Vec<NodeConstraint> = Vec::new();
+  if let Some(sel) = require_selector {
+    // Expand convenience arrays into constraints on metadata arrays
+    if let Some(labels) = &sel.labels {
+      for v in labels {
+        require_constraints.push(NodeConstraint {
+          key: "labels".into(),
+          operator: ConstraintOp::Eq,
+          value: v.clone(),
+        });
+      }
+    }
+    if let Some(regions) = &sel.regions {
+      for v in regions {
+        require_constraints.push(NodeConstraint {
+          key: "regions".into(),
+          operator: ConstraintOp::Eq,
+          value: v.clone(),
+        });
+      }
+    }
+    if let Some(groups) = &sel.groups {
+      for v in groups {
+        require_constraints.push(NodeConstraint {
+          key: "groups".into(),
+          operator: ConstraintOp::Eq,
+          value: v.clone(),
+        });
+      }
+    }
+    if let Some(extra) = &sel.constraints {
+      require_constraints.extend_from_slice(extra);
+    }
+  }
+  // Prefer regions list for soft ordering
+  let prefer_regions: Vec<String> = prefer_selector
     .and_then(|s| s.regions.clone())
-    .or_else(|| placement.and_then(|p| p.regions.clone()));
-  let prefer_regions: Option<Vec<String>> = placement
-    .and_then(|p| p.prefer.as_ref())
-    .and_then(|s| s.regions.clone());
-  // Strategy hook (future): we can extend to Balanced/Distinct/UserDefined
+    .unwrap_or_default();
+  // Strategy hook (future): Balanced/Distinct/UserDefined
   // Select nodes via SQL with either least-loaded or balanced strategy.
-  // We fetch a small buffer above replicas to allow post-filtering by regions.
-  let prelimit = replicas.saturating_mul(5).max(5);
+  // We fetch a buffer above replicas to allow post-filtering by metadata constraints.
+  let prelimit = replicas.saturating_mul(10).max(10);
+  // Resolve strategy up-front for later logic (eg: Distinct enforcement)
+  let strategy = cargo
+    .spec
+    .placement
+    .as_ref()
+    .and_then(|p| p.strategy.clone())
+    .unwrap_or(nanocl_stubs::cargo_spec::CargoPlacementStrategy::LeastLoaded);
+  // Normalize NodeConstraints to SQL-friendly path/value tuples grouped by operator
+  let mut req_eq: Vec<(Vec<String>, String)> = Vec::new();
+  let mut req_ne: Vec<(Vec<String>, String)> = Vec::new();
+  for c in &require_constraints {
+    let path: Vec<String> = c.key.split('.').map(|s| s.to_string()).collect();
+    match c.operator {
+      ConstraintOp::Eq => req_eq.push((path, c.value.clone())),
+      ConstraintOp::Ne => req_ne.push((path, c.value.clone())),
+    }
+  }
   let mut nodes = {
-    let strategy = cargo
-      .spec
-      .placement
-      .as_ref()
-      .and_then(|p| p.strategy.clone())
-      .unwrap_or(nanocl_stubs::cargo_spec::CargoPlacementStrategy::LeastLoaded);
-
     match strategy {
+      nanocl_stubs::cargo_spec::CargoPlacementStrategy::Distinct => {
+        // Distinct: prefer at most one replica per node, but degrade gracefully
+        // If fewer nodes than replicas, we'll still place extras via round-robin later
+        let q = CapacityQuery {
+          cpu_cores_required: cpu_req,
+          mem_bytes_required: mem_req,
+          storage_bytes_required: storage_req,
+          cpu_utilization_cap: cpu_cap,
+          mem_utilization_cap: mem_cap,
+          recency_seconds: Some(METRIC_RECENCY_DEFAULT_SECS),
+          limit: prelimit,
+          weights: None,
+          require_constraints_eq: req_eq.clone(),
+          require_constraints_ne: req_ne.clone(),
+        };
+        MetricDb::select_nodes_for_capacity(&q, &state.inner.pool).await?
+      }
       nanocl_stubs::cargo_spec::CargoPlacementStrategy::Balanced => {
         // Derive and normalize weights from spec or defaults
         let (w_cpu, w_mem) = cargo
@@ -292,6 +354,8 @@ pub async fn plan_selection(
             cpu_weight: w_cpu,
             mem_weight: w_mem,
           }),
+          require_constraints_eq: req_eq.clone(),
+          require_constraints_ne: req_ne.clone(),
         };
         MetricDb::select_nodes_for_capacity_balanced(&q, &state.inner.pool)
           .await?
@@ -307,26 +371,15 @@ pub async fn plan_selection(
           recency_seconds: Some(METRIC_RECENCY_DEFAULT_SECS),
           limit: prelimit,
           weights: None,
+          require_constraints_eq: req_eq.clone(),
+          require_constraints_ne: req_ne.clone(),
         };
         MetricDb::select_nodes_for_capacity(&q, &state.inner.pool).await?
       }
     }
   };
-  // Hard filter by required regions if provided (based on node metadata)
-  if let Some(req_regions) = &require_regions {
-    let req_set: std::collections::HashSet<String> =
-      req_regions.iter().cloned().collect();
-    nodes.retain(|n| match &n.metadata {
-      Some(meta) => {
-        let region = meta.get("region").or_else(|| meta.get("Region"));
-        match region.and_then(|v| v.as_str()) {
-          Some(r) => req_set.contains(r),
-          None => false,
-        }
-      }
-      None => false,
-    });
-  }
+  // Distinct is best-effort: we do not fail if fewer nodes than replicas
+  // All filtering is now pushed down to SQL via CapacityQuery constraints
   if nodes.is_empty() {
     return Err(IoError::not_found(
       "PlanSelection",
@@ -334,16 +387,27 @@ pub async fn plan_selection(
     ));
   }
   // Soft preference: bring preferred regions first
-  if let Some(pref_regions) = &prefer_regions {
+  if !prefer_regions.is_empty() {
     let pref_set: std::collections::HashSet<String> =
-      pref_regions.iter().cloned().collect();
+      prefer_regions.iter().cloned().collect();
     nodes.sort_by_key(|n| {
       let is_pref = match &n.metadata {
         Some(meta) => {
-          let region = meta.get("region").or_else(|| meta.get("Region"));
-          match region.and_then(|v| v.as_str()) {
-            Some(r) => pref_set.contains(r),
-            None => false,
+          // Accept either single string Region/region or array Regions/regions
+          let direct = meta.get("region").or_else(|| meta.get("Region"));
+          if let Some(r) = direct.and_then(|v| v.as_str()) {
+            pref_set.contains(r)
+          } else if let Some(arr) = meta
+            .get("regions")
+            .or_else(|| meta.get("Regions"))
+            .and_then(|v| v.as_array())
+          {
+            arr
+              .iter()
+              .filter_map(|v| v.as_str())
+              .any(|r| pref_set.contains(r))
+          } else {
+            false
           }
         }
         None => false,
@@ -356,8 +420,7 @@ pub async fn plan_selection(
   if nodes.len() > replicas {
     nodes.truncate(replicas);
   }
-
-  // Compute round-robin assignments across selected nodes
+  // Compute assignments
   let n = nodes.len();
   if n == 0 {
     return Err(IoError::not_found(
@@ -365,20 +428,33 @@ pub async fn plan_selection(
       "No nodes available after filtering",
     ));
   }
-  let base = replicas / n;
-  let extra = replicas % n;
-  let mut assignments = Vec::with_capacity(n);
-  for (idx, node) in nodes.into_iter().enumerate() {
-    let mut count = base;
-    if idx < extra {
-      count += 1;
+  let assignments = if matches!(
+    strategy,
+    nanocl_stubs::cargo_spec::CargoPlacementStrategy::Distinct
+  ) {
+    // Strict distinct: at most one replica per node; if not enough nodes,
+    // only schedule up to the number of nodes and let the rest wait.
+    nodes
+      .into_iter()
+      .map(|node| SelectionAssignment { node, replicas: 1 })
+      .collect::<Vec<_>>()
+  } else {
+    // Default: round-robin distribution across selected nodes
+    let base = replicas / n;
+    let extra = replicas % n;
+    let mut acc = Vec::with_capacity(n);
+    for (idx, node) in nodes.into_iter().enumerate() {
+      let mut count = base;
+      if idx < extra {
+        count += 1;
+      }
+      acc.push(SelectionAssignment {
+        node,
+        replicas: count,
+      });
     }
-    assignments.push(SelectionAssignment {
-      node,
-      replicas: count,
-    });
-  }
-
+    acc
+  };
   Ok(SelectionPlan {
     total_replicas: replicas,
     assignments,
