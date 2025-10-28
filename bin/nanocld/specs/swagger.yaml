@@ -2548,6 +2548,7 @@ components:
           items:
             type: string
           description: Select by labels
+          default: null
         Regions:
           type:
           - array
@@ -2555,6 +2556,7 @@ components:
           items:
             type: string
           description: Select by regions
+          default: null
         Groups:
           type:
           - array
@@ -2562,6 +2564,7 @@ components:
           items:
             type: string
           description: Select by groups
+          default: null
         Cargoes:
           type:
           - array
@@ -2569,6 +2572,7 @@ components:
           items:
             type: string
           description: Select by cargoes running on the nodes
+          default: null
         Vms:
           type:
           - array
@@ -2576,6 +2580,15 @@ components:
           items:
             type: string
           description: Select by vms running on the nodes
+          default: null
+        Constraints:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/NodeConstraint'
+          description: Optional advanced constraints (key/operator/value)
+          default: null
       additionalProperties: false
     CargoPlacementSpec:
       type: object
@@ -2588,12 +2601,14 @@ components:
           - integer
           - 'null'
           description: Number of replicas to deploy on the selected nodes
+          default: null
           minimum: 0
         Strategy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementStrategy'
             description: Strategy to use to place the cargo on the nodes
+          default: null
         Regions:
           type:
           - array
@@ -2601,16 +2616,19 @@ components:
           items:
             type: string
           description: Regions to deploy the cargo
+          default: null
         Require:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: requirements to select nodes to deploy the cargo
+          default: null
         Prefer:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: preferences to select nodes to deploy the cargo
+          default: null
       additionalProperties: false
     CargoPlacementStrategy:
       oneOf:
@@ -2722,16 +2740,15 @@ components:
     CargoSpecPartial:
       type: object
       description: A cargo spec partial is used to create a Cargo
-      required:
-      - Name
-      - Container
       properties:
         Name:
           type: string
           description: Name of the cargo
+          default: ''
         Metadata:
           type: object
           description: Metadata of the cargo (user defined)
+          default: null
           additionalProperties:
             $ref: '#/components/schemas/Any'
           propertyNames:
@@ -2741,6 +2758,7 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the container
+          default: null
         Secrets:
           type:
           - array
@@ -2748,29 +2766,36 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          default: null
         ImagePullSecret:
           type:
           - string
           - 'null'
           description: Secret to use when pulling the image
+          default: null
         ImagePullPolicy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
             description: Image pull policy of the cargo
+          default: null
         Container:
-          $ref: '#/components/schemas/Config'
-          description: Container specification of the cargo
+          oneOf:
+          - $ref: '#/components/schemas/Config'
+            description: Container specification of the cargo
+          default: {}
         Placement:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSpec'
             description: Fine tune how the cargo is placed on the nodes
+          default: null
         ResourceRequirement:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
             description: Define minimal resource requirements for the cargo
+          default: null
       additionalProperties: false
     CargoSpecUpdate:
       type: object
@@ -2784,9 +2809,11 @@ components:
           - string
           - 'null'
           description: New name of the cargo
+          default: null
         Metadata:
           type: object
           description: New metadata of the cargo (user defined)
+          default: null
           additionalProperties:
             $ref: '#/components/schemas/Any'
           propertyNames:
@@ -2796,6 +2823,7 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the container
+          default: null
         Secrets:
           type:
           - array
@@ -2803,31 +2831,37 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          default: null
         ImagePullSecret:
           type:
           - string
           - 'null'
           description: Secret to use when pulling the image
+          default: null
         ImagePullPolicy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
             description: Image pull policy of the cargo
+          default: null
         Container:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: New container specification of the cargo
+          default: null
         Placement:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSpec'
             description: Fine tune how the cargo is placed on the nodes
+          default: null
         ResourceRequirement:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
             description: Define minimal resource requirements for the cargo
+          default: null
       additionalProperties: false
     CargoSummary:
       type: object
@@ -3106,6 +3140,14 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/NetworkingConfig_String'
             description: This container's networking configuration.
+    ConstraintOp:
+      type: string
+      description: |-
+        Generic constraint operator for node selection
+        Allows advanced matching beyond simple selectors
+      enum:
+      - Eq
+      - Ne
     ContainerConfig:
       type: object
       description: Configuration for a container that is portable between hosts.  When used as `ContainerConfig` field in an image, `ContainerConfig` is an optional field containing the configuration of the container that was last committed when creating the image.  Previous versions of Docker builder used this field to store build cache, and it is not in active use anymore.
@@ -6060,6 +6102,24 @@ components:
           description: Version of the node
         Metadata:
           description: User defined metadata
+    NodeConstraint:
+      type: object
+      description: Arbitrary node constraint expressed as key/operator/value
+      required:
+      - Key
+      - Operator
+      - Value
+      properties:
+        Key:
+          type: string
+          description: 'Constraint key (eg: "region", "label", "group", etc.)'
+        Operator:
+          $ref: '#/components/schemas/ConstraintOp'
+          description: Constraint operator (Eq/Ne)
+        Value:
+          type: string
+          description: Constraint value
+      additionalProperties: false
     ObjPsStatus:
       type: object
       required:

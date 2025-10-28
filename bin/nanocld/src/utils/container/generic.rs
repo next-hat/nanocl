@@ -1,14 +1,15 @@
 use bollard_next::network::InspectNetworkOptions;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
+  cargo::Cargo,
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
 };
 
 use crate::{
   models::{
-    CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb, ObjPsStatusUpdate, SystemState,
-    VmDb,
+    CargoDb, JobDb, JobUpdateDb, MetricDb, NodeDb, ObjPsStatusDb,
+    ObjPsStatusUpdate, SystemState, VmDb,
   },
   repositories::generic::*,
 };
@@ -177,4 +178,93 @@ pub async fn inject_data(
   let gateway_addr = network.gateway.clone().unwrap_or_default();
   let new_data = payload.replace("$$INTERNAL_GATEWAY", &gateway_addr);
   Ok(new_data)
+}
+
+/// Plan node selection for a cargo based on placement and resource requirements.
+/// This function relies on SQL queries over metrics to avoid loading all nodes in memory.
+/// Returns a list of candidate nodes ordered by the chosen strategy (currently least-loaded first).
+pub async fn plan_selection(
+  cargo: &Cargo,
+  state: &SystemState,
+) -> IoResult<Vec<NodeDb>> {
+  // Determine desired replicas (default: 1)
+  let replicas = cargo
+    .spec
+    .placement
+    .as_ref()
+    .and_then(|p| p.replicas)
+    .unwrap_or(1)
+    .max(1);
+  // Extract minimal resource requirements (CPU cores, memory bytes)
+  let (cpu_req, mem_req) = cargo
+    .spec
+    .resource_requirement
+    .as_ref()
+    .map(|r| (r.cpu, r.memory))
+    .unwrap_or((None, None));
+  // Extract placement selectors (regions) for require/prefer
+  let placement = cargo.spec.placement.as_ref();
+  let require_regions: Option<Vec<String>> = placement
+    .and_then(|p| p.require.as_ref())
+    .and_then(|s| s.regions.clone())
+    .or_else(|| placement.and_then(|p| p.regions.clone()));
+  let prefer_regions: Option<Vec<String>> = placement
+    .and_then(|p| p.prefer.as_ref())
+    .and_then(|s| s.regions.clone());
+  // Strategy hook (future): we can extend to Balanced/Distinct/UserDefined
+  // For now, we select least-loaded nodes that satisfy capacity using SQL.
+  // We fetch a small buffer above replicas to allow post-filtering by regions.
+  let prelimit = replicas.saturating_mul(5).max(5);
+  let mut nodes = MetricDb::select_nodes_for_capacity(
+    cpu_req,
+    mem_req,
+    prelimit,
+    &state.inner.pool,
+  )
+  .await?;
+  // Hard filter by required regions if provided (based on node metadata)
+  if let Some(req_regions) = &require_regions {
+    let req_set: std::collections::HashSet<String> =
+      req_regions.iter().cloned().collect();
+    nodes.retain(|n| match &n.metadata {
+      Some(meta) => {
+        let region = meta.get("region").or_else(|| meta.get("Region"));
+        match region.and_then(|v| v.as_str()) {
+          Some(r) => req_set.contains(r),
+          None => false,
+        }
+      }
+      None => false,
+    });
+  }
+  if nodes.is_empty() {
+    return Err(IoError::not_found(
+      "PlanSelection",
+      "No nodes match resource requirements",
+    ));
+  }
+  // Soft preference: bring preferred regions first
+  if let Some(pref_regions) = &prefer_regions {
+    let pref_set: std::collections::HashSet<String> =
+      pref_regions.iter().cloned().collect();
+    nodes.sort_by_key(|n| {
+      let is_pref = match &n.metadata {
+        Some(meta) => {
+          let region = meta.get("region").or_else(|| meta.get("Region"));
+          match region.and_then(|v| v.as_str()) {
+            Some(r) => pref_set.contains(r),
+            None => false,
+          }
+        }
+        None => false,
+      };
+      // Preferred first
+      if is_pref { 0 } else { 1 }
+    });
+  }
+  // Truncate to replicas count
+  if nodes.len() > replicas {
+    nodes.truncate(replicas);
+  }
+  Ok(nodes)
 }

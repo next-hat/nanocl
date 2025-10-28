@@ -2,7 +2,7 @@ mod cargo;
 mod distributed_mutex;
 mod event;
 mod job;
-mod metric;
+pub mod metric;
 mod namespace;
 mod node;
 mod object_process_status;

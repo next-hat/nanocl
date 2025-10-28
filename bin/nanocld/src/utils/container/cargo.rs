@@ -263,8 +263,7 @@ pub async fn create(
 
 /// Start cargo instances
 ///
-pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+pub async fn start(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
     "data",
     GenericClause::Contains(serde_json::json!({
@@ -303,19 +302,14 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   .await?;
   if let Some(init_container) = &cargo.spec.init_container {
     if init_process.is_empty() {
-      let process =
-        create_init_container(&cargo, init_container, state).await?;
+      let process = create_init_container(cargo, init_container, state).await?;
       start_init_container(&process, state).await?;
     } else {
       start_init_container(&init_process[0], state).await?;
     }
   }
-  // TODO: FIND BEST NODES TO RUN WORKLOAD
-  // let nodes =
-  //   MetricDb::find_best_nodes(90.0, 90.0, 100, &state.inner.pool).await?;
-  // log::debug!("BEST NODES FOR CARGO {key}: {nodes:?}");
   if processes.is_empty() {
-    create(&cargo, 1, state).await?;
+    create(cargo, 1, state).await?;
   }
   super::process::start_instances(
     &cargo.spec.cargo_key,

@@ -3,6 +3,7 @@ use nanocl_stubs::{process::ProcessKind, system::EventActorKind};
 
 use crate::{
   models::{CargoDb, SystemState},
+  repositories::generic::*,
   utils,
 };
 
@@ -20,7 +21,20 @@ impl ObjTaskStart for CargoDb {
     let state = state.clone();
     Box::pin(async move {
       let mutex = CargoDb::create_mutex(&key, "start", &state).await?;
-      utils::container::cargo::start(&key, &state).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+      let selected_nodes =
+        utils::container::generic::plan_selection(&cargo, &state).await?;
+      for node_selected in selected_nodes {
+        if node_selected.name == state.inner.config.hostname {
+          utils::container::cargo::start(&cargo, &state).await?;
+        } else {
+          log::warn!(
+            "Call a remote node to start cargo {} not yet implemented",
+            &key
+          );
+        }
+      }
       CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })

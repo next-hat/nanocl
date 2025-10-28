@@ -59,8 +59,19 @@ pub struct CargoResourceRequirementSpec {
   pub storage: Option<usize>,
 }
 
-/// Way to select specific or preferred nodes to place the cargo
-///
+/// Generic constraint operator for node selection
+/// Allows advanced matching beyond simple selectors
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum ConstraintOp {
+  Eq,
+  Ne,
+}
+
+/// Arbitrary node constraint expressed as key/operator/value
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -68,6 +79,25 @@ pub struct CargoResourceRequirementSpec {
 #[cfg_attr(
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct NodeConstraint {
+  /// Constraint key (eg: "region", "label", "group", etc.)
+  pub key: String,
+  /// Constraint operator (Eq/Ne)
+  pub operator: ConstraintOp,
+  /// Constraint value
+  pub value: String,
+}
+
+/// Way to select specific or preferred nodes to place the cargo
+///
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoPlacementSelectorSpec {
   /// Select by labels
@@ -100,18 +130,24 @@ pub struct CargoPlacementSelectorSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub vms: Option<Vec<String>>,
+  /// Optional advanced constraints (key/operator/value)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub constraints: Option<Vec<NodeConstraint>>,
 }
 
 /// Structure to control the placement of the cargo
 /// It can be used to define on which nodes the cargo will be deployed
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoPlacementSpec {
   /// Number of replicas to deploy on the selected nodes
@@ -153,7 +189,7 @@ pub struct CargoPlacementSpec {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoSpecPartial {
   /// Name of the cargo
@@ -215,7 +251,7 @@ pub struct CargoSpecPartial {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoSpecUpdate {
   /// New name of the cargo
