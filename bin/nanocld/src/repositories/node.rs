@@ -1,8 +1,8 @@
-use std::{collections::HashMap, net::IpAddr};
+use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 
 use nanocl_stubs::generic::GenericFilter;
 
@@ -81,19 +81,8 @@ impl NodeDb {
   }
 
   pub async fn register(state: &SystemState) -> IoResult<()> {
-    let ip_address =
-      state
-        .inner
-        .config
-        .gateway
-        .parse::<IpAddr>()
-        .map_err(|err| {
-          IoError::invalid_data("Invalid gateway", err.to_string().as_str())
-        })?;
-    let ip_address = ipnet::IpNet::from(ip_address);
     let node = NodeDb {
       name: state.inner.config.hostname.clone(),
-      ip_address,
       endpoint: state.inner.config.advertise_addr.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       version: vars::VERSION.to_owned(),

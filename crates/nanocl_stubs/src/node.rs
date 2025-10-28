@@ -11,9 +11,6 @@ pub struct Node {
   pub name: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
-  /// The ip address of the node
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
-  pub ip_address: ipnet::IpNet,
   /// Endpoint to connect to the node
   pub endpoint: String,
   /// Version of the node

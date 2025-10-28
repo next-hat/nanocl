@@ -76,7 +76,6 @@ diesel::table! {
     nodes (name) {
         name -> Varchar,
         created_at -> Timestamptz,
-        ip_address -> Inet,
         endpoint -> Varchar,
         version -> Varchar,
         metadata -> Nullable<Jsonb>,

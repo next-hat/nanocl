@@ -25,8 +25,6 @@ pub enum NodeCommand {
 pub struct NodeRow {
   /// Name of the node
   pub name: String,
-  /// IP address of the node
-  pub ip_address: String,
   /// Endpoint of the node
   pub endpoint: String,
   /// Version of the node
@@ -41,7 +39,6 @@ impl From<Node> for NodeRow {
     let created_at = node.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
     Self {
       name: node.name,
-      ip_address: node.ip_address.to_string(),
       endpoint: node.endpoint,
       version: node.version,
       created_at,

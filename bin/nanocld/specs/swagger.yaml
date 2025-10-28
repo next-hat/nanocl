@@ -6104,7 +6104,6 @@ components:
       required:
       - Name
       - CreatedAt
-      - IpAddress
       - Endpoint
       - Version
       properties:
@@ -6115,9 +6114,6 @@ components:
           type: string
           format: date-time
           description: The created at date
-        IpAddress:
-          type: string
-          description: The ip address of the node
         Endpoint:
           type: string
           description: Endpoint to connect to the node
