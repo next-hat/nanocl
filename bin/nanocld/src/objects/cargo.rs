@@ -237,7 +237,16 @@ impl ObjPatchByPk for CargoDb {
       } else {
         cargo.spec.init_container
       },
-      replication: obj.spec.replication.clone(),
+      placement: if obj.spec.placement.is_some() {
+        obj.spec.placement.clone()
+      } else {
+        cargo.spec.placement
+      },
+      resource_requirement: if obj.spec.resource_requirement.is_some() {
+        obj.spec.resource_requirement.clone()
+      } else {
+        cargo.spec.resource_requirement
+      },
       secrets: if obj.spec.secrets.is_some() {
         obj.spec.secrets.clone()
       } else {

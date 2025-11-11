@@ -73,24 +73,9 @@ diesel::table! {
 }
 
 diesel::table! {
-    node_group_links (rowid) {
-        node_name -> Varchar,
-        node_group_name -> Varchar,
-        rowid -> Int8,
-    }
-}
-
-diesel::table! {
-    node_groups (name) {
-        name -> Varchar,
-    }
-}
-
-diesel::table! {
     nodes (name) {
         name -> Varchar,
         created_at -> Timestamptz,
-        ip_address -> Inet,
         endpoint -> Varchar,
         version -> Varchar,
         metadata -> Nullable<Jsonb>,
@@ -192,8 +177,6 @@ diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
-diesel::joinable!(node_group_links -> node_groups (node_group_name));
-diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
@@ -209,8 +192,6 @@ diesel::allow_tables_to_appear_in_same_query!(
   jobs,
   metrics,
   namespaces,
-  node_group_links,
-  node_groups,
   nodes,
   object_process_statuses,
   processes,

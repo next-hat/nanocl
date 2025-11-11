@@ -11,7 +11,6 @@ use bollard_next::{
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
-  cargo_spec::ReplicationMode,
   generic::{GenericClause, GenericFilter},
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
@@ -264,8 +263,11 @@ pub async fn create(
 
 /// Start cargo instances
 ///
-pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+pub async fn start(
+  cargo: &Cargo,
+  replicas: usize,
+  state: &SystemState,
+) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
     "data",
     GenericClause::Contains(serde_json::json!({
@@ -304,23 +306,14 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   .await?;
   if let Some(init_container) = &cargo.spec.init_container {
     if init_process.is_empty() {
-      let process =
-        create_init_container(&cargo, init_container, state).await?;
+      let process = create_init_container(cargo, init_container, state).await?;
       start_init_container(&process, state).await?;
     } else {
       start_init_container(&init_process[0], state).await?;
     }
   }
-  // TODO: FIND BEST NODES TO RUN WORKLOAD
-  // let nodes =
-  //   MetricDb::find_best_nodes(90.0, 90.0, 100, &state.inner.pool).await?;
-  // log::debug!("BEST NODES FOR CARGO {key}: {nodes:?}");
   if processes.is_empty() {
-    let number = match &cargo.spec.replication {
-      Some(ReplicationMode::Static(replication)) => replication.number,
-      _ => 1,
-    };
-    create(&cargo, number, state).await?;
+    create(cargo, replicas, state).await?;
   }
   super::process::start_instances(
     &cargo.spec.cargo_key,
@@ -373,16 +366,12 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     .await
     .into_iter()
     .collect::<IoResult<Vec<_>>>()?;
-  let number = match &cargo.spec.replication {
-    Some(ReplicationMode::Static(replication)) => replication.number,
-    _ => 1,
-  };
   // Create instance with the new spec
   if let Some(init_container) = &cargo.spec.init_container {
     let process = create_init_container(&cargo, init_container, state).await?;
     start_init_container(&process, state).await?;
   }
-  let new_instances = match create(&cargo, number, state).await {
+  let new_instances = match create(&cargo, 1, state).await {
     Err(err) => {
       log::error!(
         "Unable to create cargo instance {} : {err}",

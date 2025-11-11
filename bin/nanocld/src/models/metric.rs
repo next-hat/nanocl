@@ -81,3 +81,31 @@ impl From<&MetricNodePartial> for MetricDb {
 pub struct MetricNodeDb {
   pub node_name: String,
 }
+
+/// Weights used by the balanced node selection strategy
+#[derive(Debug, Clone)]
+pub struct BalanceWeights {
+  pub cpu_weight: f32,
+  pub mem_weight: f32,
+}
+
+/// Query parameters for capacity-based node selection.
+/// This bundles optional requirements, caps, recency window and limit,
+/// and optionally the weights for the balanced strategy.
+#[derive(Debug, Clone)]
+pub struct CapacityQuery {
+  pub cpu_cores_required: Option<usize>,
+  pub mem_bytes_required: Option<usize>,
+  pub storage_bytes_required: Option<usize>,
+  pub cpu_utilization_cap: Option<f32>,
+  pub mem_utilization_cap: Option<f32>,
+  pub recency_seconds: Option<i64>,
+  pub limit: usize,
+  /// When Some, indicates that balanced strategy should be used with these weights
+  pub weights: Option<BalanceWeights>,
+  /// Generic metadata constraints (require): Eq on path segments -> value
+  /// Example: path ["regions"], value "eu-west-1"
+  pub require_constraints_eq: Vec<(Vec<String>, String)>,
+  /// Generic metadata constraints (require): Ne on path segments -> value
+  pub require_constraints_ne: Vec<(Vec<String>, String)>,
+}

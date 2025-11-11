@@ -2536,9 +2536,162 @@ components:
         signal:
           type: string
           description: 'Signal to send to the container default: SIGKILL'
+    CargoPlacementSelectorSpec:
+      type: object
+      description: |
+        Way to select specific or preferred nodes to place the cargo
+      properties:
+        Labels:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Select by labels
+          default: null
+        Regions:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Select by regions
+          default: null
+        Groups:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Select by groups
+          default: null
+        Cargoes:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Select by cargoes running on the nodes
+          default: null
+        Vms:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Select by vms running on the nodes
+          default: null
+        Constraints:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/NodeConstraint'
+          description: Optional advanced constraints (key/operator/value)
+          default: null
+      additionalProperties: false
+    CargoPlacementSpec:
+      type: object
+      description: |
+        Structure to control the placement of the cargo
+        It can be used to define on which nodes the cargo will be deployed
+      properties:
+        Replicas:
+          type:
+          - integer
+          - 'null'
+          description: Number of replicas to deploy on the selected nodes
+          default: null
+          minimum: 0
+        Strategy:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoPlacementStrategy'
+            description: Strategy to use to place the cargo on the nodes
+          default: null
+        Regions:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Regions to deploy the cargo
+          default: null
+        Require:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
+            description: requirements to select nodes to deploy the cargo
+          default: null
+        Prefer:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
+            description: preferences to select nodes to deploy the cargo
+          default: null
+      additionalProperties: false
+    CargoPlacementStrategy:
+      oneOf:
+      - type: 'null'
+        default: null
+      - type: 'null'
+        default: null
+      - type: 'null'
+        default: null
+      - type: string
+      description: |
+        Enum to define the strategy to place the cargo on the nodes
+    CargoResourceRequirementSpec:
+      type: object
+      description: |
+        Resource requirements for the cargo
+      properties:
+        CpuCores:
+          type:
+          - integer
+          - 'null'
+          description: CPU requirement in number of cores
+          minimum: 0
+        CpuUtilizationCap:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Maximum allowed average CPU utilization on a target node (0.0 - 1.0)
+        MemoryBytes:
+          type:
+          - integer
+          - 'null'
+          description: Memory requirement in bytes
+          minimum: 0
+        MemoryUtilizationCap:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Maximum allowed average Memory utilization on a target node (0.0 - 1.0)
+        CpuWeight:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Optional weight for CPU in balanced placement (0.0 - 1.0)
+        MemoryWeight:
+          type:
+          - number
+          - 'null'
+          format: float
+          description: Optional weight for Memory in balanced placement (0.0 - 1.0)
+        StorageBytes:
+          type:
+          - integer
+          - 'null'
+          description: Storage requirement in bytes
+          minimum: 0
+      additionalProperties: false
     CargoSpec:
       type: object
-      description: |-
+      description: |
         A cargo spec is the specification of a cargo
         It used to know the state of the cargo
         It keep tracking of an history when you patch an existing cargo
@@ -2599,24 +2752,27 @@ components:
         Container:
           $ref: '#/components/schemas/Config'
           description: Container specification of the cargo
-        Replication:
+        Placement:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/ReplicationMode'
-            description: Replication specification of the cargo
+          - $ref: '#/components/schemas/CargoPlacementSpec'
+            description: Fine tune how the cargo is placed on the nodes
+        ResourceRequirement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
     CargoSpecPartial:
       type: object
       description: A cargo spec partial is used to create a Cargo
-      required:
-      - Name
-      - Container
       properties:
         Name:
           type: string
           description: Name of the cargo
+          default: ''
         Metadata:
           type: object
           description: Metadata of the cargo (user defined)
+          default: null
           additionalProperties:
             $ref: '#/components/schemas/Any'
           propertyNames:
@@ -2626,6 +2782,7 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the container
+          default: null
         Secrets:
           type:
           - array
@@ -2633,28 +2790,40 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          default: null
         ImagePullSecret:
           type:
           - string
           - 'null'
           description: Secret to use when pulling the image
+          default: null
         ImagePullPolicy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
             description: Image pull policy of the cargo
+          default: null
         Container:
-          $ref: '#/components/schemas/Config'
-          description: Container specification of the cargo
-        Replication:
+          oneOf:
+          - $ref: '#/components/schemas/Config'
+            description: Container specification of the cargo
+          default: {}
+        Placement:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/ReplicationMode'
-            description: Replication specification of the cargo
+          - $ref: '#/components/schemas/CargoPlacementSpec'
+            description: Fine tune how the cargo is placed on the nodes
+          default: null
+        ResourceRequirement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
+            description: Define minimal resource requirements for the cargo
+          default: null
       additionalProperties: false
     CargoSpecUpdate:
       type: object
-      description: |-
+      description: |
         Payload used to patch a cargo
         It will create a new [CargoSpec](CargoSpec) with the new values
         It will keep the old values in the history
@@ -2664,9 +2833,11 @@ components:
           - string
           - 'null'
           description: New name of the cargo
+          default: null
         Metadata:
           type: object
           description: New metadata of the cargo (user defined)
+          default: null
           additionalProperties:
             $ref: '#/components/schemas/Any'
           propertyNames:
@@ -2676,6 +2847,7 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the container
+          default: null
         Secrets:
           type:
           - array
@@ -2683,26 +2855,37 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          default: null
         ImagePullSecret:
           type:
           - string
           - 'null'
           description: Secret to use when pulling the image
+          default: null
         ImagePullPolicy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
             description: Image pull policy of the cargo
+          default: null
         Container:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: New container specification of the cargo
-        Replication:
+          default: null
+        Placement:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/ReplicationMode'
-            description: New replication specification of the cargo
+          - $ref: '#/components/schemas/CargoPlacementSpec'
+            description: Fine tune how the cargo is placed on the nodes
+          default: null
+        ResourceRequirement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
+            description: Define minimal resource requirements for the cargo
+          default: null
       additionalProperties: false
     CargoSummary:
       type: object
@@ -2981,6 +3164,14 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/NetworkingConfig_String'
             description: This container's networking configuration.
+    ConstraintOp:
+      type: string
+      description: |-
+        Generic constraint operator for node selection
+        Allows advanced matching beyond simple selectors
+      enum:
+      - Eq
+      - Ne
     ContainerConfig:
       type: object
       description: Configuration for a container that is portable between hosts.  When used as `ContainerConfig` field in an image, `ContainerConfig` is an optional field containing the configuration of the container that was last committed when creating the image.  Previous versions of Docker builder used this field to store build cache, and it is not in active use anymore.
@@ -5913,7 +6104,6 @@ components:
       required:
       - Name
       - CreatedAt
-      - IpAddress
       - Endpoint
       - Version
       properties:
@@ -5924,9 +6114,6 @@ components:
           type: string
           format: date-time
           description: The created at date
-        IpAddress:
-          type: string
-          description: The ip address of the node
         Endpoint:
           type: string
           description: Endpoint to connect to the node
@@ -5935,6 +6122,24 @@ components:
           description: Version of the node
         Metadata:
           description: User defined metadata
+    NodeConstraint:
+      type: object
+      description: Arbitrary node constraint expressed as key/operator/value
+      required:
+      - Key
+      - Operator
+      - Value
+      properties:
+        Key:
+          type: string
+          description: 'Constraint key (eg: "region", "label", "group", etc.)'
+        Operator:
+          $ref: '#/components/schemas/ConstraintOp'
+          description: Constraint operator (Eq/Ne)
+        Value:
+          type: string
+          description: Constraint value
+      additionalProperties: false
     ObjPsStatus:
       type: object
       required:
@@ -6390,139 +6595,6 @@ components:
           items:
             type: string
           description: List of registry URLs that act as a mirror for the official (`docker.io`) registry.
-    ReplicationMode:
-      oneOf:
-      - type: object
-        description: |-
-          Auto is used to automatically define that the number of replicas in the cluster
-          This will ensure at least 1 replica exists in the cluster
-          And automatically add more replicas in the cluster if needed for redundancy
-        required:
-        - Mode
-        properties:
-          Mode:
-            type: string
-            enum:
-            - Auto
-      - type: object
-        description: Unique is used to ensure that only one replica exists in the cluster
-        required:
-        - Mode
-        properties:
-          Mode:
-            type: string
-            enum:
-            - Unique
-      - type: object
-        description: UniqueByNode is used to ensure one replica is running on each node
-        required:
-        - Mode
-        properties:
-          Mode:
-            type: string
-            enum:
-            - UniqueByNode
-      - type: object
-        description: UniqueByNodeGroups is used to ensure one replica is running on each node group
-        required:
-        - groups
-        - Mode
-        properties:
-          groups:
-            type: array
-            items:
-              type: string
-          Mode:
-            type: string
-            enum:
-            - UniqueByNodeGroups
-      - type: object
-        description: UniqueByNodeNames is used to ensure one replica is running on each node name
-        required:
-        - names
-        - Mode
-        properties:
-          names:
-            type: array
-            items:
-              type: string
-          Mode:
-            type: string
-            enum:
-            - UniqueByNodeNames
-      - allOf:
-        - $ref: '#/components/schemas/ReplicationStatic'
-          description: Number is used to manually set the number of replicas in one node
-        - type: object
-          required:
-          - Mode
-          properties:
-            Mode:
-              type: string
-              enum:
-              - Static
-        description: Number is used to manually set the number of replicas in one node
-      - allOf:
-        - $ref: '#/components/schemas/ReplicationStatic'
-          description: NumberByNodes is used to manually set the number of replicas in each node
-        - type: object
-          required:
-          - Mode
-          properties:
-            Mode:
-              type: string
-              enum:
-              - StaticByNodes
-        description: NumberByNodes is used to manually set the number of replicas in each node
-      - type: object
-        description: NumberByNodeGroups is used to manually set the number of replicas in each node group
-        required:
-        - groups
-        - number
-        - Mode
-        properties:
-          groups:
-            type: array
-            items:
-              type: string
-          number:
-            type: integer
-            format: int64
-          Mode:
-            type: string
-            enum:
-            - StaticByNodeGroups
-      - type: object
-        description: NumberByNodeNames is used to manually set the number of replicas in each node name
-        required:
-        - names
-        - number
-        - Mode
-        properties:
-          names:
-            type: array
-            items:
-              type: string
-          number:
-            type: integer
-            format: int64
-          Mode:
-            type: string
-            enum:
-            - StaticByNodeNames
-      description: |-
-        Auto is used to automatically define that the number of replicas in the cluster
-        Number is used to manually set the number of replicas
-        Note: auto will ensure at least 1 replica exists in the cluster
-    ReplicationStatic:
-      type: object
-      required:
-      - Number
-      properties:
-        Number:
-          type: integer
-          minimum: 0
-      additionalProperties: false
     Resource:
       type: object
       description: |-

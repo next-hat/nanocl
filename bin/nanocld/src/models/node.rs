@@ -16,9 +16,7 @@ pub struct NodeDb {
   pub name: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
-  /// The ip address of the node
-  pub ip_address: ipnet::IpNet,
-  /// Endpoint to connect to the node
+  /// Endpoint to communicate with the node
   pub endpoint: String,
   /// Version of the node
   pub version: String,

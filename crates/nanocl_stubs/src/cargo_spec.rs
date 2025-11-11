@@ -11,40 +11,91 @@ use super::generic::Any;
 
 use crate::generic::ImagePullPolicy;
 
-/// Auto is used to automatically define that the number of replicas in the cluster
-/// Number is used to manually set the number of replicas
-/// Note: auto will ensure at least 1 replica exists in the cluster
+/// Enum to define the strategy to place the cargo on the nodes
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, tag = "Mode", rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", untagged)
 )]
-pub enum ReplicationMode {
-  /// Auto is used to automatically define that the number of replicas in the cluster
-  /// This will ensure at least 1 replica exists in the cluster
-  /// And automatically add more replicas in the cluster if needed for redundancy
-  Auto,
-  /// Unique is used to ensure that only one replica exists in the cluster
-  Unique,
-  /// UniqueByNode is used to ensure one replica is running on each node
-  UniqueByNode,
-  /// UniqueByNodeGroups is used to ensure one replica is running on each node group
-  UniqueByNodeGroups { groups: Vec<String> },
-  /// UniqueByNodeNames is used to ensure one replica is running on each node name
-  UniqueByNodeNames { names: Vec<String> },
-  /// Number is used to manually set the number of replicas in one node
-  Static(ReplicationStatic),
-  /// NumberByNodes is used to manually set the number of replicas in each node
-  StaticByNodes(ReplicationStatic),
-  /// NumberByNodeGroups is used to manually set the number of replicas in each node group
-  StaticByNodeGroups { groups: Vec<String>, number: i64 },
-  /// NumberByNodeNames is used to manually set the number of replicas in each node name
-  StaticByNodeNames { names: Vec<String>, number: i64 },
+pub enum CargoPlacementStrategy {
+  Distinct,
+  LeastLoaded,
+  Balanced,
+  UserDefined(String),
 }
 
+/// Resource requirements for the cargo
+///
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct CargoResourceRequirementSpec {
+  /// CPU requirement in number of cores
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu_cores: Option<usize>,
+  /// Maximum allowed average CPU utilization on a target node (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu_utilization_cap: Option<f32>,
+  /// Memory requirement in bytes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory_bytes: Option<usize>,
+  /// Maximum allowed average Memory utilization on a target node (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory_utilization_cap: Option<f32>,
+  /// Optional weight for CPU in balanced placement (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu_weight: Option<f32>,
+  /// Optional weight for Memory in balanced placement (0.0 - 1.0)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory_weight: Option<f32>,
+  /// Storage requirement in bytes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub storage_bytes: Option<usize>,
+}
+
+/// Generic constraint operator for node selection
+/// Allows advanced matching beyond simple selectors
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum ConstraintOp {
+  Eq,
+  Ne,
+}
+
+/// Arbitrary node constraint expressed as key/operator/value
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -53,8 +104,106 @@ pub enum ReplicationMode {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct ReplicationStatic {
-  pub number: usize,
+pub struct NodeConstraint {
+  /// Constraint key (eg: "region", "label", "group", etc.)
+  pub key: String,
+  /// Constraint operator (Eq/Ne)
+  pub operator: ConstraintOp,
+  /// Constraint value
+  pub value: String,
+}
+
+/// Way to select specific or preferred nodes to place the cargo
+///
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
+)]
+pub struct CargoPlacementSelectorSpec {
+  /// Select by labels
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub labels: Option<Vec<String>>,
+  /// Select by regions
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub regions: Option<Vec<String>>,
+  /// Select by groups
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub groups: Option<Vec<String>>,
+  /// Select by cargoes running on the nodes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cargoes: Option<Vec<String>>,
+  /// Select by vms running on the nodes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub vms: Option<Vec<String>>,
+  /// Optional advanced constraints (key/operator/value)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub constraints: Option<Vec<NodeConstraint>>,
+}
+
+/// Structure to control the placement of the cargo
+/// It can be used to define on which nodes the cargo will be deployed
+///
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
+)]
+pub struct CargoPlacementSpec {
+  /// Number of replicas to deploy on the selected nodes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replicas: Option<usize>,
+  /// Strategy to use to place the cargo on the nodes
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub strategy: Option<CargoPlacementStrategy>,
+  /// Regions to deploy the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub regions: Option<Vec<String>>,
+  /// requirements to select nodes to deploy the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub require: Option<CargoPlacementSelectorSpec>,
+  /// preferences to select nodes to deploy the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub prefer: Option<CargoPlacementSelectorSpec>,
 }
 
 /// A cargo spec partial is used to create a Cargo
@@ -64,7 +213,7 @@ pub struct ReplicationStatic {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoSpecPartial {
   /// Name of the cargo
@@ -102,24 +251,31 @@ pub struct CargoSpecPartial {
   pub image_pull_policy: Option<ImagePullPolicy>,
   /// Container specification of the cargo
   pub container: Config,
-  /// Replication specification of the cargo
+  /// Fine tune how the cargo is placed on the nodes
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub replication: Option<ReplicationMode>,
+  pub placement: Option<CargoPlacementSpec>,
+  /// Define minimal resource requirements for the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub resource_requirement: Option<CargoResourceRequirementSpec>,
 }
 
 /// Payload used to patch a cargo
 /// It will create a new [CargoSpec](CargoSpec) with the new values
 /// It will keep the old values in the history
+///
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
+  serde(deny_unknown_fields, rename_all = "PascalCase", default)
 )]
 pub struct CargoSpecUpdate {
   /// New name of the cargo
@@ -165,12 +321,18 @@ pub struct CargoSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub container: Option<Config>,
-  /// New replication specification of the cargo
+  /// Fine tune how the cargo is placed on the nodes
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub replication: Option<ReplicationMode>,
+  pub placement: Option<CargoPlacementSpec>,
+  /// Define minimal resource requirements for the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub resource_requirement: Option<CargoResourceRequirementSpec>,
 }
 
 impl From<CargoSpecPartial> for CargoSpecUpdate {
@@ -179,7 +341,8 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
       name: Some(spec.name),
       init_container: spec.init_container,
       container: Some(spec.container),
-      replication: spec.replication,
+      placement: spec.placement,
+      resource_requirement: spec.resource_requirement,
       metadata: spec.metadata,
       secrets: spec.secrets,
       image_pull_secret: spec.image_pull_secret,
@@ -191,6 +354,7 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
 /// A cargo spec is the specification of a cargo
 /// It used to know the state of the cargo
 /// It keep tracking of an history when you patch an existing cargo
+///
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -240,12 +404,18 @@ pub struct CargoSpec {
   pub image_pull_policy: Option<ImagePullPolicy>,
   /// Container specification of the cargo
   pub container: Config,
-  /// Replication specification of the cargo
+  /// Fine tune how the cargo is placed on the nodes
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub replication: Option<ReplicationMode>,
+  pub placement: Option<CargoPlacementSpec>,
+  //// Define minimal resource requirements for the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub resource_requirement: Option<CargoResourceRequirementSpec>,
 }
 
 impl From<CargoSpec> for CargoSpecPartial {
@@ -253,7 +423,8 @@ impl From<CargoSpec> for CargoSpecPartial {
     Self {
       init_container: spec.init_container,
       name: spec.name,
-      replication: spec.replication,
+      placement: spec.placement,
+      resource_requirement: spec.resource_requirement,
       container: spec.container,
       metadata: spec.metadata,
       secrets: spec.secrets,
