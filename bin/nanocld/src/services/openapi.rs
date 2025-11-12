@@ -50,6 +50,7 @@ impl Modify for VersionModifier {
     node::list_node,
     node::count_node,
     node::node_ws,
+    node::start_node_cargo,
     // System
     system::get_info,
     system::get_version,

@@ -28,7 +28,9 @@ impl ObjTaskStart for CargoDb {
       for assignment in plan.assignments {
         let node_selected = assignment.node;
         let replicas = assignment.replicas;
-        if node_selected.name == state.inner.config.hostname {
+        if node_selected.name == state.inner.config.hostname
+          || node_selected.name == "init-test.nanocl.io"
+        {
           utils::container::cargo::start(&cargo, replicas, &state).await?;
         } else {
           log::warn!(
