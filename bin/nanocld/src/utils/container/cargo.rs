@@ -450,11 +450,18 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
-/// Delete cargo instances and the cargo itself in the database
+/// Delete cargo instances only
 ///
-pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
+pub async fn delete_instances(key: &str, state: &SystemState) -> IoResult<()> {
+  let node_name = state.inner.config.hostname.clone();
+  let filter = GenericFilter::new()
+    .r#where("node_name", GenericClause::Eq(node_name.clone()));
   let processes =
-    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(key, Some(filter), &state.inner.pool).await?;
+  log::debug!(
+    "Deleting cargo instances {:?}",
+    processes.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
+  );
   for process in processes {
     let _ = state
       .inner
@@ -467,6 +474,13 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
       .remove_container(&process.key, None::<RemoveContainerOptions>)
       .await;
   }
+  Ok(())
+}
+
+/// Delete cargo instances and the cargo itself in the database
+///
+pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
+  delete_instances(key, state).await?;
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   CargoDb::clear_by_pk(key, &state.inner.pool).await?;
   state

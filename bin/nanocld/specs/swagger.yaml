@@ -875,6 +875,21 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Node'
+  /nodes/cargoes/start:
+    get:
+      tags:
+      - Nodes
+      summary: Start cargo instances on the node used for node to node communication
+      operationId: start_node_cargo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartNodeCargoParams'
+        required: true
+      responses:
+        '200':
+          description: Cargoes sucessfully started
   /nodes/count:
     get:
       tags:
@@ -7079,6 +7094,17 @@ components:
           - integer
           - 'null'
           description: The maximum size for a line of output. The default is 8 * 1024 (roughly 1024 characters).
+          minimum: 0
+    StartNodeCargoParams:
+      type: object
+      required:
+      - CargoKey
+      - Replicas
+      properties:
+        CargoKey:
+          type: string
+        Replicas:
+          type: integer
           minimum: 0
     Statefile:
       type: object

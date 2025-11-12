@@ -22,3 +22,22 @@ pub struct Node {
   )]
   pub metadata: Option<serde_json::Value>,
 }
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StartNodeCargoParams {
+  pub cargo_key: String,
+  pub replicas: usize,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct DeleteNodeCargoParams {
+  pub cargo_key: String,
+}
