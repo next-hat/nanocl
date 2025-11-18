@@ -2066,9 +2066,9 @@ checksum = "5e0826a989adedc2a244799e823aece04662b66609d96af8dff7ac6df9a8925d"
 
 [[package]]
 name = "ntex"
-version = "2.16.0"
+version = "2.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4b41d1af2e11a7c29499395c2505550507749c35b29fa4a31234130abdb2285"
+checksum = "483c0641500f9424a638bcc28f41d8a8f243351f222736a0e6814996ea105c74"
 dependencies = [
  "base64",
  "bitflags 2.10.0",
@@ -2106,9 +2106,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-bytes"
-version = "0.1.30"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d23b86ef2f4a947e29e959a61bdae71c9d52a80df02936a9992bc6dbda9ddb"
+checksum = "da68b58d622475c69e4f19e33d12f90b4acaff1939f134e09e9318ad8bc6fa74"
 dependencies = [
  "bitflags 2.10.0",
  "bytes",
@@ -2201,9 +2201,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-net"
-version = "2.8.1"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a53c65509e4e3abf6490514e98a570d4cbcdbf18628e9569a02cc1d47c1e29b9"
+checksum = "8954ded069d59412df14b4c4804c4c6b45631300fcd13376c08aa19b4043d3fd"
 dependencies = [
  "bitflags 2.10.0",
  "cfg-if",
@@ -2234,9 +2234,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-rt"
-version = "0.4.32"
+version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c30a11a3017f0bf2ea00d0bd6ba8f69e52906aa8c1f894a060341056d8b1eef8"
+checksum = "86073cb8a4ae37ca4d4a10a50fb8fc01e7a40973567d3e4f1dcbfb37039a97ce"
 dependencies = [
  "async-channel",
  "futures-timer",
