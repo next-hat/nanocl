@@ -3,7 +3,7 @@ FROM ubuntu:25.10
 USER root
 
 RUN apt-get update && \
-  apt-get install -y nginx nginx-common nginx-extras && \
+  apt-get install -y haproxy && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /tmp/* && \
   rm -rf /var/log/* && \

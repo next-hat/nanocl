@@ -8,14 +8,15 @@ if [ -z "$STATE_DIR" ]; then
   exit 1
 fi
 
-mkdir -p /var/log/nginx
+mkdir -p /run/haproxy
 
-## Test if STATE_DIR/nginx.conf exists
-if [ ! -f "$STATE_DIR/nginx.conf" ]; then
-  cp /etc/nginx/nginx.conf $STATE_DIR
+## Test if STATE_DIR/haproxy.cfg exists
+if [ ! -f "$STATE_DIR/haproxy.cfg" ]; then
+  cp /etc/haproxy/haproxy.cfg $STATE_DIR
 fi
 
-rm -f /etc/nginx/nginx.conf
-ln -s $STATE_DIR/nginx.conf /etc/nginx/nginx.conf
+rm -f /etc/haproxy/haproxy.cfg
+ln -s $STATE_DIR/haproxy.cfg /etc/haproxy/haproxy.cfg
 
-nginx -g "daemon off;"
+echo "Starting haproxy with config: /etc/haproxy/haproxy.cfg"
+haproxy -f /etc/haproxy/haproxy.cfg -db -p /run/haproxy.pid

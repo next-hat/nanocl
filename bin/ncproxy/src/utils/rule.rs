@@ -13,7 +13,7 @@ use nanocld_client::{
 };
 
 use crate::models::{
-  NginxRuleKind, SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
+  ProxyRuleKind, SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
 };
 
 /// Get public address of host
@@ -100,7 +100,7 @@ pub async fn get_network_addr(
   client: &NanocldClient,
 ) -> IoResult<String> {
   match network {
-    NetworkKind::All => Ok(format!("{port}")),
+    NetworkKind::All => Ok(format!("*:{port}")),
     NetworkKind::Public => {
       let ip = get_host_addr(client).await?;
       Ok(format!("{ip}:{port}"))
@@ -151,21 +151,36 @@ pub async fn gen_ssl_config(
           |err| err.map_err_context(|| "Unable to deserialize ProxySslConfig"),
         )?;
       let secret_path = format!("{}/secrets/{}", state.store.dir, secret.name);
+
+      // HAProxy requires a combined PEM file with certificate + key
+      let combined_pem_path = format!("{secret_path}.pem");
+      let combined_pem = format!(
+        "{}\n{}",
+        ssl_config.certificate.trim(),
+        ssl_config.certificate_key.trim()
+      );
+      tokio::fs::write(&combined_pem_path, combined_pem).await?;
+
+      // Also write separate cert and key files for backend SSL
       let cert_path = format!("{secret_path}.cert");
       tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
       let key_path = format!("{secret_path}.key");
       tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
+
       if let Some(certificate_client) = ssl_config.certificate_client {
         let certificate_client_path = format!("{secret_path}.ca");
         tokio::fs::write(&certificate_client_path, certificate_client).await?;
         ssl_config.certificate_client = Some(certificate_client_path);
       }
       if let Some(dh_param) = ssl_config.dhparam {
-        let dh_param_path = format!("{secret_path}.pem");
+        let dh_param_path = format!("{secret_path}.dhparam");
         tokio::fs::write(&dh_param_path, dh_param).await?;
         ssl_config.dhparam = Some(dh_param_path);
       }
-      ssl_config.certificate = cert_path;
+
+      // Set the combined PEM path for frontend binds
+      ssl_config.certificate = combined_pem_path;
+      // Keep separate cert and key paths for backend connections
       ssl_config.certificate_key = key_path;
       Ok(ssl_config)
     }
@@ -174,12 +189,26 @@ pub async fn gen_ssl_config(
 
 pub async fn gen_upstream(
   target: &UpstreamTarget,
-  kind: &NginxRuleKind,
+  kind: &ProxyRuleKind,
   state: &SystemStateRef,
 ) -> IoResult<String> {
   let (target_name, target_namespace, target_kind) =
     parse_upstream_target(&target.key)?;
   let port = target.port;
+
+  // Process SSL configuration for end-to-end TLS
+  let ssl_config = if let Some(ssl) = &target.ssl {
+    match gen_ssl_config(ssl, state).await {
+      Ok(ssl) => Some(ssl),
+      Err(err) => {
+        log::warn!("SSL config error for target {}: {}", target.key, err);
+        None
+      }
+    }
+  } else {
+    None
+  };
+
   let (key, content) = match target_kind.as_str() {
     "c" => {
       let cargo = state
@@ -193,10 +222,16 @@ pub async fn gen_upstream(
         })?;
       let addresses = get_addresses(&cargo.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
+      let mode = match kind {
+        ProxyRuleKind::Site => "http",
+        ProxyRuleKind::Stream => "tcp",
+      };
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,
         "port": port,
         "addresses": addresses,
+        "mode": mode,
+        "ssl": ssl_config,
       }))?;
       (key, data)
     }
@@ -210,10 +245,16 @@ pub async fn gen_upstream(
         })?;
       let addresses = get_addresses(&vm.instances, "nanoclbr0").await?;
       let key = format!("{}-{}-vm", vm.spec.vm_key, port);
+      let mode = match kind {
+        ProxyRuleKind::Site => "http",
+        ProxyRuleKind::Stream => "tcp",
+      };
       let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
         "key": key,
         "port": port,
         "addresses": addresses,
+        "mode": mode,
+        "ssl": ssl_config,
       }))?;
       (key, data)
     }
@@ -224,23 +265,33 @@ pub async fn gen_upstream(
       ));
     }
   };
-  state.store.write_conf_file(&key, &content, kind).await?;
+  // Always store upstream backends in streams-* so they are appended
+  // outside the shared HTTP frontend section.
+  state
+    .store
+    .write_conf_file(&key, &content, &ProxyRuleKind::Stream)
+    .await?;
   Ok(key)
 }
 
 pub async fn gen_unix_target_key(
   unix: &UnixTarget,
-  kind: &NginxRuleKind,
+  kind: &ProxyRuleKind,
   state: &SystemStateRef,
 ) -> IoResult<String> {
   let upstream_key = format!("unix-{}", unix.unix_path.replace('/', "-"));
+  let mode = match kind {
+    ProxyRuleKind::Site => "http",
+    ProxyRuleKind::Stream => "tcp",
+  };
   let data = UNIX_UPSTREAM_TEMPLATE.compile(&liquid::object!({
     "upstream_key": upstream_key,
     "path": unix.unix_path,
+    "mode": mode,
   }))?;
   state
     .store
-    .write_conf_file(&upstream_key, &data, kind)
+    .write_conf_file(&upstream_key, &data, &ProxyRuleKind::Stream)
     .await?;
   Ok(upstream_key)
 }
@@ -251,10 +302,10 @@ pub async fn gen_stream_upstream_key(
 ) -> IoResult<String> {
   match target {
     StreamTarget::Upstream(upstream) => {
-      gen_upstream(upstream, &NginxRuleKind::Stream, state).await
+      gen_upstream(upstream, &ProxyRuleKind::Stream, state).await
     }
     StreamTarget::Unix(unix) => {
-      gen_unix_target_key(unix, &NginxRuleKind::Stream, state).await
+      gen_unix_target_key(unix, &ProxyRuleKind::Stream, state).await
     }
     StreamTarget::Uri(_) => {
       Err(IoError::invalid_input("StreamTarget", "uri not supported"))

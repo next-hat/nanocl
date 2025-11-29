@@ -1,4 +1,4 @@
-pub mod nginx;
+pub mod haproxy;
 pub mod resource;
 pub mod rule;
 pub mod server;
@@ -85,7 +85,7 @@ pub(crate) mod tests {
     let home = std::env::var("HOME").unwrap();
     let options = crate::cli::Cli {
       state_dir: format!("{home}/.nanocl_dev/state/proxy"),
-      nginx_dir: "/etc/nginx".to_owned(),
+      haproxy_dir: "/etc/haproxy".to_owned(),
     };
     let system_state = crate::subsystem::init(&options).await.unwrap();
     // Create test server

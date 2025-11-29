@@ -1,13 +1,13 @@
 /// # ncproxy
 ///
 /// The program in charge of managing writing proxy configuration.
-/// It's based on nginx and use the nanocld api to get the configuration wanted by the user.
+/// It's now based on HAProxy and uses the nanocld api to get the configuration wanted by the user.
 ///
 /// It work by doing 4 main tasks:
-/// - Create a new rule in nginx when a resource `ncproxy.io/rule` is created
-/// - Delete a new rule in nginx when a resource `ncproxy.io/rule` is deleted
+/// - Create a new rule in HAProxy when a resource `ncproxy.io/rule` is created
+/// - Delete a rule in HAProxy when a resource `ncproxy.io/rule` is deleted
 /// - Watch nanocld events for resource, cargo and vm change to update proxy rules accordingly
-/// - Send a reload task to nginx when a rule is created, deleted or updated
+/// - Send a reload task to HAProxy when a rule is created, deleted or updated
 ///
 use clap::Parser;
 

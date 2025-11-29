@@ -99,7 +99,7 @@ pub(crate) async fn update_rules(
     .map(|resource| async move {
       let resource: ResourcePartial = resource.clone().into();
       let rule = serialize(&resource.data)?;
-      super::nginx::add_rule(&resource.name, &rule, state).await?;
+      super::haproxy::add_rule(&resource.name, &rule, state).await?;
       Ok::<_, IoError>(())
     })
     .collect::<FuturesUnordered<_>>()

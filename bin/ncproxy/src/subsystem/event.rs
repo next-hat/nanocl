@@ -36,7 +36,7 @@ fn get_cargo_attributes(
   Ok((name, namespace_name))
 }
 
-/// Update the nginx configuration when a cargo is started, patched
+/// Update the haproxy configuration when a cargo is started, patched
 async fn update_cargo_rule(
   name: &str,
   namespace: &str,
@@ -54,7 +54,7 @@ async fn update_cargo_rule(
       let resource: ResourcePartial = resource.into();
       let rule = utils::resource::serialize(&resource.data)?;
       if let Err(err) =
-        utils::nginx::add_rule(&resource.name, &rule, state).await
+        utils::haproxy::add_rule(&resource.name, &rule, state).await
       {
         log::warn!("event::update_cargo_rule: {err}");
       }
@@ -68,7 +68,7 @@ async fn update_cargo_rule(
   Ok(())
 }
 
-/// Update the nginx configuration when a cargo is stopped, deleted
+/// Update the haproxy configuration when a cargo is stopped, deleted
 async fn delete_cargo_rule(
   name: &str,
   namespace: &str,
@@ -84,7 +84,7 @@ async fn delete_cargo_rule(
   Ok(())
 }
 
-/// Analyze nanocld events and update nginx configuration
+/// Analyze nanocld events and update haproxy configuration
 async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let action = NativeEventAction::from_str(&event.action)?;
   let kind = &event.kind;
@@ -157,7 +157,7 @@ async fn r#loop(state: &SystemStateRef) {
           log::warn!("event::loop: {err}");
           continue;
         }
-        let _ = utils::nginx::ensure_conf(state).await;
+        let _ = utils::haproxy::ensure_conf(state).await;
         log::info!("event::loop: subscribed to nanocld events");
         while let Some(event) = stream.next().await {
           let event = match event {

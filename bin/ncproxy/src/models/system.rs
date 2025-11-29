@@ -17,7 +17,7 @@ pub struct SystemState {
   pub store: Store,
   pub client: NanocldClient,
   pub event_emitter: EventEmitter,
-  pub nginx_dir: String,
+  pub haproxy_dir: String,
 }
 
 pub type SystemStateRef = Arc<SystemState>;
@@ -29,15 +29,17 @@ pub enum SystemEventKind {
 
 struct SystemEventInner {
   client: NanocldClient,
+  state_dir: String,
   task: ntex::rt::JoinHandle<IoResult<()>>,
 }
 
 pub struct SystemEvent(SystemEventInner);
 
 impl SystemEvent {
-  pub fn new(client: &NanocldClient) -> Self {
+  pub fn new(client: &NanocldClient, state_dir: String) -> Self {
     Self(SystemEventInner {
       client: client.clone(),
+      state_dir,
       task: rt::spawn(async move { Ok::<_, IoError>(()) }),
     })
   }
@@ -49,9 +51,10 @@ impl SystemEvent {
       abort_handle.abort();
     }
     let client = self.0.client.clone();
+    let state_dir = self.0.state_dir.clone();
     self.0.task = rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_millis(750)).await;
-      if let Err(err) = utils::nginx::reload(&client).await {
+      if let Err(err) = utils::haproxy::reload(&client, &state_dir).await {
         log::warn!("system: {err}");
       }
       Ok::<_, IoError>(())
@@ -64,12 +67,12 @@ pub struct EventEmitter(pub Arc<mpsc::UnboundedSender<SystemEventKind>>);
 
 impl EventEmitter {
   /// Create a new thread with it's own event loop and return an emitter to send events to it
-  pub fn new(client: &NanocldClient) -> Self {
+  pub fn new(client: &NanocldClient, state_dir: String) -> Self {
     let (tx, mut rx) = mpsc::unbounded();
     let client = client.clone();
     rt::Arbiter::new().exec_fn(move || {
       ntex::rt::spawn(async move {
-        let mut local_event = SystemEvent::new(&client);
+        let mut local_event = SystemEvent::new(&client, state_dir);
         while let Some(e) = rx.next().await {
           local_event.handle(e);
         }

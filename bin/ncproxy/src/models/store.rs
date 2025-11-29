@@ -8,13 +8,13 @@ use nanocld_client::stubs::proxy::ProxyRule;
 /// * Site for HTTP/HTTPS
 /// * Stream for TCP/UDP
 #[derive(Debug)]
-pub enum NginxRuleKind {
+pub enum ProxyRuleKind {
   Site,
   Stream,
 }
 
 /// Implement Display for RuleKind for better display message
-impl std::fmt::Display for NginxRuleKind {
+impl std::fmt::Display for ProxyRuleKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Site => write!(f, "Site"),
@@ -24,7 +24,7 @@ impl std::fmt::Display for NginxRuleKind {
 }
 
 /// Implement From<ProxyRule> for RuleKind to convert ProxyRule to RuleKind
-impl From<ProxyRule> for NginxRuleKind {
+impl From<ProxyRule> for ProxyRuleKind {
   fn from(rule: ProxyRule) -> Self {
     match rule {
       ProxyRule::Http(_) => Self::Site,
@@ -33,7 +33,7 @@ impl From<ProxyRule> for NginxRuleKind {
   }
 }
 
-impl FromStr for NginxRuleKind {
+impl FromStr for ProxyRuleKind {
   type Err = IoError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -60,14 +60,14 @@ impl Store {
     }
   }
 
-  fn gen_path(&self, name: &str, kind: &NginxRuleKind) -> (String, String) {
+  fn gen_path(&self, name: &str, kind: &ProxyRuleKind) -> (String, String) {
     let dir = &self.dir;
     match kind {
-      NginxRuleKind::Site => (
-        format!("{dir}/sites-available/{name}.conf"),
-        format!("{dir}/sites-enabled/{name}.conf"),
+      ProxyRuleKind::Site => (
+        format!("{dir}/routes-available/{name}.conf"),
+        format!("{dir}/routes-enabled/{name}.conf"),
       ),
-      NginxRuleKind::Stream => (
+      ProxyRuleKind::Stream => (
         format!("{dir}/streams-available/{name}.conf"),
         format!("{dir}/streams-enabled/{name}.conf"),
       ),
@@ -78,7 +78,7 @@ impl Store {
     &self,
     name: &str,
     data: &str,
-    kind: &NginxRuleKind,
+    kind: &ProxyRuleKind,
   ) -> IoResult<()> {
     let path = self.gen_path(name, kind);
     tokio::fs::write(&path.0, data).await.map_err(|err| {
@@ -90,7 +90,7 @@ impl Store {
     Ok(())
   }
 
-  pub async fn delete_conf_file(&self, name: &str, kind: &NginxRuleKind) {
+  pub async fn delete_conf_file(&self, name: &str, kind: &ProxyRuleKind) {
     let path = self.gen_path(name, kind);
     let _ = tokio::fs::remove_file(&path.0).await;
     let _ = tokio::fs::remove_file(&path.1).await;

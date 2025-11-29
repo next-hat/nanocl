@@ -9,7 +9,7 @@ use crate::{
   models::{EventEmitter, Store, SystemState, SystemStateRef},
 };
 
-use super::{event, metric};
+use super::{event, logger, metric};
 
 pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   #[allow(unused)]
@@ -22,14 +22,16 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
       ..Default::default()
     })?;
   }
-  let event_emitter = EventEmitter::new(&client);
+  let event_emitter = EventEmitter::new(&client, cli.state_dir.clone());
   let state = Arc::new(SystemState {
     client,
     event_emitter,
     store: Store::new(&cli.state_dir),
-    nginx_dir: cli.nginx_dir.clone(),
+    haproxy_dir: cli.haproxy_dir.clone(),
   });
   event::spawn(&state);
+  // Receive HAProxy logs over unix datagram socket and persist to files
+  logger::spawn(&state);
   metric::spawn(&state);
   Ok(state)
 }

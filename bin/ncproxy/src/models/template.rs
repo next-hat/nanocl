@@ -40,7 +40,7 @@ impl Template<'_> {
 }
 
 pub const CONF_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/nginx.conf"),
+  data: include_str!("templates/haproxy.cfg"),
 };
 
 pub const STREAM_TEMPLATE: &Template = &Template {

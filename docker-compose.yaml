@@ -68,6 +68,7 @@ services:
 
   nproxy:
     container_name: nproxy.system.c
+    image: nproxy:dev
     build:
       context: .
       dockerfile: ./bin/nproxy/Dockerfile
@@ -120,6 +121,7 @@ services:
 
   ndns:
     container_name: ndns.system.c
+    image: ndns:dev
     build:
       context: .
       dockerfile: ./bin/ndns/Dockerfile
