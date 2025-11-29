@@ -33,12 +33,17 @@ impl ObjTaskStart for CargoDb {
         {
           utils::container::cargo::start(&cargo, replicas, &state).await?;
         } else {
-          log::warn!(
-            "Call a remote node to start {} replicas of cargo {} on node {} not yet implemented",
+          let client_opts = nanocld_client::ConnectOpts {
+            url: node_selected.endpoint.clone(),
+            ssl: None,
+            version: Some(node_selected.version.clone()),
+          };
+          let client = nanocld_client::NanocldClient::connect_to(&client_opts)?;
+          let params = nanocl_stubs::node::StartNodeCargoParams {
+            cargo_key: key.clone(),
             replicas,
-            &key,
-            node_selected.name
-          );
+          };
+          client.start_node_cargo(&params).await?;
         }
       }
       CargoDb::delete_mutex(&mutex.key, &state).await?;
