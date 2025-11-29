@@ -45,6 +45,7 @@ pub async fn delete_node_cargo(
   state: web::types::State<SystemState>,
   params: web::types::Json<DeleteNodeCargoParams>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::container::cargo::delete_instances(&params.cargo_key, &state).await?;
+  utils::container::cargo::delete_instances(&params.cargo_key, false, &state)
+    .await?;
   Ok(web::HttpResponse::Ok().finish())
 }

@@ -1,4 +1,5 @@
 use futures::{StreamExt, stream::FuturesUnordered};
+use nanocld_client::{ConnectOpts, NanocldClient};
 use ntex::rt;
 
 use bollard_next::{
@@ -12,12 +13,13 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
   generic::{GenericClause, GenericFilter},
+  node::DeleteNodeCargoParams,
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
 };
 
 use crate::{
-  models::{CargoDb, ObjPsStatusDb, ProcessDb, SystemState},
+  models::{CargoDb, NodeDb, ObjPsStatusDb, ProcessDb, SystemState},
   repositories::generic::*,
   utils,
 };
@@ -452,10 +454,16 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
 
 /// Delete cargo instances only
 ///
-pub async fn delete_instances(key: &str, state: &SystemState) -> IoResult<()> {
+pub async fn delete_instances(
+  key: &str,
+  all: bool,
+  state: &SystemState,
+) -> IoResult<()> {
   let node_name = state.inner.config.hostname.clone();
-  let filter = GenericFilter::new()
-    .r#where("node_name", GenericClause::Eq(node_name.clone()));
+  let mut filter = GenericFilter::new();
+  if !all {
+    filter = filter.r#where("node_name", GenericClause::Eq(node_name.clone()));
+  }
   let processes =
     ProcessDb::read_by_kind_key(key, Some(filter), &state.inner.pool).await?;
   log::debug!(
@@ -463,16 +471,31 @@ pub async fn delete_instances(key: &str, state: &SystemState) -> IoResult<()> {
     processes.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
   );
   for process in processes {
-    let _ = state
-      .inner
-      .docker_api
-      .stop_container(&process.key, None::<StopContainerOptions>)
-      .await;
-    let _ = state
-      .inner
-      .docker_api
-      .remove_container(&process.key, None::<RemoveContainerOptions>)
-      .await;
+    if process.node_name == node_name {
+      let _ = state
+        .inner
+        .docker_api
+        .stop_container(&process.key, None::<StopContainerOptions>)
+        .await;
+      let _ = state
+        .inner
+        .docker_api
+        .remove_container(&process.key, None::<RemoveContainerOptions>)
+        .await;
+    } else {
+      let node =
+        NodeDb::read_by_pk(&process.node_name, &state.inner.pool).await?;
+      let client_opts = ConnectOpts {
+        url: node.endpoint.to_owned(),
+        ssl: None,
+        version: Some(node.version.to_owned()),
+      };
+      let client = NanocldClient::connect_to(&client_opts)?;
+      let params = DeleteNodeCargoParams {
+        cargo_key: key.to_owned(),
+      };
+      client.delete_node_cargo(&params).await?;
+    }
   }
   Ok(())
 }
@@ -480,7 +503,7 @@ pub async fn delete_instances(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete cargo instances and the cargo itself in the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
-  delete_instances(key, state).await?;
+  delete_instances(key, true, state).await?;
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   CargoDb::clear_by_pk(key, &state.inner.pool).await?;
   state
