@@ -1,4 +1,5 @@
 pub mod haproxy;
+pub mod haproxy_socket;
 pub mod resource;
 pub mod rule;
 pub mod server;

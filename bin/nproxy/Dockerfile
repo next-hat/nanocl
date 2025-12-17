@@ -1,15 +1,8 @@
-FROM ubuntu:25.10
+FROM haproxy:lts-alpine3.22
 
 USER root
 
-RUN apt-get update && \
-  apt-get install -y haproxy && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /tmp/* && \
-  rm -rf /var/log/* && \
-  rm -rf /var/tmp/*
-
-EXPOSE 80/tcp 443/tcp
+EXPOSE 80/tcp 443/tcp 443/udp
 
 COPY ./bin/nproxy/html /html
 COPY ./bin/nproxy/entrypoint.sh /entrypoint.sh

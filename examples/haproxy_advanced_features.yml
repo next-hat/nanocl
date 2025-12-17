@@ -1,0 +1,103 @@
+ApiVersion: v0.15
+
+Cargoes:
+  - Name: test-backend
+    Container:
+      Image: nginx:alpine
+      Env:
+        - NGINX_PORT=9000
+
+Resources:
+  - Name: haproxy-advanced-test
+    Kind: ncproxy.io/rule
+    Version: v0.15
+    Data:
+      Rules:
+        # HTTP rule with all advanced features
+        - Http:
+            Domain: advanced.test
+            Port: 443
+            Network: Public
+            # HSTS configuration
+            Hsts: Recommended
+            # Enable HTTP/3 over QUIC
+            Http3: true
+            # SSL with client certificate verification
+            Ssl:
+              Config:
+                Certificate: /path/to/cert.pem
+                CertificateKey: /path/to/key.pem
+                CertificateClient: /path/to/ca.pem
+                VerifyClient: true
+                Dhparam: /path/to/dhparam.pem
+            # Rate limiting zone (10MB, 10 requests/second)
+            LimitReqZone:
+              Size: 10
+              Rate: 10
+            # Timeout configuration
+            Timeout:
+              Connect: 10s
+              Client: 60s
+              Server: 60s
+            # Multiple locations with different features
+            Locations:
+              # Location 1: Standard upstream with rate limiting
+              - Path: /api
+                LimitReq:
+                  Burst: 20
+                  Delay: 10
+                Target:
+                  Upstream:
+                    Key: test-backend.global.c
+                    Port: 9000
+                    Path: /
+
+              # Location 2: IP allowlist (only specific IPs allowed)
+              - Path: /admin
+                AllowedIps:
+                  - 192.168.1.0/24
+                  - 10.0.0.1
+                Target:
+                  Upstream:
+                    Key: test-backend.global.c
+                    Port: 9000
+
+              # Location 3: Custom headers
+              - Path: /secure
+                Headers:
+                  - "X-Custom-Header: value"
+                  - "X-Another-Header: another-value"
+                Target:
+                  Upstream:
+                    Key: test-backend.global.c
+                    Port: 9000
+
+              # Location 4: HTTP redirect
+              - Path: /old-path
+                Target:
+                  Http:
+                    Url: https://advanced.test/new-path
+                    Redirect: 301
+
+              # Location 5: HTTP/1.1 version enforcement
+              - Path: /http11
+                Version: 1.1
+                Target:
+                  Upstream:
+                    Key: test-backend.global.c
+                    Port: 9000
+
+              # Location 6: HTTP/2 version enforcement
+              - Path: /http2
+                Version: 2
+                Target:
+                  Upstream:
+                    Key: test-backend.global.c
+                    Port: 9000
+
+              # Location 7: Unix socket backend
+              - Path: /unix
+                Target:
+                  Unix:
+                    UnixPath: /var/run/backend.sock
+

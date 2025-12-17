@@ -169,16 +169,21 @@ pub async fn gen_ssl_config(
 
       if let Some(certificate_client) = ssl_config.certificate_client {
         let certificate_client_path = format!("{secret_path}.ca");
-        tokio::fs::write(&certificate_client_path, certificate_client).await?;
+        tokio::fs::write(&certificate_client_path, &certificate_client).await?;
         ssl_config.certificate_client = Some(certificate_client_path);
+
+        // Note: Per-certificate CA files are used in crt-list with [ca-file ... verify required]
+        // This allows different domains to have different client certificate requirements
       }
       if let Some(dh_param) = ssl_config.dhparam {
         let dh_param_path = format!("{secret_path}.dhparam");
-        tokio::fs::write(&dh_param_path, dh_param).await?;
+        tokio::fs::write(&dh_param_path, &dh_param).await?;
         ssl_config.dhparam = Some(dh_param_path);
-      }
 
-      // Set the combined PEM path for frontend binds
+        // Also write global dhparam.pem for global config
+        let global_dh_path = format!("{}/secrets/dhparam.pem", state.store.dir);
+        tokio::fs::write(&global_dh_path, dh_param).await?;
+      } // Set the combined PEM path for frontend binds
       ssl_config.certificate = combined_pem_path;
       // Keep separate cert and key paths for backend connections
       ssl_config.certificate_key = key_path;
@@ -191,6 +196,7 @@ pub async fn gen_upstream(
   target: &UpstreamTarget,
   kind: &ProxyRuleKind,
   state: &SystemStateRef,
+  version: Option<f64>,
 ) -> IoResult<String> {
   let (target_name, target_namespace, target_kind) =
     parse_upstream_target(&target.key)?;
@@ -221,7 +227,12 @@ pub async fn gen_upstream(
           })
         })?;
       let addresses = get_addresses(&cargo.instances, "nanoclbr0").await?;
-      let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
+      // Include version in key to create separate backends for different HTTP versions
+      let version_suffix = version
+        .map(|v| format!("-v{}", v.to_string().replace('.', "_")))
+        .unwrap_or_default();
+      let key =
+        format!("{}-{}-cargo{}", cargo.spec.cargo_key, port, version_suffix);
       let mode = match kind {
         ProxyRuleKind::Site => "http",
         ProxyRuleKind::Stream => "tcp",
@@ -232,6 +243,7 @@ pub async fn gen_upstream(
         "addresses": addresses,
         "mode": mode,
         "ssl": ssl_config,
+        "version": version,
       }))?;
       (key, data)
     }
@@ -244,7 +256,11 @@ pub async fn gen_upstream(
           err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
         })?;
       let addresses = get_addresses(&vm.instances, "nanoclbr0").await?;
-      let key = format!("{}-{}-vm", vm.spec.vm_key, port);
+      // Include version in key to create separate backends for different HTTP versions
+      let version_suffix = version
+        .map(|v| format!("-v{}", v.to_string().replace('.', "_")))
+        .unwrap_or_default();
+      let key = format!("{}-{}-vm{}", vm.spec.vm_key, port, version_suffix);
       let mode = match kind {
         ProxyRuleKind::Site => "http",
         ProxyRuleKind::Stream => "tcp",
@@ -255,6 +271,7 @@ pub async fn gen_upstream(
         "addresses": addresses,
         "mode": mode,
         "ssl": ssl_config,
+        "version": version,
       }))?;
       (key, data)
     }
@@ -265,12 +282,10 @@ pub async fn gen_upstream(
       ));
     }
   };
-  // Always store upstream backends in streams-* so they are appended
-  // outside the shared HTTP frontend section.
-  state
-    .store
-    .write_conf_file(&key, &content, &ProxyRuleKind::Stream)
-    .await?;
+  // Write backend to the appropriate location:
+  // - HTTP backends (Site) go to routes-enabled (with their frontends)
+  // - TCP/UDP backends (Stream) go to streams-enabled
+  state.store.write_conf_file(&key, &content, kind).await?;
   Ok(key)
 }
 
@@ -278,8 +293,16 @@ pub async fn gen_unix_target_key(
   unix: &UnixTarget,
   kind: &ProxyRuleKind,
   state: &SystemStateRef,
+  version: Option<f64>,
 ) -> IoResult<String> {
-  let upstream_key = format!("unix-{}", unix.unix_path.replace('/', "-"));
+  let version_suffix = version
+    .map(|v| format!("-v{}", v.to_string().replace('.', "_")))
+    .unwrap_or_default();
+  let upstream_key = format!(
+    "unix-{}{}",
+    unix.unix_path.replace('/', "-"),
+    version_suffix
+  );
   let mode = match kind {
     ProxyRuleKind::Site => "http",
     ProxyRuleKind::Stream => "tcp",
@@ -288,10 +311,12 @@ pub async fn gen_unix_target_key(
     "upstream_key": upstream_key,
     "path": unix.unix_path,
     "mode": mode,
+    "version": version,
   }))?;
+  // Write backend to the appropriate location based on kind
   state
     .store
-    .write_conf_file(&upstream_key, &data, &ProxyRuleKind::Stream)
+    .write_conf_file(&upstream_key, &data, kind)
     .await?;
   Ok(upstream_key)
 }
@@ -302,10 +327,10 @@ pub async fn gen_stream_upstream_key(
 ) -> IoResult<String> {
   match target {
     StreamTarget::Upstream(upstream) => {
-      gen_upstream(upstream, &ProxyRuleKind::Stream, state).await
+      gen_upstream(upstream, &ProxyRuleKind::Stream, state, None).await
     }
     StreamTarget::Unix(unix) => {
-      gen_unix_target_key(unix, &ProxyRuleKind::Stream, state).await
+      gen_unix_target_key(unix, &ProxyRuleKind::Stream, state, None).await
     }
     StreamTarget::Uri(_) => {
       Err(IoError::invalid_input("StreamTarget", "uri not supported"))

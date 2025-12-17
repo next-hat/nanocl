@@ -123,7 +123,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   }
 }
 
-async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
+pub(crate) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
     name: "ncproxy.io/rule".to_owned(),

@@ -9,7 +9,7 @@ use crate::{
   models::{EventEmitter, Store, SystemState, SystemStateRef},
 };
 
-use super::{event, logger, metric};
+use super::{event, logger};
 
 pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   #[allow(unused)]
@@ -29,9 +29,17 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
     store: Store::new(&cli.state_dir),
     haproxy_dir: cli.haproxy_dir.clone(),
   });
+  // Initialize HAProxy configuration on startup
+  if let Err(err) = crate::utils::haproxy::ensure_conf(&state).await {
+    log::warn!("init: failed to initialize HAProxy configuration: {err}");
+  }
+  // Recover runtime state from state files after restart
+  if let Err(err) = crate::utils::haproxy::recover_from_state(&state).await {
+    log::warn!("init: failed to recover HAProxy runtime state: {err}");
+  }
+  // Watch for nanocld events and sync proxy rules
   event::spawn(&state);
-  // Receive HAProxy logs over unix datagram socket and persist to files
+  // Receive HAProxy logs over unix datagram sockets and POST metrics directly to nanocld
   logger::spawn(&state);
-  metric::spawn(&state);
   Ok(state)
 }

@@ -6502,6 +6502,11 @@ components:
           items:
             type: string
           description: Path to extra config file to include
+        Timeout:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProxyTimeout'
+            description: Timeout configuration (connect, client, server in seconds)
       additionalProperties: false
     ProxyRuleStream:
       type: object
@@ -6570,6 +6575,26 @@ components:
       enum:
       - Tcp
       - Udp
+    ProxyTimeout:
+      type: object
+      description: Proxy timeout configuration
+      properties:
+        Connect:
+          type:
+          - string
+          - 'null'
+          description: Timeout for backend connection (default 5s)
+        Client:
+          type:
+          - string
+          - 'null'
+          description: Timeout for client inactivity (default 50s)
+        Server:
+          type:
+          - string
+          - 'null'
+          description: Timeout for server inactivity (default 50s)
+      additionalProperties: false
     RegistryServiceConfig:
       type: object
       description: RegistryServiceConfig stores daemon registry services configuration.

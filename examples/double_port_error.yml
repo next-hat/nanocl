@@ -10,13 +10,13 @@ Resources:
   Data:
     Rules:
     - Network: Local
-      Port: 8181
+      Port: 8182
       Protocol: Tcp
       Target:
         Key: deploy-example2.global.c
         Port: 9000
     - Network: Local
-      Port: 8181
+      Port: 8182
       Protocol: Tcp
       Target:
         Key: deploy-example2.global.c

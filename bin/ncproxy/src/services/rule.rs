@@ -25,7 +25,11 @@ pub async fn apply_rule(
   payload: web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::info!("apply_rule: {}", path.1);
-  utils::haproxy::add_rule(&path.1, &payload, &state).await?;
+  // This now validates config and rolls back on failure
+  if let Err(err) = utils::haproxy::add_rule(&path.1, &payload, &state).await {
+    log::error!("APPLY RULE FAILED HELLOOOOOOO");
+    return Err(err.into());
+  }
   state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
@@ -48,7 +52,8 @@ pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::info!("remove_rule: {}", path.1);
-  utils::haproxy::del_rule(&path.1, &state).await;
+  // This now validates config and rolls back on failure
+  utils::haproxy::del_rule(&path.1, &state).await?;
   state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -113,6 +118,7 @@ mod tests {
         ssl: Some(ProxySsl::Secret("tls.secret".into())),
         http3: Some(ProxyHttp3::Bool(true)),
         includes: None,
+        timeout: None,
       })],
     };
     let mut res = client

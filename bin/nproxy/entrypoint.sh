@@ -10,13 +10,42 @@ fi
 
 mkdir -p /run/haproxy
 
-## Test if STATE_DIR/haproxy.cfg exists
+## Create default haproxy.cfg if it doesn't exist in STATE_DIR
 if [ ! -f "$STATE_DIR/haproxy.cfg" ]; then
-  cp /etc/haproxy/haproxy.cfg $STATE_DIR
+  echo "Creating default haproxy.cfg"
+  cat > "$STATE_DIR/haproxy.cfg" <<'EOF'
+global
+  log stdout format raw local0 info
+  maxconn 2048
+
+defaults
+  log global
+  mode http
+  option dontlognull
+  option forwardfor
+  timeout connect 5s
+  timeout client  50s
+  timeout server  50s
+EOF
 fi
 
-rm -f /etc/haproxy/haproxy.cfg
-ln -s $STATE_DIR/haproxy.cfg /etc/haproxy/haproxy.cfg
+## Create empty frontends.cfg and streams.cfg if they don't exist
+if [ ! -f "$STATE_DIR/frontends.cfg" ]; then
+  echo "Creating default frontends.cfg with minimal HTTP frontend"
+  cat > "$STATE_DIR/frontends.cfg" <<'EOF'
 
-echo "Starting haproxy with config: /etc/haproxy/haproxy.cfg"
-haproxy -f /etc/haproxy/haproxy.cfg -db -p /run/haproxy.pid
+frontend http_80
+  bind *:80
+  mode http
+  option forwardfor
+  http-request return status 503 content-type text/html lf-string "<html><body><h1>503 Service Unavailable</h1><p>Proxy is starting...</p></body></html>"
+
+EOF
+fi
+
+if [ ! -f "$STATE_DIR/streams.cfg" ]; then
+  touch "$STATE_DIR/streams.cfg"
+fi
+
+echo "Starting haproxy with config: $STATE_DIR/haproxy.cfg, $STATE_DIR/frontends.cfg, $STATE_DIR/streams.cfg"
+haproxy -W -f $STATE_DIR/haproxy.cfg -f $STATE_DIR/frontends.cfg -f $STATE_DIR/streams.cfg -p /run/haproxy.pid

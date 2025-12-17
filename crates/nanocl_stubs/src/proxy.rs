@@ -402,6 +402,42 @@ pub struct ProxyRuleHttp {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub includes: Option<Vec<String>>,
+  /// Timeout configuration (connect, client, server in seconds)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub timeout: Option<ProxyTimeout>,
+}
+
+/// Proxy timeout configuration
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct ProxyTimeout {
+  /// Timeout for backend connection (default 5s)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub connect: Option<String>,
+  /// Timeout for client inactivity (default 50s)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub client: Option<String>,
+  /// Timeout for server inactivity (default 50s)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub server: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -53,7 +53,10 @@ impl SystemEvent {
     let client = self.0.client.clone();
     let state_dir = self.0.state_dir.clone();
     self.0.task = rt::spawn(async move {
+      // Short debounce so multiple apply/delete batch into one reload
       ntex::time::sleep(std::time::Duration::from_millis(750)).await;
+      // Only reload here. All file writes, map sync, and validation
+      // must have been done before emitting the reload event.
       if let Err(err) = utils::haproxy::reload(&client, &state_dir).await {
         log::warn!("system: {err}");
       }
