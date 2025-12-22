@@ -621,6 +621,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-encoding"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
+
+[[package]]
 name = "deranged"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1542,13 +1548,13 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.36.0"
+version = "0.37.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd94c1d7bfa9d30b5d4268df9fe8c5ed13fa600a6bd0dae02b04db86d575fc8a"
+checksum = "73c9ffb2b5c56d58030e1b532d8e8389da94590515f118cf35b5cb68e4764a7e"
 dependencies = [
  "ahash",
- "base64",
  "bytecount",
+ "data-encoding",
  "email_address",
  "fancy-regex",
  "fraction",
@@ -2795,9 +2801,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.36.0"
+version = "0.37.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1cb02ef237bd757aba02cd648a4ffa628cd8e5852e2b9bb89aabf93dc5dcc7"
+checksum = "4283168a506f0dcbdce31c9f9cce3129c924da4c6bca46e46707fcb746d2d70c"
 dependencies = [
  "ahash",
  "fluent-uri",
