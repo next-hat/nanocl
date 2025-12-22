@@ -173,7 +173,7 @@ async fn main() -> std::io::Result<()> {
   };
   let vpnkit_client = VpnKitRc::connect_uds("/run/host-services/backend.sock");
   let nanocl_client = NanocldClient::connect_with_unix_default();
-  let proxy_default = vec![
+  let proxy_default = [
     VpnKitPort {
       proto: Some(VpnKitProtocol::TCP),
       out_ip: Some("0.0.0.0".into()),
