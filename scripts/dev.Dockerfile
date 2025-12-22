@@ -1,5 +1,7 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.89.0-alpine3.22
+FROM --platform=$BUILDPLATFORM rust:1.92.0-alpine3.23
+
+ENV TZ=UTC
 
 RUN apk add --update \
   gcc \
@@ -33,7 +35,6 @@ RUN apk add --update alpine-sdk \
 RUN mkdir -p /project
 WORKDIR /project
 
-ENV TZ=${tz}
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
