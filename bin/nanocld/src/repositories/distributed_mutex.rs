@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 use nanocl_error::io::IoResult;
+use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
@@ -34,11 +35,11 @@ impl RepositoryBase for DistributedMutexDb {
       ),
       (
         "acquired_at",
-        (ColumnType::Text, "distributed_mutexes.acquired_at"),
+        (ColumnType::Timestamptz, "distributed_mutexes.acquired_at"),
       ),
       (
         "expires_at",
-        (ColumnType::Text, "distributed_mutexes.expires_at"),
+        (ColumnType::Timestamptz, "distributed_mutexes.expires_at"),
       ),
     ])
   }
@@ -91,6 +92,23 @@ impl RepositoryCountBy for DistributedMutexDb {
 }
 
 impl RepositoryDelByPk for DistributedMutexDb {}
+
+impl RepositoryDelBy for DistributedMutexDb {
+  fn gen_del_query(
+    filter: &GenericFilter,
+  ) -> diesel::query_builder::BoxedDeleteStatement<
+    'static,
+    diesel::pg::Pg,
+    <Self as diesel::associations::HasTable>::Table,
+  >
+  where
+    Self: diesel::associations::HasTable,
+  {
+    let mut query = diesel::delete(distributed_mutexes::table).into_boxed();
+    let columns = Self::get_columns();
+    gen_sql_query!(query, filter, columns)
+  }
+}
 
 impl DistributedMutexDb {
   pub async fn get_lock(

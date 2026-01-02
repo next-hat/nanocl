@@ -10,11 +10,6 @@ CREATE TABLE
     "acquired_at" TIMESTAMPTZ NOT NULL DEFAULT now (),
     "expires_at" TIMESTAMPTZ NOT NULL DEFAULT (now () + INTERVAL '5 minutes'),
     UNIQUE ("resource_kind", "resource_key")
-  )
-WITH
-  (
-    ttl_expiration_expression = 'expires_at',
-    ttl_job_cron = '* * * * *'
   );
 
 CREATE INDEX IF NOT EXISTS idx_distributed_mutexes_resource ON distributed_mutexes (resource_kind, resource_key);

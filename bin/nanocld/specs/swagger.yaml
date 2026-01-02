@@ -6620,7 +6620,7 @@ components:
           description: The creation date of the resource
         Spec:
           $ref: '#/components/schemas/ResourceSpec'
-          description: Specification of the ressource
+          description: Specification of the resource
     ResourceDnsRule:
       type: object
       required:
