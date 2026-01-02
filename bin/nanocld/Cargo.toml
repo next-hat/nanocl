@@ -85,7 +85,7 @@ nanocl_stubs = { version = "0.17", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.8", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "5", features = ["yaml"], optional = true }
 notify = "8.0"
-ntex-cors = "2"
+ntex-cors = "3"
 rand = "0.9"
 openssl = { version = "0.10" }
 ipnet = { version = "2.10.0", features = ["serde"] }
