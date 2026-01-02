@@ -22,7 +22,7 @@ use crate::{dnsmasq, utils};
 ))]
 #[web::put("/rules/{name}")]
 pub(crate) async fn apply_rule(
-  // To follow the ressource service convention, we have to use a tuple
+  // To follow the resource service convention, we have to use a tuple
   client: web::types::State<NanocldClient>,
   dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
   path: web::types::Path<(String, String)>,
@@ -77,10 +77,13 @@ mod tests {
   async fn basic() {
     let data = std::fs::read_to_string("tests/resource_dns.yml").unwrap();
     let payload = serde_yaml::from_str::<ResourceDnsRule>(&data).unwrap();
+    log::debug!("apply_rule: payload = {payload:#?}");
     let client = gen_default_test_client();
-    let res = client
+    let mut res = client
       .send_put("/rules/test", Some(payload), None::<String>)
       .await;
+    let body = res.json::<serde_json::Value>().await;
+    log::debug!("apply_rule: body = {body:#?}");
     test_status_code!(res.status(), http::StatusCode::OK, "basic");
   }
 

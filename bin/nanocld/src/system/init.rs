@@ -1,4 +1,6 @@
-use std::{os::unix::prelude::PermissionsExt, path::Path, process::Stdio};
+use std::{
+  os::unix::prelude::PermissionsExt, path::Path, process::Stdio, time::Duration,
+};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use ntex::rt;
@@ -10,9 +12,11 @@ use tokio::{
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::config::DaemonConfig;
+use nanocl_stubs::generic::{GenericClause, GenericFilter};
 
 use crate::{
-  models::{NodeDb, SystemState},
+  models::{DistributedMutexDb, NodeDb, SystemState},
+  repositories::generic::RepositoryDelBy,
   utils,
 };
 
@@ -153,6 +157,29 @@ fn spawn_crond() {
   });
 }
 
+/// Create a new thread and periodically delete expired distributed mutexes.
+///
+/// CockroachDB used TTL table options, but PostgreSQL does not.
+/// We emulate TTL by running a delete loop every second.
+fn spawn_distributed_mutexes_gc(state: &SystemState) {
+  log::debug!("boot::spawn_distributed_mutexes_gc: start thread");
+  let pool = state.inner.pool.clone();
+  rt::Arbiter::new().exec_fn(|| {
+    rt::spawn(async move {
+      loop {
+        let filter = GenericFilter::new().r#where(
+          "expires_at",
+          GenericClause::Le(chrono::Utc::now().to_rfc3339()),
+        );
+        if let Err(err) = DistributedMutexDb::del_by(&filter, &pool).await {
+          log::warn!("boot::spawn_distributed_mutexes_gc: {err}");
+        }
+        ntex::time::sleep(Duration::from_secs(1)).await;
+      }
+    });
+  });
+}
+
 /// Ensure that the state dir exists and is ready to use
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
@@ -182,8 +209,6 @@ pub fn docker_healthcheck(state: &SystemState) {
             "Docker daemon not reachable",
           );
           error.print_and_exit();
-        } else {
-          log::debug!("boot::docker_healthcheck: Docker daemon is healthy");
         }
         ntex::time::sleep(std::time::Duration::from_secs(5)).await;
       }
@@ -200,6 +225,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
   docker_healthcheck(&system_state);
+  spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;
   utils::system::register_namespace("global", &system_state).await?;
   utils::system::register_namespace("system", &system_state).await?;

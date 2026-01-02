@@ -108,7 +108,7 @@ pub struct Resource {
   pub kind: String,
   /// The creation date of the resource
   pub created_at: chrono::NaiveDateTime,
-  /// Specification of the ressource
+  /// Specification of the resource
   pub spec: ResourceSpec,
 }
 
