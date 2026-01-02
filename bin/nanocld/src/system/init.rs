@@ -2,9 +2,11 @@ use std::{os::unix::prelude::PermissionsExt, path::Path, process::Stdio};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use ntex::rt;
-use tokio::fs;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command as TokioCommand;
+use tokio::{
+  fs,
+  io::{AsyncBufReadExt, BufReader},
+  process::Command as TokioCommand,
+};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::config::DaemonConfig;
@@ -17,6 +19,7 @@ use crate::{
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
 /// Then close the thread
+///
 fn set_uds_perm() {
   log::trace!("boot::set_uds_perm: start thread");
   rt::Arbiter::new().exec_fn(|| {
@@ -84,6 +87,7 @@ fn set_uds_perm() {
 }
 
 /// Create a new thread and spawn and manage a crond instance to run cron jobs
+///
 fn spawn_crond() {
   log::trace!("boot::spawn_crond: start thread");
   rt::Arbiter::new().exec_fn(|| {
@@ -150,6 +154,7 @@ fn spawn_crond() {
 }
 
 /// Ensure that the state dir exists and is ready to use
+///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
@@ -163,17 +168,42 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
+pub fn docker_healthcheck(state: &SystemState) {
+  let state = state.clone();
+  rt::Arbiter::new().exec_fn(|| {
+    rt::spawn(async move {
+      loop {
+        if let Err(err) = state.inner.docker_api.ping().await {
+          log::error!(
+            "boot::docker_healthcheck: Docker daemon not reachable: {err}"
+          );
+          let error = IoError::interrupted(
+            "Docker Healthcheck",
+            "Docker daemon not reachable",
+          );
+          error.print_and_exit();
+        } else {
+          log::debug!("boot::docker_healthcheck: Docker daemon is healthy");
+        }
+        ntex::time::sleep(std::time::Duration::from_secs(5)).await;
+      }
+    });
+  });
+}
+
 /// Init function called before http server start.
 /// To boot and initialize our state and database.
+///
 pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   spawn_crond();
   set_uds_perm();
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
+  docker_healthcheck(&system_state);
+  NodeDb::register(&system_state).await?;
+  utils::system::register_namespace("global", &system_state).await?;
+  utils::system::register_namespace("system", &system_state).await?;
   let system_ptr = system_state.clone();
-  NodeDb::register(&system_ptr).await?;
-  utils::system::register_namespace("global", &system_ptr).await?;
-  utils::system::register_namespace("system", &system_ptr).await?;
   rt::spawn(async move {
     let fut = async move {
       utils::system::sync_processes(&system_ptr).await?;

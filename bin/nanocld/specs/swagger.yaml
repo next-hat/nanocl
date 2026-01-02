@@ -913,15 +913,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/GenericCount'
-  /nodes/ws:
-    get:
-      tags:
-      - Nodes
-      summary: Websocket endpoint for communication between nodes used internally
-      operationId: node_ws
-      responses:
-        '101':
-          description: Websocket connection
   /process/{name}/stats:
     get:
       tags:

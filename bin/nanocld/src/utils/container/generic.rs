@@ -184,18 +184,27 @@ pub async fn inject_data(
 /// Plan node selection for a cargo based on placement and resource requirements.
 /// This function relies on SQL queries over metrics to avoid loading all nodes in memory.
 /// Returns a list of candidate nodes ordered by the chosen strategy (currently least-loaded first).
+///
 #[derive(Debug, Clone)]
 pub struct SelectionAssignment {
   pub node: NodeDb,
   pub replicas: usize,
 }
 
+/// SelectionPlan represents the result of planning node assignments for a cargo.
+/// It includes the total number of replicas and the specific assignments to nodes.
+///
 #[derive(Debug, Clone)]
 pub struct SelectionPlan {
+  /// Total replicas is currently not in use but may be useful for logging or future features
+  #[allow(dead_code)]
   pub total_replicas: usize,
   pub assignments: Vec<SelectionAssignment>,
 }
 
+/// Select nodes for the given cargo based on its placement and resource requirements.
+/// Returns a SelectionPlan with node assignments.
+///
 pub async fn plan_selection(
   cargo: &Cargo,
   state: &SystemState,
