@@ -1,8 +1,6 @@
 use futures::StreamExt;
 use ntex::util::BytesMut;
-use ntex::web::{Error, ErrorRenderer, WebRequest, WebResponse};
-use ntex::{Middleware, Service, ServiceCtx};
-use ntex::{http, web};
+use ntex::{Middleware, Service, ServiceCtx, http, web};
 
 /// Middleware to convert default ntex SerializeError from text/plain to application/json
 pub struct SerializeError;
@@ -19,20 +17,24 @@ pub struct SerializeErrorMiddleware<S> {
   service: S,
 }
 
-impl<S, Err> Service<WebRequest<Err>> for SerializeErrorMiddleware<S>
+impl<S, Err> Service<web::WebRequest<Err>> for SerializeErrorMiddleware<S>
 where
-  S: Service<WebRequest<Err>, Response = WebResponse, Error = Error>,
-  Err: ErrorRenderer,
+  S: Service<
+      web::WebRequest<Err>,
+      Response = web::WebResponse,
+      Error = web::Error,
+    >,
+  Err: web::ErrorRenderer,
 {
-  type Response = WebResponse;
-  type Error = Error;
+  type Response = web::WebResponse;
+  type Error = web::Error;
 
   ntex::forward_ready!(service);
   ntex::forward_shutdown!(service);
 
   async fn call(
     &self,
-    req: WebRequest<Err>,
+    req: web::WebRequest<Err>,
     ctx: ServiceCtx<'_, Self>,
   ) -> Result<Self::Response, Self::Error> {
     let mut res = ctx.call(&self.service, req).await?;

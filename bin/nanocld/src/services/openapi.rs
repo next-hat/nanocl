@@ -49,7 +49,6 @@ impl Modify for VersionModifier {
     // Node
     node::list_node,
     node::count_node,
-    node::node_ws,
     node::start_node_cargo,
     // System
     system::get_info,

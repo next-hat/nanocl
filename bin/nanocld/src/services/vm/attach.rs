@@ -111,7 +111,7 @@ async fn ws_attach_service(
     ready(Ok(item))
   });
   // handler service for shutdown notification that stop heartbeat task
-  let on_shutdown = fn_shutdown(move || {
+  let on_shutdown = fn_shutdown(async move || {
     let _ = tx.send(());
   });
   // pipe our service with on_shutdown callback

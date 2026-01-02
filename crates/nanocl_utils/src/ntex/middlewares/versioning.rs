@@ -1,9 +1,11 @@
 /// Versionning middleware
 use std::rc::Rc;
 
-use ntex::http::header::{HeaderName, HeaderValue};
-use ntex::web::{Error, ErrorRenderer, HttpResponse, WebRequest, WebResponse};
-use ntex::{Middleware, Service, ServiceCtx};
+use ntex::{
+  Middleware, Service, ServiceCtx,
+  http::header::{HeaderName, HeaderValue},
+  web,
+};
 
 struct Inner {
   version: String,
@@ -61,19 +63,23 @@ pub struct VersioningMiddleware<S> {
   inner: Rc<Inner>,
 }
 
-impl<S, Err> Service<WebRequest<Err>> for VersioningMiddleware<S>
+impl<S, Err> Service<web::WebRequest<Err>> for VersioningMiddleware<S>
 where
-  S: Service<WebRequest<Err>, Response = WebResponse, Error = Error>,
-  Err: ErrorRenderer,
+  S: Service<
+      web::WebRequest<Err>,
+      Response = web::WebResponse,
+      Error = web::Error,
+    >,
+  Err: web::ErrorRenderer,
 {
-  type Response = WebResponse;
-  type Error = Error;
+  type Response = web::WebResponse;
+  type Error = web::Error;
 
   ntex::forward_ready!(service);
 
   async fn call(
     &self,
-    mut req: WebRequest<Err>,
+    mut req: web::WebRequest<Err>,
     ctx: ServiceCtx<'_, Self>,
   ) -> Result<Self::Response, Self::Error> {
     let version = req.match_info_mut().get("version");
@@ -96,7 +102,7 @@ where
       {
         let msg = format!("{version} is invalid");
         let mut res = req.into_response(
-          HttpResponse::NotFound()
+          web::HttpResponse::NotFound()
             .json(&serde_json::json!({
               "msg": msg,
             }))
@@ -116,7 +122,7 @@ where
       {
         let msg = format!("{version} is not a number");
         let mut res = req.into_response(
-          HttpResponse::NotFound()
+          web::HttpResponse::NotFound()
             .json(&serde_json::json!({
               "msg": msg,
             }))
@@ -135,7 +141,7 @@ where
       {
         let msg = format!("{version} is not supported");
         let mut res = req.into_response(
-          HttpResponse::NotFound()
+          web::HttpResponse::NotFound()
             .json(&serde_json::json!({
               "msg": msg,
             }))

@@ -3,19 +3,16 @@ pub use ntex::web;
 pub mod cargo;
 pub mod count;
 pub mod list;
-pub mod ws;
 
 pub use cargo::*;
 pub use count::*;
 pub use list::*;
-pub use ws::*;
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config
     .service(start_node_cargo)
     .service(list_node)
-    .service(count_node)
-    .service(web::resource("/nodes/ws").route(web::get().to(node_ws)));
+    .service(count_node);
 }
 
 #[cfg(test)]
