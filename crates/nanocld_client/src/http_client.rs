@@ -4,6 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use ntex::{
   channel::mpsc::Receiver,
   rt,
+  time::Millis,
   util::{Bytes, Stream},
 };
 
@@ -103,7 +104,9 @@ impl NanocldClient {
 
   async fn gen_client(&self) -> IoResult<ntex::client::Client> {
     #[allow(unused_mut)]
-    let mut client = ntex::client::Client::builder();
+    let mut client = ntex::client::Client::builder()
+      .response_payload_timeout(Millis::from_secs(20))
+      .response_timeout(Millis::from_secs(20));
     #[cfg(not(target_os = "windows"))]
     {
       if let Some(unix_socket) = &self.unix_socket {
@@ -182,6 +185,7 @@ impl NanocldClient {
         )
       }
     }
+
     client
       .build(ntex::SharedCfg::default())
       .await

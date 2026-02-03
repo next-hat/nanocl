@@ -69,8 +69,8 @@ mod tests {
     Ok(())
   }
 
-  #[test]
-  fn generate_wrong_host() -> IoResult<()> {
+  #[ntex::test]
+  async fn generate_wrong_host() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
