@@ -56,7 +56,7 @@ mod tests {
   async fn basic_list() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut res = client.send_get("/processes", None::<String>).await;
+    let res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
   }
@@ -106,14 +106,14 @@ mod tests {
       })),
     );
     let qs = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get("/processes", Some(qs)).await;
+    let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
     assert!(items.iter().any(|i| i.name == "nstore.system.c"));
     // Filter by limit and offset
     let filter = GenericFilter::new().limit(1).offset(1);
     let qs = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get("/processes", Some(qs)).await;
+    let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
     assert_eq!(items.len(), 1);
@@ -122,7 +122,7 @@ mod tests {
       .r#where("name", GenericClause::Like("nstore%".to_owned()))
       .r#where("kind", GenericClause::Eq("cargo".to_owned()));
     let qs = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get("/processes", Some(qs)).await;
+    let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
     assert!(items.iter().any(|i| i.name == "nstore.system.c"));

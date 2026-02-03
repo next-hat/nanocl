@@ -5,7 +5,7 @@ use nanocl_error::http_client::{HttpClientError, HttpClientResult};
 use nanocl_error::io::FromIo;
 
 pub(crate) async fn is_api_error(
-  res: &mut http::client::ClientResponse,
+  res: &mut ntex::client::ClientResponse,
   status: &http::StatusCode,
 ) -> HttpClientResult<()> {
   if status.is_server_error() || status.is_client_error() {

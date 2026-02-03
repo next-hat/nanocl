@@ -47,10 +47,10 @@ pub struct VersioningFactory {
   inner: Rc<Inner>,
 }
 
-impl<S> Middleware<S> for VersioningFactory {
+impl<S, Cfg> Middleware<S, Cfg> for VersioningFactory {
   type Service = VersioningMiddleware<S>;
 
-  fn create(&self, service: S) -> Self::Service {
+  fn create(&self, service: S, _: Cfg) -> Self::Service {
     VersioningMiddleware {
       service,
       inner: self.inner.clone(),

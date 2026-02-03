@@ -1,5 +1,3 @@
-use ntex::http;
-
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::{HttpClientError, HttpClientResult};
 use nanocl_error::io::{FromIo, IoResult};
@@ -8,11 +6,11 @@ use crate::version::{CHANNEL, VERSION};
 
 /// Get template from our GitHub repo for installation
 async fn get() -> HttpClientResult<String> {
-  let client = http::client::Client::new();
+  let client = ntex::client::Client::new().await;
   let url = format!(
     "https://raw.githubusercontent.com/next-hat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml"
   );
-  let mut res = client.get(url).send().await.map_err(|err| {
+  let res = client.get(url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to fetch installer template")
   })?;
   let status = res.status();

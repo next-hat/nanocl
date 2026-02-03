@@ -33,7 +33,7 @@ mod tests {
     const CARGO_NAME: &str = "nstore";
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut res = client
+    let res = client
       .send_post(
         &format!("/cargoes/{CARGO_NAME}/exec"),
         Some(&CreateExecOptions {
@@ -60,7 +60,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "exec start");
     let mut stream = res.into_stream();
     while (stream.next().await).is_some() {}
-    let mut res = client
+    let res = client
       .send_get(&format!("/exec/{exec_id}/cargo/inspect"), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "exec inspect");

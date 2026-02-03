@@ -93,7 +93,7 @@ mod tests {
         Some("ghcr.io/next-hat/nanocl-get-started:latest".to_owned())
       );
     }
-    let mut res = client
+    let res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_cargo}/inspect"),
         None::<String>,
@@ -110,7 +110,7 @@ mod tests {
       "Expected to find cargo with name {main_test_cargo} got {}",
       response.spec.name
     );
-    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    let res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
     let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
@@ -148,7 +148,7 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "basic cargo restart"
     );
-    let mut res = client
+    let res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_cargo}"),
         Some(&CargoSpecPartial {
@@ -177,7 +177,7 @@ mod tests {
       patch_response.spec.container.env,
       Some(vec!["TEST=1".to_owned()])
     );
-    let mut res = client
+    let res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_cargo}/histories"),
         None::<String>,

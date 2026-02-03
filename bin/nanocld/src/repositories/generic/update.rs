@@ -1,6 +1,6 @@
 use diesel::{associations, prelude::*};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use crate::{models::Pool, utils};
 
@@ -44,6 +44,12 @@ pub trait RepositoryUpdate: super::RepositoryBase {
       .map_err(Self::map_err)?;
       Ok(item)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while updating item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }

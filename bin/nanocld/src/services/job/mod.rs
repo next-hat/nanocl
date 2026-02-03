@@ -64,13 +64,13 @@ mod tests {
     let state: &str = include_str!("../../../../../examples/job_example.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(state).unwrap();
     let job_spec = &yaml["Jobs"][0];
-    let mut res = client
+    let res = client
       .send_post(ENDPOINT, Some(job_spec.clone()), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create job");
     let job = res.json::<Job>().await.unwrap();
     let job_endpoint = format!("{ENDPOINT}/{}", &job.name);
-    let mut res = client.get(ENDPOINT).send().await.unwrap();
+    let res = client.get(ENDPOINT).send().await.unwrap();
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
       .send_get(

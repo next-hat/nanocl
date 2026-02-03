@@ -50,7 +50,7 @@ mod test_secret {
       }),
       metadata: None,
     };
-    let mut res = client
+    let res = client
       .send_post(ENDPOINT, Some(new_secret), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create secret");

@@ -51,7 +51,7 @@ pub mod tests {
         let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-    let mut res = client
+    let res = client
       .post(&format!("/vms/images/{name}/import"))
       .send_stream(stream)
       .await
@@ -72,7 +72,7 @@ pub mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let err_msg = format!("Unable to inspect image {name}");
-    let mut res = client
+    let res = client
       .get(&format!("/vms/images/{name}/inspect"))
       .send()
       .await
@@ -106,7 +106,7 @@ pub mod tests {
     import_image(name, path).await.unwrap();
     let image = inspect_image(name).await.unwrap();
     assert_eq!(image.name, name);
-    let mut res = client.get("/vms/images").send().await.unwrap();
+    let res = client.get("/vms/images").send().await.unwrap();
     test_status_code!(res.status(), StatusCode::OK, "Unable to list images");
     let images = res.json::<Vec<VmImage>>().await.unwrap();
     assert!(images.iter().any(|i| i.name == name));

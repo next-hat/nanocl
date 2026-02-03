@@ -16,7 +16,7 @@ pub async fn generate(
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("server::gen: start");
   let daemon_state_ptr = daemon_state.clone();
-  let mut server = web::HttpServer::new(move || {
+  let mut server = web::HttpServer::new(async move || {
     web::App::new()
       // bind config state
       .state(daemon_state_ptr.clone())
@@ -115,7 +115,7 @@ mod tests {
 
   use clap::Parser;
   use nanocl_stubs::system::BinaryInfo;
-  use ntex::http::{StatusCode, client::Connector};
+  use ntex::{client::Connector, http::StatusCode};
   use openssl::ssl::SslConnector;
 
   use super::*;
@@ -215,16 +215,12 @@ mod tests {
     builder
       .set_private_key_file("../../tests/client.key", SslFiletype::PEM)
       .unwrap();
-    let client = ntex::http::client::Client::build()
-      .timeout(Duration::from_secs(10))
-      .connector(
-        Connector::default()
-          .openssl(builder.build())
-          .timeout(Duration::from_secs(10))
-          .finish(),
-      )
-      .finish();
-    let mut res = client
+    let client = ntex::client::Client::builder()
+      .connector::<&str>(Connector::default().openssl(builder.build()))
+      .build(ntex::SharedCfg::default())
+      .await
+      .unwrap();
+    let res = client
       .get("https://0.0.0.0:6443/v0.16/version")
       .timeout(Duration::from_secs(10))
       .send()
@@ -252,9 +248,11 @@ mod tests {
     // Configure SSL/TLS settings
     let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
     builder.set_verify(SslVerifyMode::NONE);
-    let client = ntex::http::client::Client::build()
-      .connector(Connector::default().openssl(builder.build()).finish())
-      .finish();
+    let client = ntex::client::Client::builder()
+      .connector::<&str>(Connector::default().openssl(builder.build()))
+      .build(ntex::SharedCfg::default())
+      .await
+      .unwrap();
     let res = client
       .get("https://0.0.0.0:4443/v0.16/version")
       .send()

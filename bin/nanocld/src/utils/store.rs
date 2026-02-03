@@ -80,7 +80,8 @@ async fn wait(store_addr: &str) -> IoResult<()> {
     .next()
     .expect("Unable to resolve store address");
   log::info!("store::wait: {addr}");
-  while let Err(_err) = rt::tcp_connect(addr).await {
+  while let Err(_err) = rt::tcp_connect(addr, ntex::SharedCfg::default()).await
+  {
     log::warn!("store::wait: retry in 2s");
     time::sleep(Duration::from_secs(2)).await;
   }

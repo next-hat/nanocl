@@ -35,17 +35,17 @@ mod tests {
   async fn basic() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut resp = client.get("/events").send().await.unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let events = resp.json::<Vec<Event>>().await.unwrap();
+    let res = client.get("/events").send().await.unwrap();
+    assert_eq!(res.status(), http::StatusCode::OK);
+    let events = res.json::<Vec<Event>>().await.unwrap();
     assert!(!events.is_empty());
-    let mut resp = client
+    let res = client
       .get(&format!("/events/{}/inspect", events[0].key))
       .send()
       .await
       .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    resp.json::<Event>().await.unwrap();
+    assert_eq!(res.status(), http::StatusCode::OK);
+    res.json::<Event>().await.unwrap();
   }
 
   #[ntex::test]

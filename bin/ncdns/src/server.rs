@@ -14,7 +14,7 @@ pub fn generate(
 ) -> IoResult<ntex::server::Server> {
   let dnsmasq = dnsmasq.clone();
   let client = client.clone();
-  let mut server = web::HttpServer::new(move || {
+  let mut server = web::HttpServer::new(async move || {
     web::App::new()
       .state(dnsmasq.clone())
       .state(client.clone())
@@ -69,8 +69,8 @@ mod tests {
     Ok(())
   }
 
-  #[test]
-  fn generate_wrong_host() -> IoResult<()> {
+  #[ntex::test]
+  async fn generate_wrong_host() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),

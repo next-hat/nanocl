@@ -139,19 +139,33 @@ impl NanocldClient {
     // open websockets connection over http transport
     #[cfg(not(target_os = "windows"))]
     {
+      use nanocl_error::io::IoError;
+
       let con = match &self.unix_socket {
-        Some(path) => ws::WsClient::build(&url)
-          .connector(ntex::service::fn_service(|_| async move {
-            Ok::<_, _>(rt::unix_connect(&path).await?)
+        Some(path) => ws::WsClient::builder(&url)
+          .connector::<_, _>(ntex::service::fn_service(|_| async move {
+            Ok(rt::unix_connect(&path, ntex::SharedCfg::default()).await?)
           }))
-          .finish()
-          .map_err(|err| err.map_err_context(|| path))?
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::interrupted(
+              "Unable to build websocket client",
+              &format!("{err:?}"),
+            )
+          })?
           .connect()
           .await
           .map_err(|err| err.map_err_context(|| path))?,
-        None => ws::WsClient::build(&url)
-          .finish()
-          .map_err(|err| err.map_err_context(|| &self.url))?
+        None => ws::WsClient::builder(&url)
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::interrupted(
+              "Unable to build websocket client",
+              &format!("{err:?}"),
+            )
+          })?
           .connect()
           .await
           .map_err(|err| err.map_err_context(|| &self.url))?,
@@ -160,8 +174,7 @@ impl NanocldClient {
     }
     #[cfg(target_os = "windows")]
     {
-      let con = ws::WsClient::build(&url)
-        .finish()
+      let con = ws::WsClient::builder(&url)
         .map_err(|err| err.map_err_context(|| &self.url))?
         .connect()
         .await

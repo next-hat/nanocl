@@ -70,7 +70,7 @@ mod tests {
     let client = gen_default_test_client().await;
     ensure_test_cargo().await.unwrap();
     let payload = read_rule("tests/basic.yml").unwrap();
-    let mut res = client
+    let res = client
       .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
       .await;
     let json = res.json::<serde_yaml::Value>().await.unwrap();
@@ -115,7 +115,7 @@ mod tests {
         includes: None,
       })],
     };
-    let mut res = client
+    let res = client
       .send_put(&format!("/rules/{name}"), Some(&rule), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "put h3 rule");

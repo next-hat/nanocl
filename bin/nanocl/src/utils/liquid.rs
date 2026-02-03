@@ -26,7 +26,7 @@ impl StateSource {
     .as_str()
     .to_owned();
     std::thread::spawn(move || {
-      ntex::rt::System::new(&url)
+      ntex::rt::System::new(&url, ntex::rt::DefaultRuntime)
         .block_on(async move { utils::state::download_statefile(&url).await })
     })
     .join()

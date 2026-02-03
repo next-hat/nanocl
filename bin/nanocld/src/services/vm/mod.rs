@@ -47,7 +47,7 @@ mod tests {
     let client = system.client;
     let name = "api-test-vm";
     let image = "ubuntu-22-test";
-    let mut res = client
+    let res = client
       .post("/vms")
       .send_json(&VmSpecPartial {
         name: name.to_owned(),
@@ -65,7 +65,7 @@ mod tests {
       panic!("create vm failed: {} {}", status, body);
     }
     test_status_code!(res.status(), http::StatusCode::OK, "create vm");
-    let mut res = client
+    let res = client
       .get(&format!("/vms/{name}/inspect"))
       .send()
       .await
@@ -73,7 +73,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "inspect vm");
     let vm = res.json::<VmInspect>().await.unwrap();
     assert_eq!(vm.spec.name, name);
-    let mut res = client.get("/vms").send().await.unwrap();
+    let res = client.get("/vms").send().await.unwrap();
     test_status_code!(res.status(), http::StatusCode::OK, "list vm");
     let vms = res.json::<Vec<VmSummary>>().await.unwrap();
     assert!(vms.iter().any(|i| i.spec.name == name));

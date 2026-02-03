@@ -1,10 +1,13 @@
-use ntex::http::client::{ClientResponse, Connector};
-use ntex::http::{Client, StatusCode};
-use ntex::rt;
+use ntex::{
+  ServiceFactory,
+  client::{Client, ClientResponse},
+  http::StatusCode,
+  rt,
+};
 
-use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
 use nanocl_error::io::FromIo;
+use nanocl_error::{http::HttpError, io::IoError};
+use nanocl_error::{http_client::HttpClientError, io::IoResult};
 
 /// Controller client
 pub struct CtrlClient {
@@ -18,36 +21,55 @@ pub struct CtrlClient {
 
 impl CtrlClient {
   /// Create a new controller client
-  pub fn new(name: &str, url: &str) -> Self {
+  pub async fn new(name: &str, url: &str) -> IoResult<Self> {
     log::debug!("CtrlClient::new {name}: {url}");
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
         let url = url.to_owned();
-        let client = Client::build()
-          .connector(
-            Connector::default()
-              .connector(ntex::service::fn_service(move |_| {
-                let path = url.trim_start_matches("unix://").to_owned();
-                async move { Ok(rt::unix_connect(path).await?) }
-              }))
-              .timeout(ntex::time::Millis::from_secs(50))
-              .finish(),
+        let client = Client::builder()
+          .connector::<&str>(
+            ntex::client::Connector::default().connector(
+              ntex::service::fn_service(move |_| {
+                let unix_socket = url.trim_start_matches("unix://").to_owned();
+                async {
+                  Ok(
+                    rt::unix_connect(unix_socket, ntex::SharedCfg::default())
+                      .await?,
+                  )
+                }
+              })
+              .map_init_err(|_| unreachable!()),
+            ),
           )
-          .timeout(ntex::time::Millis::from_secs(50))
-          .finish();
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::invalid_data(
+              "Unable to build http client",
+              err.to_string().as_str(),
+            )
+          })?;
         (client, "http://localhost")
       }
       url if url.starts_with("http://") || url.starts_with("https://") => {
-        let client = Client::build().finish();
+        let client = Client::builder()
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::invalid_data(
+              "Unable to build http client",
+              err.to_string().as_str(),
+            )
+          })?;
         (client, url)
       }
       _ => panic!("Invalid url: {}", url),
     };
-    Self {
+    Ok(Self {
       client,
       name: name.to_owned(),
       base_url: url.to_owned(),
-    }
+    })
   }
 
   /// Format url with base url
@@ -58,7 +80,7 @@ impl CtrlClient {
   /// Check if the response is an API error
   async fn is_api_error(
     &self,
-    res: &mut ClientResponse,
+    res: &ClientResponse,
     status: &StatusCode,
   ) -> Result<(), HttpClientError> {
     if status.is_server_error() || status.is_client_error() {
@@ -80,7 +102,7 @@ impl CtrlClient {
   /// Parse http response to json
   async fn res_json<T>(
     &self,
-    res: &mut ClientResponse,
+    res: &ClientResponse,
   ) -> Result<T, HttpClientError>
   where
     T: serde::de::DeserializeOwned,
@@ -101,15 +123,15 @@ impl CtrlClient {
   ) -> Result<serde_json::Value, HttpClientError> {
     let url = self.format_url(&format!("/{version}/rules/{name}"));
     log::debug!("CtrlClient::apply_rule url: {}", url);
-    let mut res = self
+    let res = self
       .client
       .put(url)
       .send_json(data)
       .await
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
-    self.is_api_error(&mut res, &status).await?;
-    self.res_json(&mut res).await
+    self.is_api_error(&res, &status).await?;
+    self.res_json(&res).await
   }
 
   /// Call delete rule method on controller
@@ -120,14 +142,14 @@ impl CtrlClient {
   ) -> Result<(), HttpClientError> {
     let url = self.format_url(&format!("/{version}/rules/{name}"));
     log::debug!("CtrlClient::delete_rule url: {}", url);
-    let mut res = self
+    let res = self
       .client
       .delete(url)
       .send()
       .await
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
-    self.is_api_error(&mut res, &status).await?;
+    self.is_api_error(&res, &status).await?;
     Ok(())
   }
 }

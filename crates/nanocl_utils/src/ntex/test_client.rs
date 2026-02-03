@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
-use ntex::http::client::{ClientRequest, ClientResponse};
+use ntex::client::{ClientRequest, ClientResponse};
+use ntex::time::Millis;
 use ntex::web::test::TestServer;
 
 #[macro_export]
@@ -35,13 +36,17 @@ impl TestClient {
   }
 
   pub fn get(&self, url: &str) -> ClientRequest {
-    self.srv.get(self.gen_url(url))
+    self
+      .srv
+      .get(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
   }
 
   pub fn delete(&self, url: &str) -> ClientRequest {
     self
       .srv
       .delete(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
       .header("User-Agent", "nanocld_client")
   }
 
@@ -49,6 +54,7 @@ impl TestClient {
     self
       .srv
       .post(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
       .header("User-Agent", "nanocld_client")
   }
 
@@ -56,6 +62,7 @@ impl TestClient {
     self
       .srv
       .patch(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
       .header("User-Agent", "nanocld_client")
   }
 
@@ -63,6 +70,7 @@ impl TestClient {
     self
       .srv
       .put(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
       .header("User-Agent", "nanocld_client")
   }
 
@@ -70,6 +78,7 @@ impl TestClient {
     self
       .srv
       .head(self.gen_url(url))
+      .timeout(Millis::from_secs(20))
       .header("User-Agent", "nanocld_client")
   }
 
@@ -203,7 +212,7 @@ impl TestClient {
     }
   }
 
-  pub async fn res_json<R>(mut res: ClientResponse) -> R
+  pub async fn res_json<R>(res: ClientResponse) -> R
   where
     R: serde::de::DeserializeOwned + Send + 'static,
   {
