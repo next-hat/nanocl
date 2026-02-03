@@ -1,6 +1,6 @@
 use diesel::{prelude::*, query_dsl::methods::LoadQuery};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::{GenericClause, GenericFilter};
 
@@ -38,7 +38,13 @@ pub trait RepositoryReadBy: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(item)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while reading item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 
   async fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> IoResult<Self::Output>
@@ -71,7 +77,13 @@ pub trait RepositoryReadBy: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(items)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while reading item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }
 
@@ -139,6 +151,12 @@ pub trait RepositoryCountBy: RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(count)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while reading item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }

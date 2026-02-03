@@ -80,7 +80,7 @@ mod tests {
   #[ntex::test]
   pub async fn get_version() {
     let client = gen_test_system(ntex_config, vars::VERSION).await.client;
-    let mut res = client.send_get("/version", None::<String>).await;
+    let res = client.send_get("/version", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "version");
     let data = res.json::<BinaryInfo>().await.unwrap();
     assert_eq!(data.arch, vars::ARCH, "Expect arch to be {}", vars::ARCH);

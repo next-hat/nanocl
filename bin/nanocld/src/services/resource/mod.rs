@@ -97,7 +97,7 @@ mod tests {
         "Test": "gg",
       })),
     };
-    let mut res = client
+    let res = client
       .send_post(ENDPOINT, Some(&resource), None::<String>)
       .await;
     test_status_code!(
@@ -109,14 +109,14 @@ mod tests {
     assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
     assert_eq!(resource.kind, TEST_RESOURCE_KIND);
     // Basic list
-    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    let res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list resource");
     let _ = res.json::<Vec<Resource>>().await.unwrap();
     // Using filter exists
     let filter = GenericFilter::new()
       .r#where("data", GenericClause::HasKey("Username".to_owned()));
     let query = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    let res = client.send_get(ENDPOINT, Some(&query)).await;
     test_status_code!(
       res.status(),
       http::StatusCode::OK,
@@ -134,7 +134,7 @@ mod tests {
       })),
     );
     let query = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    let res = client.send_get(ENDPOINT, Some(&query)).await;
     test_status_code!(
       res.status(),
       http::StatusCode::OK,
@@ -148,7 +148,7 @@ mod tests {
     let filter = GenericFilter::new()
       .r#where("metadata", GenericClause::HasKey("Test".to_owned()));
     let query = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    let res = client.send_get(ENDPOINT, Some(&query)).await;
     test_status_code!(
       res.status(),
       http::StatusCode::OK,
@@ -166,7 +166,7 @@ mod tests {
       })),
     );
     let query = GenericListQuery::try_from(filter).unwrap();
-    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    let res = client.send_get(ENDPOINT, Some(&query)).await;
     test_status_code!(
       res.status(),
       http::StatusCode::OK,
@@ -178,7 +178,7 @@ mod tests {
       "Expect 1 resource when filter by meta contains"
     );
     // Inspect
-    let mut res = client
+    let res = client
       .send_get(
         &format!("{ENDPOINT}/{TEST_RESOURCE}/inspect"),
         None::<String>,
@@ -208,7 +208,7 @@ mod tests {
       data: data.clone(),
       metadata: None,
     };
-    let mut res = client
+    let res = client
       .send_put(
         &format!("{ENDPOINT}/{TEST_RESOURCE}"),
         Some(&new_resource),

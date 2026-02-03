@@ -38,7 +38,7 @@ nanocl_error = { version = "0.6", features = [
 ] }
 log = "0.4"
 clap = { version = "4.5", features = ["derive"] }
-ntex = { version = "2", features = ["tokio", "openssl"] }
+ntex = { version = "3", features = ["tokio", "openssl"] }
 tokio = { version = "1.49", features = ["fs"] }
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }

@@ -49,7 +49,7 @@ mod tests {
       http::StatusCode::BAD_REQUEST,
       "reserved metric kind"
     );
-    let mut res = client
+    let res = client
       .send_post(
         ENDPOINT,
         Some(&MetricPartial {

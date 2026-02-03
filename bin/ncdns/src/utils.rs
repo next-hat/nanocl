@@ -166,7 +166,7 @@ pub mod tests {
   }
 
   // Generate a test server
-  pub fn gen_default_test_client() -> TestClient {
+  pub async fn gen_default_test_client() -> TestClient {
     before();
     let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq
@@ -178,12 +178,13 @@ pub mod tests {
     })
     .expect("Failed to create a nanocl client");
     // Create test server
-    let srv = ntex::web::test::server(move || {
+    let srv = ntex::web::test::server(async move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())
         .state(client.clone())
         .configure(services::ntex_config)
-    });
+    })
+    .await;
     TestClient::new(srv, vars::VERSION)
   }
 }

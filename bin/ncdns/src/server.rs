@@ -14,7 +14,7 @@ pub fn generate(
 ) -> IoResult<ntex::server::Server> {
   let dnsmasq = dnsmasq.clone();
   let client = client.clone();
-  let mut server = web::HttpServer::new(move || {
+  let mut server = web::HttpServer::new(async move || {
     web::App::new()
       .state(dnsmasq.clone())
       .state(client.clone())

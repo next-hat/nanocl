@@ -111,7 +111,7 @@ mod tests {
         url: Some("unix:///run/nanocl/proxy.sock".to_owned()),
       },
     };
-    let mut res = client
+    let res = client
       .send_post(ENDPOINT, Some(&payload), None::<String>)
       .await;
     test_status_code!(
@@ -123,12 +123,12 @@ mod tests {
     assert_eq!(kind.name, payload.name);
     assert_eq!(kind.version, payload.version);
     // List
-    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    let res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "resource kind list");
     let items = res.json::<Vec<ResourceKind>>().await.unwrap();
     assert!(items.iter().any(|i| i.name == payload.name));
     // Inspect
-    let mut res = client
+    let res = client
       .send_get(
         &format!("{}/{}/inspect", ENDPOINT, payload.name),
         None::<String>,
@@ -142,7 +142,7 @@ mod tests {
     let kind = res.json::<ResourceKindInspect>().await.unwrap();
     assert_eq!(kind.name, payload.name);
     // Inspect version
-    let mut res = client
+    let res = client
       .send_get(
         &format!(
           "{}/{}/version/{}/inspect",

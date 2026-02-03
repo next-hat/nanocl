@@ -29,7 +29,13 @@ pub trait RepositoryCreate: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(item)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while creating item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 
   async fn create_try_from<I>(item: I, pool: &Pool) -> IoResult<Self>

@@ -10,7 +10,7 @@ use crate::{models::SystemStateRef, services};
 
 pub fn generate(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
   let state = Arc::clone(state);
-  let mut server = web::HttpServer::new(move || {
+  let mut server = web::HttpServer::new(async move || {
     web::App::new()
       .state(Arc::clone(&state))
       .wrap(middlewares::SerializeError)

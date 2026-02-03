@@ -141,7 +141,8 @@ pub async fn vm_attach(
   let key = utils::key::gen_key(&namespace, &path.1);
   web::ws::start(
     req,
-    // inject state to ws_attach_service factory
+    None::<&str>,
+    // inject chat server send to a ws_service factory
     map_config(fn_factory_with_config(ws_attach_service), move |cfg| {
       (key.clone(), cfg, state.clone())
     }),

@@ -5,10 +5,10 @@ use ntex::{Middleware, Service, ServiceCtx, http, web};
 /// Middleware to convert default ntex SerializeError from text/plain to application/json
 pub struct SerializeError;
 
-impl<S> Middleware<S> for SerializeError {
+impl<S, Cfg> Middleware<S, Cfg> for SerializeError {
   type Service = SerializeErrorMiddleware<S>;
 
-  fn create(&self, service: S) -> Self::Service {
+  fn create(&self, service: S, _: Cfg) -> Self::Service {
     SerializeErrorMiddleware { service }
   }
 }

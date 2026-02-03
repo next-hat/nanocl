@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ntex::http::client::{ClientRequest, ClientResponse};
+use ntex::client::{ClientRequest, ClientResponse};
 use ntex::web::test::TestServer;
 
 #[macro_export]
@@ -203,7 +203,7 @@ impl TestClient {
     }
   }
 
-  pub async fn res_json<R>(mut res: ClientResponse) -> R
+  pub async fn res_json<R>(res: ClientResponse) -> R
   where
     R: serde::de::DeserializeOwned + Send + 'static,
   {

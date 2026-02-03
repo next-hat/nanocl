@@ -57,12 +57,13 @@ pub mod tests {
     let state = SystemState::new(&config).await.unwrap();
     let state_ptr = state.clone();
     // Create test server
-    let srv = test::server(move || {
+    let srv = test::server(async move || {
       App::new()
         .state(state_ptr.clone())
         .configure(routes)
         .default_service(web::route().to(services::unhandled))
-    });
+    })
+    .await;
     let client = TestClient::new(srv, version);
     TestSystem { state, client }
   }

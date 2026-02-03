@@ -1,18 +1,19 @@
 use std::error::Error;
 
-use nanocl_error::io::IoResult;
-use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
-use ntex::{http, rt};
-
 use futures::{StreamExt, TryStreamExt};
-use ntex::channel::mpsc::Receiver;
-use ntex::util::{Bytes, Stream};
+use ntex::{
+  channel::mpsc::Receiver,
+  rt,
+  util::{Bytes, Stream},
+};
 
+use nanocl_error::io::IoResult;
 use nanocl_error::{
   http::HttpError,
   http_client::HttpClientError,
   io::{FromIo, IoError},
 };
+use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
 
 use crate::error::is_api_error;
 
@@ -100,21 +101,27 @@ impl NanocldClient {
     }
   }
 
-  fn gen_client(&self) -> IoResult<http::client::Client> {
+  async fn gen_client(&self) -> IoResult<ntex::client::Client> {
     #[allow(unused_mut)]
-    let mut client = http::client::Client::build();
+    let mut client = ntex::client::Client::builder();
     #[cfg(not(target_os = "windows"))]
     {
       if let Some(unix_socket) = &self.unix_socket {
+        use ntex::ServiceFactory;
         let unix_socket = unix_socket.clone();
-        client = client.connector(
-          http::client::Connector::default()
-            .connector(ntex::service::fn_service(move |_| {
+        client = client.connector::<&str>(
+          ntex::client::Connector::default().connector(
+            ntex::service::fn_service(move |_| {
               let unix_socket = unix_socket.clone();
-              async { Ok::<_, _>(rt::unix_connect(unix_socket).await?) }
-            }))
-            .timeout(ntex::time::Millis::from_secs(100))
-            .finish(),
+              async {
+                Ok(
+                  rt::unix_connect(unix_socket, ntex::SharedCfg::default())
+                    .await?,
+                )
+              }
+            })
+            .map_init_err(|_| unreachable!()),
+          ),
         );
       }
     }
@@ -170,19 +177,25 @@ impl NanocldClient {
             err.to_string().as_str(),
           )
         })?;
-        client = ntex::http::client::Client::build().connector(
-          http::client::Connector::default()
-            .openssl(builder.build())
-            .finish(),
+        client = ntex::client::Client::builder().connector::<&str>(
+          ntex::client::Connector::default().openssl(builder.build()),
         )
       }
     }
-    Ok(client.timeout(ntex::time::Millis::from_secs(100)).finish())
+    client
+      .build(ntex::SharedCfg::default())
+      .await
+      .map_err(|err| {
+        IoError::invalid_data(
+          "Unable to build http client",
+          err.to_string().as_str(),
+        )
+      })
   }
 
   fn send_error(
     &self,
-    err: http::client::error::SendRequestError,
+    err: ntex::client::error::SendRequestError,
   ) -> HttpClientError {
     let url = if let Some(url) = &self.unix_socket {
       url
@@ -196,55 +209,61 @@ impl NanocldClient {
     format!("{}/{}{}", self.url, self.version, url)
   }
 
-  fn get(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn get(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .get(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
   }
 
-  fn delete(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn delete(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .delete(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
   }
 
-  fn post(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn post(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .post(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
   }
 
-  fn patch(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn patch(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .patch(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
   }
 
-  fn put(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn put(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .put(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
   }
 
-  fn head(&self, url: &str) -> IoResult<http::client::ClientRequest> {
+  async fn head(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
-        .gen_client()?
+        .gen_client()
+        .await?
         .head(self.gen_url(url))
         .header("User-Agent", "nanocld_client"),
     )
@@ -254,11 +273,11 @@ impl NanocldClient {
     &self,
     url: &str,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     Q: serde::Serialize,
   {
-    let mut req = self.get(url)?;
+    let mut req = self.get(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -292,12 +311,12 @@ impl NanocldClient {
     url: &str,
     body: Option<B>,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.post(url)?;
+    let mut req = self.post(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -320,13 +339,13 @@ impl NanocldClient {
     url: &str,
     stream: S,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     Q: serde::Serialize,
     E: Error + 'static,
   {
-    let mut req = self.post(url)?;
+    let mut req = self.post(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -345,11 +364,11 @@ impl NanocldClient {
     &self,
     url: &str,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     Q: serde::Serialize,
   {
-    let mut req = self.delete(url)?;
+    let mut req = self.delete(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -366,12 +385,12 @@ impl NanocldClient {
     url: &str,
     body: Option<B>,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.patch(url)?;
+    let mut req = self.patch(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -393,11 +412,11 @@ impl NanocldClient {
     &self,
     url: &str,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     Q: serde::Serialize,
   {
-    let mut req = self.head(url)?;
+    let mut req = self.head(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -414,12 +433,12 @@ impl NanocldClient {
     url: &str,
     body: Option<B>,
     query: Option<Q>,
-  ) -> Result<http::client::ClientResponse, HttpClientError>
+  ) -> Result<ntex::client::ClientResponse, HttpClientError>
   where
     B: serde::Serialize,
     Q: serde::Serialize,
   {
-    let mut req = self.put(url)?;
+    let mut req = self.put(url).await?;
     if let Some(query) = query {
       req = req
         .query(&query)
@@ -438,7 +457,7 @@ impl NanocldClient {
   }
 
   pub async fn res_json<R>(
-    mut res: http::client::ClientResponse,
+    res: ntex::client::ClientResponse,
   ) -> Result<R, HttpClientError>
   where
     R: serde::de::DeserializeOwned + Send + 'static,
@@ -452,7 +471,7 @@ impl NanocldClient {
   }
 
   pub async fn res_stream<R>(
-    res: http::client::ClientResponse,
+    res: ntex::client::ClientResponse,
   ) -> Receiver<Result<R, HttpError>>
   where
     R: serde::de::DeserializeOwned + Send + 'static,

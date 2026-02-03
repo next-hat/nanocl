@@ -1,6 +1,6 @@
 use diesel::{associations::HasTable, prelude::*, query_builder, query_dsl};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
@@ -32,7 +32,13 @@ pub trait RepositoryDelByPk: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(())
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while deleting item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }
 
@@ -65,6 +71,12 @@ pub trait RepositoryDelBy: super::RepositoryBase {
       query.execute(&mut conn).map_err(Self::map_err)?;
       Ok(())
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while deleting item",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }

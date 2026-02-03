@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use diesel::prelude::*;
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
@@ -127,7 +127,13 @@ impl DistributedMutexDb {
       let item = query.get_result(&mut conn).map_err(Self::map_err)?;
       Ok(item)
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while getting lock",
+        err.to_string().as_str(),
+      )
+    })?
   }
 
   pub async fn del_lock(
@@ -148,6 +154,12 @@ impl DistributedMutexDb {
       query.execute(&mut conn).map_err(Self::map_err)?;
       Ok(())
     })
-    .await?
+    .await
+    .map_err(|err| {
+      IoError::interrupted(
+        "Interrupted while deleting lock",
+        err.to_string().as_str(),
+      )
+    })?
   }
 }

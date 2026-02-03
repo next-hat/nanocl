@@ -30,7 +30,7 @@ mod tests {
   async fn basic() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    let res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list nodes");
     let _ = res.json::<Vec<Node>>().await.unwrap();
   }

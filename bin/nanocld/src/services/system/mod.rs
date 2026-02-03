@@ -26,7 +26,7 @@ mod tests {
   async fn system_info() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut res = client.send_get("/info", None::<String>).await;
+    let res = client.send_get("/info", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "system info");
     let _ = res.json::<HostInfo>().await.unwrap();
   }

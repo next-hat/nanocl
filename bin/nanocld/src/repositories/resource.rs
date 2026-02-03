@@ -215,7 +215,8 @@ impl ResourceDb {
       })?;
     }
     if let Some(url) = &kind.data.url {
-      let ctrl_client = utils::ctrl_client::CtrlClient::new(&kind.name, url);
+      let ctrl_client =
+        utils::ctrl_client::CtrlClient::new(&kind.name, url).await?;
       let config = ctrl_client
         .apply_rule(&version, &resource.name, &resource.data)
         .await?;
@@ -234,7 +235,8 @@ impl ResourceDb {
       .try_into()?;
     log::debug!("hook_delete_resource kind: {kind:?}");
     if let Some(url) = &kind.data.url {
-      let ctrl_client = utils::ctrl_client::CtrlClient::new(&kind.name, url);
+      let ctrl_client =
+        utils::ctrl_client::CtrlClient::new(&kind.name, url).await?;
       ctrl_client
         .delete_rule(&resource.spec.version, &resource.spec.resource_key)
         .await?;

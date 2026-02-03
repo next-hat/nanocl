@@ -405,17 +405,17 @@ where
 }
 
 #[cfg(feature = "ntex")]
-impl FromIo<Box<IoError>> for ntex::http::client::error::SendRequestError {
+impl FromIo<Box<IoError>> for ntex::client::error::SendRequestError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,
   {
     let inner = match self {
-      ntex::http::client::error::SendRequestError::Timeout => {
+      ntex::client::error::SendRequestError::Timeout => {
         std::io::Error::new(std::io::ErrorKind::TimedOut, format!("{self}"))
       }
-      ntex::http::client::error::SendRequestError::Connect(err) => match err {
-        ntex::http::client::error::ConnectError::Disconnected(_) => {
+      ntex::client::error::SendRequestError::Connect(err) => match err {
+        ntex::client::error::ConnectError::Disconnected(_) => {
           std::io::Error::new(
             std::io::ErrorKind::ConnectionAborted,
             format!("{err}"),
@@ -435,7 +435,7 @@ impl FromIo<Box<IoError>> for ntex::http::client::error::SendRequestError {
 }
 
 #[cfg(feature = "ntex")]
-impl FromIo<Box<IoError>> for ntex::http::client::error::JsonPayloadError {
+impl FromIo<Box<IoError>> for ntex::client::error::JsonPayloadError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,
@@ -461,7 +461,10 @@ impl FromIo<Box<IoError>> for ntex::http::error::PayloadError {
 }
 
 #[cfg(feature = "ntex")]
-impl FromIo<Box<IoError>> for ntex::ws::error::WsClientBuilderError {
+impl<T> FromIo<Box<IoError>> for ntex::ws::error::WsClientBuilderError<T>
+where
+  T: std::fmt::Display,
+{
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,

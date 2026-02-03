@@ -78,8 +78,8 @@ mod tests {
     let data = std::fs::read_to_string("tests/resource_dns.yml").unwrap();
     let payload = serde_yaml::from_str::<ResourceDnsRule>(&data).unwrap();
     log::debug!("apply_rule: payload = {payload:#?}");
-    let client = gen_default_test_client();
-    let mut res = client
+    let client = gen_default_test_client().await;
+    let res = client
       .send_put("/rules/test", Some(payload), None::<String>)
       .await;
     let body = res.json::<serde_json::Value>().await;
@@ -89,7 +89,7 @@ mod tests {
 
   #[ntex::test]
   async fn apply_empty_rule() {
-    let client = gen_default_test_client();
+    let client = gen_default_test_client().await;
     let res = client
       .send_put("/rules/test", None::<String>, None::<String>)
       .await;
@@ -102,7 +102,7 @@ mod tests {
 
   #[ntex::test]
   async fn remove_unexisting_rule() {
-    let client = gen_default_test_client();
+    let client = gen_default_test_client().await;
     let res = client.send_delete("/rules/test", None::<String>).await;
     test_status_code!(
       res.status(),
