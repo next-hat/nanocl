@@ -81,7 +81,10 @@ mod tests {
         "watch events condition"
       );
       let mut stream = res.into_stream();
-      while (stream.next().await).is_some() {}
+      while let Some(Ok(event)) = stream.next().await {
+        let string = String::from_utf8_lossy(&event);
+        log::info!("Received event: {string}");
+      }
     });
     let cargo = CargoSpecPartial {
       name: CARGO_NAME.to_owned(),

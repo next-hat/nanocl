@@ -70,11 +70,20 @@ impl TaskManager {
 
   pub async fn remove_task(&self, key: &str) {
     let mut tasks = self.tasks.lock().await;
-    let task = tasks.get(key);
-    if let Some(task) = task {
-      task.fut.abort();
-      log::debug!("Removing task: {key} {}", task.kind);
-      tasks.remove(key);
+    if let Some(task) = tasks.remove(key) {
+      let kind = task.kind.clone();
+      if !task.fut.is_finished() {
+        log::debug!("Cancelling task: {key} {kind}");
+        match Arc::try_unwrap(task.fut) {
+          Ok(handle) => handle.cancel(),
+          Err(_handle) => {
+            log::debug!(
+              "Task cancellation skipped for {key} {kind} because handle is shared",
+            );
+          }
+        }
+      }
+      log::debug!("Removing task: {key} {kind}");
     }
   }
 

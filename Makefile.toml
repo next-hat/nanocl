@@ -48,6 +48,7 @@ args = [
   "--",
   "--test-threads",
   "1",
+  "--nocapture",
 ]
 
 # Test nanocld_client

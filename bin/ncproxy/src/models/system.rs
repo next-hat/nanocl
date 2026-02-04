@@ -43,10 +43,13 @@ impl SystemEvent {
   }
 
   pub fn handle(&mut self, _e: SystemEventKind) {
-    let abort_handle = self.0.task.abort_handle();
-    if !abort_handle.is_finished() {
-      log::info!("system: aborting reload task");
-      abort_handle.abort();
+    if !self.0.task.is_finished() {
+      log::info!("system: canceling reload task");
+      let task = std::mem::replace(
+        &mut self.0.task,
+        rt::spawn(async move { Ok::<_, IoError>(()) }),
+      );
+      task.cancel();
     }
     let client = self.0.client.clone();
     self.0.task = rt::spawn(async move {
