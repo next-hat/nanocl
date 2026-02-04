@@ -33,9 +33,9 @@ mod tests {
   async fn list_jobs() {
     let system = gen_default_test_system().await;
     let client = system.client;
-    let mut response = client.get(ENDPOINT).send().await.unwrap();
-    test_status_code!(response.status(), http::StatusCode::OK, "list jobs");
-    let _ = response.json::<Vec<JobSummary>>().await.unwrap();
+    let res = client.get(ENDPOINT).send().await.unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "list jobs");
+    let _ = res.json::<Vec<JobSummary>>().await.unwrap();
   }
 
   #[ntex::test]
