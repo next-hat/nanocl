@@ -1828,7 +1828,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "nix",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "openssl",
  "regex",
  "ring",
@@ -1850,7 +1850,7 @@ version = "0.6.0"
 dependencies = [
  "bollard-next",
  "diesel",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -1883,7 +1883,7 @@ dependencies = [
  "libc",
  "log",
  "nanocl_error",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "serde",
  "serde_json",
  "utoipa",
@@ -1913,7 +1913,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "ntex-cors",
  "num_cpus",
  "openssl",
@@ -1936,7 +1936,7 @@ dependencies = [
  "futures",
  "nanocl_error",
  "nanocl_stubs",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "openssl",
  "serde",
  "serde_json",
@@ -1961,7 +1961,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -1986,7 +1986,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2005,7 +2005,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.0.1",
+ "ntex 3.3.0",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2091,9 +2091,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "3.0.1"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87580e15d6df4536dac61210ab2e3b36832608a263a800f9e2a577fd47df7928"
+checksum = "f2a8d2be2a5934093fe81634ca82c9398268d8cf17ec6f76683a2ae435ab4fcc"
 dependencies = [
  "base64",
  "bitflags 2.10.0",
@@ -2107,16 +2107,16 @@ dependencies = [
  "ntex-bytes 1.5.0",
  "ntex-codec 1.1.0",
  "ntex-dispatcher",
- "ntex-h2 3.6.1",
+ "ntex-h2 3.7.1",
  "ntex-http 1.0.0",
  "ntex-io 3.8.0",
  "ntex-macros 3.1.0",
- "ntex-net 3.6.1",
+ "ntex-net 3.7.0",
  "ntex-router 1.0.0",
  "ntex-rt 3.7.0",
- "ntex-server 3.6.0",
- "ntex-service 4.0.0",
- "ntex-tls 3.2.0",
+ "ntex-server 3.8.0",
+ "ntex-service 4.4.0",
+ "ntex-tls 3.3.0",
  "ntex-util 3.4.0",
  "openssl",
  "percent-encoding",
@@ -2179,20 +2179,20 @@ checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.0.1",
+ "ntex 3.3.0",
 ]
 
 [[package]]
 name = "ntex-dispatcher"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a80bfce58012a2a6ff4f969990a7d7f67a67db60b04825a33c6f8759381f174"
+checksum = "bdc658d0b4caced7d7cfeefaeddd50f6c80265dc98e944beae3ac6601337b267"
 dependencies = [
  "bitflags 2.10.0",
  "log",
  "ntex-codec 1.1.0",
  "ntex-io 3.8.0",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "pin-project-lite",
 ]
@@ -2220,9 +2220,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-h2"
-version = "3.6.1"
+version = "3.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f6ca5ae74e7adec846bbfe847abb96fb5f51eb2e75420b1b0e924dddfa54173"
+checksum = "ff063201f811d97557a5053dc75cbbd417adf4234e57ed8ec11fb05e3f2fdc3d"
 dependencies = [
  "bitflags 2.10.0",
  "foldhash",
@@ -2233,8 +2233,9 @@ dependencies = [
  "ntex-dispatcher",
  "ntex-http 1.0.0",
  "ntex-io 3.8.0",
- "ntex-net 3.6.1",
- "ntex-service 4.0.0",
+ "ntex-net 3.7.0",
+ "ntex-server 3.8.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "pin-project-lite",
  "thiserror 2.0.18",
@@ -2297,7 +2298,7 @@ dependencies = [
  "log",
  "ntex-bytes 1.5.0",
  "ntex-codec 1.1.0",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "pin-project-lite",
 ]
@@ -2358,9 +2359,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-net"
-version = "3.6.1"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87e9a81edf7781a285f1776976959e0884ea19fb4ca57ae36671bec53c52a2d3"
+checksum = "28bdb6cd6694011070753d228ba76f7683a0dd78d30ea0d0354702296f5f78bf"
 dependencies = [
  "bitflags 2.10.0",
  "cfg-if",
@@ -2372,7 +2373,7 @@ dependencies = [
  "ntex-io-uring",
  "ntex-polling",
  "ntex-rt 3.7.0",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "scoped-tls",
  "slab",
@@ -2447,7 +2448,7 @@ dependencies = [
  "foldhash",
  "futures-timer",
  "log",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "oneshot",
  "scoped-tls",
  "swap-buffer-queue",
@@ -2478,9 +2479,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-server"
-version = "3.6.0"
+version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "470e030e25b8b398c651522ab14d4ce22e94693ace4aaa57905bae7c8165ca81"
+checksum = "e1235b8aaa4e01a6b54d30d37065b6f57c4ec82cdae72b51e56423d13e45292a"
 dependencies = [
  "async-channel",
  "atomic-waker",
@@ -2488,10 +2489,10 @@ dependencies = [
  "ctrlc",
  "log",
  "ntex-io 3.8.0",
- "ntex-net 3.6.1",
+ "ntex-net 3.7.0",
  "ntex-polling",
  "ntex-rt 3.7.0",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "oneshot",
  "signal-hook",
@@ -2512,9 +2513,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-service"
-version = "4.0.0"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "179cfd5ab6b56445ca1b4146ee1d7a87e7f7bb1b7d4973f02327619c6aa90bcc"
+checksum = "a684729aee0b65ee6f573e127ac4759e2a0f0cb5c0ec8c1bda8b2972aac26d4c"
 dependencies = [
  "foldhash",
  "log",
@@ -2537,15 +2538,15 @@ dependencies = [
 
 [[package]]
 name = "ntex-tls"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cf2451491245ba3da8ce297baaf909a75178896b14d2e3db060bdd27b35284e"
+checksum = "df010ac89eab9dc4ab3ec7507cea08788f964c476b6c0c50de5a88869ac7dc6b"
 dependencies = [
  "log",
  "ntex-bytes 1.5.0",
  "ntex-io 3.8.0",
- "ntex-net 3.6.1",
- "ntex-service 4.0.0",
+ "ntex-net 3.7.0",
+ "ntex-service 4.4.0",
  "ntex-util 3.4.0",
  "openssl",
 ]
@@ -2595,7 +2596,7 @@ dependencies = [
  "log",
  "ntex-bytes 1.5.0",
  "ntex-rt 3.7.0",
- "ntex-service 4.0.0",
+ "ntex-service 4.4.0",
  "pin-project-lite",
  "slab",
  "thiserror 2.0.18",
