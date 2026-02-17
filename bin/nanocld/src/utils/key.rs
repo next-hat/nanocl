@@ -5,9 +5,7 @@
 /// The cargo key will be `get-started.global`
 use rand::{RngExt, distr::Alphanumeric, rng};
 
-use nanocl_error::{
-  io::{IoError, IoResult},
-};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::process::ProcessKind;
 
