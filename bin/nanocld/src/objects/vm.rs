@@ -11,7 +11,7 @@ use nanocl_stubs::{
 use crate::{
   models::{
     ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SpecDb, SystemState, VmDb,
-    VmImageDb, VmObjCreateIn, VmObjPatchIn, VmObjPutIn,
+    VmObjCreateIn, VmObjPatchIn, VmObjPutIn,
   },
   repositories::generic::*,
   utils,
@@ -43,22 +43,7 @@ impl ObjCreate for VmDb {
     if name.contains('.') {
       return Err(HttpError::bad_request("VM name cannot contain '.'"));
     }
-    let image =
-      VmImageDb::read_by_pk(&vm.disk.image, &state.inner.pool).await?;
-    if image.kind.as_str() != "Base" {
-      return Err(HttpError::bad_request(format!(
-        "Image {} is not a base image please convert the snapshot into a base image first",
-        &vm.disk.image
-      )));
-    }
-    let snap_name = format!("{}.{vm_key}", &image.name);
     let size = vm.disk.size.unwrap_or(20);
-    log::debug!("Creating snapshot {snap_name} with size {size}");
-    let image =
-      utils::vm_image::create_snap(&snap_name, size, &image, state).await?;
-    log::debug!("Snapshot {snap_name} created");
-    // Use the snapshot image
-    vm.disk.image.clone_from(&image.name);
     vm.disk.size = Some(size);
     let status = ObjPsStatusPartial {
       key: vm_key.clone(),
@@ -184,6 +169,11 @@ impl ObjPatchByPk for VmDb {
         spec.ssh_key.clone()
       } else {
         old_spec.ssh_key
+      },
+      init_container: if spec.init_container.is_some() {
+        spec.init_container.clone()
+      } else {
+        old_spec.init_container.clone()
       },
       mac_address: old_spec.mac_address,
       labels: if spec.labels.is_some() {

@@ -19,7 +19,6 @@ mod stats;
 mod uninstall;
 mod version;
 mod vm;
-mod vm_image;
 
 pub use generic::*;
 

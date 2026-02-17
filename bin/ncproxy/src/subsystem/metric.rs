@@ -162,7 +162,7 @@ async fn watch(state: &SystemStateRef) -> IoResult<()> {
 /// and the nanocl daemon will be able to save them to the database
 pub(crate) fn spawn(state: &SystemStateRef) {
   let state = Arc::clone(state);
-  rt::Arbiter::new().exec_fn(move || {
+  rt::Arbiter::new().handle().spawn(async move {
     rt::spawn(async move {
       if let Err(err) = watch(&state).await {
         log::warn!("metric::spawn: {err}");

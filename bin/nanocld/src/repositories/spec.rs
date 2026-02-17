@@ -174,6 +174,7 @@ impl SpecDb {
       disk: p.disk,
       host_config: p.host_config.unwrap_or_default(),
       ssh_key: p.ssh_key,
+      init_container: p.init_container,
       user: p.user,
       mac_address: p.mac_address,
       labels: p.labels,

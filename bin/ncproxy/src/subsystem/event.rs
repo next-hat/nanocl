@@ -181,8 +181,8 @@ async fn r#loop(state: &SystemStateRef) {
 /// Spawn new thread with event loop to watch for nanocld events
 pub(crate) fn spawn(state: &SystemStateRef) {
   let state = Arc::clone(state);
-  rt::Arbiter::new().exec_fn(move || {
-    ntex::rt::spawn(async move {
+  rt::Arbiter::new().handle().spawn(async move {
+    rt::spawn(async move {
       r#loop(&state).await;
       rt::Arbiter::current().stop();
     });

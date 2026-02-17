@@ -97,6 +97,8 @@ services:
       - 8686:8686
     networks:
       - nanoclbr0
+    environment:
+      - RUST_BACKTRACE=1
     command:
       - watch
       - -w
@@ -148,6 +150,8 @@ services:
       - 8787:8787
     networks:
       - nanoclbr0
+    environment:
+      - RUST_BACKTRACE=1
     command:
       - watch
       - -w
@@ -186,6 +190,8 @@ services:
       - io.nanocl.c=ndaemon.system
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+    environment:
+      - RUST_BACKTRACE=1
     volumes:
       - type: bind
         source: .
@@ -249,6 +255,7 @@ services:
       - vpnkit
     environment:
       - USER_HOME=${HOME}
+      - RUST_BACKTRACE=1
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo

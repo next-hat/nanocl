@@ -3,7 +3,7 @@ use ntex::http::StatusCode;
 
 use nanocl_error::{
   http_client::HttpClientError,
-  io::{FromIo, IoResult},
+  io::{FromIo, IoError, IoResult},
 };
 use nanocld_client::{
   NanocldClient,
@@ -175,7 +175,9 @@ where
         continue;
       }
       if let Some(waiter) = waiter {
-        waiter.await??;
+        waiter.await.map_err(|err| {
+          IoError::interrupted("wait_process_state", &err.to_string())
+        })??;
       }
       pg.finish_with_message("(destroyed)");
     }
@@ -222,7 +224,9 @@ pub trait GenericCommandStart: GenericCommand {
         eprintln!("{err} {name}");
         continue;
       };
-      if let Err(err) = waiter.await? {
+      if let Err(err) = waiter.await.map_err(|err| {
+        IoError::interrupted("wait_process_state", &err.to_string())
+      })? {
         eprintln!("{err} {name}");
       }
     }
@@ -269,7 +273,9 @@ pub trait GenericCommandStop: GenericCommand {
         eprintln!("{err} {name}");
         continue;
       }
-      if let Err(err) = waiter.await? {
+      if let Err(err) = waiter.await.map_err(|err| {
+        IoError::interrupted("wait_process_state", &err.to_string())
+      })? {
         eprintln!("{err} {name}");
       }
     }

@@ -14,7 +14,7 @@ use ntex::{rt, time, util::Bytes, ws};
 #[cfg(not(target_os = "windows"))]
 use termios::{ECHO, ICANON, TCSANOW, Termios, tcsetattr};
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::{
   NanocldClient,
   stubs::{
@@ -34,7 +34,6 @@ use crate::{
   utils,
 };
 
-use super::vm_image::exec_vm_image;
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
@@ -90,6 +89,18 @@ pub async fn exec_vm_create(
   options: &VmCreateOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let mut options = options.clone();
+  let image_path = options.image.clone();
+  if !std::path::Path::new(&image_path).exists() {
+    return Err(IoError::other(
+      "vm run",
+      &format!("Image not found: {image_path}"),
+    ));
+  }
+  let full_path = std::fs::canonicalize(&image_path).map_err(|err| {
+    IoError::other("vm run", &format!("Unable to get full path: {err}"))
+  })?;
+  options.image = full_path.to_str().unwrap_or(&image_path).to_owned();
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
@@ -105,6 +116,18 @@ pub async fn exec_vm_run(
   options: &VmRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let mut options = options.clone();
+  let image_path = options.image.clone();
+  if !std::path::Path::new(&image_path).exists() {
+    return Err(IoError::other(
+      "vm run",
+      &format!("Image not found: {image_path}"),
+    ));
+  }
+  let full_path = std::fs::canonicalize(&image_path).map_err(|err| {
+    IoError::other("vm run", &format!("Unable to get full path: {err}"))
+  })?;
+  options.image = full_path.to_str().unwrap_or(&image_path).to_owned();
   let vm: VmSpecPartial = options.clone().into();
   let waiter =
     wait_vm_state(&vm.name, args, NativeEventAction::Start, client).await?;
@@ -112,7 +135,10 @@ pub async fn exec_vm_run(
   client
     .start_process("vm", &vm.spec.name, args.namespace.as_deref())
     .await?;
-  waiter.await??;
+  waiter.await.map_err(|err| {
+    IoError::interrupted("wait_process_state", &err.to_string())
+  })??;
+  ntex::time::sleep(Duration::from_secs(10)).await;
   if options.attach {
     #[cfg(not(target_os = "windows"))]
     {
@@ -141,7 +167,9 @@ pub async fn exec_vm_patch(
   client
     .patch_vm(&options.name, &vm, args.namespace.as_deref())
     .await?;
-  waiter.await??;
+  waiter.await.map_err(|err| {
+    IoError::interrupted("wait_process_state", &err.to_string())
+  })??;
   Ok(())
 }
 
@@ -254,7 +282,6 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   let client = &cli_conf.client;
   let namespace = args.namespace.clone().unwrap_or("global".to_owned());
   match &args.command {
-    VmCommand::Image(args) => exec_vm_image(client, args).await,
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
     VmCommand::List(opts) => VmArg::exec_ls(client, args, opts).await,
     VmCommand::Remove(opts) => {

@@ -16,5 +16,4 @@ pub mod resource_kind;
 pub mod secret;
 pub mod statefile;
 pub mod vm;
-pub mod vm_image;
 pub mod vm_spec;

@@ -55,7 +55,7 @@ impl SystemState {
   /// It will handle events and execute some actions
   /// It will also emit the event to the raw event emitter for the http clients
   fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
-    self.inner.arbiter.clone().exec_fn(move || {
+    self.inner.arbiter.clone().handle().spawn(async move {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
           if let Err(err) = super::exec_event(&e, &self).await {

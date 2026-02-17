@@ -26,9 +26,6 @@ pub use distributed_mutex::*;
 mod vm;
 pub use vm::*;
 
-mod vm_image;
-pub use vm_image::*;
-
 mod resource;
 pub use resource::*;
 

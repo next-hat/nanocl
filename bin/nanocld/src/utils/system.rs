@@ -19,11 +19,11 @@ use nanocl_stubs::{
 use crate::{
   models::{
     CargoDb, CargoObjCreateIn, NamespaceDb, ObjPsStatusDb, ObjPsStatusUpdate,
-    ProcessDb, ProcessUpdateDb, SystemState, VmImageDb,
+    ProcessDb, ProcessUpdateDb, SystemState,
   },
   objects::generic::ObjCreate,
   repositories::generic::*,
-  utils, vars,
+  vars,
 };
 
 /// Will determine if the instance is registered by nanocl
@@ -249,37 +249,5 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     );
   ProcessDb::del_by(&filter, &state.inner.pool).await?;
   log::info!("system::sync_processes: done");
-  Ok(())
-}
-
-/// Check for vm images inside the vm images directory
-/// and create them in the database if they don't exist
-pub async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
-  log::info!("system::sync_vm_images: start");
-  let files =
-    std::fs::read_dir(format!("{}/vms/images", &state.inner.config.state_dir))?;
-  for file in files {
-    let file = file?;
-    let file_name = file.file_name();
-    let file_name = file_name.to_str().unwrap_or_default();
-    let dot_split_name = file_name.split('.').collect::<Vec<&str>>();
-    let name = if dot_split_name.len() > 1 {
-      dot_split_name[..dot_split_name.len() - 1].join(".")
-    } else {
-      dot_split_name[0].to_owned()
-    };
-    let file_path = file.path();
-    let path = file_path.to_str().unwrap_or_default();
-    if VmImageDb::read_by_pk(&name, &state.inner.pool)
-      .await
-      .is_ok()
-    {
-      continue;
-    }
-    if let Err(error) = utils::vm_image::create(&name, path, state).await {
-      log::warn!("system::sync_vm_images: {error}")
-    }
-  }
-  log::info!("system::sync_vm_images: done");
   Ok(())
 }

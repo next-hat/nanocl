@@ -868,36 +868,22 @@ mod tests {
   async fn virtual_machine() {
     assert_cli_ok!(
       "vm",
-      "image",
       "create",
-      "test-cli-image",
+      "test-cli-vm",
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
-    assert_cli_err!(
-      "vm",
-      "image",
-      "create",
-      "test-cli-image",
-      "../../tests/invalid_image.img"
-    );
-    assert_cli_ok!("vm", "image", "ls");
-    assert_cli_ok!("vm", "image", "rm", "-y", "test-cli-image");
-    assert_cli_ok!(
-      "vm",
-      "image",
-      "create",
-      "test-cli-image",
-      "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
-    );
-    assert_cli_ok!("vm", "create", "test-cli-vm", "test-cli-image");
     assert_cli_ok!("vm", "ls");
     assert_cli_ok!("vm", "inspect", "test-cli-vm");
     assert_cli_ok!("vm", "start", "test-cli-vm");
     assert_cli_ok!("vm", "stop", "test-cli-vm");
     assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
-    assert_cli_ok!("vm", "run", "test-cli-vm", "test-cli-image");
+    assert_cli_ok!(
+      "vm",
+      "run",
+      "test-cli-vm",
+      "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
+    );
     assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
-    assert_cli_ok!("vm", "image", "rm", "-y", "test-cli-image");
   }
 
   #[ntex::test]

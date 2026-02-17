@@ -9,7 +9,7 @@ use nanocld_client::stubs::vm_spec::{
 
 use super::{
   GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
-  GenericStopOpts, VmImageArg,
+  GenericStopOpts,
 };
 
 /// `nanocl vm` available commands
@@ -17,8 +17,6 @@ use super::{
 pub enum VmCommand {
   /// Run a vm
   Run(VmRunOpts),
-  /// Manage vm images
-  Image(VmImageArg),
   /// Create a vm
   Create(VmCreateOpts),
   /// List vms
@@ -129,7 +127,7 @@ pub struct VmRunOpts {
   pub attach: bool,
   /// Name of the vm
   pub name: String,
-  /// Name of the vm image
+  /// Full path of the vm image
   pub image: String,
 }
 
@@ -187,7 +185,7 @@ pub struct VmCreateOpts {
   pub kvm: bool,
   /// Name of the vm
   pub name: String,
-  /// Name of the vm image
+  /// Full path of the vm image
   pub image: String,
 }
 

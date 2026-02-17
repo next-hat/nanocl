@@ -22,41 +22,41 @@ Run a vm
 
 ## OPTIONS
 
-**--hostname** *\<HOSTNAME\>*  
+**--hostname** *\<HOSTNAME\>*
 hostname of the vm
 
-**--cpu** *\<CPU\>*  
+**--cpu** *\<CPU\>*
 Cpu of the vm default to 1
 
-**--mem** *\<MEMORY\>*  
+**--mem** *\<MEMORY\>*
 Memory of the vm in MB default to 512
 
-**--net-iface** *\<NET_IFACE\>*  
+**--net-iface** *\<NET_IFACE\>*
 network interface of the vm
 
-**--user** *\<USER\>*  
+**--user** *\<USER\>*
 Default user of the VM
 
-**--password** *\<PASSWORD\>*  
+**--password** *\<PASSWORD\>*
 Default password of the VM
 
-**--ssh-key** *\<SSH_KEY\>*  
+**--ssh-key** *\<SSH_KEY\>*
 Ssh key for the user
 
-**--img-size** *\<IMAGE_SIZE\>*  
+**--img-size** *\<IMAGE_SIZE\>*
 Size of the disk in GB
 
-**--kvm**  
+**--kvm**
 Enable KVM
 
-**-a**, **--attach**  
+**-a**, **--attach**
 Attach to the vm
 
-**-h**, **--help**  
+**-h**, **--help**
 Print help
 
-\<*NAME*\>  
+\<*NAME*\>
 Name of the vm
 
-\<*IMAGE*\>  
-Name of the vm image
+\<*IMAGE*\>
+Full path of the vm image
