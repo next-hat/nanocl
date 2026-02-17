@@ -76,7 +76,7 @@ colored = "3.0.0"
 termimad = "0.34"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-nix = { version = "0.30", features = ["user"] }
+nix = { version = "0.31", features = ["user"] }
 nanocl_utils = { version = "0.8", features = ["unix"] }
 termios = "0.3"
 
