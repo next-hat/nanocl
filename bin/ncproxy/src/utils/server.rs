@@ -13,7 +13,7 @@ pub fn generate(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
   let mut server = web::HttpServer::new(async move || {
     web::App::new()
       .state(Arc::clone(&state))
-      .wrap(middlewares::SerializeError)
+      .middleware(middlewares::SerializeError)
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });

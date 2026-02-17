@@ -46,7 +46,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   }
   config.service(
     web::scope("/{version}")
-      .wrap(
+      .middleware(
         nanocl_utils::ntex::middlewares::Versioning::new(crate::vars::VERSION)
           .finish(),
       )

@@ -24,11 +24,11 @@ pub async fn generate(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
       .state(web::types::JsonConfig::default().limit(20_000_000_000)) // <- limit size of the json payload
-      .wrap(Cors::new().finish())
-      .wrap(middlewares::Versioning::new(vars::VERSION).finish())
-      .wrap(middlewares::SerializeError)
+      .middleware(Cors::new().finish())
+      .middleware(middlewares::Versioning::new(vars::VERSION).finish())
+      .middleware(middlewares::SerializeError)
       // Default logger middleware
-      .wrap(web::middleware::Logger::default())
+      .middleware(web::middleware::Logger::default())
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });

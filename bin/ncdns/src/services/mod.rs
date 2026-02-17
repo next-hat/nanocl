@@ -41,7 +41,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
   config.service(
     web::scope("/{version}")
-      .wrap(versioning)
+      .middleware(versioning)
       .configure(rule::ntex_config),
   );
 }

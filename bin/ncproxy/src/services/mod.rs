@@ -38,7 +38,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   let versioning = middlewares::Versioning::new(vars::VERSION).finish();
   config.service(
     web::scope("/{version}")
-      .wrap(versioning)
+      .middleware(versioning)
       .configure(rule::ntex_config),
   );
 }

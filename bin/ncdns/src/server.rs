@@ -18,7 +18,7 @@ pub fn generate(
     web::App::new()
       .state(dnsmasq.clone())
       .state(client.clone())
-      .wrap(middlewares::SerializeError)
+      .middleware(middlewares::SerializeError)
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });

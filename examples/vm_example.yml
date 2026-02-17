@@ -21,7 +21,7 @@ Resources:
 VirtualMachines:
 - Name: vm-test
   Disk:
-    Image: ubuntu-22
+    Image: ubuntu
   HostConfig:
     Cpu: 2
     Memory: 2048
