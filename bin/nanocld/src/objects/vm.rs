@@ -54,7 +54,7 @@ impl ObjCreate for VmDb {
       ObjPsStatusDb::create_from(status, &state.inner.pool)
         .await?
         .try_into()?;
-    let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, &vm)?;
+    let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, vm)?;
     let spec = SpecDb::create_from(new_spec, &state.inner.pool)
       .await?
       .try_to_vm_spec()?;
