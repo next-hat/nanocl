@@ -55,6 +55,10 @@ async fn exec_docker(
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   let name = attributes.get("name").cloned().unwrap_or_default();
+  let is_not_init_cargo_instance = attributes
+    .get("io.nanocl.not-init-c")
+    .map(|value| value == "true")
+    .unwrap_or_default();
   let action = action.as_str();
   let mut event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
@@ -73,7 +77,7 @@ async fn exec_docker(
       key: Some(name.clone()),
       kind: EventActorKind::Process,
       attributes: Some(
-        serde_json::to_value(attributes)
+        serde_json::to_value(attributes.clone())
           .map_err(|err| err.map_err_context(|| "Event attributes"))?,
       ),
     }),
@@ -104,6 +108,21 @@ async fn exec_docker(
           .await?;
         }
         _ => {}
+      }
+    }
+    action if action.starts_with("health_status:") => {
+      event.action = NativeEventAction::Update.to_string();
+      if action == "health_status: healthy"
+        && kind == EventActorKind::Cargo
+        && is_not_init_cargo_instance
+        && !name.starts_with("tmp-")
+        && !name.starts_with("init-")
+        && let Ok(cargo) =
+          CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool).await
+      {
+        state
+          .emit_normal_native_action_sync(&cargo, NativeEventAction::Update)
+          .await;
       }
     }
     "die" => {

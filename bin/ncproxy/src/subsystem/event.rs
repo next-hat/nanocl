@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::{Duration, Instant}};
 
 use futures::{StreamExt, stream::FuturesUnordered};
 use ntex::rt;
@@ -17,6 +17,79 @@ use nanocld_client::{
 };
 
 use crate::{models::SystemStateRef, utils, vars};
+
+fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
+  if cargo.spec.container.healthcheck.is_some() {
+    return true;
+  }
+  cargo.instances.iter().any(|instance| {
+    serde_json::to_value(&instance.data)
+      .map(|value| {
+        value.pointer("/Config/Healthcheck").is_some()
+          || value.pointer("/State/Health").is_some()
+      })
+      .unwrap_or_default()
+  })
+}
+
+fn count_healthy_instances(
+  cargo: &nanocld_client::stubs::cargo::CargoInspect,
+) -> usize {
+  cargo
+    .instances
+    .iter()
+    .filter(|instance| {
+      serde_json::to_value(&instance.data)
+        .ok()
+        .and_then(|value| {
+          value
+            .pointer("/State/Health/Status")
+            .and_then(|status| status.as_str())
+            .map(|status| status == "healthy")
+        })
+        .unwrap_or_default()
+    })
+    .count()
+}
+
+async fn wait_cargo_health_quorum(
+  name: &str,
+  namespace: &str,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  let timeout = Instant::now() + Duration::from_secs(120);
+  loop {
+    let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
+    if !has_healthcheck(&cargo) {
+      return Ok(());
+    }
+    if cargo.instances.is_empty() {
+      if Instant::now() >= timeout {
+        return Err(IoError::interrupted(
+          "ProxyHealthTimeout",
+          "Timeout waiting cargo instances to be available",
+        ));
+      }
+      ntex::time::sleep(Duration::from_secs(1)).await;
+      continue;
+    }
+    let needed = (cargo.instances.len() / 2) + 1;
+    let healthy = count_healthy_instances(&cargo);
+    if healthy >= needed {
+      return Ok(());
+    }
+    if Instant::now() >= timeout {
+      return Err(IoError::interrupted(
+        "ProxyHealthTimeout",
+        &format!(
+          "Timeout waiting healthy quorum {healthy}/{needed} (total: {})",
+          cargo.instances.len()
+        ),
+      ));
+    }
+    ntex::time::sleep(Duration::from_secs(1)).await;
+  }
+}
 
 /// Get cargo attributes from nanocld event
 fn get_cargo_attributes(
@@ -97,6 +170,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
     (EventActorKind::Cargo, NativeEventAction::Start)
     | (EventActorKind::Cargo, NativeEventAction::Update) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      wait_cargo_health_quorum(&name, &namespace, state).await?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())

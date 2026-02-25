@@ -28,6 +28,8 @@ impl ObjTaskStart for CargoDb {
       for assignment in plan.assignments {
         let node_selected = assignment.node;
         let replicas = assignment.replicas;
+        // If the node selected is the current node we start the cargo with internal utils
+        // There is a edge case in the test environment where the hostname is always "init-test.nanocl.io" so we need to check for that as well
         if node_selected.name == state.inner.config.hostname
           || node_selected.name == "init-test.nanocl.io"
         {
