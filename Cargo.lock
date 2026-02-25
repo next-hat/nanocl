@@ -1894,7 +1894,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "nix",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "openssl",
  "regex",
  "ring",
@@ -1916,7 +1916,7 @@ version = "0.6.0"
 dependencies = [
  "bollard-next",
  "diesel",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -1949,7 +1949,7 @@ dependencies = [
  "libc",
  "log",
  "nanocl_error",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "serde",
  "serde_json",
  "utoipa",
@@ -1979,7 +1979,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "ntex-cors",
  "num_cpus",
  "openssl",
@@ -2002,7 +2002,7 @@ dependencies = [
  "futures",
  "nanocl_error",
  "nanocl_stubs",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "openssl",
  "serde",
  "serde_json",
@@ -2027,7 +2027,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "num_cpus",
  "openssl",
  "serde",
@@ -2052,7 +2052,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "num_cpus",
  "openssl",
  "serde",
@@ -2071,7 +2071,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.5.0",
+ "ntex 3.5.1",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2157,9 +2157,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "3.5.0"
+version = "3.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76bdcbd805e1cbd5d5274e0c2f69265e080ceccc78e4c340f89ee19565154749"
+checksum = "ac57f3f6d756ac54b26245cab7a2e5c11df8362d7ff048af61d65decc5c96e55"
 dependencies = [
  "base64",
  "bitflags 2.11.0",
@@ -2181,7 +2181,7 @@ dependencies = [
  "ntex-router 1.0.0",
  "ntex-rt 3.8.3",
  "ntex-server 3.9.0",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-tls 3.3.0",
  "ntex-util 3.4.0",
  "openssl",
@@ -2245,7 +2245,7 @@ checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.5.0",
+ "ntex 3.5.1",
 ]
 
 [[package]]
@@ -2258,7 +2258,7 @@ dependencies = [
  "log",
  "ntex-codec 1.1.0",
  "ntex-io 3.9.0",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "pin-project-lite",
 ]
@@ -2301,7 +2301,7 @@ dependencies = [
  "ntex-io 3.9.0",
  "ntex-net 3.7.0",
  "ntex-server 3.9.0",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "pin-project-lite",
  "thiserror 2.0.18",
@@ -2364,7 +2364,7 @@ dependencies = [
  "log",
  "ntex-bytes 1.5.0",
  "ntex-codec 1.1.0",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "pin-project-lite",
 ]
@@ -2439,7 +2439,7 @@ dependencies = [
  "ntex-io-uring",
  "ntex-polling",
  "ntex-rt 3.8.3",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "scoped-tls",
  "slab",
@@ -2514,7 +2514,7 @@ dependencies = [
  "foldhash 0.2.0",
  "futures-timer",
  "log",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "oneshot",
  "scoped-tls",
  "swap-buffer-queue",
@@ -2558,7 +2558,7 @@ dependencies = [
  "ntex-net 3.7.0",
  "ntex-polling",
  "ntex-rt 3.8.3",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "oneshot",
  "signal-hook",
@@ -2579,9 +2579,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-service"
-version = "4.5.0"
+version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc9eb453f1ce1e1561edd50892249fe8ce35e5740f347ff09e53c079ba7784e"
+checksum = "7568541fe86432af0e9230341fe798179ca61a30063f992ce8ea2bd2d73e0e45"
 dependencies = [
  "foldhash 0.2.0",
  "log",
@@ -2612,7 +2612,7 @@ dependencies = [
  "ntex-bytes 1.5.0",
  "ntex-io 3.9.0",
  "ntex-net 3.7.0",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "ntex-util 3.4.0",
  "openssl",
 ]
@@ -2662,7 +2662,7 @@ dependencies = [
  "log",
  "ntex-bytes 1.5.0",
  "ntex-rt 3.8.3",
- "ntex-service 4.5.0",
+ "ntex-service 4.5.1",
  "pin-project-lite",
  "slab",
  "thiserror 2.0.18",
