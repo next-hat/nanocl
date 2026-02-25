@@ -916,6 +916,8 @@ async fn state_apply(
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
           pg.set_message("(creating)");
+          let image_full_path = utils::path::resolve_full_path(&vm.image)?;
+          vm.image = image_full_path;
           client.create_vm(&vm, Some(&namespace)).await?;
           let waiter = utils::process::wait_process_state(
             &format!("{}.{namespace}", vm.name),

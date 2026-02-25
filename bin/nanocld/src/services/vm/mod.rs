@@ -34,7 +34,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use nanocl_stubs::vm::{VmInspect, VmSummary};
-  use nanocl_stubs::vm_spec::{VmDisk, VmSpecPartial};
+  use nanocl_stubs::vm_spec::VmSpecPartial;
   use ntex::http;
 
   use crate::utils::tests::*;
@@ -49,10 +49,7 @@ mod tests {
       .post("/vms")
       .send_json(&VmSpecPartial {
         name: name.to_owned(),
-        disk: VmDisk {
-          image: image.to_owned(),
-          ..Default::default()
-        },
+        image: image.to_owned(),
         ..Default::default()
       })
       .await

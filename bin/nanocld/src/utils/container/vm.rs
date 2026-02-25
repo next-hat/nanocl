@@ -118,11 +118,8 @@ pub async fn create_instance(
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
-  let mut args: Vec<String> = vec![
-    "-hda".into(),
-    vm.spec.disk.image.clone(),
-    "--nographic".into(),
-  ];
+  let mut args: Vec<String> =
+    vec!["-hda".into(), vm.spec.image.clone(), "--nographic".into()];
   let host_config = vm.spec.host_config.clone();
   let kvm = host_config.kvm.unwrap_or_default();
   let mut devices = vec![DeviceMapping {
@@ -213,10 +210,7 @@ pub async fn create_instance(
           .clone()
           .unwrap_or("nanoclbr0".to_owned()),
       ),
-      binds: Some(vec![format!(
-        "{}:{}",
-        vm.spec.disk.image, vm.spec.disk.image
-      )]),
+      binds: Some(vec![format!("{}:{}", vm.spec.image, vm.spec.image)]),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
       ..Default::default()

@@ -20,14 +20,7 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/objects/virtual-machine
 VirtualMachines:
 - Name: vm-test
-  InitContainer:
-    Image: alpine:latest
-    Cmd:
-    - sh
-    - -c
-    - wget -O /tmp/vm-test.img https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
-  Disk:
-    Image: /tmp/vm-test.img
+  Image: ./tests/ubuntu-24.04-minimal-cloudimg-amd64.img
   HostConfig:
     Cpu: 2
     Memory: 2048

@@ -90,17 +90,8 @@ pub async fn exec_vm_create(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut options = options.clone();
-  let image_path = options.image.clone();
-  if !std::path::Path::new(&image_path).exists() {
-    return Err(IoError::other(
-      "vm run",
-      &format!("Image not found: {image_path}"),
-    ));
-  }
-  let full_path = std::fs::canonicalize(&image_path).map_err(|err| {
-    IoError::other("vm run", &format!("Unable to get full path: {err}"))
-  })?;
-  options.image = full_path.to_str().unwrap_or(&image_path).to_owned();
+  let image_full_path = utils::path::resolve_full_path(&options.image)?;
+  options.image = image_full_path;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
@@ -117,17 +108,8 @@ pub async fn exec_vm_run(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut options = options.clone();
-  let image_path = options.image.clone();
-  if !std::path::Path::new(&image_path).exists() {
-    return Err(IoError::other(
-      "vm run",
-      &format!("Image not found: {image_path}"),
-    ));
-  }
-  let full_path = std::fs::canonicalize(&image_path).map_err(|err| {
-    IoError::other("vm run", &format!("Unable to get full path: {err}"))
-  })?;
-  options.image = full_path.to_str().unwrap_or(&image_path).to_owned();
+  let image_full_path = utils::path::resolve_full_path(&options.image)?;
+  options.image = image_full_path;
   let vm: VmSpecPartial = options.clone().into();
   let waiter =
     wait_vm_state(&vm.name, args, NativeEventAction::Start, client).await?;

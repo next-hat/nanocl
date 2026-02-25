@@ -7957,23 +7957,6 @@ components:
         Spec:
           $ref: '#/components/schemas/VmSpec'
           description: Specification of the vm
-    VmDisk:
-      type: object
-      description: Disk representation of a VM
-      required:
-      - Image
-      properties:
-        Image:
-          type: string
-          description: Full path of the image to use
-        Size:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: 'Virtual size allowed for the disk in GB (default: 20)'
-          minimum: 0
-      additionalProperties: false
     VmHostConfig:
       type: object
       description: A vm's resources (cpu, memory, network)
@@ -8082,7 +8065,7 @@ components:
       - Name
       - Version
       - VmKey
-      - Disk
+      - Image
       - HostConfig
       properties:
         Key:
@@ -8134,9 +8117,9 @@ components:
           - string
           - 'null'
           description: Default user of the vm (cloud)
-        Disk:
-          $ref: '#/components/schemas/VmDisk'
-          description: Disk config of the vm
+        Image:
+          type: string
+          description: 'The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)'
         MacAddress:
           type:
           - string
@@ -8159,7 +8142,7 @@ components:
       description: A vm spec partial is used to create a vm
       required:
       - Name
-      - Disk
+      - Image
       properties:
         Name:
           type: string
@@ -8196,9 +8179,9 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the VM runtime container
-        Disk:
-          $ref: '#/components/schemas/VmDisk'
-          description: Disk config of the vm (image, size) required
+        Image:
+          type: string
+          description: 'The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)'
         MacAddress:
           type:
           - string
