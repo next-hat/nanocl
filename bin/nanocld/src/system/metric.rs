@@ -56,7 +56,7 @@ async fn save_metric(
 /// The metrics are saved for the current node.
 pub fn spawn(state: &SystemState) {
   let state = state.clone();
-  rt::Arbiter::new().exec_fn(move || {
+  rt::Arbiter::new().handle().spawn(async move {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");
     rt::spawn(async move {
       loop {

@@ -26,67 +26,62 @@ use crate::{
 ///
 fn set_uds_perm() {
   log::trace!("boot::set_uds_perm: start thread");
-  rt::Arbiter::new().exec_fn(|| {
-    rt::spawn(async {
-      let path = Path::new("/run/nanocl");
-      if !path.exists() {
-        log::warn!("boot::set_uds_perm: /run/nanocl not found");
+  rt::Arbiter::new().handle().spawn(async move {
+    let path = Path::new("/run/nanocl");
+    if !path.exists() {
+      log::warn!("boot::set_uds_perm: /run/nanocl not found");
+      return;
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    // Automatically select the best implementation for your platform.
+    // You can also access each implementation directly e.g. INotifyWatcher.
+    let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
+      Ok(watcher) => watcher,
+      Err(e) => {
+        log::warn!("boot::set_uds_perm: {e}");
         return;
       }
-      let (tx, rx) = std::sync::mpsc::channel();
-      // Automatically select the best implementation for your platform.
-      // You can also access each implementation directly e.g. INotifyWatcher.
-      let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
-        Ok(watcher) => watcher,
-        Err(e) => {
-          log::warn!("boot::set_uds_perm: {e}");
-          return;
-        }
-      };
-      // Add a path to be watched. All files and directories at that path and
-      // below will be monitored for changes.
-      watcher.watch(path, RecursiveMode::Recursive).unwrap();
-      log::trace!("boot::set_uds_perm: watching /run/nanocl");
-      for res in rx {
-        match res {
-          Ok(event) => {
-            if event.kind.is_modify()
-              || event.kind.is_create()
-              || event.kind.is_access()
-              || event.kind.is_other()
+    };
+    // Add a path to be watched. All files and directories at that path and
+    // below will be monitored for changes.
+    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+    log::trace!("boot::set_uds_perm: watching /run/nanocl");
+    for res in rx {
+      match res {
+        Ok(event) => {
+          if event.kind.is_modify()
+            || event.kind.is_create()
+            || event.kind.is_access()
+            || event.kind.is_other()
+          {
+            log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
+            let mut perms = match fs::metadata("/run/nanocl/nanocl.sock").await
             {
-              log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
-              let mut perms =
-                match fs::metadata("/run/nanocl/nanocl.sock").await {
-                  Err(err) => {
-                    log::warn!(
-                      "boot::set_uds_perm: /run/nanocl/nanocl.sock {err}"
-                    );
-                    break;
-                  }
-                  Ok(perms) => perms.permissions(),
-                };
-              perms.set_mode(0o770);
-              if let Err(err) =
-                fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
-              {
+              Err(err) => {
                 log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+                break;
               }
-              log::trace!(
-                "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set"
-              );
-              break;
+              Ok(perms) => perms.permissions(),
+            };
+            perms.set_mode(0o770);
+            if let Err(err) =
+              fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
+            {
+              log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
             }
-          }
-          Err(err) => {
-            log::warn!("boot::set_uds_perm: watcher {err}");
+            log::trace!(
+              "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set"
+            );
             break;
           }
         }
+        Err(err) => {
+          log::warn!("boot::set_uds_perm: watcher {err}");
+          break;
+        }
       }
-      log::trace!("boot::set_uds_perm: stop thread");
-      rt::Arbiter::current().stop();
-    });
+    }
+    log::trace!("boot::set_uds_perm: stop thread");
   });
 }
 
@@ -94,66 +89,63 @@ fn set_uds_perm() {
 ///
 fn spawn_crond() {
   log::trace!("boot::spawn_crond: start thread");
-  rt::Arbiter::new().exec_fn(|| {
-    rt::spawn(async {
-      // Spawn crond in foreground with piped stdout/stderr
-      match TokioCommand::new("crond")
-        .args(["-f", "-d", "8", "-l", "8", "-L", "/dev/stdout"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-      {
-        Ok(mut child) => {
-          // Stream stdout
-          if let Some(stdout) = child.stdout.take() {
-            rt::spawn(async move {
-              let mut lines = BufReader::new(stdout).lines();
-              loop {
-                match lines.next_line().await {
-                  Ok(Some(line)) => log::info!("{line}"),
-                  Ok(None) => break,
-                  Err(err) => {
-                    log::warn!("crond stdout read error: {err}");
-                    break;
-                  }
+  rt::Arbiter::new().handle().spawn(async move {
+    // Spawn crond in foreground with piped stdout/stderr
+    match TokioCommand::new("crond")
+      .args(["-f", "-d", "8", "-l", "8", "-L", "/dev/stdout"])
+      .stdin(Stdio::null())
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped())
+      .spawn()
+    {
+      Ok(mut child) => {
+        // Stream stdout
+        if let Some(stdout) = child.stdout.take() {
+          rt::spawn(async move {
+            let mut lines = BufReader::new(stdout).lines();
+            loop {
+              match lines.next_line().await {
+                Ok(Some(line)) => log::info!("{line}"),
+                Ok(None) => break,
+                Err(err) => {
+                  log::warn!("crond stdout read error: {err}");
+                  break;
                 }
               }
-            });
-          }
-          // Stream stderr
-          if let Some(stderr) = child.stderr.take() {
-            rt::spawn(async move {
-              let mut lines = BufReader::new(stderr).lines();
-              loop {
-                match lines.next_line().await {
-                  Ok(Some(line)) => log::warn!("{line}"),
-                  Ok(None) => break,
-                  Err(err) => {
-                    log::warn!("crond stderr read error: {err}");
-                    break;
-                  }
-                }
-              }
-            });
-          }
-          // Wait for crond to exit
-          match child.wait().await {
-            Ok(status) => {
-              log::info!("boot::spawn_crond: crond exited with {status}");
             }
-            Err(err) => {
-              log::error!("boot::spawn_crond: wait error: {err}");
-            }
-          }
+          });
         }
-        Err(err) => {
-          log::error!("boot::spawn_crond: spawn error: {err}");
+        // Stream stderr
+        if let Some(stderr) = child.stderr.take() {
+          rt::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            loop {
+              match lines.next_line().await {
+                Ok(Some(line)) => log::warn!("{line}"),
+                Ok(None) => break,
+                Err(err) => {
+                  log::warn!("crond stderr read error: {err}");
+                  break;
+                }
+              }
+            }
+          });
+        }
+        // Wait for crond to exit
+        match child.wait().await {
+          Ok(status) => {
+            log::info!("boot::spawn_crond: crond exited with {status}");
+          }
+          Err(err) => {
+            log::error!("boot::spawn_crond: wait error: {err}");
+          }
         }
       }
-      log::trace!("boot::spawn_crond: stop thread");
-      rt::Arbiter::current().stop();
-    });
+      Err(err) => {
+        log::error!("boot::spawn_crond: spawn error: {err}");
+      }
+    }
+    log::trace!("boot::spawn_crond: stop thread");
   });
 }
 
@@ -164,29 +156,23 @@ fn spawn_crond() {
 fn spawn_distributed_mutexes_gc(state: &SystemState) {
   log::debug!("boot::spawn_distributed_mutexes_gc: start thread");
   let pool = state.inner.pool.clone();
-  rt::Arbiter::new().exec_fn(|| {
-    rt::spawn(async move {
-      loop {
-        let filter = GenericFilter::new().r#where(
-          "expires_at",
-          GenericClause::Le(chrono::Utc::now().to_rfc3339()),
-        );
-        if let Err(err) = DistributedMutexDb::del_by(&filter, &pool).await {
-          log::warn!("boot::spawn_distributed_mutexes_gc: {err}");
-        }
-        ntex::time::sleep(Duration::from_secs(1)).await;
+  rt::Arbiter::new().handle().spawn(async move {
+    loop {
+      let filter = GenericFilter::new().r#where(
+        "expires_at",
+        GenericClause::Le(chrono::Utc::now().to_rfc3339()),
+      );
+      if let Err(err) = DistributedMutexDb::del_by(&filter, &pool).await {
+        log::warn!("boot::spawn_distributed_mutexes_gc: {err}");
       }
-    });
+      ntex::time::sleep(Duration::from_secs(1)).await;
+    }
   });
 }
 
 /// Ensure that the state dir exists and is ready to use
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
-  let vm_dir = format!("{state_dir}/vms/images");
-  fs::create_dir_all(vm_dir).await.map_err(|err| {
-    err.map_err_context(|| format!("Unable to create {state_dir}/vms/images"))
-  })?;
   fs::create_dir_all(format!("{state_dir}/secrets"))
     .await
     .map_err(|err| {
@@ -197,22 +183,20 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 
 pub fn docker_healthcheck(state: &SystemState) {
   let state = state.clone();
-  rt::Arbiter::new().exec_fn(|| {
-    rt::spawn(async move {
-      loop {
-        if let Err(err) = state.inner.docker_api.ping().await {
-          log::error!(
-            "boot::docker_healthcheck: Docker daemon not reachable: {err}"
-          );
-          let error = IoError::interrupted(
-            "Docker Healthcheck",
-            "Docker daemon not reachable",
-          );
-          error.print_and_exit();
-        }
-        ntex::time::sleep(std::time::Duration::from_secs(5)).await;
+  rt::Arbiter::new().handle().spawn(async move {
+    loop {
+      if let Err(err) = state.inner.docker_api.ping().await {
+        log::error!(
+          "boot::docker_healthcheck: Docker daemon not reachable: {err}"
+        );
+        let error = IoError::interrupted(
+          "Docker Healthcheck",
+          "Docker daemon not reachable",
+        );
+        error.print_and_exit();
       }
-    });
+      ntex::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
   });
 }
 
@@ -233,7 +217,6 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   rt::spawn(async move {
     let fut = async move {
       utils::system::sync_processes(&system_ptr).await?;
-      utils::system::sync_vm_images(&system_ptr).await?;
       Ok::<_, IoError>(())
     };
     if let Err(err) = fut.await {

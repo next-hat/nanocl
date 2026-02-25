@@ -1956,169 +1956,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /vms/images:
-    get:
-      tags:
-      - VmImages
-      summary: List virtual machine images with optional filter
-      operationId: list_vm_images
-      parameters:
-      - name: filter
-        in: query
-        description: Generic filter
-        required: false
-        schema:
-          type: string
-        example: '{ "filter": { "where": { "name": { "eq": "my-image" } } } }'
-      responses:
-        '200':
-          description: List of vm images
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VmImage'
-  /vms/images/{name}:
-    delete:
-      tags:
-      - VmImages
-      summary: Delete a virtual machine image
-      operationId: delete_vm_image
-      parameters:
-      - name: name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Image have been deleted
-        '404':
-          description: The vm image does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /vms/images/{name}/clone/{clone_name}:
-    post:
-      tags:
-      - VmImages
-      summary: Clone a virtual machine image
-      operationId: clone_vm_image
-      parameters:
-      - name: name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: clone_name
-        in: path
-        description: The name of the clone
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          text/plain:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: The snapshot have been created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmImage'
-        '404':
-          description: The vm image does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /vms/images/{name}/import:
-    post:
-      tags:
-      - VmImages
-      summary: Import a virtual machine image from a file
-      operationId: import_vm_image
-      parameters:
-      - name: name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          text/plain:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: Image have been imported
-  /vms/images/{name}/resize:
-    post:
-      tags:
-      - VmImages
-      summary: Resize a virtual machine image
-      operationId: resize_vm_image
-      parameters:
-      - name: name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VmImageResizePayload'
-        required: true
-      responses:
-        '200':
-          description: The snapshot have been created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmImage'
-  /vms/images/{name}/snapshot/{snapshot_name}:
-    post:
-      tags:
-      - VmImages
-      summary: Create a snapshot of a virtual machine image
-      operationId: snapshot_vm_image
-      parameters:
-      - name: name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: snap
-        in: path
-        description: The name of the snapshot
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          text/plain:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: The snapshot have been created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmImage'
   /vms/{name}:
     delete:
       tags:
@@ -8120,23 +7957,6 @@ components:
         Spec:
           $ref: '#/components/schemas/VmSpec'
           description: Specification of the vm
-    VmDisk:
-      type: object
-      description: Disk representation of a VM
-      required:
-      - Image
-      properties:
-        Image:
-          type: string
-          description: Name of the image to use
-        Size:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: 'Virtual size allowed for the disk in GB (default: 20)'
-          minimum: 0
-      additionalProperties: false
     VmHostConfig:
       type: object
       description: A vm's resources (cpu, memory, network)
@@ -8190,56 +8010,6 @@ components:
           - boolean
           - 'null'
           description: Use host tun device
-      additionalProperties: false
-    VmImage:
-      type: object
-      required:
-      - Name
-      - CreatedAt
-      - Path
-      - Kind
-      - Format
-      - SizeActual
-      - SizeVirtual
-      properties:
-        Name:
-          type: string
-          description: The name of the image
-        CreatedAt:
-          type: string
-          format: date-time
-          description: When the image was created
-        Path:
-          type: string
-          description: The path to the image
-        Kind:
-          type: string
-          description: The type of the image
-        Format:
-          type: string
-          description: The format of the image
-        SizeActual:
-          type: integer
-          format: int64
-          description: The actual size of the image in bytes
-        SizeVirtual:
-          type: integer
-          format: int64
-          description: The virtual size of the image in bytes
-    VmImageResizePayload:
-      type: object
-      required:
-      - Size
-      - Shrink
-      properties:
-        Size:
-          type: integer
-          format: int64
-          description: The new size of the image in bytes
-          minimum: 0
-        Shrink:
-          type: boolean
-          description: Whether to shrink the image or not
       additionalProperties: false
     VmInspect:
       type: object
@@ -8295,7 +8065,7 @@ components:
       - Name
       - Version
       - VmKey
-      - Disk
+      - Image
       - HostConfig
       properties:
         Key:
@@ -8337,14 +8107,19 @@ components:
           - string
           - 'null'
           description: Default ssh key for the user
+        InitContainer:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Config'
+            description: Action to run before the VM runtime container
         User:
           type:
           - string
           - 'null'
           description: Default user of the vm (cloud)
-        Disk:
-          $ref: '#/components/schemas/VmDisk'
-          description: Disk config of the vm
+        Image:
+          type: string
+          description: 'The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)'
         MacAddress:
           type:
           - string
@@ -8367,7 +8142,7 @@ components:
       description: A vm spec partial is used to create a vm
       required:
       - Name
-      - Disk
+      - Image
       properties:
         Name:
           type: string
@@ -8399,9 +8174,14 @@ components:
           - string
           - 'null'
           description: Default ssh pub key for the user (recommended)
-        Disk:
-          $ref: '#/components/schemas/VmDisk'
-          description: Disk config of the vm (image, size) required
+        InitContainer:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Config'
+            description: Action to run before the VM runtime container
+        Image:
+          type: string
+          description: 'The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)'
         MacAddress:
           type:
           - string
@@ -8463,6 +8243,11 @@ components:
           - string
           - 'null'
           description: Default ssh key for the user
+        InitContainer:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Config'
+            description: Action to run before the VM runtime container
         Labels:
           type:
           - object
@@ -8521,8 +8306,6 @@ tags:
   description: Resources management endpoints.
 - name: System
   description: General system endpoints.
-- name: VmImages
-  description: Virtual machine images management endpoints.
 - name: Vms
   description: Virtual machines management endpoints.
 - name: Metrics

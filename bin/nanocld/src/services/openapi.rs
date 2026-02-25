@@ -8,7 +8,7 @@ use crate::vars;
 
 use super::{
   cargo, event, exec, job, metric, namespace, node, process, resource,
-  resource_kind, secret, system, vm, vm_image,
+  resource_kind, secret, system, vm,
 };
 
 /// When returning a [HttpError](nanocl_error::http::HttpError)
@@ -87,13 +87,6 @@ impl Modify for VersionModifier {
     exec::create_exec_command,
     exec::start_exec_command,
     exec::inspect_exec_command,
-    // VM Image
-    vm_image::list_vm_images,
-    vm_image::import_vm_image,
-    vm_image::delete_vm_image,
-    vm_image::resize_vm_image,
-    vm_image::clone_vm_image,
-    vm_image::snapshot_vm_image,
     // Vm
     vm::list_vm,
     vm::inspect_vm,
@@ -149,7 +142,6 @@ impl Modify for VersionModifier {
     (name = "Nodes", description = "Nodes management endpoints."),
     (name = "Resources", description = "Resources management endpoints."),
     (name = "System", description = "General system endpoints."),
-    (name = "VmImages", description = "Virtual machine images management endpoints."),
     (name = "Vms", description = "Virtual machines management endpoints."),
     (name = "Metrics", description = "Metrics management endpoints."),
     (name = "Processes", description = "Processes management endpoints."),

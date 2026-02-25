@@ -161,22 +161,24 @@ impl SpecDb {
   }
 
   pub fn try_to_vm_spec(&self) -> IoResult<VmSpec> {
-    let p = serde_json::from_value::<VmSpecPartial>(self.data.clone())?;
+    let vm_spec_partial =
+      serde_json::from_value::<VmSpecPartial>(self.data.clone())?;
     let spec = VmSpec {
       key: self.key,
       vm_key: self.kind_key.clone(),
       version: self.version.clone(),
       created_at: self.created_at,
-      name: p.name,
+      name: vm_spec_partial.name,
       metadata: self.metadata.clone(),
-      hostname: p.hostname,
-      password: p.password,
-      disk: p.disk,
-      host_config: p.host_config.unwrap_or_default(),
-      ssh_key: p.ssh_key,
-      user: p.user,
-      mac_address: p.mac_address,
-      labels: p.labels,
+      hostname: vm_spec_partial.hostname,
+      password: vm_spec_partial.password,
+      image: vm_spec_partial.image,
+      host_config: vm_spec_partial.host_config.unwrap_or_default(),
+      ssh_key: vm_spec_partial.ssh_key,
+      init_container: vm_spec_partial.init_container,
+      user: vm_spec_partial.user,
+      mac_address: vm_spec_partial.mac_address,
+      labels: vm_spec_partial.labels,
     };
     Ok(spec)
   }

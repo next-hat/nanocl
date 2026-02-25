@@ -4,12 +4,12 @@ use tabled::Tabled;
 
 use nanocld_client::stubs::vm::VmSummary;
 use nanocld_client::stubs::vm_spec::{
-  VmDisk, VmHostConfig, VmSpecPartial, VmSpecUpdate,
+  VmHostConfig, VmSpecPartial, VmSpecUpdate,
 };
 
 use super::{
   GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
-  GenericStopOpts, VmImageArg,
+  GenericStopOpts,
 };
 
 /// `nanocl vm` available commands
@@ -17,8 +17,6 @@ use super::{
 pub enum VmCommand {
   /// Run a vm
   Run(VmRunOpts),
-  /// Manage vm images
-  Image(VmImageArg),
   /// Create a vm
   Create(VmCreateOpts),
   /// List vms
@@ -118,9 +116,6 @@ pub struct VmRunOpts {
   /// Ssh key for the user
   #[clap(long)]
   pub ssh_key: Option<String>,
-  /// Size of the disk in GB
-  #[clap(long = "img-size")]
-  pub image_size: Option<u64>,
   /// Enable KVM
   #[clap(long)]
   pub kvm: bool,
@@ -129,7 +124,7 @@ pub struct VmRunOpts {
   pub attach: bool,
   /// Name of the vm
   pub name: String,
-  /// Name of the vm image
+  /// Full path of the vm image
   pub image: String,
 }
 
@@ -142,10 +137,7 @@ impl From<VmRunOpts> for VmSpecPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      disk: VmDisk {
-        image: val.image,
-        size: val.image_size,
-      },
+      image: val.image,
       host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
@@ -187,7 +179,7 @@ pub struct VmCreateOpts {
   pub kvm: bool,
   /// Name of the vm
   pub name: String,
-  /// Name of the vm image
+  /// Full path of the vm image
   pub image: String,
 }
 
@@ -207,10 +199,7 @@ impl From<VmCreateOpts> for VmSpecPartial {
         kvm: Some(val.kvm),
         ..Default::default()
       }),
-      disk: VmDisk {
-        image: val.image,
-        ..Default::default()
-      },
+      image: val.image,
       ..Default::default()
     }
   }
@@ -222,8 +211,8 @@ impl From<VmCreateOpts> for VmSpecPartial {
 pub struct VmRow {
   /// Name of the vm
   pub(crate) name: String,
-  /// Disk of the vm
-  pub(crate) disk: String,
+  /// Image of the vm
+  pub(crate) image: String,
   /// Status of the vm
   pub(crate) status: String,
   /// Number of instances
@@ -255,7 +244,7 @@ impl From<VmSummary> for VmRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: vm.spec.name,
-      disk: vm.spec.disk.image,
+      image: vm.spec.image,
       version: vm.spec.version,
       status: format!("{}/{}", vm.status.actual, vm.status.wanted),
       instances: format!("{}/{}", vm.instance_running, vm.instance_total),

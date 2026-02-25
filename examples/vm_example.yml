@@ -20,8 +20,7 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/objects/virtual-machine
 VirtualMachines:
 - Name: vm-test
-  Disk:
-    Image: ubuntu
+  Image: ./tests/ubuntu-24.04-minimal-cloudimg-amd64.img
   HostConfig:
     Cpu: 2
     Memory: 2048

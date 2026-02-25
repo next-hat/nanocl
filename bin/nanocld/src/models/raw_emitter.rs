@@ -108,7 +108,7 @@ impl RawEventEmitter {
   /// Spawn a task that will check if clients are still connected
   fn spawn_check_connection(&self) {
     let mut self_ptr = self.clone();
-    rt::Arbiter::new().exec_fn(|| {
+    rt::Arbiter::new().handle().spawn(async move {
       rt::spawn(async move {
         let task = time::interval(Duration::from_secs(10));
         loop {

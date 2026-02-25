@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
-use bollard_next::secret::{DeviceMapping, HostConfig};
+use bollard_next::{
+  container::{Config, StartContainerOptions, WaitContainerOptions},
+  secret::{DeviceMapping, HostConfig},
+};
+use futures::StreamExt;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{FromIo, IoResult};
 use nanocl_stubs::{
   generic::ImagePullPolicy,
   process::{Process, ProcessKind},
@@ -11,25 +15,111 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{ProcessDb, SystemState, VmDb, VmImageDb},
+  models::{ProcessDb, SystemState, VmDb},
   repositories::generic::*,
   utils, vars,
 };
+
+async fn create_init_container(
+  vm: &Vm,
+  init_container: &Config,
+  state: &SystemState,
+) -> IoResult<Process> {
+  let mut init_container = init_container.clone();
+  let image = init_container.image.clone().unwrap_or_else(|| {
+    vm.spec
+      .host_config
+      .runtime
+      .clone()
+      .unwrap_or_else(|| vars::VM_RUNTIME.to_owned())
+  });
+  init_container.image = Some(image.clone());
+  super::image::download(
+    &image,
+    None,
+    ImagePullPolicy::IfNotPresent,
+    vm,
+    state,
+  )
+  .await?;
+  let mut labels = init_container.labels.to_owned().unwrap_or_default();
+  labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.to_owned());
+  labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.to_owned());
+  labels.insert("io.nanocl.init-v".to_owned(), "true".to_owned());
+  labels.insert(
+    "com.docker.compose.project".to_owned(),
+    format!("nanocl_{}", vm.namespace_name),
+  );
+  init_container.labels = Some(labels);
+  let short_id = utils::key::generate_short_id(6);
+  let name =
+    format!("init-{}-{}.{}.v", vm.spec.name, short_id, vm.namespace_name);
+  let process = super::process::create(
+    &ProcessKind::Vm,
+    &name,
+    &vm.spec.vm_key,
+    &init_container,
+    state,
+  )
+  .await?;
+  Ok(process)
+}
+
+async fn start_init_container(
+  process: &Process,
+  state: &SystemState,
+) -> IoResult<()> {
+  state
+    .inner
+    .docker_api
+    .start_container(&process.name, None::<StartContainerOptions<String>>)
+    .await
+    .map_err(|err| err.map_err_context(|| "InitContainer"))?;
+  let options = Some(WaitContainerOptions {
+    condition: "not-running",
+  });
+  let mut stream = state
+    .inner
+    .docker_api
+    .wait_container(&process.name, options);
+  while let Some(wait_status) = stream.next().await {
+    match wait_status {
+      Ok(wait_status) => {
+        if wait_status.status_code != 0 {
+          let error = match wait_status.error {
+            Some(error) => error.message.unwrap_or("Unknown error".to_owned()),
+            None => "Unknown error".to_owned(),
+          };
+          return Err(nanocl_error::io::IoError::interrupted(
+            "InitContainer",
+            &format!("{error} {}", wait_status.status_code),
+          ));
+        }
+      }
+      Err(err) => {
+        return Err(nanocl_error::io::IoError::interrupted(
+          "InitContainer",
+          &format!("{err}"),
+        ));
+      }
+    }
+  }
+  Ok(())
+}
 
 /// Create a VM instance
 ///
 pub async fn create_instance(
   vm: &Vm,
-  image: &VmImageDb,
   disable_keygen: bool,
   state: &SystemState,
 ) -> IoResult<Process> {
   let mut labels: HashMap<String, String> = HashMap::new();
-  let img_path = format!("{}/vms/images", state.inner.config.state_dir);
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
+  labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
   let mut args: Vec<String> =
-    vec!["-hda".into(), image.path.clone(), "--nographic".into()];
+    vec!["-hda".into(), vm.spec.image.clone(), "--nographic".into()];
   let host_config = vm.spec.host_config.clone();
   let kvm = host_config.kvm.unwrap_or_default();
   let mut devices = vec![DeviceMapping {
@@ -89,6 +179,10 @@ pub async fn create_instance(
     Some(runtime) => runtime.to_owned(),
     None => vars::VM_RUNTIME.to_owned(),
   };
+  if let Some(init_container) = &vm.spec.init_container {
+    let process = create_init_container(vm, init_container, state).await?;
+    start_init_container(&process, state).await?;
+  }
   super::image::download(
     &image,
     None,
@@ -116,7 +210,7 @@ pub async fn create_instance(
           .clone()
           .unwrap_or("nanoclbr0".to_owned()),
       ),
-      binds: Some(vec![format!("{img_path}:{img_path}")]),
+      binds: Some(vec![format!("{}:{}", vm.spec.image, vm.spec.image)]),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
       ..Default::default()
@@ -139,13 +233,11 @@ pub async fn create_instance(
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let image =
-    VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
       .await?;
   if processes.is_empty() {
-    create_instance(&vm, &image, true, state).await?;
+    create_instance(&vm, true, state).await?;
   }
   super::process::start_instances(&vm.spec.vm_key, &ProcessKind::Vm, state)
     .await?;
@@ -166,7 +258,6 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
     state,
   )
   .await?;
-  utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
   VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
   state
     .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
@@ -179,10 +270,8 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let container_name = format!("{}.v", &vm.spec.vm_key);
-  let image =
-    VmImageDb::read_by_pk(&vm.spec.disk.image, &state.inner.pool).await?;
   super::process::delete_instances(&[container_name], state).await?;
-  create_instance(&vm, &image, false, state).await?;
+  create_instance(&vm, false, state).await?;
   super::process::start_instances(key, &ProcessKind::Vm, state).await?;
   Ok(())
 }

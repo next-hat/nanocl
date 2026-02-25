@@ -1,26 +1,4 @@
 -- Your SQL goes here
-CREATE TABLE IF NOT EXISTS "vm_images" (
-  "name" VARCHAR NOT NULL PRIMARY KEY,
-  "node_name" VARCHAR NOT NULL REFERENCES nodes("name"),
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "kind" VARCHAR NOT NULL,
-  "path" VARCHAR NOT NULL,
-  "format" VARCHAR NOT NULL,
-  "size_actual" BIGINT NOT NULL,
-  "size_virtual" BIGINT NOT NULL,
-  "parent" VARCHAR REFERENCES vm_images("name")
-);
-
-CREATE INDEX "vm_images_name_idx" ON "vm_images" ("name");
-CREATE INDEX "vm_images_node_name_idx" ON "vm_images" ("node_name");
-CREATE INDEX "vm_images_created_at_idx" ON "vm_images" ("created_at");
-CREATE INDEX "vm_images_kind_idx" ON "vm_images" ("kind");
-CREATE INDEX "vm_images_path_idx" ON "vm_images" ("path");
-CREATE INDEX "vm_images_format_idx" ON "vm_images" ("format");
-CREATE INDEX "vm_images_size_actual_idx" ON "vm_images" ("size_actual");
-CREATE INDEX "vm_images_size_virtual_idx" ON "vm_images" ("size_virtual");
-CREATE INDEX "vm_images_parent_idx" ON "vm_images" ("parent");
-
 CREATE TABLE IF NOT EXISTS "vms" (
   "key" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
   "name" VARCHAR NOT NULL,

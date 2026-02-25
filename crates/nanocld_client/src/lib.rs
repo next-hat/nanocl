@@ -12,7 +12,6 @@ pub(crate) mod resource_kind;
 pub(crate) mod secret;
 pub(crate) mod system;
 pub(crate) mod vm;
-pub(crate) mod vm_image;
 
 pub use bollard_next;
 pub mod error;

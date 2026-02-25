@@ -20,7 +20,6 @@ mod stats;
 mod uninstall;
 mod version;
 mod vm;
-mod vm_image;
 
 pub use backup::*;
 pub use cargo::*;
@@ -39,7 +38,6 @@ pub use state::*;
 pub use stats::*;
 pub use uninstall::*;
 pub use vm::*;
-pub use vm_image::*;
 
 const LONG_ABOUT: &str = r#"Nanocl is a modern, self-sufficient orchestrator for containers and virtual machines.
 It delivers a clean dev→prod workflow with declarative Statefiles (YAML/TOML/JSON) and opinionated, predictable defaults.

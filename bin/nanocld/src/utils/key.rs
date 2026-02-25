@@ -5,10 +5,7 @@
 /// The cargo key will be `get-started.global`
 use rand::{RngExt, distr::Alphanumeric, rng};
 
-use nanocl_error::{
-  http::{HttpError, HttpResult},
-  io::{IoError, IoResult},
-};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::process::ProcessKind;
 
@@ -25,21 +22,6 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
 /// Generate a key based on the namespace and the name of the model.
 pub fn gen_key(nsp: &str, name: &str) -> String {
   format!("{name}.{nsp}")
-}
-
-/// Validate the name of a cargo or a vm
-/// By checking if it's only contain a-z, A-Z, 0-9, - and _
-pub fn validate_name(name: &str) -> HttpResult<()> {
-  // Ensure name only contain a-z, A-Z, 0-9, - and _
-  if !name
-    .chars()
-    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-  {
-    return Err(HttpError::bad_request(format!(
-      "Vm image name {name} is invalid"
-    )));
-  }
-  Ok(())
 }
 
 /// Generate a short id based on the length

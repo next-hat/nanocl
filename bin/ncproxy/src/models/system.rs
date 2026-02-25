@@ -70,8 +70,8 @@ impl EventEmitter {
   pub fn new(client: &NanocldClient) -> Self {
     let (tx, mut rx) = mpsc::unbounded();
     let client = client.clone();
-    rt::Arbiter::new().exec_fn(move || {
-      ntex::rt::spawn(async move {
+    rt::Arbiter::new().handle().spawn(async move {
+      rt::spawn(async move {
         let mut local_event = SystemEvent::new(&client);
         while let Some(e) = rx.next().await {
           local_event.handle(e);

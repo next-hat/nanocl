@@ -11,7 +11,6 @@ pub mod secret;
 pub mod server;
 pub mod store;
 pub mod system;
-pub mod vm_image;
 
 #[cfg(test)]
 pub mod tests {

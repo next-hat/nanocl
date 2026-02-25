@@ -56,8 +56,8 @@ async fn r#loop(client: &NanocldClient) {
 /// Spawn new thread with event loop to watch for nanocld events
 pub(crate) fn spawn(client: &NanocldClient) {
   let client = client.clone();
-  rt::Arbiter::new().exec_fn(move || {
-    ntex::rt::spawn(async move {
+  rt::Arbiter::new().handle().spawn(async move {
+    rt::spawn(async move {
       r#loop(&client).await;
       rt::Arbiter::current().stop();
     });

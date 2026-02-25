@@ -197,27 +197,25 @@ async fn exec_docker(
 /// Create a new thread with his own loop to analyze events from docker
 pub fn analyze(state: &SystemState) {
   let state = state.clone();
-  rt::Arbiter::new().exec_fn(move || {
-    rt::spawn(async move {
-      loop {
-        let mut streams =
-          state.inner.docker_api.events(None::<EventsOptions<String>>);
-        log::info!("event::analyze_docker: stream connected");
-        while let Some(event) = streams.next().await {
-          match event {
-            Ok(event) => {
-              if let Err(err) = exec_docker(&event, &state).await {
-                log::warn!("event::analyze_docker: {err}")
-              }
-            }
-            Err(err) => {
-              log::warn!("event::analyze_docker: {err}");
+  rt::Arbiter::new().handle().spawn(async move {
+    loop {
+      let mut streams =
+        state.inner.docker_api.events(None::<EventsOptions<String>>);
+      log::info!("event::analyze_docker: stream connected");
+      while let Some(event) = streams.next().await {
+        match event {
+          Ok(event) => {
+            if let Err(err) = exec_docker(&event, &state).await {
+              log::warn!("event::analyze_docker: {err}")
             }
           }
+          Err(err) => {
+            log::warn!("event::analyze_docker: {err}");
+          }
         }
-        log::warn!("event::analyze_docker: disconnected trying to reconnect");
-        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       }
-    });
+      log::warn!("event::analyze_docker: disconnected trying to reconnect");
+      ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
   });
 }

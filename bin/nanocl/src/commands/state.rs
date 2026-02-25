@@ -499,7 +499,7 @@ fn inject_namespace(
   args: &serde_json::Value,
 ) -> IoResult<String> {
   let object = liquid::object!({
-    "Args": args,
+    "Args": args.clone(),
   });
   let str = utils::state::compile(namespace, &object, StateRoot::None)?;
   Ok(str)
@@ -531,14 +531,14 @@ async fn inject_data(
     },
   );
   let data = liquid::object!({
-    "Args": args,
-    "Envs": envs,
-    "Context": context,
+    "Args": args.clone(),
+    "Envs": envs.clone(),
+    "Context": context.clone(),
     "Os": consts::OS,
     "OsFamily": consts::FAMILY,
     "Config": info.config,
     "HostGateway": info.host_gateway,
-    "Namespaces": namespaces,
+    "Namespaces": namespaces.clone(),
     "StateRoot": state_ref.root.to_string(),
   });
   let raw =
@@ -829,7 +829,9 @@ async fn state_apply(
         )
         .await?;
         client.delete_job(&job.name).await?;
-        waiter.await??;
+        waiter.await.map_err(|err| {
+          IoError::interrupted("wait_process_state", &err.to_string())
+        })??;
         pg.set_message("(cleared)");
       }
       pg.set_message("(creating)");
@@ -843,7 +845,9 @@ async fn state_apply(
       .await?;
       pg.set_message("(starting)");
       client.start_process("job", &job.name, None).await?;
-      waiter.await??;
+      waiter.await.map_err(|err| {
+        IoError::interrupted("wait_process_state", &err.to_string())
+      })??;
       pg.finish_with_message("(running)");
     }
   }
@@ -870,7 +874,9 @@ async fn state_apply(
           client
             .start_process("cargo", &cargo.name, Some(&namespace))
             .await?;
-          waiter.await??;
+          waiter.await.map_err(|err| {
+            IoError::interrupted("wait_process_state", &err.to_string())
+          })??;
         }
         Ok(inspect) => {
           let cmp: CargoSpecPartial = inspect.spec.into();
@@ -886,7 +892,9 @@ async fn state_apply(
             client
               .put_cargo(&cargo.name, &cargo, Some(&namespace))
               .await?;
-            waiter.await??;
+            waiter.await.map_err(|err| {
+              IoError::interrupted("wait_process_state", &err.to_string())
+            })??;
             pg.set_message("(updated)");
           } else if inspect.status.actual == ObjPsStatusKind::Start {
             pg.finish_with_message("(unchanged)");
@@ -908,6 +916,8 @@ async fn state_apply(
       match client.inspect_vm(&vm.name, Some(&namespace)).await {
         Err(_) => {
           pg.set_message("(creating)");
+          let image_full_path = utils::path::resolve_full_path(&vm.image)?;
+          vm.image = image_full_path;
           client.create_vm(&vm, Some(&namespace)).await?;
           let waiter = utils::process::wait_process_state(
             &format!("{}.{namespace}", vm.name),
@@ -920,7 +930,9 @@ async fn state_apply(
           client
             .start_process("vm", &vm.name, Some(&namespace))
             .await?;
-          waiter.await??;
+          waiter.await.map_err(|err| {
+            IoError::interrupted("wait_process_state", &err.to_string())
+          })??;
         }
         Ok(inspect) => {
           let cmp: VmSpecPartial = inspect.spec.into();
@@ -935,7 +947,9 @@ async fn state_apply(
             )
             .await?;
             client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
-            waiter.await??;
+            waiter.await.map_err(|err| {
+              IoError::interrupted("wait_process_state", &err.to_string())
+            })??;
             pg.set_message("(updated)");
           } else if inspect.status.actual == ObjPsStatusKind::Start {
             pg.finish_with_message("(unchanged)");

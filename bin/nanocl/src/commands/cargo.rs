@@ -4,7 +4,7 @@ use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use ntex::rt;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::{
   NanocldClient,
   stubs::{
@@ -138,7 +138,9 @@ async fn exec_cargo_patch(
   client
     .patch_cargo(&opts.name, &opts.clone().into(), args.namespace.as_deref())
     .await?;
-  waiter.await??;
+  waiter.await.map_err(|err| {
+    IoError::interrupted("wait_cargo_state", &err.to_string())
+  })??;
   Ok(())
 }
 
@@ -299,7 +301,9 @@ async fn exec_cargo_revert(
   let cargo = client
     .revert_cargo(&opts.name, &opts.history_id, args.namespace.as_deref())
     .await?;
-  waiter.await??;
+  waiter.await.map_err(|err| {
+    IoError::interrupted("wait_cargo_state", &err.to_string())
+  })??;
   utils::print::print_yml(cargo)?;
   Ok(())
 }
@@ -320,7 +324,9 @@ async fn exec_cargo_run(
   client
     .start_process("cargo", &cargo.spec.name, Some(&cargo.namespace_name))
     .await?;
-  waiter.await??;
+  waiter.await.map_err(|err| {
+    IoError::interrupted("wait_cargo_state", &err.to_string())
+  })??;
   Ok(())
 }
 

@@ -17,13 +17,17 @@ impl ObjTask {
   where
     F: Future<Output = IoResult<()>> + 'static,
   {
-    let fut = Arc::new(rt::spawn(task));
+    let fut = Arc::new(futures_util::lock::Mutex::new(Some(rt::spawn(task))));
     Self { kind, fut }
   }
 
   pub async fn wait(&self) {
     loop {
-      if self.fut.is_finished() {
+      let is_finished = {
+        let fut = self.fut.lock().await;
+        fut.as_ref().is_none_or(|f| f.is_finished())
+      };
+      if is_finished {
         log::debug!("Task finished: {}", self.kind);
         break;
       }
@@ -72,16 +76,15 @@ impl TaskManager {
     let mut tasks = self.tasks.lock().await;
     if let Some(task) = tasks.remove(key) {
       let kind = task.kind.clone();
-      if !task.fut.is_finished() {
+      let handle = {
+        let mut fut = task.fut.lock().await;
+        fut.take()
+      };
+      if let Some(handle) = handle
+        && !handle.is_finished()
+      {
         log::debug!("Cancelling task: {key} {kind}");
-        match Arc::try_unwrap(task.fut) {
-          Ok(handle) => handle.cancel(),
-          Err(_handle) => {
-            log::debug!(
-              "Task cancellation skipped for {key} {kind} because handle is shared",
-            );
-          }
-        }
+        handle.cancel();
       }
       log::debug!("Removing task: {key} {kind}");
     }

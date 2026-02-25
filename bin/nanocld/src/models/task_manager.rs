@@ -10,7 +10,7 @@ use nanocl_stubs::system::NativeEventAction;
 #[derive(Clone)]
 pub struct ObjTask {
   pub kind: NativeEventAction,
-  pub fut: Arc<rt::JoinHandle<IoResult<()>>>,
+  pub fut: Arc<Mutex<Option<rt::JoinHandle<IoResult<()>>>>>,
 }
 
 #[derive(Clone, Default)]

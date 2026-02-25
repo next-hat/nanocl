@@ -34,27 +34,22 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use nanocl_stubs::vm::{VmInspect, VmSummary};
-  use nanocl_stubs::vm_spec::{VmDisk, VmSpecPartial};
+  use nanocl_stubs::vm_spec::VmSpecPartial;
   use ntex::http;
 
-  use crate::services::vm_image::tests::ensure_test_image;
   use crate::utils::tests::*;
 
   #[ntex::test]
   async fn basic() {
-    ensure_test_image().await;
     let system = gen_default_test_system().await;
     let client = system.client;
     let name = "api-test-vm";
-    let image = "ubuntu-22-test";
+    let image = "/tmp/ubuntu-22-test.img";
     let res = client
       .post("/vms")
       .send_json(&VmSpecPartial {
         name: name.to_owned(),
-        disk: VmDisk {
-          image: image.to_owned(),
-          ..Default::default()
-        },
+        image: image.to_owned(),
         ..Default::default()
       })
       .await

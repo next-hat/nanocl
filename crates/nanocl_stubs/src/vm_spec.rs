@@ -1,30 +1,12 @@
 use std::collections::HashMap;
 
+pub use bollard_next::container::Config;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "utoipa")]
 use super::generic::Any;
-
-/// Disk representation of a VM
-#[derive(Debug, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct VmDisk {
-  /// Name of the image to use
-  pub image: String,
-  /// Virtual size allowed for the disk in GB (default: 20)
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub size: Option<u64>,
-}
 
 /// A vm's resources (cpu, memory, network)
 #[derive(Debug, Clone, PartialEq)]
@@ -143,8 +125,14 @@ pub struct VmSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ssh_key: Option<String>,
-  /// Disk config of the vm (image, size) required
-  pub disk: VmDisk,
+  /// Action to run before the VM runtime container
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub init_container: Option<Config>,
+  /// The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)
+  pub image: String,
   /// Mac address of the vm (default: generated)
   #[cfg_attr(
     feature = "serde",
@@ -217,6 +205,12 @@ pub struct VmSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ssh_key: Option<String>,
+  /// Action to run before the VM runtime container
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub init_container: Option<Config>,
   /// User-defined key/value metadata.
   #[cfg_attr(
     feature = "serde",
@@ -241,6 +235,7 @@ impl From<VmSpecPartial> for VmSpecUpdate {
       host_config: spec.host_config,
       password: spec.password,
       ssh_key: spec.ssh_key,
+      init_container: spec.init_container,
       metadata: spec.metadata,
     }
   }
@@ -290,14 +285,20 @@ pub struct VmSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ssh_key: Option<String>,
+  /// Action to run before the VM runtime container
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub init_container: Option<Config>,
   /// Default user of the vm (cloud)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub user: Option<String>,
-  /// Disk config of the vm
-  pub disk: VmDisk,
+  /// The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)
+  pub image: String,
   /// Mac address of the vm
   #[cfg_attr(
     feature = "serde",
@@ -324,6 +325,7 @@ impl From<VmSpec> for VmSpecUpdate {
       host_config: Some(spec.host_config),
       password: spec.password,
       ssh_key: spec.ssh_key,
+      init_container: spec.init_container,
       metadata: spec.metadata,
     }
   }
@@ -339,8 +341,9 @@ impl From<VmSpec> for VmSpecPartial {
       host_config: Some(spec.host_config),
       password: spec.password,
       ssh_key: spec.ssh_key,
+      init_container: spec.init_container,
       metadata: spec.metadata,
-      disk: spec.disk,
+      image: spec.image,
       mac_address: spec.mac_address,
     }
   }
