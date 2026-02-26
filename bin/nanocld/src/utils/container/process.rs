@@ -215,6 +215,7 @@ pub async fn stop_instances(
 pub async fn start_instances(
   kind_key: &str,
   kind: &ProcessKind,
+  emit_event: bool,
   state: &SystemState,
 ) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
@@ -231,6 +232,9 @@ pub async fn start_instances(
     ProcessDb::read_by_kind_key(kind_key, Some(filter), &state.inner.pool)
       .await?;
   for process in processes {
+    if process.name.starts_with("tmp-") {
+      continue;
+    }
     log::debug!("starting process {}", process.name);
     state
       .inner
@@ -242,12 +246,15 @@ pub async fn start_instances(
       .await
       .map_err(|err| err.map_err_context(|| "StartProcess"))?;
   }
-  ObjPsStatusDb::update_actual_status(
-    kind_key,
-    &ObjPsStatusKind::Start,
-    &state.inner.pool,
-  )
-  .await?;
-  super::generic::emit(kind_key, kind, NativeEventAction::Start, state).await?;
+  if emit_event {
+    ObjPsStatusDb::update_actual_status(
+      kind_key,
+      &ObjPsStatusKind::Start,
+      &state.inner.pool,
+    )
+    .await?;
+    super::generic::emit(kind_key, kind, NativeEventAction::Start, state)
+      .await?;
+  }
   Ok(())
 }

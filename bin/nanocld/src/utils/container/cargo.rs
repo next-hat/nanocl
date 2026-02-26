@@ -1,7 +1,7 @@
 use futures::{StreamExt, stream::FuturesUnordered};
 use nanocld_client::{ConnectOpts, NanocldClient};
 use ntex::rt;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bollard_next::{
   container::{
@@ -43,10 +43,6 @@ fn create_cargo_env(
   envs
 }
 
-fn health_quorum(total: usize) -> usize {
-  (total / 2) + 1
-}
-
 async fn instance_has_healthcheck(
   process: &Process,
   state: &SystemState,
@@ -57,12 +53,17 @@ async fn instance_has_healthcheck(
     .inspect_container(&process.key, None::<InspectContainerOptions>)
     .await
     .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-  let data = serde_json::to_value(inspected)
-    .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-  Ok(
-    data.pointer("/Config/Healthcheck").is_some()
-      || data.pointer("/State/Health").is_some(),
-  )
+  let has_config_healthcheck = inspected
+    .config
+    .as_ref()
+    .and_then(|config| config.healthcheck.as_ref())
+    .is_some();
+  let has_state_health = inspected
+    .state
+    .as_ref()
+    .and_then(|state| state.health.as_ref())
+    .is_some();
+  Ok(has_config_healthcheck || has_state_health)
 }
 
 async fn has_container_healthcheck(
@@ -79,144 +80,6 @@ async fn has_container_healthcheck(
     }
   }
   Ok(false)
-}
-
-async fn count_healthy_instances(
-  instances: &[Process],
-  state: &SystemState,
-) -> IoResult<usize> {
-  let mut healthy = 0usize;
-  for process in instances {
-    let inspected = state
-      .inner
-      .docker_api
-      .inspect_container(&process.key, None::<InspectContainerOptions>)
-      .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    let data = serde_json::to_value(inspected)
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    if data
-      .pointer("/State/Health/Status")
-      .and_then(|value| value.as_str())
-      == Some("healthy")
-    {
-      healthy += 1;
-    }
-  }
-  Ok(healthy)
-}
-
-fn truncate_health_output(output: &str) -> String {
-  const LIMIT: usize = 180;
-  let mut compact = output
-    .chars()
-    .map(|character| {
-      if character == '\n' || character == '\r' {
-        ' '
-      } else {
-        character
-      }
-    })
-    .collect::<String>();
-  compact = compact.trim().to_owned();
-  if compact.chars().count() <= LIMIT {
-    return compact;
-  }
-  let truncated = compact.chars().take(LIMIT).collect::<String>();
-  format!("{truncated}...")
-}
-
-async fn health_failure_reason(
-  instances: &[Process],
-  state: &SystemState,
-) -> IoResult<String> {
-  if instances.is_empty() {
-    return Ok("No created cargo instances to inspect".to_owned());
-  }
-  let mut reasons: Vec<String> = Vec::new();
-  for process in instances {
-    let inspected = state
-      .inner
-      .docker_api
-      .inspect_container(&process.key, None::<InspectContainerOptions>)
-      .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    let data = serde_json::to_value(inspected)
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    let status = data
-      .pointer("/State/Health/Status")
-      .and_then(|value| value.as_str())
-      .unwrap_or("unknown");
-    if status == "healthy" {
-      continue;
-    }
-    let failing_streak = data
-      .pointer("/State/Health/FailingStreak")
-      .and_then(|value| value.as_i64())
-      .unwrap_or_default();
-    let (exit_code, output) = data
-      .pointer("/State/Health/Log")
-      .and_then(|value| value.as_array())
-      .and_then(|value| value.last())
-      .map(|entry| {
-        let code = entry
-          .get("ExitCode")
-          .and_then(|value| value.as_i64())
-          .unwrap_or_default();
-        let output = entry
-          .get("Output")
-          .and_then(|value| value.as_str())
-          .map(truncate_health_output)
-          .unwrap_or_default();
-        (code, output)
-      })
-      .unwrap_or_default();
-    reasons.push(format!(
-      "{} status={status} failing_streak={failing_streak} exit_code={exit_code} output='{}'",
-      process.name,
-      if output.is_empty() {
-        "no probe output".to_owned()
-      } else {
-        output
-      }
-    ));
-  }
-  if reasons.is_empty() {
-    return Ok(
-      "Healthcheck did not reach quorum before timeout (instances still starting)"
-        .to_owned(),
-    );
-  }
-  Ok(reasons.join("; "))
-}
-
-async fn wait_health_quorum(
-  instances: &[Process],
-  state: &SystemState,
-) -> IoResult<()> {
-  if instances.is_empty() {
-    return Ok(());
-  }
-  let needed = health_quorum(instances.len());
-  let timeout = Instant::now() + Duration::from_secs(120);
-  loop {
-    let healthy = count_healthy_instances(instances, state).await?;
-    if healthy >= needed {
-      log::info!("cargo health quorum reached: {healthy}/{}", instances.len());
-      return Ok(());
-    }
-    if Instant::now() >= timeout {
-      let reason = health_failure_reason(instances, state).await?;
-      return Err(IoError::interrupted(
-        "CargoHealthTimeout",
-        &format!(
-          "Timeout waiting healthy quorum {healthy}/{needed} (total: {}): {reason}",
-          instances.len(),
-        ),
-      ));
-    }
-    ntex::time::sleep(Duration::from_secs(1)).await;
-  }
 }
 
 async fn rename_instances_back(
@@ -246,6 +109,88 @@ async fn rename_instances_back(
     .into_iter()
     .collect::<IoResult<Vec<_>>>()?;
   Ok(())
+}
+
+async fn wait_cargo_start_or_fail(
+  cargo_key: &str,
+  state: &SystemState,
+) -> IoResult<()> {
+  async fn healthcheck_failure_reason(
+    cargo_key: &str,
+    state: &SystemState,
+  ) -> IoResult<Option<String>> {
+    let processes =
+      ProcessDb::read_by_kind_key(cargo_key, None, &state.inner.pool).await?;
+    for process in processes {
+      if process.name.starts_with("tmp-") || process.name.starts_with("init-") {
+        continue;
+      }
+      let inspected = state
+        .inner
+        .docker_api
+        .inspect_container(&process.key, None::<InspectContainerOptions>)
+        .await
+        .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
+      let Some(health) = inspected
+        .state
+        .as_ref()
+        .and_then(|container_state| container_state.health.as_ref())
+      else {
+        continue;
+      };
+      let status = health
+        .status
+        .as_ref()
+        .map(|status| status.to_string())
+        .unwrap_or_else(|| "unknown".to_owned());
+      if status != "unhealthy" {
+        continue;
+      }
+      let failing_streak = health.failing_streak.unwrap_or_default();
+      let (exit_code, output) = health
+        .log
+        .as_ref()
+        .and_then(|logs| logs.last())
+        .map(|entry| {
+          (
+            entry.exit_code.unwrap_or_default(),
+            entry
+              .output
+              .as_ref()
+              .map(|value| value.replace(['\n', '\r'], " ").trim().to_owned())
+              .unwrap_or_default(),
+          )
+        })
+        .unwrap_or_default();
+      return Ok(Some(format!(
+        "Healthcheck failed: {} unhealthy, {} failing_streak, exit({}) {}",
+        process.name,
+        failing_streak,
+        exit_code,
+        if output.is_empty() {
+          "no probe output".to_owned()
+        } else {
+          output
+        }
+      )));
+    }
+    Ok(None)
+  }
+
+  loop {
+    let status =
+      ObjPsStatusDb::read_by_pk(cargo_key, &state.inner.pool).await?;
+    if status.actual == ObjPsStatusKind::Start.to_string() {
+      return Ok(());
+    }
+    if status.actual == ObjPsStatusKind::Fail.to_string() {
+      let reason = healthcheck_failure_reason(cargo_key, state)
+        .await?
+        .unwrap_or_else(|| format!("Cargo {cargo_key} became unhealthy"));
+      return Err(IoError::interrupted("CargoStart", &reason));
+    }
+    ntex::time::sleep(Duration::from_millis(250)).await;
+  }
 }
 
 /// Function that create the init container of the cargo
@@ -524,13 +469,6 @@ pub async fn start(
   if processes.is_empty() {
     create(cargo, replicas, state).await?;
   }
-  super::process::start_instances(
-    &cargo.spec.cargo_key,
-    &ProcessKind::Cargo,
-    state,
-  )
-  .await?;
-
   let filter = GenericFilter::new().r#where(
     "data",
     GenericClause::Contains(serde_json::json!({
@@ -547,20 +485,28 @@ pub async fn start(
     &state.inner.pool,
   )
   .await?;
+  super::process::start_instances(
+    &cargo.spec.cargo_key,
+    &ProcessKind::Cargo,
+    false,
+    state,
+  )
+  .await?;
   let has_healthcheck =
     has_container_healthcheck(cargo, &started_instances, state).await?;
-  if has_healthcheck
-    && let Err(err) = wait_health_quorum(&started_instances, state).await
-  {
-    state.emit_error_native_action(
-      cargo,
-      NativeEventAction::Start,
-      Some(format!(
-        "Healthcheck failed during cargo start {}: {err}",
-        cargo.spec.cargo_key
-      )),
-    );
-    return Err(err);
+  if has_healthcheck {
+    return wait_cargo_start_or_fail(&cargo.spec.cargo_key, state).await;
+  }
+  if !has_healthcheck {
+    ObjPsStatusDb::update_actual_status(
+      &cargo.spec.cargo_key,
+      &ObjPsStatusKind::Start,
+      &state.inner.pool,
+    )
+    .await?;
+    state
+      .emit_normal_native_action_sync(cargo, NativeEventAction::Start)
+      .await;
   }
   Ok(())
 }
@@ -572,12 +518,27 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
-  let old_instance_keys = processes
+  let old_processes = processes
+    .iter()
+    .filter(|process| {
+      process
+        .data
+        .config
+        .as_ref()
+        .and_then(|config| config.labels.as_ref())
+        .and_then(|labels| labels.get("io.nanocl.not-init-c"))
+        .map(|value| value == "true")
+        .unwrap_or_default()
+        && !process.name.starts_with("tmp-")
+    })
+    .cloned()
+    .collect::<Vec<_>>();
+  let old_instance_keys = old_processes
     .iter()
     .map(|process| process.key.clone())
     .collect::<Vec<_>>();
   // rename old instances to flag them for deletion
-  processes
+  old_processes
     .iter()
     .map(|process| {
       let docker_api = state.inner.docker_api.clone();
@@ -628,7 +589,10 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   };
   log::debug!("cargo new instances {new_instances:?}");
   // start created containers
-  match super::process::start_instances(key, &ProcessKind::Cargo, state).await {
+  let has_healthcheck;
+  match super::process::start_instances(key, &ProcessKind::Cargo, false, state)
+    .await
+  {
     Err(err) => {
       log::error!(
         "Unable to start cargo instance {} : {err}",
@@ -643,7 +607,8 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
         &state_ptr_ptr,
       )
       .await;
-      if let Err(err) = rename_instances_back(&processes, &state_ptr_ptr).await
+      if let Err(err) =
+        rename_instances_back(&old_processes, &state_ptr_ptr).await
       {
         log::error!("Unable to rename containers back: {err}");
       }
@@ -651,49 +616,25 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     }
     Ok(_) => {
       log::debug!("cargo instance {} started", cargo.spec.cargo_key);
-      let has_healthcheck =
+      has_healthcheck =
         has_container_healthcheck(&cargo, &new_instances, state).await?;
-      if has_healthcheck
-        && let Err(err) = wait_health_quorum(&new_instances, state).await
-      {
-        state.emit_error_native_action(
-          &cargo,
-          NativeEventAction::Start,
-          Some(format!(
-            "Healthcheck failed during cargo update {}: {err}",
-            cargo.spec.cargo_key
-          )),
-        );
-        log::error!(
-          "Unable to get healthy cargo quorum {}: {err}",
-          cargo.spec.cargo_key
-        );
-        let _ = super::process::delete_instances(
-          &new_instances
-            .iter()
-            .map(|p| p.key.clone())
-            .collect::<Vec<_>>(),
-          state,
-        )
-        .await;
-        if let Err(rename_err) = rename_instances_back(&processes, state).await
-        {
-          log::error!("Unable to rename containers back: {rename_err}");
-        }
-        return Err(err);
-      }
-      // Delete old containers
-      let state_ptr_ptr = state.clone();
-      let old_instance_keys = old_instance_keys.clone();
-      rt::spawn(async move {
-        if !has_healthcheck {
+      if !has_healthcheck {
+        // Delete old containers
+        let state_ptr_ptr = state.clone();
+        let old_instance_keys = old_instance_keys.clone();
+        rt::spawn(async move {
           ntex::time::sleep(Duration::from_secs(4)).await;
-        }
-        let _ =
-          super::process::delete_instances(&old_instance_keys, &state_ptr_ptr)
-            .await;
-      });
+          let _ = super::process::delete_instances(
+            &old_instance_keys,
+            &state_ptr_ptr,
+          )
+          .await;
+        });
+      }
     }
+  }
+  if has_healthcheck {
+    return wait_cargo_start_or_fail(key, state).await;
   }
   ObjPsStatusDb::update_actual_status(
     key,

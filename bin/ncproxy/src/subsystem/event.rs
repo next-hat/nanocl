@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc, time::{Duration, Instant}};
+use std::{str::FromStr, sync::Arc};
 
 use futures::{StreamExt, stream::FuturesUnordered};
 use ntex::rt;
@@ -32,63 +32,13 @@ fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
   })
 }
 
-fn count_healthy_instances(
-  cargo: &nanocld_client::stubs::cargo::CargoInspect,
-) -> usize {
-  cargo
-    .instances
-    .iter()
-    .filter(|instance| {
-      serde_json::to_value(&instance.data)
-        .ok()
-        .and_then(|value| {
-          value
-            .pointer("/State/Health/Status")
-            .and_then(|status| status.as_str())
-            .map(|status| status == "healthy")
-        })
-        .unwrap_or_default()
-    })
-    .count()
-}
-
-async fn wait_cargo_health_quorum(
+async fn should_wait_for_healthy_event(
   name: &str,
   namespace: &str,
   state: &SystemStateRef,
-) -> IoResult<()> {
-  let timeout = Instant::now() + Duration::from_secs(120);
-  loop {
-    let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
-    if !has_healthcheck(&cargo) {
-      return Ok(());
-    }
-    if cargo.instances.is_empty() {
-      if Instant::now() >= timeout {
-        return Err(IoError::interrupted(
-          "ProxyHealthTimeout",
-          "Timeout waiting cargo instances to be available",
-        ));
-      }
-      ntex::time::sleep(Duration::from_secs(1)).await;
-      continue;
-    }
-    let needed = (cargo.instances.len() / 2) + 1;
-    let healthy = count_healthy_instances(&cargo);
-    if healthy >= needed {
-      return Ok(());
-    }
-    if Instant::now() >= timeout {
-      return Err(IoError::interrupted(
-        "ProxyHealthTimeout",
-        &format!(
-          "Timeout waiting healthy quorum {healthy}/{needed} (total: {})",
-          cargo.instances.len()
-        ),
-      ));
-    }
-    ntex::time::sleep(Duration::from_secs(1)).await;
-  }
+) -> IoResult<bool> {
+  let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
+  Ok(has_healthcheck(&cargo))
 }
 
 /// Get cargo attributes from nanocld event
@@ -167,12 +117,19 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
+    (EventActorKind::Cargo, NativeEventAction::Healthy) => {
+      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      update_cargo_rule(&name, &namespace, state).await?;
+      let _ = state.event_emitter.emit_reload().await;
+      Ok(())
+    }
     (EventActorKind::Cargo, NativeEventAction::Start)
     | (EventActorKind::Cargo, NativeEventAction::Update) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
-      wait_cargo_health_quorum(&name, &namespace, state).await?;
-      update_cargo_rule(&name, &namespace, state).await?;
-      let _ = state.event_emitter.emit_reload().await;
+      if !should_wait_for_healthy_event(&name, &namespace, state).await? {
+        update_cargo_rule(&name, &namespace, state).await?;
+        let _ = state.event_emitter.emit_reload().await;
+      }
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)

@@ -5644,6 +5644,12 @@ components:
         - restart
       - type: string
         enum:
+        - healthy
+      - type: string
+        enum:
+        - unhealthy
+      - type: string
+        enum:
         - finish
       - type: string
         enum:

@@ -239,8 +239,13 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   if processes.is_empty() {
     create_instance(&vm, true, state).await?;
   }
-  super::process::start_instances(&vm.spec.vm_key, &ProcessKind::Vm, state)
-    .await?;
+  super::process::start_instances(
+    &vm.spec.vm_key,
+    &ProcessKind::Vm,
+    true,
+    state,
+  )
+  .await?;
   Ok(())
 }
 
@@ -272,6 +277,6 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let container_name = format!("{}.v", &vm.spec.vm_key);
   super::process::delete_instances(&[container_name], state).await?;
   create_instance(&vm, false, state).await?;
-  super::process::start_instances(key, &ProcessKind::Vm, state).await?;
+  super::process::start_instances(key, &ProcessKind::Vm, true, state).await?;
   Ok(())
 }
