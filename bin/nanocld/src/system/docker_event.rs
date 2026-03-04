@@ -10,7 +10,7 @@ use bollard_next::{
 };
 use nanocl_stubs::system::{
   EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
-  ObjPsStatusKind,
+  ObjPsHealthStatusKind, ObjPsStatusKind,
 };
 
 use crate::{
@@ -20,10 +20,6 @@ use crate::{
   repositories::generic::*,
   utils, vars,
 };
-
-fn health_quorum(total: usize) -> usize {
-  (total / 2) + 1
-}
 
 fn truncate_health_output(output: &str) -> String {
   const LIMIT: usize = 180;
@@ -55,12 +51,18 @@ async fn unhealthy_instances_reason(
 ) -> IoResult<Option<String>> {
   let mut reasons: Vec<String> = Vec::new();
   for process in instances {
-    let inspected = state
+    let inspected = match state
       .inner
       .docker_api
       .inspect_container(&process.key, None::<InspectContainerOptions>)
       .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
+    {
+      Ok(inspected) => inspected,
+      Err(err) => {
+        log::debug!("skip unhealthy reason for {}: {err}", process.name);
+        continue;
+      }
+    };
     let Some(health) = inspected
       .state
       .as_ref()
@@ -140,64 +142,6 @@ async fn count_health_states(
   Ok((healthy, unhealthy, starting, unknown))
 }
 
-async fn has_healthcheck(
-  cargo: &nanocl_stubs::cargo::Cargo,
-  instances: &[nanocl_stubs::process::Process],
-  state: &SystemState,
-) -> IoResult<bool> {
-  if cargo.spec.container.healthcheck.is_some() {
-    return Ok(true);
-  }
-  for process in instances {
-    let inspected = state
-      .inner
-      .docker_api
-      .inspect_container(&process.key, None::<InspectContainerOptions>)
-      .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    let has_config_healthcheck = inspected
-      .config
-      .as_ref()
-      .and_then(|config| config.healthcheck.as_ref())
-      .is_some();
-    let has_state_health = inspected
-      .state
-      .as_ref()
-      .and_then(|container_state| container_state.health.as_ref())
-      .is_some();
-    if has_config_healthcheck || has_state_health {
-      return Ok(true);
-    }
-  }
-  Ok(false)
-}
-
-async fn container_id_has_healthcheck(
-  container_id: &str,
-  state: &SystemState,
-) -> IoResult<bool> {
-  if container_id.is_empty() {
-    return Ok(false);
-  }
-  let inspected = state
-    .inner
-    .docker_api
-    .inspect_container(container_id, None::<InspectContainerOptions>)
-    .await
-    .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-  let has_config_healthcheck = inspected
-    .config
-    .as_ref()
-    .and_then(|config| config.healthcheck.as_ref())
-    .is_some();
-  let has_state_health = inspected
-    .state
-    .as_ref()
-    .and_then(|container_state| container_state.health.as_ref())
-    .is_some();
-  Ok(has_config_healthcheck || has_state_health)
-}
-
 async fn handle_cargo_health_event(
   kind_key: &str,
   action: &str,
@@ -215,39 +159,60 @@ async fn handle_cargo_health_event(
   if runtime_instances.is_empty() {
     return Ok(());
   }
-  if !has_healthcheck(&cargo, &runtime_instances, state).await? {
+  if !utils::container::cargo::has_container_healthcheck(
+    &cargo,
+    &runtime_instances,
+  ) {
     return Ok(());
   }
+  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
 
   if action == "health_status: unhealthy" {
+    let reason = unhealthy_instances_reason(&runtime_instances, state)
+      .await?
+      .unwrap_or_else(|| "Cargo healthcheck reported unhealthy".to_owned());
+    let should_emit_rollout_error = status.actual
+      == ObjPsStatusKind::Updating.to_string()
+      || status.actual == ObjPsStatusKind::Starting.to_string();
+    let health_changed = ObjPsStatusDb::update_health_status(
+      kind_key,
+      &ObjPsHealthStatusKind::Unhealthy,
+      &state.inner.pool,
+    )
+    .await?;
+    if !health_changed && !should_emit_rollout_error {
+      return Ok(());
+    }
     let old_instances = instances
       .iter()
       .filter(|process| process.name.starts_with("tmp-"))
       .cloned()
       .collect::<Vec<_>>();
-    if !old_instances.is_empty() {
-      let new_instance_keys = runtime_instances
-        .iter()
-        .map(|process| process.key.clone())
-        .collect::<Vec<_>>();
-      if !new_instance_keys.is_empty() {
-        let _ = utils::container::process::delete_instances(
-          &new_instance_keys,
-          state,
-        )
-        .await;
+    if should_emit_rollout_error {
+      if !old_instances.is_empty() {
+        let new_instance_keys = runtime_instances
+          .iter()
+          .map(|process| process.key.clone())
+          .collect::<Vec<_>>();
+        if !new_instance_keys.is_empty() {
+          let _ = utils::container::process::delete_instances(
+            &new_instance_keys,
+            state,
+          )
+          .await;
+        }
       }
-    }
-    for process in old_instances {
-      let name = process.name.trim_start_matches("tmp-").to_owned();
-      let _ = state
-        .inner
-        .docker_api
-        .rename_container(
-          &process.key,
-          bollard_next::container::RenameContainerOptions { name: &name },
-        )
-        .await;
+      for process in old_instances {
+        let name = process.name.trim_start_matches("tmp-").to_owned();
+        let _ = state
+          .inner
+          .docker_api
+          .rename_container(
+            &process.key,
+            bollard_next::container::RenameContainerOptions { name: &name },
+          )
+          .await;
+      }
     }
     ObjPsStatusDb::update_actual_status(
       kind_key,
@@ -255,20 +220,21 @@ async fn handle_cargo_health_event(
       &state.inner.pool,
     )
     .await?;
-    let reason = unhealthy_instances_reason(&runtime_instances, state)
-      .await?
-      .unwrap_or_else(|| "Cargo healthcheck reported unhealthy".to_owned());
-    state.emit_error_native_action(
-      &cargo,
-      NativeEventAction::Start,
-      Some(format!(
-        "CargoStart: Cargo {} became unhealthy: {reason}",
-        cargo.spec.cargo_key,
-      )),
-    );
-    state
-      .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
-      .await;
+    if should_emit_rollout_error {
+      state.emit_error_native_action(
+        &cargo,
+        NativeEventAction::Start,
+        Some(format!(
+          "CargoStart: Cargo {} became unhealthy: {reason}",
+          cargo.spec.cargo_key,
+        )),
+      );
+    }
+    if health_changed {
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
+        .await;
+    }
     return Ok(());
   }
 
@@ -282,8 +248,7 @@ async fn handle_cargo_health_event(
       );
       return Ok(());
     }
-    let needed = health_quorum(runtime_instances.len());
-    if healthy < needed {
+    if healthy != runtime_instances.len() {
       return Ok(());
     }
 
@@ -303,6 +268,13 @@ async fn handle_cargo_health_event(
         })?;
     }
 
+    let health_changed = ObjPsStatusDb::update_health_status(
+      kind_key,
+      &ObjPsHealthStatusKind::Healthy,
+      &state.inner.pool,
+    )
+    .await?;
+
     let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
     if status.actual != ObjPsStatusKind::Start.to_string() {
       ObjPsStatusDb::update_actual_status(
@@ -314,6 +286,8 @@ async fn handle_cargo_health_event(
       state
         .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
         .await;
+    }
+    if health_changed {
       state
         .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
         .await;
@@ -401,9 +375,12 @@ async fn exec_docker(
             .filter(|process| is_runtime_cargo_instance(&process.name))
             .cloned()
             .collect::<Vec<_>>();
-          let has_hc = has_healthcheck(&cargo, &runtime_instances, state)
-            .await?
-            || container_id_has_healthcheck(&id, state).await?;
+          let has_hc = utils::container::cargo::has_container_healthcheck(
+            &cargo,
+            &runtime_instances,
+          )
+            || utils::container::process::container_has_healthcheck(&id, state)
+              .await?;
           if !has_hc {
             ObjPsStatusDb::update_actual_status(
               &kind_key,
@@ -464,8 +441,10 @@ async fn exec_docker(
               .filter(|process| is_runtime_cargo_instance(&process.name))
               .cloned()
               .collect::<Vec<_>>();
-            let has_hc =
-              has_healthcheck(&cargo, &runtime_instances, state).await?;
+            let has_hc = utils::container::cargo::has_container_healthcheck(
+              &cargo,
+              &runtime_instances,
+            );
             if !has_hc {
               log::debug!("Set cargo status to fail");
               ObjPsStatusDb::update_actual_status(

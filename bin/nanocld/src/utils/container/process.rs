@@ -17,6 +17,32 @@ use crate::{
   repositories::generic::*,
 };
 
+pub async fn container_has_healthcheck(
+  container_id: &str,
+  state: &SystemState,
+) -> IoResult<bool> {
+  if container_id.is_empty() {
+    return Ok(false);
+  }
+  let inspected = state
+    .inner
+    .docker_api
+    .inspect_container(container_id, None::<InspectContainerOptions>)
+    .await
+    .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
+  let has_config_healthcheck = inspected
+    .config
+    .as_ref()
+    .and_then(|config| config.healthcheck.as_ref())
+    .is_some();
+  let has_state_health = inspected
+    .state
+    .as_ref()
+    .and_then(|container_state| container_state.health.as_ref())
+    .is_some();
+  Ok(has_config_healthcheck || has_state_health)
+}
+
 /// Create a process (container) based on the kind and the item
 pub async fn create(
   kind: &ProcessKind,

@@ -5989,6 +5989,12 @@ components:
           type: string
           description: Constraint value
       additionalProperties: false
+    ObjPsHealthStatusKind:
+      type: string
+      enum:
+      - healthy
+      - unhealthy
+      - unknown
     ObjPsStatus:
       type: object
       required:
@@ -5997,6 +6003,7 @@ components:
       - PrevWanted
       - Actual
       - PrevActual
+      - Health
       properties:
         UpdatedAt:
           type: string
@@ -6009,6 +6016,8 @@ components:
           $ref: '#/components/schemas/ObjPsStatusKind'
         PrevActual:
           $ref: '#/components/schemas/ObjPsStatusKind'
+        Health:
+          $ref: '#/components/schemas/ObjPsHealthStatusKind'
     ObjPsStatusKind:
       type: string
       enum:

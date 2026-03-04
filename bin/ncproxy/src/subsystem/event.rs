@@ -23,12 +23,18 @@ fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
     return true;
   }
   cargo.instances.iter().any(|instance| {
-    serde_json::to_value(&instance.data)
-      .map(|value| {
-        value.pointer("/Config/Healthcheck").is_some()
-          || value.pointer("/State/Health").is_some()
-      })
-      .unwrap_or_default()
+    instance
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.healthcheck.as_ref())
+      .is_some()
+      || instance
+        .data
+        .state
+        .as_ref()
+        .and_then(|container_state| container_state.health.as_ref())
+        .is_some()
   })
 }
 

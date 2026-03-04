@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS "object_process_statuses" (
   "wanted" VARCHAR NOT NULL,
   "prev_wanted" VARCHAR NOT NULL,
   "actual" VARCHAR NOT NULL,
-  "prev_actual" VARCHAR NOT NULL
+  "prev_actual" VARCHAR NOT NULL,
+  "health" VARCHAR NOT NULL DEFAULT 'unknown'
 );
 
 CREATE INDEX "object_process_statuses_key_idx" ON "object_process_statuses" ("key");
@@ -16,3 +17,4 @@ CREATE INDEX "object_process_statuses_wanted_idx" ON "object_process_statuses" (
 CREATE INDEX "object_process_statuses_prev_wanted_idx" ON "object_process_statuses" ("prev_wanted");
 CREATE INDEX "object_process_statuses_actual_idx" ON "object_process_statuses" ("actual");
 CREATE INDEX "object_process_statuses_prev_actual_idx" ON "object_process_statuses" ("prev_actual");
+CREATE INDEX "object_process_statuses_health_idx" ON "object_process_statuses" ("health");

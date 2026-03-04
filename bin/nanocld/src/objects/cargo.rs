@@ -8,7 +8,10 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::CargoSpecPartial,
-  system::{NativeEventAction, ObjPsStatusKind, ObjPsStatusPartial},
+  system::{
+    NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
+    ObjPsStatusPartial,
+  },
 };
 
 use crate::{
@@ -53,6 +56,7 @@ impl ObjCreate for CargoDb {
       prev_wanted: ObjPsStatusKind::Create,
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
+      health: ObjPsHealthStatusKind::Unknown,
     };
     let status = ObjPsStatusDb::create_from(status, &state.inner.pool).await?;
     let new_item = CargoDb {
@@ -108,6 +112,7 @@ impl ObjDelByPk for CargoDb {
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Destroying.to_string()),
       prev_actual: Some(status.actual),
+      ..Default::default()
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     Ok(cargo)
@@ -129,6 +134,7 @@ impl ObjPutByPk for CargoDb {
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Updating.to_string()),
       prev_actual: Some(status.actual),
+      health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.inner.pool)

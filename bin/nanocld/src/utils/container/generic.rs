@@ -4,7 +4,7 @@ use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{ConstraintOp, NodeConstraint},
   process::{Process, ProcessKind},
-  system::{NativeEventAction, ObjPsStatusKind},
+  system::{NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind},
 };
 
 use crate::{
@@ -117,6 +117,7 @@ pub async fn emit_starting(
     prev_wanted: Some(current_status.wanted),
     actual: Some(ObjPsStatusKind::Starting.to_string()),
     prev_actual: Some(current_status.actual),
+    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
   };
   ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
   emit(kind_key, kind, NativeEventAction::Starting, state).await?;
@@ -144,6 +145,7 @@ pub async fn emit_stopping(
     prev_wanted: Some(current_status.wanted),
     actual: Some(ObjPsStatusKind::Stopping.to_string()),
     prev_actual: Some(current_status.actual),
+    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
   };
   ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
   emit(kind_key, kind, NativeEventAction::Stopping, state).await?;

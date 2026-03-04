@@ -91,6 +91,7 @@ diesel::table! {
         prev_wanted -> Varchar,
         actual -> Varchar,
         prev_actual -> Varchar,
+        health -> Varchar,
     }
 }
 

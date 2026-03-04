@@ -2,7 +2,8 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   system::{
-    NativeEventAction, ObjPsStatus, ObjPsStatusKind, ObjPsStatusPartial,
+    NativeEventAction, ObjPsHealthStatusKind, ObjPsStatus, ObjPsStatusKind,
+    ObjPsStatusPartial,
   },
   vm::{Vm, VmInspect},
   vm_spec::VmSpecPartial,
@@ -49,6 +50,7 @@ impl ObjCreate for VmDb {
       prev_wanted: ObjPsStatusKind::Create,
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
+      health: ObjPsHealthStatusKind::Unknown,
     };
     let status: ObjPsStatus =
       ObjPsStatusDb::create_from(status, &state.inner.pool)
@@ -92,6 +94,7 @@ impl ObjDelByPk for VmDb {
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Destroying.to_string()),
       prev_actual: Some(status.actual),
+      ..Default::default()
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     Ok(vm)
@@ -114,6 +117,7 @@ impl ObjPutByPk for VmDb {
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Updating.to_string()),
       prev_actual: Some(status.actual),
+      health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     let vm = VmDb::update_from_spec(
