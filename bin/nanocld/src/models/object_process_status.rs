@@ -16,6 +16,7 @@ pub struct ObjPsStatusDb {
   pub prev_wanted: String,
   pub actual: String,
   pub prev_actual: String,
+  pub health: String,
 }
 
 impl TryFrom<ObjPsStatusDb> for ObjPsStatus {
@@ -28,6 +29,7 @@ impl TryFrom<ObjPsStatusDb> for ObjPsStatus {
       prev_wanted: value.prev_wanted.parse()?,
       actual: value.actual.parse()?,
       prev_actual: value.prev_actual.parse()?,
+      health: value.health.parse()?,
     })
   }
 }
@@ -39,6 +41,7 @@ pub struct ObjPsStatusUpdate {
   pub prev_wanted: Option<String>,
   pub actual: Option<String>,
   pub prev_actual: Option<String>,
+  pub health: Option<String>,
 }
 
 impl From<ObjPsStatusPartial> for ObjPsStatusDb {
@@ -51,6 +54,7 @@ impl From<ObjPsStatusPartial> for ObjPsStatusDb {
       prev_wanted: partial.prev_wanted.to_string(),
       actual: partial.actual.to_string(),
       prev_actual: partial.prev_actual.to_string(),
+      health: partial.health.to_string(),
     }
   }
 }

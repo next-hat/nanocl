@@ -1,6 +1,7 @@
 use futures::{StreamExt, stream::FuturesUnordered};
 use nanocld_client::{ConnectOpts, NanocldClient};
 use ntex::rt;
+use std::time::Duration;
 
 use bollard_next::{
   container::{
@@ -39,6 +40,55 @@ fn create_cargo_env(
   envs.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
   envs.push(format!("NANOCL_CARGO_INSTANCE={}", current));
   envs
+}
+
+pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
+  if cargo.spec.container.healthcheck.is_some() {
+    return true;
+  }
+  instances.iter().any(|instance| {
+    instance
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.healthcheck.as_ref())
+      .is_some()
+      || instance
+        .data
+        .state
+        .as_ref()
+        .and_then(|container_state| container_state.health.as_ref())
+        .is_some()
+  })
+}
+
+async fn rename_instances_back(
+  processes: &[Process],
+  state: &SystemState,
+) -> IoResult<()> {
+  processes
+    .iter()
+    .map(|process| {
+      let docker_api = state.inner.docker_api.clone();
+      async move {
+        docker_api
+          .rename_container(
+            &process.key,
+            RenameContainerOptions {
+              name: &process.name,
+            },
+          )
+          .await
+          .map_err(|err| err.map_err_context(|| "RenameContainer"))?;
+        Ok::<_, IoError>(())
+      }
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await
+    .into_iter()
+    .collect::<IoResult<Vec<_>>>()?;
+  Ok(())
 }
 
 /// Function that create the init container of the cargo
@@ -317,12 +367,45 @@ pub async fn start(
   if processes.is_empty() {
     create(cargo, replicas, state).await?;
   }
+  let filter = GenericFilter::new().r#where(
+    "data",
+    GenericClause::Contains(serde_json::json!({
+      "Config": {
+        "Labels": {
+          "io.nanocl.not-init-c": "true"
+        }
+      }
+    })),
+  );
+  let started_instances = ProcessDb::read_by_kind_key(
+    &cargo.spec.cargo_key,
+    Some(filter),
+    &state.inner.pool,
+  )
+  .await?;
   super::process::start_instances(
     &cargo.spec.cargo_key,
     &ProcessKind::Cargo,
+    false,
     state,
   )
   .await?;
+  let has_healthcheck = has_container_healthcheck(cargo, &started_instances);
+  // Healthchecked cargo status/events are handled asynchronously in docker_event.rs.
+  if has_healthcheck {
+    return Ok(());
+  }
+  if !has_healthcheck {
+    ObjPsStatusDb::update_actual_status(
+      &cargo.spec.cargo_key,
+      &ObjPsStatusKind::Start,
+      &state.inner.pool,
+    )
+    .await?;
+    state
+      .emit_normal_native_action_sync(cargo, NativeEventAction::Start)
+      .await;
+  }
   Ok(())
 }
 
@@ -333,8 +416,27 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
+  let old_processes = processes
+    .iter()
+    .filter(|process| {
+      process
+        .data
+        .config
+        .as_ref()
+        .and_then(|config| config.labels.as_ref())
+        .and_then(|labels| labels.get("io.nanocl.not-init-c"))
+        .map(|value| value == "true")
+        .unwrap_or_default()
+        && !process.name.starts_with("tmp-")
+    })
+    .cloned()
+    .collect::<Vec<_>>();
+  let old_instance_keys = old_processes
+    .iter()
+    .map(|process| process.key.clone())
+    .collect::<Vec<_>>();
   // rename old instances to flag them for deletion
-  processes
+  old_processes
     .iter()
     .map(|process| {
       let docker_api = state.inner.docker_api.clone();
@@ -385,7 +487,10 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   };
   log::debug!("cargo new instances {new_instances:?}");
   // start created containers
-  match super::process::start_instances(key, &ProcessKind::Cargo, state).await {
+  let has_healthcheck;
+  match super::process::start_instances(key, &ProcessKind::Cargo, false, state)
+    .await
+  {
     Err(err) => {
       log::error!(
         "Unable to start cargo instance {} : {err}",
@@ -400,45 +505,34 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
         &state_ptr_ptr,
       )
       .await;
-      let res = processes
-        .iter()
-        .map(|process| {
-          let docker_api = state_ptr_ptr.inner.docker_api.clone();
-          async move {
-            docker_api
-              .rename_container(
-                &process.key,
-                RenameContainerOptions {
-                  name: &process.name,
-                },
-              )
-              .await
-              .map_err(|err| err.map_err_context(|| "RenameContainer"))?;
-            Ok::<_, IoError>(())
-          }
-        })
-        .collect::<FuturesUnordered<_>>()
-        .collect::<Vec<_>>()
-        .await
-        .into_iter()
-        .collect::<IoResult<Vec<_>>>();
-      if let Err(err) = res {
+      if let Err(err) =
+        rename_instances_back(&old_processes, &state_ptr_ptr).await
+      {
         log::error!("Unable to rename containers back: {err}");
       }
+      return Err(err);
     }
     Ok(_) => {
       log::debug!("cargo instance {} started", cargo.spec.cargo_key);
-      // Delete old containers
-      let state_ptr_ptr = state.clone();
-      rt::spawn(async move {
-        ntex::time::sleep(std::time::Duration::from_secs(4)).await;
-        let _ = super::process::delete_instances(
-          &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
-          &state_ptr_ptr,
-        )
-        .await;
-      });
+      has_healthcheck = has_container_healthcheck(&cargo, &new_instances);
+      if !has_healthcheck {
+        // Delete old containers
+        let state_ptr_ptr = state.clone();
+        let old_instance_keys = old_instance_keys.clone();
+        rt::spawn(async move {
+          ntex::time::sleep(Duration::from_secs(4)).await;
+          let _ = super::process::delete_instances(
+            &old_instance_keys,
+            &state_ptr_ptr,
+          )
+          .await;
+        });
+      }
     }
+  }
+  // Healthchecked cargo status/events are handled asynchronously in docker_event.rs.
+  if has_healthcheck {
+    return Ok(());
   }
   ObjPsStatusDb::update_actual_status(
     key,

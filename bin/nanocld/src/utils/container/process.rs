@@ -17,6 +17,32 @@ use crate::{
   repositories::generic::*,
 };
 
+pub async fn container_has_healthcheck(
+  container_id: &str,
+  state: &SystemState,
+) -> IoResult<bool> {
+  if container_id.is_empty() {
+    return Ok(false);
+  }
+  let inspected = state
+    .inner
+    .docker_api
+    .inspect_container(container_id, None::<InspectContainerOptions>)
+    .await
+    .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
+  let has_config_healthcheck = inspected
+    .config
+    .as_ref()
+    .and_then(|config| config.healthcheck.as_ref())
+    .is_some();
+  let has_state_health = inspected
+    .state
+    .as_ref()
+    .and_then(|container_state| container_state.health.as_ref())
+    .is_some();
+  Ok(has_config_healthcheck || has_state_health)
+}
+
 /// Create a process (container) based on the kind and the item
 pub async fn create(
   kind: &ProcessKind,
@@ -215,6 +241,7 @@ pub async fn stop_instances(
 pub async fn start_instances(
   kind_key: &str,
   kind: &ProcessKind,
+  emit_event: bool,
   state: &SystemState,
 ) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
@@ -231,6 +258,9 @@ pub async fn start_instances(
     ProcessDb::read_by_kind_key(kind_key, Some(filter), &state.inner.pool)
       .await?;
   for process in processes {
+    if process.name.starts_with("tmp-") {
+      continue;
+    }
     log::debug!("starting process {}", process.name);
     state
       .inner
@@ -242,12 +272,15 @@ pub async fn start_instances(
       .await
       .map_err(|err| err.map_err_context(|| "StartProcess"))?;
   }
-  ObjPsStatusDb::update_actual_status(
-    kind_key,
-    &ObjPsStatusKind::Start,
-    &state.inner.pool,
-  )
-  .await?;
-  super::generic::emit(kind_key, kind, NativeEventAction::Start, state).await?;
+  if emit_event {
+    ObjPsStatusDb::update_actual_status(
+      kind_key,
+      &ObjPsStatusKind::Start,
+      &state.inner.pool,
+    )
+    .await?;
+    super::generic::emit(kind_key, kind, NativeEventAction::Start, state)
+      .await?;
+  }
   Ok(())
 }

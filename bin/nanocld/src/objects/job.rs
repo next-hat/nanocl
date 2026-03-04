@@ -1,7 +1,10 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   job::{Job, JobInspect, JobPartial},
-  system::{NativeEventAction, ObjPsStatusKind, ObjPsStatusPartial},
+  system::{
+    NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
+    ObjPsStatusPartial,
+  },
 };
 
 use crate::{
@@ -27,6 +30,7 @@ impl ObjCreate for JobDb {
       prev_wanted: ObjPsStatusKind::Create,
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
+      health: ObjPsHealthStatusKind::Unknown,
     };
     let status = ObjPsStatusDb::create_from(status, &state.inner.pool).await?;
     let job = JobDb::create_from(db_model, &state.inner.pool)
@@ -59,6 +63,7 @@ impl ObjDelByPk for JobDb {
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Destroying.to_string()),
       prev_actual: Some(status.actual),
+      ..Default::default()
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     Ok(job)

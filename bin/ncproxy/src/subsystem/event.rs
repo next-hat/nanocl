@@ -18,6 +18,35 @@ use nanocld_client::{
 
 use crate::{models::SystemStateRef, utils, vars};
 
+fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
+  if cargo.spec.container.healthcheck.is_some() {
+    return true;
+  }
+  cargo.instances.iter().any(|instance| {
+    instance
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.healthcheck.as_ref())
+      .is_some()
+      || instance
+        .data
+        .state
+        .as_ref()
+        .and_then(|container_state| container_state.health.as_ref())
+        .is_some()
+  })
+}
+
+async fn should_wait_for_healthy_event(
+  name: &str,
+  namespace: &str,
+  state: &SystemStateRef,
+) -> IoResult<bool> {
+  let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
+  Ok(has_healthcheck(&cargo))
+}
+
 /// Get cargo attributes from nanocld event
 fn get_cargo_attributes(
   attributes: &Option<serde_json::Value>,
@@ -94,11 +123,19 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
-    (EventActorKind::Cargo, NativeEventAction::Start)
-    | (EventActorKind::Cargo, NativeEventAction::Update) => {
+    (EventActorKind::Cargo, NativeEventAction::Healthy) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
+      Ok(())
+    }
+    (EventActorKind::Cargo, NativeEventAction::Start)
+    | (EventActorKind::Cargo, NativeEventAction::Update) => {
+      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      if !should_wait_for_healthy_event(&name, &namespace, state).await? {
+        update_cargo_rule(&name, &namespace, state).await?;
+        let _ = state.event_emitter.emit_reload().await;
+      }
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)

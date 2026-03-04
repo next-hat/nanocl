@@ -1,0 +1,19 @@
+ApiVersion: v0.17
+
+Cargoes:
+- Name: health-check
+  Container:
+    Image: leone-website:0.5.7
+
+Resources:
+- Name: http.deploy-example.com
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: deploy-example.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Key: health-check.global.c
+          Port: 8080

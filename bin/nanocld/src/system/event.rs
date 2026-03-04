@@ -7,7 +7,7 @@ use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
   system::{
     Event, EventActor, EventActorKind, EventKind, NativeEventAction,
-    ObjPsStatusKind,
+    ObjPsHealthStatusKind, ObjPsStatusKind,
   },
 };
 
@@ -172,6 +172,13 @@ async fn update(
         .unwrap();
       log::debug!("found {} cargoes using secret {key}", cargoes.len());
       for cargo in &cargoes {
+        ObjPsStatusDb::update_health_status(
+          &cargo.spec.cargo_key,
+          &ObjPsHealthStatusKind::Unknown,
+          &state.inner.pool,
+        )
+        .await
+        .ok();
         ObjPsStatusDb::update_actual_status(
           &cargo.spec.cargo_key,
           &ObjPsStatusKind::Updating,

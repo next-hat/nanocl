@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use diesel::prelude::*;
 
 use nanocl_error::io::IoResult;
-use nanocl_stubs::{generic::GenericFilter, system::ObjPsStatusKind};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  system::{ObjPsHealthStatusKind, ObjPsStatusKind},
+};
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
@@ -32,6 +35,10 @@ impl RepositoryBase for ObjPsStatusDb {
       (
         "prev_actual",
         (ColumnType::Text, "object_process_statuses.prev_actual"),
+      ),
+      (
+        "health",
+        (ColumnType::Text, "object_process_statuses.health"),
       ),
       (
         "created_at",
@@ -100,5 +107,23 @@ impl ObjPsStatusDb {
     };
     ObjPsStatusDb::update_pk(key, new_status, pool).await?;
     Ok(())
+  }
+
+  pub async fn update_health_status(
+    key: &str,
+    health: &ObjPsHealthStatusKind,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let curr_status = ObjPsStatusDb::read_by_pk(key, pool).await?;
+    let health = health.to_string();
+    if curr_status.health == health {
+      return Ok(false);
+    }
+    let new_status = ObjPsStatusUpdate {
+      health: Some(health),
+      ..Default::default()
+    };
+    ObjPsStatusDb::update_pk(key, new_status, pool).await?;
+    Ok(true)
   }
 }

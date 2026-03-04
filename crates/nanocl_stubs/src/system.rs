@@ -92,6 +92,41 @@ impl FromStr for ObjPsStatusKind {
   }
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum ObjPsHealthStatusKind {
+  Healthy,
+  Unhealthy,
+  #[default]
+  Unknown,
+}
+
+impl FromStr for ObjPsHealthStatusKind {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "healthy" => Ok(Self::Healthy),
+      "unhealthy" => Ok(Self::Unhealthy),
+      _ => Ok(Self::Unknown),
+    }
+  }
+}
+
+impl std::fmt::Display for ObjPsHealthStatusKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
+      Self::Healthy => "healthy",
+      Self::Unhealthy => "unhealthy",
+      Self::Unknown => "unknown",
+    };
+    write!(f, "{data}")
+  }
+}
+
 impl std::fmt::Display for ObjPsStatusKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let data = match self {
@@ -123,6 +158,7 @@ pub struct ObjPsStatus {
   pub prev_wanted: ObjPsStatusKind,
   pub actual: ObjPsStatusKind,
   pub prev_actual: ObjPsStatusKind,
+  pub health: ObjPsHealthStatusKind,
 }
 
 #[derive(Clone, Debug)]
@@ -136,6 +172,7 @@ pub struct ObjPsStatusPartial {
   pub prev_wanted: ObjPsStatusKind,
   pub actual: ObjPsStatusKind,
   pub prev_actual: ObjPsStatusKind,
+  pub health: ObjPsHealthStatusKind,
 }
 
 /// HostInfo contains information about the host and the docker daemon
@@ -219,6 +256,8 @@ pub enum NativeEventAction {
   Stopping,
   Stop,
   Restart,
+  Healthy,
+  Unhealthy,
   Finish,
   Fail,
   Die,
@@ -242,6 +281,8 @@ impl FromStr for NativeEventAction {
       "stopping" => Ok(NativeEventAction::Stopping),
       "stop" => Ok(NativeEventAction::Stop),
       "restart" => Ok(NativeEventAction::Restart),
+      "healthy" => Ok(NativeEventAction::Healthy),
+      "unhealthy" => Ok(NativeEventAction::Unhealthy),
       "finish" => Ok(NativeEventAction::Finish),
       "fail" => Ok(NativeEventAction::Fail),
       "die" => Ok(NativeEventAction::Die),
@@ -265,6 +306,8 @@ impl std::fmt::Display for NativeEventAction {
       NativeEventAction::Destroying => write!(f, "destroying"),
       NativeEventAction::Destroy => write!(f, "destroy"),
       NativeEventAction::Restart => write!(f, "restart"),
+      NativeEventAction::Healthy => write!(f, "healthy"),
+      NativeEventAction::Unhealthy => write!(f, "unhealthy"),
       NativeEventAction::Finish => write!(f, "finish"),
       NativeEventAction::Fail => write!(f, "fail"),
       NativeEventAction::Die => write!(f, "die"),
