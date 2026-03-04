@@ -321,7 +321,10 @@ impl From<CargoSummary> for CargoRow {
       name: cargo.spec.name,
       image: cargo.spec.container.image.unwrap_or_default(),
       version: cargo.spec.version,
-      status: format!("{}/{}", cargo.status.actual, cargo.status.wanted),
+      status: format!(
+        "{}/{} ({})",
+        cargo.status.actual, cargo.status.wanted, cargo.status.health
+      ),
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
