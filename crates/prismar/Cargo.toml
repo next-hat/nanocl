@@ -1,0 +1,34 @@
+[package]
+name = "prismar"
+version = "0.1.0"
+edition = "2024"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "Prisma-like typed filters for Diesel + ntex"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = ["derive"]
+derive = ["dep:prismar_derive"]
+nanocl_compat = ["dep:nanocl_stubs"]
+utoipa = ["dep:utoipa"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = [
+  "std",
+  "clock",
+  "serde",
+] }
+uuid = { version = "1", features = ["serde", "v4"] }
+thiserror = "2"
+diesel = { version = "2.3", features = ["r2d2"] }
+ntex = { version = "3", features = ["tokio"] }
+prismar_derive = { path = "../prismar_derive", version = "0.1.0", optional = true }
+nanocl_stubs = { version = "0.17", features = ["serde"], optional = true }
+utoipa = { version = "5", optional = true, features = ["uuid", "chrono"] }
+
+[dev-dependencies]
+serde_json = "1"
+diesel = { version = "2.3", features = ["sqlite", "r2d2"] }
+libsqlite3-sys = { version = "0.35", features = ["bundled"] }

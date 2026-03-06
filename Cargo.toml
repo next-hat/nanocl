@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/prismar",
+  "crates/prismar_derive",
   "crates/nanocl_error",
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
@@ -22,6 +24,8 @@ lto = true
 codegen-units = 1
 
 [patch.crates-io]
+prismar = { path = "crates/prismar" }
+prismar_derive = { path = "crates/prismar_derive" }
 nanocl_error = { path = "crates/nanocl_error" }
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
