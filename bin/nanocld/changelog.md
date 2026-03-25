@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Docker daemon background thread health check to restart nanocld if docker is not reachable.
+- Check docker health check to send correct even to delete old containers when updating a cargo.
 
 ## [0.17.0] - 2025-09-12
 
@@ -62,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - 2024-06-11
 
-### Chore
+### Core
 
 - Update ntex to version 2
 

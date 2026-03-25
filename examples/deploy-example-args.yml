@@ -1,0 +1,25 @@
+ApiVersion: v0.16
+
+Args:
+- Name: prefix
+  Description: The prefix to use for the proxy rule and domain.
+  Kind: String
+  Required: true
+
+Resources:
+- Name: ${{Args.prefix}}-deploy-example.com
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: ${{Args.prefix}}-deploy-example.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Key: deploy-example.global.c
+          Port: 9000
+
+Cargoes:
+- Name: deploy-example
+  Container:
+    Image: ghcr.io/next-hat/nanocl-get-started:latest

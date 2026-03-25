@@ -18,7 +18,7 @@ use nanocl_stubs::{generic::GenericListQueryNsp, system::SslConfig};
 
 use crate::error::is_api_error;
 
-pub const NANOCLD_DEFAULT_VERSION: &str = "0.17.0";
+pub const NANOCLD_DEFAULT_VERSION: &str = "0.18.0";
 
 #[derive(Clone, Debug)]
 pub struct ConnectOpts {
