@@ -28,7 +28,7 @@ test = ["nanocl_utils/ntex_test_client"]
 vendored = ["openssl/vendored"]
 
 [build-dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 nanocl_utils = { version = "0.9", features = ["build_tools"] }
 
@@ -47,7 +47,7 @@ nanocl_error = { version = "0.7", features = [
 ] }
 log = "0.4"
 liquid = "0.26"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 ntex = { version = "3", features = ["tokio"] }
 tokio = { version = "1.49", features = ["fs"] }
 serde = "1.0"
