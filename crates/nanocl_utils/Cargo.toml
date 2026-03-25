@@ -15,7 +15,7 @@ bench = false
 [features]
 dev = []
 logger = ["dep:log", "dep:env_logger"]
-ntex = ["dep:ntex", "dep:futures", "dep:serde_json"]
+ntex = ["dep:ntex", "dep:futures", "dep:serde_json", "dep:ntex-error"]
 ntex_swagger = [
   "ntex",
   "dep:utoipa",
@@ -30,6 +30,7 @@ ntex_test_client = ["dep:ntex", "dep:serde"]
 
 [dependencies]
 ntex = { version = "3", optional = true }
+ntex-error = { version = "=1.6.1", optional = true }
 log = { version = "0.4", optional = true }
 env_logger = { version = "0.11", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
