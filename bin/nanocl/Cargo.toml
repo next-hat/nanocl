@@ -1,6 +1,6 @@
 [package]
 name = "nanocl"
-version = "0.17.1"
+version = "0.18.0"
 edition = "2024"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Container and virtual machine orchestrator"
@@ -32,10 +32,10 @@ chrono = { version = "0.4", default-features = false, features = [
   "clock",
 ] }
 bollard-next = { version = "0.18.1" }
-nanocl_utils = { version = "0.8", features = ["build_tools"] }
-nanocld_client = { version = "0.17" }
+nanocl_utils = { version = "0.9", features = ["build_tools"] }
+nanocld_client = { version = "0.18" }
 serde_json = "1.0"
-nanocl_error = { version = "0.6", features = ["io", "serde_json"] }
+nanocl_error = { version = "0.7", features = ["io", "serde_json"] }
 
 [dependencies]
 bollard-next = { version = "0.18.1" }
@@ -56,8 +56,8 @@ chrono = { version = "0.4", default-features = false, features = [
 dialoguer = "0.12"
 liquid = { version = "0.26", features = ["stdlib"] }
 regex = "1.11"
-nanocld_client = { version = "0.17", features = ["tokio", "openssl"] }
-nanocl_error = { version = "0.6", features = [
+nanocld_client = { version = "0.18", features = ["tokio", "openssl"] }
+nanocl_error = { version = "0.7", features = [
   "io",
   "tokio",
   "http_client",
@@ -77,8 +77,8 @@ termimad = "0.34"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 nix = { version = "0.31", features = ["user"] }
-nanocl_utils = { version = "0.8", features = ["unix"] }
+nanocl_utils = { version = "0.9", features = ["unix"] }
 termios = "0.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-nanocl_utils = { version = "0.8" }
+nanocl_utils = { version = "0.9" }

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - unreleased
+
+### Added
+
+- Default server with reuseport to avoid binding problem
+- More header in logs to support cloudflare real ip
+
+### Changed
+
+- Drop old ssl version support
+
+
 ## [0.14.0] - 2025-09-12
 
 ### Added
@@ -49,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.12.0] - 2024-06-11
 
-### Chore
+### Core
 
 - Update ntex to version 2
 

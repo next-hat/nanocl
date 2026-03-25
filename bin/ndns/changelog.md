@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.91.0-n0.10.0] - unreleased
+
+### Core
+
+- Upgrade dependencies
+
 ## [2.91.0-n0.9.0] - 2025-09-11
 
 ### Core
@@ -21,13 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Update
 
-- Update chore image to alpine:3.20.3
+- Update core image to alpine:3.20.3
 
 ## [2.90.0-n0.7] - 2024-06-11
 
 ### Update
 
-- Update chore image to alpine:3.20.0
+- Update core image to alpine:3.20.0
 
 ## [2.90.0-n0.6] - 2024-08-05
 

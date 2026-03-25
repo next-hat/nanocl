@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Welcome to nanocl!</title>
+  <title>502 Bad Gateway</title>
   <style>
     html {
       background-color: black;
@@ -12,6 +12,7 @@
 
     p {
       color: white;
+      line-height: 1.4;
     }
 
     body {
@@ -25,21 +26,47 @@
       color: orange;
     }
 
+    .status-code {
+      text-align: center;
+      color: orange;
+      font-size: 6em;
+      margin: 0.1em 0 0.2em 0;
+      line-height: 0.9;
+      font-weight: 700;
+    }
+
+    .status-title {
+      text-align: center;
+      font-size: 1.4em;
+      margin: 0 0 0.6em 0;
+    }
+
+    .muted {
+      color: #ccc;
+      font-size: 0.95em;
+    }
+
   </style>
 </head>
 
 <body>
-  <h1 style="text-align: center;">Welcome to nanocl!</h1>
-  <p>If you see this page, the nanocl proxy server is successfully installed and
-    working. Further configuration is required.</p>
+  <div class="status-code">502</div>
+  <h1 class="status-title">Bad Gateway</h1>
 
-  <p>For online documentation and support please refer to
+  <p>If you see this page, the nanocl proxy received an invalid response from the
+    upstream server (502 Bad Gateway). This usually means the upstream service is
+    down, unreachable, or returned an unexpected response.</p>
+
+  <p class="muted">Possible actions: verify the upstream service is running, check
+    network connectivity, or review the proxy configuration and logs.</p>
+
+  <p>For documentation and support, see
     <a href="http://docs.next-hat.com">docs.next-hat.com</a>.<br />
     Commercial support is available at
     <a href="http://next-hat.com/">next-hat.com</a>.
   </p>
 
-  <p><em>Thank you for using nanocl.</em></p>
+  <p style="text-align:center; margin-top:1.2em;"><em>Thank you for using nanocl.</em></p>
 </body>
 
 </html>

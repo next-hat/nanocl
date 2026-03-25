@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "async-recursion",
  "bollard-next",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_error"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bollard-next",
  "diesel",
@@ -1955,7 +1955,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1970,7 +1970,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_utils"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2026,7 +2026,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bollard-next",
  "futures",
@@ -2048,7 +2048,7 @@ checksum = "6e3d189da485332e96ba8a5ef646a311871abd7915bf06ac848a9117f19cf6e4"
 
 [[package]]
 name = "ncdns"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2069,7 +2069,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2094,7 +2094,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "futures-util",
  "log",
@@ -3752,7 +3752,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
