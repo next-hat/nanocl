@@ -2303,9 +2303,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-error"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5cf8dc8cb6e0eedf9f191e878fec1e05fed1ba0de01afab59ac4ae54b7af2f2"
+checksum = "6929f5f14cf0ff20c24f5cb33a0be524ac368573a5bd4e618ac3dc0975853d86"
 dependencies = [
  "backtrace",
  "foldhash 0.2.0",
