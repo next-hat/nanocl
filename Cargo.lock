@@ -1924,7 +1924,7 @@ dependencies = [
  "nanocld_client",
  "nix",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "openssl",
  "regex",
  "ring",
@@ -1947,7 +1947,7 @@ dependencies = [
  "bollard-next",
  "diesel",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -1981,7 +1981,7 @@ dependencies = [
  "log",
  "nanocl_error",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "serde",
  "serde_json",
  "utoipa",
@@ -2013,7 +2013,7 @@ dependencies = [
  "notify",
  "ntex 3.6.2",
  "ntex-cors",
- "ntex-error",
+ "ntex-error 2.0.0",
  "num_cpus",
  "openssl",
  "rand",
@@ -2036,7 +2036,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_stubs",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "openssl",
  "serde",
  "serde_json",
@@ -2062,7 +2062,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2088,7 +2088,7 @@ dependencies = [
  "nanocld_client",
  "notify",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2108,7 +2108,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "ntex 3.6.2",
- "ntex-error",
+ "ntex-error 2.0.0",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2210,7 +2210,7 @@ dependencies = [
  "ntex-bytes 1.5.2",
  "ntex-codec 1.1.0",
  "ntex-dispatcher",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-h2 3.8.2",
  "ntex-http 1.1.0",
  "ntex-io 3.9.1",
@@ -2303,9 +2303,21 @@ dependencies = [
 
 [[package]]
 name = "ntex-error"
-version = "1.6.1"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5cf8dc8cb6e0eedf9f191e878fec1e05fed1ba0de01afab59ac4ae54b7af2f2"
+checksum = "76342515c9dc1ce346cef8f6aa52090f400a3389ddd25c6a701772e8e40d5c76"
+dependencies = [
+ "backtrace",
+ "foldhash 0.2.0",
+ "ntex-bytes 1.5.2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "ntex-error"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8093e08e8ce26f9157efc66027ed72bd23124153fb6afed4ef9c0e72935be167"
 dependencies = [
  "backtrace",
  "foldhash 0.2.0",
@@ -2347,7 +2359,7 @@ dependencies = [
  "ntex-bytes 1.5.2",
  "ntex-codec 1.1.0",
  "ntex-dispatcher",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-http 1.1.0",
  "ntex-io 3.9.1",
  "ntex-net 3.8.2",
@@ -2485,7 +2497,7 @@ dependencies = [
  "libc",
  "log",
  "ntex-bytes 1.5.2",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-http 1.1.0",
  "ntex-io 3.9.1",
  "ntex-io-uring",
@@ -2566,7 +2578,7 @@ dependencies = [
  "foldhash 0.2.0",
  "futures-timer",
  "log",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-service 4.6.0",
  "oneshot 0.2.1",
  "scoped-tls",
@@ -2663,7 +2675,7 @@ checksum = "5058c3a84d8eb4cd860631b0bd162b56202ab5e6bd341908911636da648826c1"
 dependencies = [
  "log",
  "ntex-bytes 1.5.2",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-io 3.9.1",
  "ntex-net 3.8.2",
  "ntex-service 4.6.0",
@@ -2715,7 +2727,7 @@ dependencies = [
  "futures-timer",
  "log",
  "ntex-bytes 1.5.2",
- "ntex-error",
+ "ntex-error 1.7.1",
  "ntex-rt 3.12.0",
  "ntex-service 4.6.0",
  "pin-project-lite",
