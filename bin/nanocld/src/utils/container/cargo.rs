@@ -470,6 +470,17 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     .await
     .into_iter()
     .collect::<IoResult<Vec<_>>>()?;
+
+  // Stop old instances if they have port bindings to avoid conflicts with the new instances
+  // To avoid this and have true zero downtime, use a proxy rules instead of port bindings
+  if let Some(old_instance) = old_processes.first()
+    && let Some(host_config) = &old_instance.data.host_config
+    && let Some(_) = &host_config.port_bindings
+  {
+    log::debug!("cargo {key} has port bindings stopping it before update");
+    super::process::stop_instances(key, &ProcessKind::Cargo, state).await?;
+  }
+
   // Create instance with the new spec
   if let Some(init_container) = &cargo.spec.init_container {
     let process = create_init_container(&cargo, init_container, state).await?;
