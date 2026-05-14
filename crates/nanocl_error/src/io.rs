@@ -405,16 +405,16 @@ where
 }
 
 #[cfg(feature = "ntex")]
-impl FromIo<Box<IoError>> for ntex::client::error::SendRequestError {
+impl FromIo<Box<IoError>> for ntex::client::error::ClientError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,
   {
     let inner = match self {
-      ntex::client::error::SendRequestError::Timeout => {
+      ntex::client::error::ClientError::Timeout => {
         std::io::Error::new(std::io::ErrorKind::TimedOut, format!("{self}"))
       }
-      ntex::client::error::SendRequestError::Connect(err) => match err {
+      ntex::client::error::ClientError::Connect(err) => match err {
         ntex::client::error::ConnectError::Disconnected(_) => {
           std::io::Error::new(
             std::io::ErrorKind::ConnectionAborted,

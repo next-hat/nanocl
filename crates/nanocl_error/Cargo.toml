@@ -16,7 +16,7 @@ bench = false
 io = []
 dev = ["backtrace"]
 backtrace = []
-ntex = ["dep:ntex", "dep:ntex-error"]
+ntex = ["dep:ntex"]
 http = ["ntex", "dep:serde_json"]
 http_client = ["io", "http", "serde_urlencoded"]
 diesel = ["dep:diesel"]
@@ -28,7 +28,6 @@ tokio = ["dep:tokio"]
 
 [dependencies]
 ntex = { version = "3", optional = true }
-ntex-error = { version = "=1.6.1", optional = true }
 serde_json = { version = "1.0", optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 diesel = { version = "2.3", default-features = false, optional = true }
