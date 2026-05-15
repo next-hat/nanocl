@@ -39,9 +39,21 @@ pub async fn generate(
   while count < len {
     let host = &hosts[count];
     if host.starts_with("unix://") {
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
       let addr = host.replace("unix://", "");
       server = match server.bind_uds(&addr) {
         Err(err) => {
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
           log::error!("server::gen: {addr}: {err}");
           return Err(err);
         }

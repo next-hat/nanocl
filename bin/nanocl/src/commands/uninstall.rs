@@ -25,6 +25,12 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "docker_host": docker_host,
     "state_dir": "/tmp/random",
     "conf_dir": "/tmp/random",
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
     "docker_uds_path": docker_host.replace("unix://", ""),
     "gateway": "127.0.0.1",
     "hosts": "tcp://127.0.0.1:8585",

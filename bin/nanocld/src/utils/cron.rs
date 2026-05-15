@@ -15,6 +15,12 @@ fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
     .first()
     .cloned()
     .unwrap_or("unix:///run/nanocl/nanocl.sock".to_owned())
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
     .replace("unix://", "");
   format!(
     "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start",
