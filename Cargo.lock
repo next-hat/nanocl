@@ -1934,7 +1934,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "nix",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "openssl",
  "regex",
  "ring",
@@ -1956,7 +1956,7 @@ version = "0.7.0"
 dependencies = [
  "bollard-next",
  "diesel",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -1989,7 +1989,7 @@ dependencies = [
  "libc",
  "log",
  "nanocl_error",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "serde",
  "serde_json",
  "utoipa",
@@ -2019,7 +2019,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "ntex-cors",
  "num_cpus",
  "openssl",
@@ -2042,7 +2042,7 @@ dependencies = [
  "futures",
  "nanocl_error",
  "nanocl_stubs",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "openssl",
  "serde",
  "serde_json",
@@ -2067,7 +2067,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "num_cpus",
  "openssl",
  "serde",
@@ -2092,7 +2092,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "num_cpus",
  "openssl",
  "serde",
@@ -2111,7 +2111,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.9.4",
+ "ntex 3.9.6",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2197,9 +2197,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "3.9.4"
+version = "3.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46ae1f7665898d5f730bf4e9a3b72151865a2eb4f80dc79f7fe778b97e1b68dd"
+checksum = "e643721853014b0fc54845c1b2d30a222a0d1e055a71b10beadc1dd27eed777b"
 dependencies = [
  "base64",
  "bitflags",
@@ -2217,15 +2217,14 @@ dependencies = [
  "ntex-error",
  "ntex-h2 3.11.1",
  "ntex-http 1.2.0",
- "ntex-httparse",
- "ntex-io 3.11.5",
+ "ntex-io 3.12.1",
  "ntex-macros 3.2.0",
- "ntex-net 3.11.3",
+ "ntex-net 3.12.0",
  "ntex-router 1.0.0",
  "ntex-rt 3.14.1",
  "ntex-server 3.9.0",
  "ntex-service 4.6.0",
- "ntex-tls 3.5.2",
+ "ntex-tls 3.6.1",
  "ntex-util 3.6.1",
  "openssl",
  "percent-encoding",
@@ -2288,7 +2287,7 @@ checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.9.4",
+ "ntex 3.9.6",
 ]
 
 [[package]]
@@ -2300,7 +2299,7 @@ dependencies = [
  "bitflags",
  "log",
  "ntex-codec 1.2.1",
- "ntex-io 3.11.5",
+ "ntex-io 3.12.1",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
  "pin-project-lite",
@@ -2354,8 +2353,8 @@ dependencies = [
  "ntex-dispatcher",
  "ntex-error",
  "ntex-http 1.2.0",
- "ntex-io 3.11.5",
- "ntex-net 3.11.3",
+ "ntex-io 3.12.1",
+ "ntex-net 3.12.0",
  "ntex-server 3.9.0",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
@@ -2396,12 +2395,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ntex-httparse"
-version = "1.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e1690b21f19d3f396779946bb4c992a66d817da04e4517d0d341d4291981921"
-
-[[package]]
 name = "ntex-io"
 version = "2.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2418,9 +2411,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "3.11.5"
+version = "3.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a52c8f48601278e66e3161ddaddc505e3816f228b4e829d86e0b86073c858f"
+checksum = "be9f20a4d1532a0fa5f6e4c09f4cadccba1473636bdcf74465c00d5cfaf6e231"
 dependencies = [
  "bitflags",
  "log",
@@ -2489,9 +2482,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-net"
-version = "3.11.3"
+version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db4bdd3ef3d9b93f4ab67c0bd7c8d7d864b9ef0533cfc38abe288a8c8168f843"
+checksum = "01215e614ad3605afe22de4d1346dde76ca10078a497ebb2cafce159e45f00fc"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -2500,7 +2493,7 @@ dependencies = [
  "ntex-bytes 1.6.8",
  "ntex-error",
  "ntex-http 1.2.0",
- "ntex-io 3.11.5",
+ "ntex-io 3.12.1",
  "ntex-io-uring",
  "ntex-polling",
  "ntex-rt 3.14.1",
@@ -2621,8 +2614,8 @@ dependencies = [
  "core_affinity",
  "ctrlc",
  "log",
- "ntex-io 3.11.5",
- "ntex-net 3.11.3",
+ "ntex-io 3.12.1",
+ "ntex-net 3.12.0",
  "ntex-polling",
  "ntex-rt 3.14.1",
  "ntex-service 4.6.0",
@@ -2671,15 +2664,15 @@ dependencies = [
 
 [[package]]
 name = "ntex-tls"
-version = "3.5.2"
+version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8a0e8126b5a118f13e45da479b3062566d4682db617e15fa716dffc7621fa10"
+checksum = "fbd52f7b3342663cf566856c99cab578c2e2fef6f15d86242c160e9d9dd57145"
 dependencies = [
  "log",
  "ntex-bytes 1.6.8",
  "ntex-error",
- "ntex-io 3.11.5",
- "ntex-net 3.11.3",
+ "ntex-io 3.12.1",
+ "ntex-net 3.12.0",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
  "openssl",
