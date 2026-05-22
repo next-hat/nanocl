@@ -486,7 +486,7 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
       .is_some()
   });
   // Stop old instances if they have port bindings to avoid conflicts with the new instances
-  // To avoid this and have true zero downtime, use a proxy rules instead of port bindings
+  // To avoid this and have true zero downtime, use a proxy rule instead of port bindings
   if as_port_binding {
     log::debug!("cargo {key} has port bindings stopping it before update");
     super::process::stop_instances(key, &ProcessKind::Cargo, state).await?;
