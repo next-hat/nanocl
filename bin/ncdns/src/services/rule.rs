@@ -29,7 +29,7 @@ pub(crate) async fn apply_rule(
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   utils::update_entries(&path.1, &payload, &dnsmasq, &client).await?;
-  utils::reload_service(&client).await?;
+  utils::reload_service(&dnsmasq).await?;
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
 
@@ -57,7 +57,7 @@ pub(crate) async fn remove_rule(
       HttpError::bad_request(format!("Unable to serialize the DnsRule: {err}"))
     })?;
   utils::remove_entries(&dns_rule, &dnsmasq, &client).await?;
-  utils::reload_service(&client).await?;
+  utils::reload_service(&dnsmasq).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
 

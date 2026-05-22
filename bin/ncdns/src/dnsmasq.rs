@@ -1,4 +1,7 @@
-use std::fs;
+use std::{fs, process::Command, time::Duration};
+
+use ntex::rt;
+use ntex::web;
 
 use nanocl_error::io::{FromIo, IoResult};
 
@@ -7,6 +10,7 @@ use nanocl_error::io::{FromIo, IoResult};
 pub struct Dnsmasq {
   pub(crate) config_dir: String,
   pub(crate) config_path: String,
+  pub(crate) pid_path: String,
   pub(crate) dns: Vec<String>,
 }
 
@@ -16,6 +20,7 @@ impl Dnsmasq {
     Self {
       config_dir: config_path.to_owned(),
       config_path: format!("{}/dnsmasq.conf", &config_path.to_owned()),
+      pid_path: format!("{}/dnsmasq.pid", &config_path.to_owned()),
       dns: Vec::new(),
     }
   }
@@ -26,6 +31,7 @@ impl Dnsmasq {
     Self {
       config_dir: self.config_dir.to_owned(),
       config_path: self.config_path.to_owned(),
+      pid_path: self.pid_path.to_owned(),
       dns: self.dns.to_owned(),
     }
   }
@@ -64,11 +70,86 @@ no-hosts
 proxy-dnssec
 except-interface=lo
 interface=nanoclbr0
+pid-file={}
 conf-dir={}/dnsmasq.d,*.conf
 ",
-      &self.config_dir
+      &self.pid_path, &self.config_dir
     );
     self.write_main_conf(&contents)?;
+    Ok(())
+  }
+
+  fn is_running(&self) -> bool {
+    let Ok(pid) = fs::read_to_string(&self.pid_path) else {
+      return false;
+    };
+    Command::new("kill")
+      .arg("-0")
+      .arg(pid.trim())
+      .status()
+      .is_ok_and(|status| status.success())
+  }
+
+  pub(crate) async fn start(&self) -> IoResult<()> {
+    let dnsmasq = self.clone();
+    web::block(move || {
+      if dnsmasq.is_running() {
+        return Ok(());
+      }
+      let _ = fs::remove_file(&dnsmasq.pid_path);
+      let output = Command::new("dnsmasq")
+        .arg(format!("--conf-file={}", dnsmasq.config_path))
+        .arg("--log-facility=-")
+        .output()
+        .map_err(|err| err.map_err_context(|| "unable to start dnsmasq"))?;
+      if output.status.success() {
+        return Ok(());
+      }
+      let mut message = String::from_utf8_lossy(&output.stdout).into_owned();
+      message.push_str(String::from_utf8_lossy(&output.stderr).as_ref());
+      Err(nanocl_error::io::IoError::other("dnsmasq", &message))
+    })
+    .await?;
+    Ok(())
+  }
+
+  pub(crate) fn spawn_monitor(&self) {
+    let dnsmasq = self.clone();
+    rt::spawn(async move {
+      loop {
+        if !dnsmasq.is_running() {
+          log::warn!("dnsmasq::monitor: dnsmasq is not running, restarting");
+          if let Err(err) = dnsmasq.start().await {
+            log::warn!("dnsmasq::monitor: {err}");
+          }
+        }
+        ntex::time::sleep(Duration::from_secs(2)).await;
+      }
+    });
+  }
+
+  pub(crate) async fn reload(&self) -> IoResult<()> {
+    if !self.is_running() {
+      return self.start().await;
+    }
+    let pid_path = self.pid_path.clone();
+    web::block(move || {
+      let pid = fs::read_to_string(&pid_path).map_err(|err| {
+        err.map_err_context(|| format!("unable to read pid file {pid_path}"))
+      })?;
+      let output = Command::new("kill")
+        .arg("-HUP")
+        .arg(pid.trim())
+        .output()
+        .map_err(|err| err.map_err_context(|| "unable to reload dnsmasq"))?;
+      if output.status.success() {
+        return Ok(());
+      }
+      let mut message = String::from_utf8_lossy(&output.stdout).into_owned();
+      message.push_str(String::from_utf8_lossy(&output.stderr).as_ref());
+      Err(nanocl_error::io::IoError::other("dnsmasq", &message))
+    })
+    .await?;
     Ok(())
   }
 

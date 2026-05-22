@@ -66,7 +66,7 @@ Modern teams need faster iteration loops, secure multi‑tenant isolation, and a
 
 - Declarative Statefiles for cargoes (containers), resources, jobs & virtual machines.
 - End‑to‑end TLS (including internal mesh primitives in progress).
-- Dynamic routing & DNS propagation (`nproxy`, `ncproxy`, `ndns`).
+- Dynamic routing & DNS propagation (`ncproxy`, `ncdns`).
 - Resource abstraction layer for pluggable kinds (e.g. proxy rules).
 - Jobs & cron style automation.
 - Backup & orphan cleanup tooling.
@@ -168,10 +168,8 @@ Nanocl is composed of modular containerized services:
 | nstore | Persist cluster state |
 | ndaemon | REST API & control surface |
 | nmetrics | Resource usage collection |
-| nproxy | Data‑plane proxy for containers/VMs (optional) |
-| ncproxy | Reconciles proxy config (optional) |
-| ndns | DNS records manager (optional) |
-| ncdns | DNS reconciliation (optional) |
+| ncproxy | Proxy controller with embedded nginx data plane (optional) |
+| ncdns | DNS controller with embedded dnsmasq data plane (optional) |
 
 Resources:
 

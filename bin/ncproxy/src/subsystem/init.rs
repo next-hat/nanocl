@@ -22,13 +22,15 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
       ..Default::default()
     })?;
   }
-  let event_emitter = EventEmitter::new(&client);
+  let event_emitter = EventEmitter::new(&cli.state_dir);
   let state = Arc::new(SystemState {
     client,
     event_emitter,
     store: Store::new(&cli.state_dir),
     nginx_dir: cli.nginx_dir.clone(),
   });
+  crate::utils::nginx::ensure_conf(&state).await?;
+  crate::utils::nginx::ensure_started(&state.store.dir).await?;
   event::spawn(&state);
   metric::spawn(&state);
   Ok(state)

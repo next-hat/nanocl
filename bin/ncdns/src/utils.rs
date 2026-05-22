@@ -54,11 +54,8 @@ async fn get_network_addr(
 }
 
 /// Reload the dns service
-/// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
-pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
-  client
-    .restart_process("cargo", "ndns", Some("system"))
-    .await?;
+pub(crate) async fn reload_service(dnsmasq: &Dnsmasq) -> IoResult<()> {
+  dnsmasq.reload().await?;
   Ok(())
 }
 
@@ -172,6 +169,10 @@ pub mod tests {
     dnsmasq
       .ensure()
       .expect("Expect to setup minimal dnsmasq config");
+    dnsmasq
+      .start()
+      .await
+      .expect("Expect to start dnsmasq for tests");
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()

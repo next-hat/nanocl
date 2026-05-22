@@ -21,6 +21,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
     .with_dns(cli.dns.clone())
     .ensure()?;
+  dnsmasq.start().await?;
   #[allow(unused)]
   let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
@@ -33,6 +34,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
   }
   event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
+  dnsmasq.spawn_monitor();
   server.await?;
   Ok(())
 }

@@ -42,7 +42,10 @@ async fn main() -> std::io::Result<()> {
     Ok(state) => state,
   };
   match utils::server::generate(&state) {
+    Ok(srv) => {
+      utils::nginx::spawn_monitor(&state.store.dir);
+      srv.await
+    }
     Err(err) => err.print_and_exit(),
-    Ok(srv) => srv.await,
   }
 }
