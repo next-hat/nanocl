@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
 use nanocl_error::io::IoResult;
 
 use nanocld_client::NanocldClient;
@@ -29,6 +31,15 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
     store: Store::new(&cli.state_dir),
     nginx_dir: cli.nginx_dir.clone(),
   });
+  loop {
+    match event::ensure_self_config(&state.client).await {
+      Ok(()) => break,
+      Err(err) => {
+        log::warn!("init: {err}");
+        ntex::time::sleep(RETRY_DELAY).await;
+      }
+    }
+  }
   crate::utils::nginx::ensure_conf(&state).await?;
   crate::utils::nginx::ensure_started(&state.store.dir).await?;
   event::spawn(&state);

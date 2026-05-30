@@ -57,9 +57,12 @@ fn is_nginx_running() -> bool {
   let Ok(pid) = std::fs::read_to_string(NGINX_PID_PATH) else {
     return false;
   };
+  let Ok(pid) = pid.trim().parse::<i32>() else {
+    return false;
+  };
   Command::new("kill")
     .arg("-0")
-    .arg(pid.trim())
+    .arg(pid.to_string())
     .status()
     .is_ok_and(|status| status.success())
 }

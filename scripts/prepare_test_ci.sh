@@ -39,3 +39,15 @@ docker run -d --rm \
   --network host \
   ghcr.io/next-hat/nanocl-dev:dev \
   run --bin ncproxy --no-default-features --features "dev" -- --state-dir $HOME/.nanocl_dev/state/proxy
+
+i=0
+while [ "$i" -lt 60 ]; do
+  if curl --silent --show-error --fail http://127.0.0.1:8585/resource/kinds/ncproxy.io/rule/inspect >/dev/null; then
+    exit 0
+  fi
+  i=$((i + 1))
+  sleep 1
+done
+
+echo "ncproxy resource kind did not become ready" >&2
+exit 1

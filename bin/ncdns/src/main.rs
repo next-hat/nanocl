@@ -16,6 +16,8 @@ use nanocld_client::NanocldClient;
 use cli::Cli;
 use dnsmasq::Dnsmasq;
 
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
 async fn run(cli: &Cli) -> IoResult<()> {
   // Spawn a new thread to listen events from nanocld
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
@@ -31,6 +33,15 @@ async fn run(cli: &Cli) -> IoResult<()> {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
+  }
+  loop {
+    match event::ensure_self_config(&client).await {
+      Ok(()) => break,
+      Err(err) => {
+        log::warn!("run: {err}");
+        ntex::time::sleep(RETRY_DELAY).await;
+      }
+    }
   }
   event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;

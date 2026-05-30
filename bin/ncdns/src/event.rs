@@ -12,7 +12,9 @@ use nanocld_client::NanocldClient;
 
 use crate::vars;
 
-async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
+pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
     name: "ncdns.io/rule".to_owned(),
@@ -49,7 +51,7 @@ async fn r#loop(client: &NanocldClient) {
       }
     }
     log::warn!("event::loop: retrying in 2 seconds");
-    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+    ntex::time::sleep(RETRY_DELAY).await;
   }
 }
 
