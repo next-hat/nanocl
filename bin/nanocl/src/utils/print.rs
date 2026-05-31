@@ -55,14 +55,12 @@ pub(crate) fn print_toml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
-  let toml =
-    stacker::maybe_grow(32 * 1024, 8 * 1024 * 1024, || toml::to_string(&data))
-      .map_err(|err| {
-        IoError::with_context(
-          "Print toml",
-          std::io::Error::new(std::io::ErrorKind::InvalidData, err),
-        )
-      })?;
+  let toml = toml::to_string(&data).map_err(|err| {
+    IoError::with_context(
+      "Print toml",
+      std::io::Error::new(std::io::ErrorKind::InvalidData, err),
+    )
+  })?;
   print!("{toml}");
   Ok(())
 }
