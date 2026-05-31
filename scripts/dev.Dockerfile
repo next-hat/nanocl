@@ -1,29 +1,32 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.95.0-bookworm
+FROM --platform=$BUILDPLATFORM rust:1.96.0-alpine3.23
 
 ENV TZ=UTC
 
-RUN apt-get update && \
-  apt-get install -y \
+RUN apk add --update \
+  alpine-sdk \
   bash \
-  build-essential \
+  build-base \
   ca-certificates \
-  cloud-image-utils \
+  cdrkit \
+  cloud-utils \
   curl \
   dnsmasq \
-  genisoimage \
   git \
+  libgcc \
+  libpq \
   libpq-dev \
-  libssl-dev \
-  make \
+  musl-dev \
   nginx \
-  nginx-common \
-  nginx-extras \
+  nginx-mod-http-headers-more \
+  nginx-mod-http-lua \
+  nginx-mod-stream \
+  openssl \
+  openssl-dev \
   perl \
-  procps \
+  procps-ng \
   tzdata \
-  util-linux && \
-  rm -rf /var/lib/apt/lists/*
+  util-linux
 
 RUN cargo install cargo-watch --locked
 RUN cargo install cargo-llvm-cov --locked
