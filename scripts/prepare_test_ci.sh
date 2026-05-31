@@ -41,12 +41,13 @@ docker run -d \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
-  -v /etc/hosts:/etc/hosts \
   -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
   -w /project \
   --hostname nanocl.internal \
   --network host \
+  --add-host store.nanocl.internal:127.0.0.1 \
+  --add-host nanocl.internal:127.0.0.1 \
   ghcr.io/next-hat/nanocl-dev:dev \
   run --bin nanocld --no-default-features --features "test" -- --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb\
     --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state
@@ -55,7 +56,6 @@ docker run -d \
   --name ncproxy-ci \
   -v $(pwd):/project \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /etc/hosts:/etc/hosts \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
@@ -63,12 +63,15 @@ docker run -d \
   -e HOME=$HOME \
   -w /project \
   --network host \
+  --add-host nanocl.internal:127.0.0.1 \
   ghcr.io/next-hat/nanocl-dev:dev \
   run --bin ncproxy --no-default-features --features "dev" -- --state-dir $HOME/.nanocl_dev/state/proxy
 
+API_BASE_URL="http://127.0.0.1:8585/v0.0"
+
 i=0
 while [ "$i" -lt 180 ]; do
-  if curl --silent --fail http://127.0.0.1:8585/resource/kinds/ncproxy.io/rule/inspect >/dev/null 2>&1; then
+  if curl --silent --fail "$API_BASE_URL/resource/kinds/ncproxy.io/rule/inspect" >/dev/null 2>&1; then
     exit 0
   fi
 
