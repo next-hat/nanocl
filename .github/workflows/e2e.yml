@@ -51,9 +51,43 @@ jobs:
           sudo gpasswd -r nanocl
           newgrp nanocl
           nanocl install -t installer.yml
-          sleep 20
+
+          ready=0
+          i=0
+          while [ "$i" -lt 180 ]; do
+            if curl --silent --fail --unix-socket /run/nanocl/nanocl.sock http://localhost/v0.0/resource/kinds/ncproxy.io/rule/inspect >/dev/null 2>&1 \
+              && curl --silent --fail -X DELETE --unix-socket /run/nanocl/proxy.sock http://localhost/v0.0/rules/__ci_readiness_probe__ >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+
+            if ! docker ps --format '{{.Names}}' | grep -q '^ndaemon.system.c$'; then
+              echo "ndaemon.system.c exited unexpectedly" >&2
+              docker logs ndaemon.system.c || true
+              exit 1
+            fi
+
+            if ! docker ps --format '{{.Names}}' | grep -q '^ncproxy.system.c$'; then
+              echo "ncproxy.system.c exited unexpectedly" >&2
+              docker logs ncproxy.system.c || true
+              exit 1
+            fi
+
+            i=$((i + 1))
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "nanocl and ncproxy did not become ready in time" >&2
+            docker ps -a
+            docker logs ndaemon.system.c || true
+            docker logs ncproxy.system.c || true
+            exit 1
+          fi
+
           docker ps -a
           docker logs ndaemon.system.c
+          docker logs ncproxy.system.c || true
           sudo chmod -R 777 /var/lib/nanocl
           sudo chmod -R 777 /run/nanocl
           nanocl version
