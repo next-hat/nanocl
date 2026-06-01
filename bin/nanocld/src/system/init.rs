@@ -20,6 +20,27 @@ use crate::{
   utils,
 };
 
+async fn maybe_set_uds_perm() -> bool {
+  let mut perms = match fs::metadata("/run/nanocl/nanocl.sock").await {
+    Ok(metadata) => metadata.permissions(),
+    Err(err) => {
+      // The watcher can receive events before the daemon creates the socket.
+      if err.kind() != std::io::ErrorKind::NotFound {
+        log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+      }
+      return false;
+    }
+  };
+  perms.set_mode(0o770);
+  if let Err(err) = fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
+  {
+    log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+    return false;
+  }
+  log::trace!("boot::set_uds_perm: /run/nanocl/nanocl.sock permission set");
+  true
+}
+
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
 /// Then close the thread
@@ -44,8 +65,18 @@ fn set_uds_perm() {
     };
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+    if let Err(err) = watcher.watch(path, RecursiveMode::Recursive) {
+      log::warn!("boot::set_uds_perm: watcher {err}");
+      return;
+    }
     log::trace!("boot::set_uds_perm: watching /run/nanocl");
+
+    // Fast path for cases where the socket already exists.
+    if maybe_set_uds_perm().await {
+      log::trace!("boot::set_uds_perm: stop thread");
+      return;
+    }
+
     for res in rx {
       match res {
         Ok(event) => {
@@ -55,24 +86,9 @@ fn set_uds_perm() {
             || event.kind.is_other()
           {
             log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
-            let mut perms = match fs::metadata("/run/nanocl/nanocl.sock").await
-            {
-              Err(err) => {
-                log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
-                break;
-              }
-              Ok(perms) => perms.permissions(),
-            };
-            perms.set_mode(0o770);
-            if let Err(err) =
-              fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
-            {
-              log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+            if maybe_set_uds_perm().await {
+              break;
             }
-            log::trace!(
-              "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set"
-            );
-            break;
           }
         }
         Err(err) => {

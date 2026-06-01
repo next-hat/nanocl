@@ -61,14 +61,13 @@ jobs:
             sudo find /var/lib/nanocl/store/ca -type f -name '*.key' -exec chmod 600 {} \; || true
           fi
 
-          sudo chmod -R 777 /run/nanocl || true
-
           daemon_ready=0
           i=0
           while [ "$i" -lt 180 ]; do
             daemon_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/nanocl.sock http://localhost/v0.0/resource/kinds/ncproxy.io/rule/inspect || true)
 
             if [ "$daemon_status" = "200" ]; then
+              echo "readiness: daemon=200 (ready)"
               daemon_ready=1
               break
             fi
@@ -100,6 +99,11 @@ jobs:
             docker logs ncproxy.system.c || true
             exit 1
           fi
+
+          # The daemon socket is created after startup; relax permissions after it exists.
+          sudo chmod -R 777 /run/nanocl || true
+          sudo chmod 777 /run/nanocl/nanocl.sock /run/nanocl/proxy.sock 2>/dev/null || true
+          ls -la /run/nanocl || true
 
           probe_ready=0
           j=0
