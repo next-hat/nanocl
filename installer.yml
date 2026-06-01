@@ -31,6 +31,11 @@ Cargoes:
         cockroach cert create-node 127.0.0.1 *.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
         cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
       fi
+
+      # Keep cert/key modes strict for CockroachDB and nanocld TLS checks.
+      chmod 600 $STATE_DIR/ca/*.key $STATE_DIR/certs/*.key 2>/dev/null || true
+      chmod 644 $STATE_DIR/certs/*.crt 2>/dev/null || true
+
       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
 
 - Name: nmetrics

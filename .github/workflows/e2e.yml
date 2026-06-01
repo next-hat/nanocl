@@ -52,7 +52,15 @@ jobs:
           newgrp nanocl
           nanocl install -t installer.yml
 
-          sudo chmod -R 777 /var/lib/nanocl || true
+          if [ -d /var/lib/nanocl/store/certs ]; then
+            sudo find /var/lib/nanocl/store/certs -type f -name '*.key' -exec chmod 600 {} \; || true
+            sudo find /var/lib/nanocl/store/certs -type f -name '*.crt' -exec chmod 644 {} \; || true
+          fi
+
+          if [ -d /var/lib/nanocl/store/ca ]; then
+            sudo find /var/lib/nanocl/store/ca -type f -name '*.key' -exec chmod 600 {} \; || true
+          fi
+
           sudo chmod -R 777 /run/nanocl || true
 
           daemon_ready=0
