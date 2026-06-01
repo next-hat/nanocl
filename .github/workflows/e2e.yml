@@ -102,38 +102,25 @@ jobs:
 
           # The daemon socket is created after startup; relax permissions after it exists.
           sudo chmod -R 777 /run/nanocl || true
-          sudo chmod 777 /run/nanocl/nanocl.sock /run/nanocl/proxy.sock 2>/dev/null || true
           ls -la /run/nanocl || true
 
-          probe_ready=0
-          j=0
-          while [ "$j" -lt 30 ]; do
-            if nanocl state apply -ys ./examples/deploy_example.yml >/tmp/nanocl-ready-apply.log 2>&1; then
-              k=0
-              while [ "$k" -lt 20 ]; do
-                if nanocl state rm -ys ./examples/deploy_example.yml >/tmp/nanocl-ready-rm.log 2>&1; then
-                  probe_ready=1
-                  break
-                fi
-                k=$((k + 1))
-                sleep 1
-              done
-              if [ "$probe_ready" -eq 1 ]; then
+          # Wait for ncproxy to bind its socket and accept connections.
+          proxy_ready=0
+          p=0
+          while [ "$p" -lt 120 ]; do
+            if [ -S /run/nanocl/proxy.sock ]; then
+              sudo chmod 777 /run/nanocl/proxy.sock 2>/dev/null || true
+              proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" \
+                --unix-socket /run/nanocl/proxy.sock 'http://localhost/v0.15/rules' 2>/dev/null || true)
+              if [ "$proxy_status" != "000" ]; then
+                echo "readiness: proxy=${proxy_status} (ready)"
+                proxy_ready=1
                 break
               fi
             fi
 
-            nanocl state rm -ys ./examples/deploy_example.yml >/dev/null 2>&1 || true
-
-            if [ $((j % 5)) -eq 0 ]; then
-              echo "controller readiness attempt=${j}" >&2
-              tail -n 10 /tmp/nanocl-ready-apply.log 2>/dev/null || true
-            fi
-
-            if ! docker ps --format '{{.Names}}' | grep -q '^ndaemon.system.c$'; then
-              echo "ndaemon.system.c exited unexpectedly" >&2
-              docker logs ndaemon.system.c || true
-              exit 1
+            if [ $((p % 10)) -eq 0 ]; then
+              echo "readiness: proxy=waiting (${p}s)"
             fi
 
             if ! docker ps --format '{{.Names}}' | grep -q '^ncproxy.system.c$'; then
@@ -142,24 +129,22 @@ jobs:
               exit 1
             fi
 
-            j=$((j + 1))
-            sleep 2
+            p=$((p + 1))
+            sleep 1
           done
 
-          if [ "$probe_ready" -ne 1 ]; then
-            echo "nanocl controller readiness probe failed" >&2
+          if [ "$proxy_ready" -ne 1 ]; then
+            echo "ncproxy did not become ready in time" >&2
             docker ps -a
-            tail -n 40 /tmp/nanocl-ready-apply.log 2>/dev/null || true
-            tail -n 40 /tmp/nanocl-ready-rm.log 2>/dev/null || true
             docker logs ndaemon.system.c || true
             docker logs ncproxy.system.c || true
             exit 1
           fi
 
+          nanocl version
           docker ps -a
           docker logs ndaemon.system.c
           docker logs ncproxy.system.c || true
-          nanocl version
       # Run E2E tests
       - name: E2E
         run: |

@@ -43,7 +43,7 @@ async fn create_instance(
       .env
       .unwrap_or_default()
       .into_iter()
-      .chain(env_secrets.into_iter())
+      .chain(env_secrets)
       .collect(),
   );
   let host_config = container.host_config.unwrap_or_default();
