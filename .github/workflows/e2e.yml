@@ -52,19 +52,21 @@ jobs:
           newgrp nanocl
           nanocl install -t installer.yml
 
-          ready=0
+          sudo chmod -R 777 /var/lib/nanocl || true
+          sudo chmod -R 777 /run/nanocl || true
+
+          daemon_ready=0
           i=0
           while [ "$i" -lt 180 ]; do
             daemon_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/nanocl.sock http://localhost/v0.0/resource/kinds/ncproxy.io/rule/inspect || true)
-            proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" -X DELETE --unix-socket /run/nanocl/proxy.sock http://localhost/v0.0/rules/__ci_readiness_probe__ || true)
 
-            if [ "$daemon_status" = "200" ] && [ "$proxy_status" = "200" ]; then
-              ready=1
+            if [ "$daemon_status" = "200" ]; then
+              daemon_ready=1
               break
             fi
 
             if [ $((i % 15)) -eq 0 ]; then
-              echo "readiness: daemon=${daemon_status} proxy=${proxy_status}"
+              echo "readiness: daemon=${daemon_status}"
             fi
 
             if ! docker ps --format '{{.Names}}' | grep -q '^ndaemon.system.c$'; then
@@ -83,9 +85,60 @@ jobs:
             sleep 1
           done
 
-          if [ "$ready" -ne 1 ]; then
-            echo "nanocl and ncproxy did not become ready in time" >&2
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo "nanocld did not become ready in time" >&2
             docker ps -a
+            docker logs ndaemon.system.c || true
+            docker logs ncproxy.system.c || true
+            exit 1
+          fi
+
+          probe_ready=0
+          j=0
+          while [ "$j" -lt 30 ]; do
+            if nanocl state apply -ys ./examples/deploy_example.yml >/tmp/nanocl-ready-apply.log 2>&1; then
+              k=0
+              while [ "$k" -lt 20 ]; do
+                if nanocl state rm -ys ./examples/deploy_example.yml >/tmp/nanocl-ready-rm.log 2>&1; then
+                  probe_ready=1
+                  break
+                fi
+                k=$((k + 1))
+                sleep 1
+              done
+              if [ "$probe_ready" -eq 1 ]; then
+                break
+              fi
+            fi
+
+            nanocl state rm -ys ./examples/deploy_example.yml >/dev/null 2>&1 || true
+
+            if [ $((j % 5)) -eq 0 ]; then
+              echo "controller readiness attempt=${j}" >&2
+              tail -n 10 /tmp/nanocl-ready-apply.log 2>/dev/null || true
+            fi
+
+            if ! docker ps --format '{{.Names}}' | grep -q '^ndaemon.system.c$'; then
+              echo "ndaemon.system.c exited unexpectedly" >&2
+              docker logs ndaemon.system.c || true
+              exit 1
+            fi
+
+            if ! docker ps --format '{{.Names}}' | grep -q '^ncproxy.system.c$'; then
+              echo "ncproxy.system.c exited unexpectedly" >&2
+              docker logs ncproxy.system.c || true
+              exit 1
+            fi
+
+            j=$((j + 1))
+            sleep 2
+          done
+
+          if [ "$probe_ready" -ne 1 ]; then
+            echo "nanocl controller readiness probe failed" >&2
+            docker ps -a
+            tail -n 40 /tmp/nanocl-ready-apply.log 2>/dev/null || true
+            tail -n 40 /tmp/nanocl-ready-rm.log 2>/dev/null || true
             docker logs ndaemon.system.c || true
             docker logs ncproxy.system.c || true
             exit 1
@@ -94,8 +147,6 @@ jobs:
           docker ps -a
           docker logs ndaemon.system.c
           docker logs ncproxy.system.c || true
-          sudo chmod -R 777 /var/lib/nanocl
-          sudo chmod -R 777 /run/nanocl
           nanocl version
       # Run E2E tests
       - name: E2E
