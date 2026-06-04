@@ -37,7 +37,7 @@ fi
 
 daemon_ready=0
 i=0
-while [ "$i" -lt 180 ]; do
+while [ "$i" -lt 240 ]; do
   daemon_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/nanocl.sock http://localhost/v0.0/version || true)
 
   if [ "$daemon_status" = "200" ]; then
@@ -77,7 +77,7 @@ fi
 # Wait for ncproxy to bind its socket and accept connections.
 proxy_ready=0
 p=0
-while [ "$p" -lt 120 ]; do
+while [ "$p" -lt 240 ]; do
   if [ -S /run/nanocl/proxy.sock ]; then
     proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/proxy.sock 'http://localhost/v0.15/rules' 2>/dev/null || true)
     if [ "$proxy_status" != "000" ]; then
