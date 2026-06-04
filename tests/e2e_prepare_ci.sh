@@ -13,7 +13,7 @@ if [ "${E2E_SKIP_IMAGE_BUILD:-0}" != "1" ]; then
 fi
 
 if [ "${E2E_SKIP_NANOCL_BUILD:-0}" != "1" ]; then
-  cargo build --release --bin nanocl
+  NANOCL_CHANNEL="${NANOCL_CHANNEL:-nightly}" cargo build --release --bin nanocl
   sudo cp target/release/nanocl /usr/bin/nanocl
   sudo chmod +x /usr/bin/nanocl
 fi
