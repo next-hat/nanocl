@@ -63,6 +63,8 @@ fn is_nginx_running() -> bool {
   Command::new("kill")
     .arg("-0")
     .arg(pid.to_string())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null())
     .status()
     .is_ok_and(|status| status.success())
 }
@@ -97,9 +99,9 @@ pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
-pub fn spawn_monitor(state_dir: &str) {
+pub fn spawn(state_dir: &str) {
   let state_dir = state_dir.to_owned();
-  rt::spawn(async move {
+  rt::Arbiter::new().handle().spawn(async move {
     loop {
       if !is_nginx_running() {
         log::warn!("nginx::monitor: nginx is not running, restarting");

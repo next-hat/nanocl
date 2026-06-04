@@ -17,6 +17,7 @@ pub fn generate(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });
+  std::fs::create_dir_all("/run/nanocl")?;
   server = server.bind_uds("/run/nanocl/proxy.sock")?;
   #[cfg(feature = "dev")]
   {

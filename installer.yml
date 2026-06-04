@@ -78,7 +78,6 @@ Cargoes:
       - //run/guest-services/nanocl:/run/nanocl
       # {% else %}
       - /run:/run
-      - /run/nanocl:/run/nanocl
       # {% endif %}
       - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
       - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt

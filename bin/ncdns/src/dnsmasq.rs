@@ -113,9 +113,9 @@ conf-dir={}/dnsmasq.d,*.conf
     Ok(())
   }
 
-  pub(crate) fn spawn_monitor(&self) {
+  pub(crate) fn spawn(&self) {
     let dnsmasq = self.clone();
-    rt::spawn(async move {
+    rt::Arbiter::new().handle().spawn(async move {
       loop {
         if !dnsmasq.is_running() {
           log::warn!("dnsmasq::monitor: dnsmasq is not running, restarting");

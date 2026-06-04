@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
-
 use nanocl_error::io::IoResult;
 
 use nanocld_client::NanocldClient;
@@ -9,6 +7,7 @@ use nanocld_client::NanocldClient;
 use crate::{
   cli::Cli,
   models::{EventEmitter, Store, SystemState, SystemStateRef},
+  utils::nginx,
 };
 
 use super::{event, metric};
@@ -24,24 +23,18 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
       ..Default::default()
     })?;
   }
-  let event_emitter = EventEmitter::new(&cli.state_dir);
+  let event_emitter: EventEmitter = EventEmitter::new(&cli.state_dir);
   let state = Arc::new(SystemState {
     client,
     event_emitter,
     store: Store::new(&cli.state_dir),
     nginx_dir: cli.nginx_dir.clone(),
   });
-  loop {
-    match event::ensure_self_config(&state.client).await {
-      Ok(()) => break,
-      Err(err) => {
-        log::warn!("init: {err}");
-        ntex::time::sleep(RETRY_DELAY).await;
-      }
-    }
+  // Do not block startup on nanocld availability; the event loop handles retries.
+  if let Err(err) = crate::utils::nginx::ensure_conf(&state).await {
+    log::warn!("init: unable to ensure nginx conf at startup: {err}");
   }
-  crate::utils::nginx::ensure_conf(&state).await?;
-  crate::utils::nginx::ensure_started(&state.store.dir).await?;
+  nginx::spawn(&state.store.dir);
   event::spawn(&state);
   metric::spawn(&state);
   Ok(state)

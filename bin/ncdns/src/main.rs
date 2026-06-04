@@ -16,14 +16,11 @@ use nanocld_client::NanocldClient;
 use cli::Cli;
 use dnsmasq::Dnsmasq;
 
-const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
-
 async fn run(cli: &Cli) -> IoResult<()> {
   // Spawn a new thread to listen events from nanocld
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
     .with_dns(cli.dns.clone())
     .ensure()?;
-  dnsmasq.start().await?;
   #[allow(unused)]
   let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
@@ -34,18 +31,10 @@ async fn run(cli: &Cli) -> IoResult<()> {
       ..Default::default()
     })?;
   }
-  loop {
-    match event::ensure_self_config(&client).await {
-      Ok(()) => break,
-      Err(err) => {
-        log::warn!("run: {err}");
-        ntex::time::sleep(RETRY_DELAY).await;
-      }
-    }
-  }
+  // Do not block socket binding on nanocld availability.
   event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
-  dnsmasq.spawn_monitor();
+  dnsmasq.spawn();
   server.await?;
   Ok(())
 }
