@@ -79,7 +79,7 @@ proxy_ready=0
 p=0
 while [ "$p" -lt 240 ]; do
   if [ -S /run/nanocl/proxy.sock ]; then
-    proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/proxy.sock 'http://localhost/v0.15/rules' 2>/dev/null || true)
+    proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/proxy.sock 'http://localhost/health' 2>/dev/null || true)
     if [ "$proxy_status" != "000" ]; then
       echo "readiness: proxy=${proxy_status} (ready)"
       proxy_ready=1
@@ -106,14 +106,48 @@ if [ "$proxy_ready" -ne 1 ]; then
   docker ps -a
   docker logs ndaemon.system.c || true
   docker logs ncproxy.system.c || true
-  exit 1
 fi
 
-sudo chmod 770 -R /run/nanocl
+# Wait for ncdns to bind its socket and accept connections.
+dns_ready=0
+p=0
+while [ "$p" -lt 240 ]; do
+  if [ -S /run/nanocl/dns.sock ]; then
+    dns_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/dns.sock 'http://localhost/health' 2>/dev/null || true)
+    if [ "$dns_status" != "000" ]; then
+      echo "readiness: dns=${dns_status} (ready)"
+      dns_ready=1
+      break
+    fi
+  fi
+
+  if [ $((p % 10)) -eq 0 ]; then
+    echo "readiness: dns=waiting (${p}s)"
+  fi
+
+  if ! docker ps --format '{{.Names}}' | grep -q '^ncdns.system.c$'; then
+    echo "ncdns.system.c exited unexpectedly" >&2
+    docker logs ncdns.system.c || true
+    exit 1
+  fi
+
+  p=$((p + 1))
+  sleep 1
+done
+
+if [ "$dns_ready" -ne 1 ]; then
+  echo "ncdns did not become ready in time" >&2
+  docker ps -a
+  docker logs ndaemon.system.c || true
+  docker logs ncdns.system.c || true
+fi
+
+sudo chmod 777 -R /run/nanocl
 
 nanocl version
 docker ps -a
 docker logs ndaemon.system.c || true
 docker logs ncproxy.system.c || true
+docker logs ndns.system.c || true
 
 echo "E2E CI prepare complete"

@@ -27,6 +27,19 @@ servers:
       enum:
       - v0.5
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check endpoint to verify that the service is running and responsive.
+      operationId: health
+      responses:
+        '200':
+          description: The health status
+          content:
+            text/plain:
+              schema:
+                type: string
   /rules/{name}:
     put:
       tags:
@@ -122,5 +135,7 @@ components:
             $ref: '#/components/schemas/DnsEntry'
       additionalProperties: false
 tags:
+- name: Health
+  description: Health check endpoint.
 - name: Rules
   description: Rules management endpoints.
