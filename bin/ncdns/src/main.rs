@@ -31,8 +31,10 @@ async fn run(cli: &Cli) -> IoResult<()> {
       ..Default::default()
     })?;
   }
+  // Do not block socket binding on nanocld availability.
   event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
+  dnsmasq.spawn();
   server.await?;
   Ok(())
 }

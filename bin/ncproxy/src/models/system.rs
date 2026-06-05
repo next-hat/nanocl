@@ -4,7 +4,6 @@ use futures::{SinkExt, StreamExt, channel::mpsc};
 use ntex::rt;
 
 use nanocl_error::io::{IoError, IoResult};
-
 use nanocld_client::NanocldClient;
 
 use crate::utils;
@@ -28,16 +27,16 @@ pub enum SystemEventKind {
 }
 
 struct SystemEventInner {
-  client: NanocldClient,
+  state_dir: String,
   task: ntex::rt::JoinHandle<IoResult<()>>,
 }
 
 pub struct SystemEvent(SystemEventInner);
 
 impl SystemEvent {
-  pub fn new(client: &NanocldClient) -> Self {
+  pub fn new(state_dir: &str) -> Self {
     Self(SystemEventInner {
-      client: client.clone(),
+      state_dir: state_dir.to_owned(),
       task: rt::spawn(async move { Ok::<_, IoError>(()) }),
     })
   }
@@ -51,10 +50,10 @@ impl SystemEvent {
       );
       task.cancel();
     }
-    let client = self.0.client.clone();
+    let state_dir = self.0.state_dir.clone();
     self.0.task = rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_millis(750)).await;
-      if let Err(err) = utils::nginx::reload(&client).await {
+      if let Err(err) = utils::nginx::reload(&state_dir).await {
         log::warn!("system: {err}");
       }
       Ok::<_, IoError>(())
@@ -67,12 +66,12 @@ pub struct EventEmitter(pub Arc<mpsc::UnboundedSender<SystemEventKind>>);
 
 impl EventEmitter {
   /// Create a new thread with it's own event loop and return an emitter to send events to it
-  pub fn new(client: &NanocldClient) -> Self {
+  pub fn new(state_dir: &str) -> Self {
     let (tx, mut rx) = mpsc::unbounded();
-    let client = client.clone();
+    let state_dir = state_dir.to_owned();
     rt::Arbiter::new().handle().spawn(async move {
       rt::spawn(async move {
-        let mut local_event = SystemEvent::new(&client);
+        let mut local_event = SystemEvent::new(&state_dir);
         while let Some(e) = rx.next().await {
           local_event.handle(e);
         }

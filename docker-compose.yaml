@@ -66,39 +66,16 @@ services:
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
-  nproxy:
-    container_name: nproxy.system.c
-    build:
-      context: .
-      dockerfile: ./bin/nproxy/Dockerfile
-    tty: true
-    network_mode: host
-    profiles:
-      - proxy
-    environment:
-      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
-    labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=nproxy.system
-      - io.nanocl.n=system
-      - io.nanocl.not-init-c=true
-    volumes:
-      - //run/guest-services/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
-
   ncproxy:
     container_name: ncproxy.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
       - proxy
-    ports:
-      - 8686:8686
-    networks:
-      - nanoclbr0
+    network_mode: host
     environment:
       - RUST_BACKTRACE=1
+      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
     command:
       - watch
       - -w
@@ -120,38 +97,16 @@ services:
       - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
 
-  ndns:
-    container_name: ndns.system.c
-    build:
-      context: .
-      dockerfile: ./bin/ndns/Dockerfile
-    tty: true
-    profiles:
-      - dns
-    network_mode: host
-    environment:
-      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
-    labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ndns.system
-      - io.nanocl.n=system
-      - io.nanocl.not-init-c=true
-    volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
-
   ncdns:
     container_name: ncdns.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
       - dns
-    ports:
-      - 8787:8787
-    networks:
-      - nanoclbr0
+    network_mode: host
     environment:
       - RUST_BACKTRACE=1
+      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
     command:
       - watch
       - -w

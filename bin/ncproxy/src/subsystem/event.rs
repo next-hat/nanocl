@@ -18,6 +18,8 @@ use nanocld_client::{
 
 use crate::{models::SystemStateRef, utils, vars};
 
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
 fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
   if cargo.spec.container.healthcheck.is_some() {
     return true;
@@ -160,7 +162,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   }
 }
 
-async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
+pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
     name: "ncproxy.io/rule".to_owned(),
@@ -211,7 +213,7 @@ async fn r#loop(state: &SystemStateRef) {
       }
     }
     log::warn!("event::loop: retrying in 2 seconds");
-    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+    ntex::time::sleep(RETRY_DELAY).await;
   }
 }
 

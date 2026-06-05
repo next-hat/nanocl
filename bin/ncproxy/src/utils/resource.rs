@@ -69,7 +69,7 @@ pub(crate) async fn list_by_cargo(
     })?;
   let resources = http_resources
     .into_iter()
-    .chain(stream_resources.into_iter())
+    .chain(stream_resources)
     .collect::<Vec<nanocld_client::stubs::resource::Resource>>();
   if resources.is_empty() {
     return Err(IoError::not_found(

@@ -42,21 +42,8 @@ jobs:
       # Build nightly image and install nanocl
       - name: Prepare CI
         run: |
-          sh ./scripts/build_images.sh
-          NANOCL_CHANNEL=nightly cargo build --release --bin nanocl
-          sudo cp target/release/nanocl /usr/bin/nanocl
-          sudo chmod +x /usr/bin/nanocl
-          sudo groupadd nanocl
-          sudo usermod -aG nanocl $USER
-          sudo gpasswd -r nanocl
-          newgrp nanocl
-          nanocl install -t installer.yml
-          sleep 20
-          docker ps -a
-          docker logs ndaemon.system.c
-          sudo chmod -R 777 /var/lib/nanocl
-          sudo chmod -R 777 /run/nanocl
-          nanocl version
+          chmod +x ./tests/e2e_prepare_ci.sh
+          ./tests/e2e_prepare_ci.sh
       # Run E2E tests
       - name: E2E
         run: |

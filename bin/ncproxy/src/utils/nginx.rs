@@ -1,20 +1,20 @@
-use std::{fs, sync::Arc};
+use std::{fs, process::Command, sync::Arc, time::Duration};
 
-use futures::StreamExt;
+use ntex::rt;
 use ntex::web;
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocld_client::{
-  NanocldClient,
-  bollard_next::exec::{CreateExecOptions, StartExecOptions},
-  stubs::proxy::{LocationTarget, ProxyRule, ResourceProxyRule},
+use nanocld_client::stubs::proxy::{
+  LocationTarget, ProxyRule, ResourceProxyRule,
 };
 
 use crate::models::{
   CONF_TEMPLATE, HTTP_TEMPLATE, LocationTemplate, NginxRuleKind,
   STREAM_TEMPLATE, SystemStateRef,
 };
+
+const NGINX_PID_PATH: &str = "/run/nginx.pid";
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let state_ref = Arc::clone(state);
@@ -45,52 +45,88 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
     "NginxManager: writing default conf to {conf_path}:\n{default_conf}"
   );
   std::fs::write(conf_path, default_conf)?;
-  self::test(&state.client).await?;
+  self::test(&state.store.dir).await?;
   Ok(())
 }
 
-pub async fn test(client: &NanocldClient) -> IoResult<()> {
+fn gen_conf_path(state_dir: &str) -> String {
+  format!("{state_dir}/nginx.conf")
+}
+
+fn is_nginx_running() -> bool {
+  let Ok(pid) = std::fs::read_to_string(NGINX_PID_PATH) else {
+    return false;
+  };
+  let Ok(pid) = pid.trim().parse::<i32>() else {
+    return false;
+  };
+  Command::new("kill")
+    .arg("-0")
+    .arg(pid.to_string())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null())
+    .status()
+    .is_ok_and(|status| status.success())
+}
+
+fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
+  let output = Command::new("nginx")
+    .args(args)
+    .arg("-c")
+    .arg(conf_path)
+    .output()
+    .map_err(|err| {
+      IoError::other("exec", &format!("unable to run nginx: {err}"))
+    })?;
+  if output.status.success() {
+    return Ok(());
+  }
+  let mut message = String::from_utf8_lossy(&output.stdout).into_owned();
+  message.push_str(String::from_utf8_lossy(&output.stderr).as_ref());
+  Err(IoError::other("exec", &message))
+}
+
+pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
+  let conf_path = gen_conf_path(state_dir);
+  web::block(move || {
+    if is_nginx_running() {
+      return Ok(());
+    }
+    let _ = std::fs::remove_file(NGINX_PID_PATH);
+    exec_nginx_cmd(&[], &conf_path)
+  })
+  .await?;
+  Ok(())
+}
+
+pub fn spawn(state_dir: &str) {
+  let state_dir = state_dir.to_owned();
+  rt::Arbiter::new().handle().spawn(async move {
+    loop {
+      if !is_nginx_running() {
+        log::warn!("nginx::monitor: nginx is not running, restarting");
+        if let Err(err) = ensure_started(&state_dir).await {
+          log::warn!("nginx::monitor: {err}");
+        }
+      }
+      ntex::time::sleep(Duration::from_secs(2)).await;
+    }
+  });
+}
+
+pub async fn test(state_dir: &str) -> IoResult<()> {
   log::info!("nginx::test: starting");
-  exec_nginx_cmd("nginx -t", client).await?;
+  let conf_path = gen_conf_path(state_dir);
+  web::block(move || exec_nginx_cmd(&["-t"], &conf_path)).await?;
   log::info!("nginx::test: done");
   Ok(())
 }
 
-async fn exec_nginx_cmd(cmd: &str, client: &NanocldClient) -> IoResult<()> {
-  let exec_options = CreateExecOptions {
-    attach_stderr: Some(true),
-    attach_stdout: Some(true),
-    cmd: Some(cmd.split(' ').map(|e| e.into()).collect()),
-    ..Default::default()
-  };
-  let start_res = client
-    .create_exec("nproxy", &exec_options, Some("system"))
-    .await?;
-  let mut start_stream = client
-    .start_exec(&start_res.id, &StartExecOptions::default())
-    .await?;
-  let mut output = String::default();
-  while let Some(output_log) = start_stream.next().await {
-    let Ok(output_log) = output_log else {
-      break;
-    };
-    output += &output_log.data;
-  }
-  let inspect_result = client.inspect_exec(&start_res.id).await?;
-  match inspect_result.exit_code {
-    Some(code) => {
-      if code == 0 {
-        return Ok(());
-      }
-      Err(IoError::other("exec", &output))
-    }
-    None => Ok(()),
-  }
-}
-
-pub async fn reload(client: &NanocldClient) -> IoResult<()> {
+pub async fn reload(state_dir: &str) -> IoResult<()> {
   log::info!("nginx::reload: starting");
-  exec_nginx_cmd("nginx -s reload", client).await?;
+  ensure_started(state_dir).await?;
+  let conf_path = gen_conf_path(state_dir);
+  web::block(move || exec_nginx_cmd(&["-s", "reload"], &conf_path)).await?;
   log::info!("nginx::reload: done");
   Ok(())
 }
@@ -280,7 +316,7 @@ pub async fn add_rule(
       .write_conf_file(name, &http_conf, &NginxRuleKind::Site)
       .await?;
   }
-  if let Err(err) = self::test(&state.client).await {
+  if let Err(err) = self::test(&state.store.dir).await {
     let _ = del_rule(name, state).await;
     return Err(err);
   }
