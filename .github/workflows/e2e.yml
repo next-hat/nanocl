@@ -22,7 +22,7 @@ jobs:
 
     steps:
       # Clone project
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Install buildx
       - name: Set up Docker Buildx
         id: buildx
