@@ -97,30 +97,22 @@ components:
     NetworkKind:
       oneOf:
       - type: string
-        description: All networks
-        enum:
-        - All
-      - type: string
-        description: Only 127.0.0.1
-        enum:
-        - Local
-      - type: string
-        description: Only public ip addresses
-        enum:
-        - Public
-      - type: string
-        description: Only internal ip addresses
-        enum:
-        - Internal
+        description: A reserved selector, IP address, or user-defined network name
       - type: object
-        description: Specific ip address
+        description: Tagged escape form for a network name which looks like a reserved selector or IP address
+        required:
+        - Named
+        properties:
+          Named:
+            type: string
+      - type: object
+        description: Backwards-compatible tagged IP address form
         required:
         - Other
         properties:
           Other:
             type: string
-            description: Specific ip address
-      description: Network binding kinds
+      description: Network binding selector
     ResourceDnsRule:
       type: object
       required:

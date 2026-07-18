@@ -61,6 +61,7 @@ docker run -d \
   -v /tmp:/tmp \
   -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
+  -e NANOCL_NODE=nanocl.internal \
   -w /project \
   --network host \
   --add-host nanocl.internal:127.0.0.1 \

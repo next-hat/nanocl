@@ -227,6 +227,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   docker_healthcheck(&system_state);
   spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;
+  utils::container::network::reconcile_networks(&system_state).await?;
   utils::system::register_namespace("global", &system_state).await?;
   utils::system::register_namespace("system", &system_state).await?;
   let system_ptr = system_state.clone();

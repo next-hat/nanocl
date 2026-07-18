@@ -11,5 +11,6 @@ docker run -it --rm \
   -e HOME=$HOME \
   -e RUST_MIN_STACK=${RUST_MIN_STACK:-8388608} \
   -w /project \
+  --add-host store.nanocl.internal:127.0.0.1 \
   --network host \
   ghcr.io/next-hat/nanocl-dev:dev "$@"

@@ -17,6 +17,9 @@ pub use metric::*;
 mod namespace;
 pub use namespace::*;
 
+mod network;
+pub use network::*;
+
 mod cargo;
 pub use cargo::*;
 

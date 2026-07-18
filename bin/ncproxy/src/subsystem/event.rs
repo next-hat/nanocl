@@ -9,16 +9,45 @@ use nanocl_utils::versioning;
 use nanocld_client::{
   NanocldClient,
   stubs::{
+    proxy::ResourceProxyRule,
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActorKind, NativeEventAction},
+    system::{EventActor, EventActorKind, NativeEventAction},
   },
 };
 
 use crate::{models::SystemStateRef, utils, vars};
 
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+const RECONCILE_INTERVAL: std::time::Duration =
+  std::time::Duration::from_secs(30);
+
+fn is_proxy_resource(actor: &EventActor) -> bool {
+  actor
+    .attributes
+    .as_ref()
+    .and_then(|attributes| attributes.get("Kind"))
+    .and_then(serde_json::Value::as_str)
+    == Some(vars::RULE_KEY)
+}
+
+fn proxy_resource_name(actor: &EventActor) -> IoResult<&str> {
+  actor
+    .key
+    .as_deref()
+    .filter(|name| !name.is_empty())
+    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing key"))
+}
+
+fn proxy_resource_rule(actor: &EventActor) -> IoResult<ResourceProxyRule> {
+  let data = actor
+    .attributes
+    .as_ref()
+    .and_then(|attributes| attributes.get("Spec"))
+    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing Spec"))?;
+  utils::resource::serialize(data)
+}
 
 fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
   if cargo.spec.container.healthcheck.is_some() {
@@ -49,8 +78,8 @@ async fn should_wait_for_healthy_event(
   Ok(has_healthcheck(&cargo))
 }
 
-/// Get cargo attributes from nanocld event
-fn get_cargo_attributes(
+/// Get workload name and namespace attributes from a nanocld event.
+fn get_workload_attributes(
   attributes: &Option<serde_json::Value>,
 ) -> IoResult<(String, String)> {
   let attributes = attributes.clone().unwrap_or_default();
@@ -115,6 +144,54 @@ async fn delete_cargo_rule(
   Ok(())
 }
 
+/// Update nginx rules targeting a VM after it starts or is recreated.
+async fn update_vm_rule(
+  name: &str,
+  namespace: &str,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  let resources = utils::resource::list_by_vm(
+    name,
+    Some(namespace.to_owned()),
+    &state.client,
+  )
+  .await?;
+  resources
+    .into_iter()
+    .map(|resource| async {
+      let resource: ResourcePartial = resource.into();
+      let rule = utils::resource::serialize(&resource.data)?;
+      if let Err(err) =
+        utils::nginx::add_rule(&resource.name, &rule, state).await
+      {
+        log::warn!("event::update_vm_rule: {err}");
+      }
+      Ok::<_, IoError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, IoError>>()?;
+  Ok(())
+}
+
+/// Rebuild rules targeting a VM after its runtime has been destroyed.
+async fn delete_vm_rule(
+  name: &str,
+  namespace: &str,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  let resources = utils::resource::list_by_vm(
+    name,
+    Some(namespace.to_owned()),
+    &state.client,
+  )
+  .await?;
+  utils::resource::update_rules(&resources, state).await?;
+  Ok(())
+}
+
 /// Analyze nanocld events and update nginx configuration
 async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let action = NativeEventAction::from_str(&event.action)?;
@@ -126,14 +203,14 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
     (EventActorKind::Cargo, NativeEventAction::Healthy) => {
-      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Start)
     | (EventActorKind::Cargo, NativeEventAction::Update) => {
-      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
       if !should_wait_for_healthy_event(&name, &namespace, state).await? {
         update_cargo_rule(&name, &namespace, state).await?;
         let _ = state.event_emitter.emit_reload().await;
@@ -142,9 +219,43 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)
     | (EventActorKind::Cargo, NativeEventAction::Destroy) => {
-      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
+      Ok(())
+    }
+    (EventActorKind::Vm, NativeEventAction::Start)
+    | (EventActorKind::Vm, NativeEventAction::Update) => {
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      update_vm_rule(&name, &namespace, state).await?;
+      let _ = state.event_emitter.emit_reload().await;
+      Ok(())
+    }
+    (EventActorKind::Vm, NativeEventAction::Stop)
+    | (EventActorKind::Vm, NativeEventAction::Destroy) => {
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      delete_vm_rule(&name, &namespace, state).await?;
+      let _ = state.event_emitter.emit_reload().await;
+      Ok(())
+    }
+    (EventActorKind::Resource, NativeEventAction::Create)
+    | (EventActorKind::Resource, NativeEventAction::Update) => {
+      if !is_proxy_resource(&actor) {
+        return Ok(());
+      }
+      let name = proxy_resource_name(&actor)?;
+      let rule = proxy_resource_rule(&actor)?;
+      utils::nginx::add_rule(name, &rule, state).await?;
+      state.event_emitter.emit_reload().await;
+      Ok(())
+    }
+    (EventActorKind::Resource, NativeEventAction::Destroy) => {
+      if !is_proxy_resource(&actor) {
+        return Ok(());
+      }
+      let name = proxy_resource_name(&actor)?;
+      utils::nginx::del_rule(name, state).await?;
+      state.event_emitter.emit_reload().await;
       Ok(())
     }
     (EventActorKind::Secret, NativeEventAction::Create)
@@ -159,6 +270,16 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       Ok(())
     }
     _ => Ok(()),
+  }
+}
+
+async fn reconcile_loop(state: &SystemStateRef) {
+  loop {
+    log::info!("event::reconcile: rebuilding committed proxy resources");
+    if let Err(err) = utils::resource::rebuild_all_rules(state).await {
+      log::warn!("event::reconcile: {err}");
+    }
+    ntex::time::sleep(RECONCILE_INTERVAL).await;
   }
 }
 
@@ -197,6 +318,9 @@ async fn r#loop(state: &SystemStateRef) {
           continue;
         }
         let _ = utils::nginx::ensure_conf(state).await;
+        if let Err(err) = utils::resource::rebuild_all_rules(state).await {
+          log::warn!("event::loop: initial reconciliation failed: {err}");
+        }
         log::info!("event::loop: subscribed to nanocld events");
         while let Some(event) = stream.next().await {
           let event = match event {
@@ -219,11 +343,66 @@ async fn r#loop(state: &SystemStateRef) {
 
 /// Spawn new thread with event loop to watch for nanocld events
 pub(crate) fn spawn(state: &SystemStateRef) {
-  let state = Arc::clone(state);
+  let event_state = Arc::clone(state);
   rt::Arbiter::new().handle().spawn(async move {
     rt::spawn(async move {
-      r#loop(&state).await;
+      r#loop(&event_state).await;
       rt::Arbiter::current().stop();
     });
   });
+  let reconcile_state = Arc::clone(state);
+  rt::Arbiter::new().handle().spawn(async move {
+    rt::spawn(async move {
+      reconcile_loop(&reconcile_state).await;
+      rt::Arbiter::current().stop();
+    });
+  });
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn workload_attributes_are_shared_by_cargo_and_vm_events() {
+    let attributes = Some(serde_json::json!({
+      "Name": "database",
+      "Namespace": "private",
+    }));
+    assert_eq!(
+      get_workload_attributes(&attributes).unwrap(),
+      ("database".to_owned(), "private".to_owned())
+    );
+  }
+
+  #[test]
+  fn committed_proxy_resource_events_expose_name_and_rule() {
+    let actor = EventActor {
+      key: Some("public-api".to_owned()),
+      kind: EventActorKind::Resource,
+      attributes: Some(serde_json::json!({
+        "Kind": vars::RULE_KEY,
+        "Version": "v0.15.0",
+        "Spec": { "Rules": [] },
+      })),
+    };
+
+    assert!(is_proxy_resource(&actor));
+    assert_eq!(proxy_resource_name(&actor).unwrap(), "public-api");
+    assert!(proxy_resource_rule(&actor).unwrap().rules.is_empty());
+  }
+
+  #[test]
+  fn resource_events_for_other_controllers_are_ignored() {
+    let actor = EventActor {
+      key: Some("dns-rule".to_owned()),
+      kind: EventActorKind::Resource,
+      attributes: Some(serde_json::json!({
+        "Kind": "ncdns.io/rule",
+        "Spec": { "Rules": [] },
+      })),
+    };
+
+    assert!(!is_proxy_resource(&actor));
+  }
 }

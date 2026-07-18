@@ -1,4 +1,4 @@
-use std::{fs, process::Command, sync::Arc, time::Duration};
+use std::{fs, future::Future, process::Command, sync::Arc, time::Duration};
 
 use ntex::rt;
 use ntex::web;
@@ -11,12 +11,13 @@ use nanocld_client::stubs::proxy::{
 
 use crate::models::{
   CONF_TEMPLATE, HTTP_TEMPLATE, LocationTemplate, NginxRuleKind,
-  STREAM_TEMPLATE, SystemStateRef,
+  STREAM_TEMPLATE, Store, StoreConfigSnapshot, SystemStateRef,
 };
 
 const NGINX_PID_PATH: &str = "/run/nginx.pid";
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
+  let _guard = state.config_lock.lock().await;
   let state_ref = Arc::clone(state);
   let conf_path = format!("{}/nginx.conf", state_ref.store.dir);
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
@@ -99,12 +100,14 @@ pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
-pub fn spawn(state_dir: &str) {
-  let state_dir = state_dir.to_owned();
+pub fn spawn(state: &SystemStateRef) {
+  let state_dir = state.store.dir.clone();
+  let config_lock = Arc::clone(&state.config_lock);
   rt::Arbiter::new().handle().spawn(async move {
     loop {
       if !is_nginx_running() {
         log::warn!("nginx::monitor: nginx is not running, restarting");
+        let _guard = config_lock.lock().await;
         if let Err(err) = ensure_started(&state_dir).await {
           log::warn!("nginx::monitor: {err}");
         }
@@ -131,7 +134,48 @@ pub async fn reload(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
+async fn rollback_config(
+  snapshot: &StoreConfigSnapshot,
+  original_error: IoError,
+  store: &Store,
+) -> IoResult<()> {
+  match store.restore_config(snapshot).await {
+    Ok(()) => Err(original_error),
+    Err(rollback_error) => Err(IoError::other(
+      "nginx configuration rollback",
+      &format!(
+        "candidate failed: {original_error}; rollback failed: {rollback_error}"
+      ),
+    )),
+  }
+}
+
+async fn config_transaction<F, Fut>(store: &Store, operation: F) -> IoResult<()>
+where
+  F: FnOnce() -> Fut,
+  Fut: Future<Output = IoResult<()>>,
+{
+  let snapshot = store.snapshot_config().await?;
+  match operation().await {
+    Ok(()) => Ok(()),
+    Err(err) => rollback_config(&snapshot, err, store).await,
+  }
+}
+
 pub async fn add_rule(
+  name: &str,
+  rule: &ResourceProxyRule,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  let _guard = state.config_lock.lock().await;
+  config_transaction(&state.store, || async {
+    render_rule(name, rule, state).await?;
+    self::test(&state.store.dir).await
+  })
+  .await
+}
+
+async fn render_rule(
   name: &str,
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
@@ -304,32 +348,163 @@ pub async fn add_rule(
       }
     }
   }
-  if !stream_conf.is_empty() {
-    state
-      .store
-      .write_conf_file(name, &stream_conf, &NginxRuleKind::Stream)
-      .await?;
-  }
-  if !http_conf.is_empty() {
-    state
-      .store
-      .write_conf_file(name, &http_conf, &NginxRuleKind::Site)
-      .await?;
-  }
-  if let Err(err) = self::test(&state.store.dir).await {
-    let _ = del_rule(name, state).await;
-    return Err(err);
-  }
-  Ok(())
+  state
+    .store
+    .replace_rule(
+      name,
+      (!http_conf.is_empty()).then_some(http_conf.as_str()),
+      (!stream_conf.is_empty()).then_some(stream_conf.as_str()),
+    )
+    .await
 }
 
-pub async fn del_rule(name: &str, state: &SystemStateRef) {
-  let _ = state
-    .store
-    .delete_conf_file(name, &NginxRuleKind::Site)
+/// Replace every managed rule from a persisted nanocld snapshot.
+///
+/// Clearing first removes resources deleted while ncproxy was offline. The
+/// previous complete directory state is restored when rendering or nginx
+/// validation rejects any candidate rule.
+pub(crate) async fn rebuild_rules_locked(
+  rules: &[(String, ResourceProxyRule)],
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  config_transaction(&state.store, || async {
+    state.store.clear_config().await?;
+    for (name, rule) in rules {
+      render_rule(name, rule, state).await?;
+    }
+    self::test(&state.store.dir).await
+  })
+  .await
+}
+
+pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
+  let _guard = state.config_lock.lock().await;
+  config_transaction(&state.store, || async {
+    state.store.replace_rule(name, None, None).await
+  })
+  .await
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+  };
+
+  use super::*;
+
+  static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
+
+  struct TestDir(PathBuf);
+
+  impl TestDir {
+    fn new() -> Self {
+      let id = NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed);
+      let path = std::env::temp_dir()
+        .join(format!("ncproxy-config-test-{}-{id}", std::process::id()));
+      for dir in [
+        "sites-available",
+        "sites-enabled",
+        "streams-available",
+        "streams-enabled",
+      ] {
+        std::fs::create_dir_all(path.join(dir)).unwrap();
+      }
+      Self(path)
+    }
+
+    fn path(&self) -> &Path {
+      &self.0
+    }
+  }
+
+  impl Drop for TestDir {
+    fn drop(&mut self) {
+      let _ = std::fs::remove_dir_all(&self.0);
+    }
+  }
+
+  #[ntex::test]
+  async fn rejected_transaction_restores_all_previous_configs() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("rule", "old site", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("rule", "old stream", &NginxRuleKind::Stream)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("shared-upstream", "old upstream", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let before = store.snapshot_config().await.unwrap();
+
+    let result = config_transaction(&store, || async {
+      store.replace_rule("rule", Some("new site"), None).await?;
+      store
+        .write_conf_file(
+          "shared-upstream",
+          "new upstream",
+          &NginxRuleKind::Site,
+        )
+        .await?;
+      Err(IoError::invalid_data("candidate", "rejected"))
+    })
     .await;
-  let _ = state
-    .store
-    .delete_conf_file(name, &NginxRuleKind::Stream)
-    .await;
+
+    assert!(result.is_err());
+    assert_eq!(store.snapshot_config().await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn successful_update_removes_a_disappeared_rule_kind() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("rule", "old site", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("rule", "old stream", &NginxRuleKind::Stream)
+      .await
+      .unwrap();
+
+    config_transaction(&store, || async {
+      store.replace_rule("rule", Some("new site"), None).await
+    })
+    .await
+    .unwrap();
+
+    let snapshot = store.snapshot_config().await.unwrap();
+    assert_eq!(snapshot.sites.get("rule.conf").unwrap(), "new site");
+    assert!(!snapshot.streams.contains_key("rule.conf"));
+    assert!(!test_dir.path().join("streams-enabled/rule.conf").exists());
+  }
+
+  #[ntex::test]
+  async fn full_rebuild_removes_configs_absent_from_committed_state() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("deleted-rule", "stale", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+
+    config_transaction(&store, || async {
+      store.clear_config().await?;
+      store
+        .write_conf_file("live-rule", "committed", &NginxRuleKind::Site)
+        .await
+    })
+    .await
+    .unwrap();
+
+    let snapshot = store.snapshot_config().await.unwrap();
+    assert!(!snapshot.sites.contains_key("deleted-rule.conf"));
+    assert_eq!(snapshot.sites.get("live-rule.conf").unwrap(), "committed");
+  }
 }

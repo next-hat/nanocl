@@ -67,6 +67,7 @@ Cargoes:
     Tty: true
     Env:
     - STATE_DIR=${{ state_dir }}/proxy
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/proxy
@@ -92,6 +93,7 @@ Cargoes:
     Tty: true
     Env:
     - STATE_DIR=${{ state_dir }}/dns
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/dns

@@ -76,6 +76,7 @@ services:
     environment:
       - RUST_BACKTRACE=1
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+      - NANOCL_NODE=nanocl.internal
     command:
       - watch
       - -w
@@ -107,6 +108,7 @@ services:
     environment:
       - RUST_BACKTRACE=1
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+      - NANOCL_NODE=nanocl.internal
     command:
       - watch
       - -w
