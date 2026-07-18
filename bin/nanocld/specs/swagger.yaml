@@ -6387,15 +6387,15 @@ components:
       properties:
         Certificate:
           type: string
-          description: Path to the certificate
+          description: Certificate PEM contents
         CertificateKey:
           type: string
-          description: Path to the certificate key
+          description: Private-key PEM contents
         CertificateClient:
           type:
           - string
           - 'null'
-          description: Path to the certificate client
+          description: Certificate-authority PEM contents
         VerifyClient:
           type:
           - boolean
@@ -6405,7 +6405,7 @@ components:
           type:
           - string
           - 'null'
-          description: Path to the dhparam file
+          description: DH parameter contents
       additionalProperties: false
     ProxyStreamProtocol:
       type: string
