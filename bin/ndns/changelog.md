@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgrade dependencies
 
+### Removed
+
+- The standalone DNS data plane is superseded by the dnsmasq integration in `ncdns`.
+
 ## [2.91.0-n0.9.0] - 2025-09-11
 
 ### Core

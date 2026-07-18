@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Core
 
+- Integrated dnsmasq data plane and health endpoint; DNS rule updates no longer require a separate `ndns` container or `docker exec`.
+
 ## [0.9.0] - 2025-09-12
 
 ### Fixed
@@ -116,4 +118,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove an existing rule
 - Default config ignore resolv.conf and hosts
 - Entry IpAddress can target a namespace with a syntax like: `{namespace name}.nsp`
-

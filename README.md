@@ -74,6 +74,10 @@ Modern teams need faster iteration loops, secure multi‑tenant isolation, and a
 - Batteries included CLI & daemon.
 - Minimal host footprint; modular optional services.
 
+See the [health-check documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/health-checks)
+for rolling update readiness behavior and [TLS secret documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/secret-tls)
+for certificate persistence.
+
 ## Installation
 
 Nanocl supports **Linux**, **macOS**, and **Windows**. See the [Installation guide][nanocl_install_guide].
@@ -122,6 +126,7 @@ Next: explore [Get Started][nanocl_get_started].
 
 ## Latest news
 
+- **Release**: [Nanocl 0.18.0](./doc/releases/nanocl-0.18.0.md)
 - **Blog**: [Automating deployment with GitHub Actions](https://docs.next-hat.com/blog/automating-deployment-with-github-actions-and-nanocl) on 24.11.2024
 - **Release**: [End to End TLS encryption and first step for network meshing](https://docs.next-hat.com/blog/nanocl-0.16) on 01.11.2024
 - **Release**: [Man page, Backup, Remove Orphans and more](https://docs.next-hat.com/blog/nanocl-0.15) on 11.06.2024
