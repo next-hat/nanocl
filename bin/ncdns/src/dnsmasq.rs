@@ -4,7 +4,7 @@ use std::{
   net::IpAddr,
   path::{Path, PathBuf},
   process::{Command, Stdio},
-  sync::Arc,
+  sync::{Arc, mpsc},
   time::{Duration, Instant},
 };
 
@@ -180,14 +180,63 @@ impl Dnsmasq {
       return Ok(());
     }
     let _ = fs::remove_file(&paths.pid);
-    let output = Command::new("dnsmasq")
+    // Keep dnsmasq as our direct child. Besides avoiding inherited capture
+    // pipes, this prevents its double-forked intermediate process from
+    // becoming a zombie when ncdns is PID 1 in the production container.
+    let mut child = Command::new("dnsmasq")
+      .arg("--keep-in-foreground")
       .arg(format!("--conf-file={}", paths.config.display()))
-      .output()
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
       .map_err(|err| err.map_err_context(|| "unable to start dnsmasq"))?;
-    if output.status.success() {
-      return Ok(());
+    let pid = child.id();
+    let (exit_tx, exit_rx) = mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+      let _ = exit_tx.send(child.wait());
+    });
+
+    // dnsmasq writes its pid file only after initialization succeeds. Wait for
+    // that signal so callers never commit an instance that failed to start.
+    for _ in 0..20 {
+      match exit_rx.try_recv() {
+        Ok(Ok(status)) => {
+          return Err(IoError::other(
+            "dnsmasq start",
+            &format!("dnsmasq failed to start with status {status}"),
+          ));
+        }
+        Ok(Err(err)) => {
+          return Err(IoError::other(
+            "dnsmasq start",
+            &format!("unable to wait for dnsmasq: {err}"),
+          ));
+        }
+        Err(mpsc::TryRecvError::Disconnected) => {
+          return Err(IoError::other(
+            "dnsmasq start",
+            "dnsmasq waiter disconnected",
+          ));
+        }
+        Err(mpsc::TryRecvError::Empty) => {}
+      }
+      if Self::is_running(&paths.pid) {
+        return Ok(());
+      }
+      std::thread::sleep(Duration::from_millis(50));
     }
-    Err(Self::command_error("dnsmasq start", output))
+
+    let _ = Command::new("kill")
+      .arg("-TERM")
+      .arg(pid.to_string())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status();
+    Err(IoError::other(
+      "dnsmasq start",
+      "dnsmasq did not create its pid file",
+    ))
   }
 
   fn stop_instance(paths: &InstancePaths) -> IoResult<()> {

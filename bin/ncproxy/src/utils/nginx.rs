@@ -89,6 +89,32 @@ fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
   Err(IoError::other("exec", &message))
 }
 
+/// Start daemonized nginx without capturing its standard streams.
+///
+/// `Command::output` waits for every writer of its capture pipes to close.
+/// Some packaged nginx builds leave those descriptors inherited by the
+/// daemon process, which keeps this call (and the configuration lock held by
+/// its caller) blocked forever even though nginx started successfully.
+fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
+  let status = Command::new("nginx")
+    .arg("-c")
+    .arg(conf_path)
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null())
+    .status()
+    .map_err(|err| {
+      IoError::other("exec", &format!("unable to start nginx: {err}"))
+    })?;
+  if status.success() {
+    return Ok(());
+  }
+  Err(IoError::other(
+    "exec",
+    &format!("nginx failed to start with status {status}"),
+  ))
+}
+
 pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   let conf_path = gen_conf_path(state_dir);
   web::block(move || {
@@ -96,7 +122,7 @@ pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
       return Ok(());
     }
     let _ = std::fs::remove_file(NGINX_PID_PATH);
-    exec_nginx_cmd(&[], &conf_path)
+    start_nginx_cmd(&conf_path)
   })
   .await?;
   Ok(())
