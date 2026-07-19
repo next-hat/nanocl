@@ -1,5 +1,5 @@
 use std::{
-  collections::{BTreeMap, HashMap},
+  collections::{BTreeMap, HashMap, HashSet},
   net::IpAddr,
   time::{Duration, Instant},
 };
@@ -145,21 +145,59 @@ async fn resolve_cached(
   Ok(address)
 }
 
-async fn build_scopes(
-  rules: &[ResourceDnsRule],
+fn rule_selectors(
+  rules: &BTreeMap<String, ResourceDnsRule>,
+  cache: &HashMap<NetworkKind, IpAddr>,
+) -> Vec<NetworkKind> {
+  let mut selectors = HashSet::new();
+  for rule in rules.values() {
+    if !cache.contains_key(&rule.network) {
+      selectors.insert(rule.network.clone());
+    }
+    for entry in &rule.entries {
+      if !cache.contains_key(&entry.ip_address) {
+        selectors.insert(entry.ip_address.clone());
+      }
+    }
+  }
+  selectors.into_iter().collect()
+}
+
+async fn resolve_selectors(
+  selectors: Vec<NetworkKind>,
+  cache: &mut HashMap<NetworkKind, IpAddr>,
   client: &NanocldClient,
+) -> IoResult<()> {
+  for selector in selectors {
+    log::debug!("dns::reconcile: resolving selector {selector}");
+    resolve_cached(&selector, cache, client).await?;
+    log::debug!("dns::reconcile: resolved selector {selector}");
+  }
+  Ok(())
+}
+
+fn build_scopes(
+  rules: &BTreeMap<String, ResourceDnsRule>,
+  cache: &HashMap<NetworkKind, IpAddr>,
 ) -> IoResult<Vec<DnsmasqScope>> {
-  let mut cache = HashMap::new();
   let mut scopes = BTreeMap::<IpAddr, DnsmasqScope>::new();
-  for rule in rules {
-    let listen_address =
-      resolve_cached(&rule.network, &mut cache, client).await?;
+  for rule in rules.values() {
+    let listen_address = *cache.get(&rule.network).ok_or_else(|| {
+      IoError::invalid_data(
+        "Network",
+        &format!("Network selector {} was not resolved", rule.network),
+      )
+    })?;
     let scope = scopes
       .entry(listen_address)
       .or_insert_with(|| DnsmasqScope::new(listen_address));
     for entry in &rule.entries {
-      let address =
-        resolve_cached(&entry.ip_address, &mut cache, client).await?;
+      let address = *cache.get(&entry.ip_address).ok_or_else(|| {
+        IoError::invalid_data(
+          "Network",
+          &format!("Network selector {} was not resolved", entry.ip_address),
+        )
+      })?;
       scope.add_entry(entry.name.clone(), address);
     }
   }
@@ -206,7 +244,8 @@ pub(crate) async fn reconcile_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  reconcile_entries_inner(current_key, replacement, None, dnsmasq, client).await
+  reconcile_entries_inner(current_key, replacement, None, None, dnsmasq, client)
+    .await
 }
 
 /// Rebuild from the committed nanocld snapshot. A resource event acknowledges
@@ -217,13 +256,35 @@ pub(crate) async fn reconcile_persisted_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  reconcile_entries_inner(None, None, acknowledged_key, dnsmasq, client).await
+  let filter = GenericFilter::new()
+    .limit(10_000)
+    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
+  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list DNS resources from nanocld")
+  })?;
+  let mut persisted = BTreeMap::new();
+  for resource in resources {
+    let key = resource.spec.resource_key;
+    let rule = serde_json::from_value::<ResourceDnsRule>(resource.spec.data)
+      .map_err(|err| err.map_err_context(|| "Unable to deserialize DnsRule"))?;
+    persisted.insert(key, rule);
+  }
+  reconcile_entries_inner(
+    None,
+    None,
+    acknowledged_key,
+    Some(&persisted),
+    dnsmasq,
+    client,
+  )
+  .await
 }
 
 async fn reconcile_entries_inner(
   current_key: Option<&str>,
   replacement: Option<&ResourceDnsRule>,
   acknowledged_key: Option<&str>,
+  persisted_snapshot: Option<&BTreeMap<String, ResourceDnsRule>>,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
@@ -233,65 +294,55 @@ async fn reconcile_entries_inner(
       "a replacement requires a resource key",
     ));
   }
-  // Keep this guard across the nanocld snapshot and the filesystem apply.
-  // Resource hooks run before nanocld commits, so confirmed/pending overrides
-  // below also carry concurrent successful hooks across that commit window.
-  let mut update = dnsmasq.lock_updates().await;
-  let filter = GenericFilter::new()
-    .limit(10_000)
-    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
-  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list DNS resources from nanocld")
-  })?;
-  let mut rules = BTreeMap::new();
-  for resource in resources {
-    let key = resource.spec.resource_key;
-    let rule = serde_json::from_value::<ResourceDnsRule>(resource.spec.data)
-      .map_err(|err| err.map_err_context(|| "Unable to deserialize DnsRule"))?;
-    rules.insert(key, rule);
-  }
-
-  // Once nanocld reflects a pending hook, its override is no longer needed.
-  retain_uncommitted_overrides(
-    &rules,
-    &mut update.overrides,
-    acknowledged_key,
-    Instant::now(),
-  );
-
-  let previous = current_key.map(|key| {
-    (
-      key.to_owned(),
-      update.overrides.insert(
+  // Resource hooks run inside nanocld's resource transaction. They must use the
+  // last committed in-memory snapshot rather than calling list_resource, which
+  // waits for the transaction that is itself waiting for this hook.
+  let mut cache = HashMap::new();
+  loop {
+    log::debug!("dns::reconcile: waiting for update lock");
+    let mut update = dnsmasq.lock_updates().await;
+    log::debug!("dns::reconcile: acquired update lock");
+    let rules = persisted_snapshot.unwrap_or(&update.persisted).clone();
+    let mut overrides = update.overrides.clone();
+    retain_uncommitted_overrides(
+      &rules,
+      &mut overrides,
+      acknowledged_key,
+      Instant::now(),
+    );
+    if let Some(key) = current_key {
+      overrides.insert(
         key.to_owned(),
         PendingDnsRule {
           desired: replacement.cloned(),
           expires_at: Instant::now() + OVERRIDE_TTL,
         },
-      ),
-    )
-  });
-  apply_overrides(&mut rules, &update.overrides);
-
-  let result = async {
-    let rules = rules.into_values().collect::<Vec<_>>();
-    let scopes = build_scopes(&rules, client).await?;
-    dnsmasq.apply_scopes(scopes).await
-  }
-  .await;
-  if result.is_err()
-    && let Some((key, previous)) = previous
-  {
-    match previous {
-      Some(previous) => {
-        update.overrides.insert(key, previous);
-      }
-      None => {
-        update.overrides.remove(&key);
-      }
+      );
     }
+    let mut effective_rules = rules.clone();
+    apply_overrides(&mut effective_rules, &overrides);
+
+    let missing = rule_selectors(&effective_rules, &cache);
+    if !missing.is_empty() {
+      log::debug!(
+        "dns::reconcile: resolving {} selectors outside update lock",
+        missing.len()
+      );
+      drop(update);
+      resolve_selectors(missing, &mut cache, client).await?;
+      continue;
+    }
+
+    let scopes = build_scopes(&effective_rules, &cache)?;
+    log::debug!("dns::reconcile: applying {} scopes", scopes.len());
+    dnsmasq.apply_scopes(scopes).await?;
+    log::debug!("dns::reconcile: applied scopes");
+    if persisted_snapshot.is_some() {
+      update.persisted = rules;
+    }
+    update.overrides = overrides;
+    return Ok(());
   }
-  result
 }
 
 #[cfg(test)]

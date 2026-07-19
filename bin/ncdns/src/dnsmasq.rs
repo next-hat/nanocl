@@ -41,6 +41,8 @@ impl DnsmasqScope {
 /// commit.
 #[derive(Default)]
 pub(crate) struct DnsmasqUpdate {
+  /// Last committed resource snapshot observed by event/periodic reconciliation.
+  pub(crate) persisted: BTreeMap<String, ResourceDnsRule>,
   pub(crate) overrides: BTreeMap<String, PendingDnsRule>,
 }
 
@@ -180,7 +182,6 @@ impl Dnsmasq {
     let _ = fs::remove_file(&paths.pid);
     let output = Command::new("dnsmasq")
       .arg(format!("--conf-file={}", paths.config.display()))
-      .arg("--log-facility=-")
       .output()
       .map_err(|err| err.map_err_context(|| "unable to start dnsmasq"))?;
     if output.status.success() {

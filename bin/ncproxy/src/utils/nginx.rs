@@ -14,6 +14,8 @@ use crate::models::{
   STREAM_TEMPLATE, Store, StoreConfigSnapshot, SystemStateRef,
 };
 
+use super::rule::{PreparedFile, PreparedUpstream};
+
 const NGINX_PID_PATH: &str = "/run/nginx.pid";
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
@@ -167,21 +169,31 @@ pub async fn add_rule(
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
 ) -> IoResult<()> {
+  let prepared = prepare_rule(name, rule, state).await?;
   let _guard = state.config_lock.lock().await;
   config_transaction(&state.store, || async {
-    render_rule(name, rule, state).await?;
+    apply_prepared_rule(name, &prepared, state).await?;
     self::test(&state.store.dir).await
   })
   .await
 }
 
-async fn render_rule(
+pub(crate) struct PreparedRule {
+  site: Option<String>,
+  stream: Option<String>,
+  upstreams: Vec<(PreparedUpstream, NginxRuleKind)>,
+  files: Vec<PreparedFile>,
+}
+
+async fn prepare_rule(
   name: &str,
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
-) -> IoResult<()> {
+) -> IoResult<PreparedRule> {
   let mut stream_conf = String::new();
   let mut http_conf = String::new();
+  let mut upstreams = Vec::new();
+  let mut files = Vec::new();
   for rule in &rule.rules {
     match rule {
       ProxyRule::Stream(stream_rule) => {
@@ -191,25 +203,26 @@ async fn render_rule(
           &state.client,
         )
         .await?;
-        let upstream_key = match super::rule::gen_stream_upstream_key(
-          &stream_rule.target,
-          state,
-        )
-        .await
-        {
-          Err(err) => {
-            log::warn!("{err} {:#?}", stream_rule.target);
-            continue;
-          }
-          Ok(upstream_key) => upstream_key,
-        };
+        let upstream =
+          match super::rule::gen_stream_upstream(&stream_rule.target, state)
+            .await
+          {
+            Err(err) => {
+              log::warn!("{err} {:#?}", stream_rule.target);
+              continue;
+            }
+            Ok(upstream) => upstream,
+          };
         let ssl = match &stream_rule.ssl {
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
               None
             }
-            Ok(ssl) => Some(ssl),
+            Ok(prepared) => {
+              files.extend(prepared.files);
+              Some(prepared.config)
+            }
           },
           None => None,
         };
@@ -220,9 +233,10 @@ async fn render_rule(
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
           "listen": listen,
           "key": name,
-          "upstream_key": upstream_key,
+          "upstream_key": upstream.key,
           "ssl": ssl,
         }))?;
+        upstreams.push((upstream, NginxRuleKind::Stream));
         stream_conf += &data;
       }
       ProxyRule::Http(http_rule) => {
@@ -245,7 +259,10 @@ async fn render_rule(
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
               None
             }
-            Ok(ssl) => Some(ssl),
+            Ok(prepared) => {
+              files.extend(prepared.files);
+              Some(prepared.config)
+            }
           },
           None => None,
         };
@@ -254,19 +271,14 @@ async fn render_rule(
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
-              let upstream_key = match super::rule::gen_upstream(
-                upstream,
-                &NginxRuleKind::Site,
-                state,
-              )
-              .await
-              {
-                Err(err) => {
-                  log::warn!("{err} {:#?}", upstream);
-                  continue;
-                }
-                Ok(upstream_key) => upstream_key,
-              };
+              let prepared_upstream =
+                match super::rule::gen_upstream(upstream, state).await {
+                  Err(err) => {
+                    log::warn!("{err} {:#?}", upstream);
+                    continue;
+                  }
+                  Ok(upstream) => upstream,
+                };
               let ssl = match &upstream.ssl {
                 Some(ssl) => {
                   match super::rule::gen_ssl_config(ssl, state).await {
@@ -274,7 +286,10 @@ async fn render_rule(
                       log::warn!("Not ssl found for {name} {ssl:#?} {err}");
                       None
                     }
-                    Ok(ssl) => Some(ssl),
+                    Ok(prepared) => {
+                      files.extend(prepared.files);
+                      Some(prepared.config)
+                    }
                   }
                 }
                 None => None,
@@ -283,9 +298,9 @@ async fn render_rule(
                 path: location.path.clone(),
                 limit_req: location.limit_req.clone(),
                 upstream_key: if ssl.is_some() {
-                  format!("https://{upstream_key}")
+                  format!("https://{}", prepared_upstream.key)
                 } else {
-                  format!("http://{upstream_key}")
+                  format!("http://{}", prepared_upstream.key)
                 },
                 redirect: None,
                 upstream_path: upstream.path.clone().unwrap_or("/".to_owned()),
@@ -294,18 +309,15 @@ async fn render_rule(
                 headers: location.headers.clone(),
                 ssl,
               };
+              upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
             }
             LocationTarget::Unix(unix) => {
-              let upstream_key = super::rule::gen_unix_target_key(
-                unix,
-                &NginxRuleKind::Site,
-                state,
-              )
-              .await?;
+              let prepared_upstream =
+                super::rule::gen_unix_target(unix).await?;
               let location = LocationTemplate {
                 path: location.path.clone(),
-                upstream_key: format!("http://{upstream_key}"),
+                upstream_key: format!("http://{}", prepared_upstream.key),
                 redirect: None,
                 limit_req: location.limit_req.clone(),
                 upstream_path: "/".to_owned(),
@@ -314,6 +326,7 @@ async fn render_rule(
                 headers: location.headers.clone(),
                 ssl: None,
               };
+              upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
             }
             LocationTarget::Http(http) => {
@@ -348,13 +361,31 @@ async fn render_rule(
       }
     }
   }
+  Ok(PreparedRule {
+    site: (!http_conf.is_empty()).then_some(http_conf),
+    stream: (!stream_conf.is_empty()).then_some(stream_conf),
+    upstreams,
+    files,
+  })
+}
+
+async fn apply_prepared_rule(
+  name: &str,
+  prepared: &PreparedRule,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  for file in &prepared.files {
+    tokio::fs::write(&file.path, &file.data).await?;
+  }
+  for (upstream, kind) in &prepared.upstreams {
+    state
+      .store
+      .write_conf_file(&upstream.key, &upstream.content, kind)
+      .await?;
+  }
   state
     .store
-    .replace_rule(
-      name,
-      (!http_conf.is_empty()).then_some(http_conf.as_str()),
-      (!stream_conf.is_empty()).then_some(stream_conf.as_str()),
-    )
+    .replace_rule(name, prepared.site.as_deref(), prepared.stream.as_deref())
     .await
 }
 
@@ -363,14 +394,19 @@ async fn render_rule(
 /// Clearing first removes resources deleted while ncproxy was offline. The
 /// previous complete directory state is restored when rendering or nginx
 /// validation rejects any candidate rule.
-pub(crate) async fn rebuild_rules_locked(
+pub(crate) async fn rebuild_rules(
   rules: &[(String, ResourceProxyRule)],
   state: &SystemStateRef,
 ) -> IoResult<()> {
+  let mut prepared_rules = Vec::with_capacity(rules.len());
+  for (name, rule) in rules {
+    prepared_rules.push((name, prepare_rule(name, rule, state).await?));
+  }
+  let _guard = state.config_lock.lock().await;
   config_transaction(&state.store, || async {
     state.store.clear_config().await?;
-    for (name, rule) in rules {
-      render_rule(name, rule, state).await?;
+    for (name, prepared) in &prepared_rules {
+      apply_prepared_rule(name, prepared, state).await?;
     }
     self::test(&state.store.dir).await
   })

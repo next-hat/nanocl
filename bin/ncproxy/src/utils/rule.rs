@@ -16,8 +16,23 @@ use nanocld_client::{
 };
 
 use crate::models::{
-  NginxRuleKind, SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
+  SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
 };
+
+pub(crate) struct PreparedFile {
+  pub(crate) path: String,
+  pub(crate) data: String,
+}
+
+pub(crate) struct PreparedSsl {
+  pub(crate) config: ProxySslConfig,
+  pub(crate) files: Vec<PreparedFile>,
+}
+
+pub(crate) struct PreparedUpstream {
+  pub(crate) key: String,
+  pub(crate) content: String,
+}
 
 /// Get public address of host
 async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
@@ -254,9 +269,12 @@ pub async fn gen_hsts_config(hsts: Option<Hsts>) -> Option<HstsConfig> {
 pub async fn gen_ssl_config(
   ssl: &ProxySsl,
   state: &SystemStateRef,
-) -> IoResult<ProxySslConfig> {
+) -> IoResult<PreparedSsl> {
   match ssl {
-    ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
+    ProxySsl::Config(ssl_config) => Ok(PreparedSsl {
+      config: ssl_config.clone(),
+      files: Vec::new(),
+    }),
     ProxySsl::Secret(secret) => {
       let secret = state.client.inspect_secret(secret).await?;
       let mut ssl_config =
@@ -265,31 +283,45 @@ pub async fn gen_ssl_config(
         )?;
       let secret_path = format!("{}/secrets/{}", state.store.dir, secret.name);
       let cert_path = format!("{secret_path}.cert");
-      tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
+      let mut files = vec![PreparedFile {
+        path: cert_path.clone(),
+        data: ssl_config.certificate.clone(),
+      }];
       let key_path = format!("{secret_path}.key");
-      tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
+      files.push(PreparedFile {
+        path: key_path.clone(),
+        data: ssl_config.certificate_key.clone(),
+      });
       if let Some(certificate_client) = ssl_config.certificate_client {
         let certificate_client_path = format!("{secret_path}.ca");
-        tokio::fs::write(&certificate_client_path, certificate_client).await?;
+        files.push(PreparedFile {
+          path: certificate_client_path.clone(),
+          data: certificate_client,
+        });
         ssl_config.certificate_client = Some(certificate_client_path);
       }
       if let Some(dh_param) = ssl_config.dhparam {
         let dh_param_path = format!("{secret_path}.pem");
-        tokio::fs::write(&dh_param_path, dh_param).await?;
+        files.push(PreparedFile {
+          path: dh_param_path.clone(),
+          data: dh_param,
+        });
         ssl_config.dhparam = Some(dh_param_path);
       }
       ssl_config.certificate = cert_path;
       ssl_config.certificate_key = key_path;
-      Ok(ssl_config)
+      Ok(PreparedSsl {
+        config: ssl_config,
+        files,
+      })
     }
   }
 }
 
 pub async fn gen_upstream(
   target: &UpstreamTarget,
-  kind: &NginxRuleKind,
   state: &SystemStateRef,
-) -> IoResult<String> {
+) -> IoResult<PreparedUpstream> {
   let (target_name, target_namespace, target_kind) =
     parse_upstream_target(&target.key)?;
   let port = target.port;
@@ -338,38 +370,28 @@ pub async fn gen_upstream(
       ));
     }
   };
-  state.store.write_conf_file(&key, &content, kind).await?;
-  Ok(key)
+  Ok(PreparedUpstream { key, content })
 }
 
-pub async fn gen_unix_target_key(
-  unix: &UnixTarget,
-  kind: &NginxRuleKind,
-  state: &SystemStateRef,
-) -> IoResult<String> {
+pub async fn gen_unix_target(unix: &UnixTarget) -> IoResult<PreparedUpstream> {
   let upstream_key = format!("unix-{}", unix.unix_path.replace('/', "-"));
   let data = UNIX_UPSTREAM_TEMPLATE.compile(&liquid::object!({
     "upstream_key": upstream_key,
     "path": unix.unix_path,
   }))?;
-  state
-    .store
-    .write_conf_file(&upstream_key, &data, kind)
-    .await?;
-  Ok(upstream_key)
+  Ok(PreparedUpstream {
+    key: upstream_key,
+    content: data,
+  })
 }
 
-pub async fn gen_stream_upstream_key(
+pub async fn gen_stream_upstream(
   target: &StreamTarget,
   state: &SystemStateRef,
-) -> IoResult<String> {
+) -> IoResult<PreparedUpstream> {
   match target {
-    StreamTarget::Upstream(upstream) => {
-      gen_upstream(upstream, &NginxRuleKind::Stream, state).await
-    }
-    StreamTarget::Unix(unix) => {
-      gen_unix_target_key(unix, &NginxRuleKind::Stream, state).await
-    }
+    StreamTarget::Upstream(upstream) => gen_upstream(upstream, state).await,
+    StreamTarget::Unix(unix) => gen_unix_target(unix).await,
     StreamTarget::Uri(_) => {
       Err(IoError::invalid_input("StreamTarget", "uri not supported"))
     }

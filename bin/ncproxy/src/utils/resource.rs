@@ -148,9 +148,6 @@ pub(crate) async fn update_rules(
 /// The nginx layer clears the managed directories transactionally, which also
 /// removes resources deleted while this controller was offline.
 pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
-  // Lock before reading committed state so a post-commit Resource event cannot
-  // be applied and then overwritten by an older reconciliation snapshot.
-  let _guard = state.config_lock.lock().await;
   let resources = list_all(&state.client).await?;
   let mut rules = resources
     .into_iter()
@@ -161,7 +158,7 @@ pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
     })
     .collect::<IoResult<Vec<_>>>()?;
   rules.sort_by(|left, right| left.0.cmp(&right.0));
-  super::nginx::rebuild_rules_locked(&rules, state).await?;
+  super::nginx::rebuild_rules(&rules, state).await?;
   state.event_emitter.emit_reload().await;
   Ok(())
 }
