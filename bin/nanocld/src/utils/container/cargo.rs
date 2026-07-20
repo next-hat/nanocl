@@ -290,8 +290,8 @@ pub async fn create(
           }));
         let env = create_cargo_env(cargo, env_secrets, current, state);
         let hostname = match &cargo.spec.container.hostname {
-          None => format!("{}{}", ordinal_index, cargo.spec.name),
-          Some(hostname) => format!("{}{}", ordinal_index, hostname),
+          None => None,
+          Some(hostname) => Some(format!("{}{}", ordinal_index, hostname)),
         };
         // mount the secret directory to the container
         let mut binds = host_config.binds.clone().unwrap_or_default();
@@ -300,7 +300,7 @@ pub async fn create(
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
-          hostname: Some(hostname),
+          hostname: hostname,
           labels: Some(labels),
           env: Some(env),
           host_config: Some(HostConfig {
