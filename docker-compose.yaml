@@ -48,7 +48,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/next-hat/metrsd:0.5.4
+    image: ghcr.io/next-hat/metrsd:0.5.8
     tty: true
     environment:
       - LOG_LEVEL=metrsd=info

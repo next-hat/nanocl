@@ -41,9 +41,9 @@ Cargoes:
 - Name: nmetrics
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% else %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% endif %}
     Tty: true
     Cmd:
