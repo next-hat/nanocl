@@ -66,13 +66,17 @@ Modern teams need faster iteration loops, secure multi‑tenant isolation, and a
 
 - Declarative Statefiles for cargoes (containers), resources, jobs & virtual machines.
 - End‑to‑end TLS (including internal mesh primitives in progress).
-- Dynamic routing & DNS propagation (`nproxy`, `ncproxy`, `ndns`).
+- Dynamic routing & DNS propagation (`ncproxy`, `ncdns`).
 - Resource abstraction layer for pluggable kinds (e.g. proxy rules).
 - Jobs & cron style automation.
 - Backup & orphan cleanup tooling.
 - Multi-format config: YAML / TOML / JSON.
 - Batteries included CLI & daemon.
 - Minimal host footprint; modular optional services.
+
+See the [health-check documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/health-checks)
+for rolling update readiness behavior and [TLS secret documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/secret-tls)
+for certificate persistence.
 
 ## Installation
 
@@ -122,6 +126,7 @@ Next: explore [Get Started][nanocl_get_started].
 
 ## Latest news
 
+- **Release**: [Nanocl 0.18.0](./doc/releases/nanocl-0.18.0.md)
 - **Blog**: [Automating deployment with GitHub Actions](https://docs.next-hat.com/blog/automating-deployment-with-github-actions-and-nanocl) on 24.11.2024
 - **Release**: [End to End TLS encryption and first step for network meshing](https://docs.next-hat.com/blog/nanocl-0.16) on 01.11.2024
 - **Release**: [Man page, Backup, Remove Orphans and more](https://docs.next-hat.com/blog/nanocl-0.15) on 11.06.2024
@@ -168,10 +173,8 @@ Nanocl is composed of modular containerized services:
 | nstore | Persist cluster state |
 | ndaemon | REST API & control surface |
 | nmetrics | Resource usage collection |
-| nproxy | Data‑plane proxy for containers/VMs (optional) |
-| ncproxy | Reconciles proxy config (optional) |
-| ndns | DNS records manager (optional) |
-| ncdns | DNS reconciliation (optional) |
+| ncproxy | Proxy controller with embedded nginx data plane (optional) |
+| ncdns | DNS controller with embedded dnsmasq data plane (optional) |
 
 Resources:
 

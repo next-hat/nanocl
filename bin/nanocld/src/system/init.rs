@@ -20,12 +20,42 @@ use crate::{
   utils,
 };
 
+async fn maybe_set_uds_perm() -> bool {
+  let mut perms = match fs::metadata("/run/nanocl/nanocl.sock").await {
+    Ok(metadata) => metadata.permissions(),
+    Err(err) => {
+      // The watcher can receive events before the daemon creates the socket.
+      if err.kind() != std::io::ErrorKind::NotFound {
+        log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+      }
+      return false;
+    }
+  };
+  let perms_mode = perms.mode();
+  log::debug!(
+    "boot::set_uds_perm: /run/nanocl/nanocl.sock current permissions: {:o}",
+    perms_mode
+  );
+  perms.set_mode(0o770);
+  if let Err(err) =
+    fs::set_permissions("/run/nanocl/nanocl.sock", perms.clone()).await
+  {
+    log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+    return false;
+  }
+  log::debug!(
+    "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set: {:o}",
+    perms.mode()
+  );
+  true
+}
+
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
 /// Then close the thread
 ///
 fn set_uds_perm() {
-  log::trace!("boot::set_uds_perm: start thread");
+  log::debug!("boot::set_uds_perm: start thread");
   rt::Arbiter::new().handle().spawn(async move {
     let path = Path::new("/run/nanocl");
     if !path.exists() {
@@ -44,8 +74,12 @@ fn set_uds_perm() {
     };
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(path, RecursiveMode::Recursive).unwrap();
-    log::trace!("boot::set_uds_perm: watching /run/nanocl");
+    if let Err(err) = watcher.watch(path, RecursiveMode::Recursive) {
+      log::warn!("boot::set_uds_perm: watcher {err}");
+      return;
+    }
+    log::debug!("boot::set_uds_perm: watching /run/nanocl");
+
     for res in rx {
       match res {
         Ok(event) => {
@@ -54,25 +88,10 @@ fn set_uds_perm() {
             || event.kind.is_access()
             || event.kind.is_other()
           {
-            log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
-            let mut perms = match fs::metadata("/run/nanocl/nanocl.sock").await
-            {
-              Err(err) => {
-                log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
-                break;
-              }
-              Ok(perms) => perms.permissions(),
-            };
-            perms.set_mode(0o770);
-            if let Err(err) =
-              fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
-            {
-              log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
+            log::debug!("boot::set_uds_perm: /run/nanocl change detected",);
+            if maybe_set_uds_perm().await {
+              break;
             }
-            log::trace!(
-              "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set"
-            );
-            break;
           }
         }
         Err(err) => {
@@ -81,14 +100,14 @@ fn set_uds_perm() {
         }
       }
     }
-    log::trace!("boot::set_uds_perm: stop thread");
+    log::debug!("boot::set_uds_perm: stop thread");
   });
 }
 
 /// Create a new thread and spawn and manage a crond instance to run cron jobs
 ///
 fn spawn_crond() {
-  log::trace!("boot::spawn_crond: start thread");
+  log::debug!("boot::spawn_crond: start thread");
   rt::Arbiter::new().handle().spawn(async move {
     // Spawn crond in foreground with piped stdout/stderr
     match TokioCommand::new("crond")
@@ -145,7 +164,7 @@ fn spawn_crond() {
         log::error!("boot::spawn_crond: spawn error: {err}");
       }
     }
-    log::trace!("boot::spawn_crond: stop thread");
+    log::debug!("boot::spawn_crond: stop thread");
   });
 }
 
@@ -211,6 +230,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   docker_healthcheck(&system_state);
   spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;
+  utils::container::network::reconcile_networks(&system_state).await?;
   utils::system::register_namespace("global", &system_state).await?;
   utils::system::register_namespace("system", &system_state).await?;
   let system_ptr = system_state.clone();

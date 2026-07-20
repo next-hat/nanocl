@@ -199,7 +199,7 @@ impl NanocldClient {
 
   fn send_error(
     &self,
-    err: ntex::client::error::SendRequestError,
+    err: ntex::client::error::ClientError,
   ) -> HttpClientError {
     let url = if let Some(url) = &self.unix_socket {
       url

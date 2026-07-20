@@ -52,10 +52,14 @@ pub struct VmHostConfig {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub runtime: Option<String>,
-  // Container network to use (default: vm namespace)
+  /// Container network used by the VM runtime.
   #[cfg_attr(
     feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
+    serde(
+      rename = "NetworkMode",
+      alias = "RuntimeNetwork",
+      skip_serializing_if = "Option::is_none"
+    )
   )]
   pub runtime_network: Option<String>,
   /// Use host tun device

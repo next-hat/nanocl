@@ -7,7 +7,7 @@ use nanocl_stubs::{
 use crate::vars;
 
 use super::{
-  cargo, event, exec, job, metric, namespace, node, process, resource,
+  cargo, event, exec, job, metric, namespace, network, node, process, resource,
   resource_kind, secret, system, vm,
 };
 
@@ -50,6 +50,9 @@ impl Modify for VersionModifier {
     node::list_node,
     node::count_node,
     node::start_node_cargo,
+    // Network
+    network::list_network,
+    network::inspect_network,
     // System
     system::get_info,
     system::get_version,
@@ -139,6 +142,7 @@ impl Modify for VersionModifier {
   components(schemas(Statefile, ResourceProxyRule, ResourceDnsRule)),
   tags(
     (name = "Namespaces", description = "Namespaces management endpoints."),
+    (name = "Networks", description = "Node-scoped Docker network inspection endpoints."),
     (name = "Nodes", description = "Nodes management endpoints."),
     (name = "Resources", description = "Resources management endpoints."),
     (name = "System", description = "General system endpoints."),

@@ -25,11 +25,11 @@ pub enum ProxyRule {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct ProxySslConfig {
-  /// Path to the certificate
+  /// Certificate contents when stored in a TLS secret.
   pub certificate: String,
-  /// Path to the certificate key
+  /// Private-key contents when stored in a TLS secret.
   pub certificate_key: String,
-  /// Path to the certificate client
+  /// Certificate-authority contents when stored in a TLS secret.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -41,7 +41,7 @@ pub struct ProxySslConfig {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub verify_client: Option<bool>,
-  /// Path to the dhparam file
+  /// DH parameter contents when stored in a TLS secret.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
