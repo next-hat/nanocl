@@ -20,6 +20,7 @@ pub(crate) async fn list_all(
   client: &NanocldClient,
 ) -> IoResult<Vec<Resource>> {
   let filter = GenericFilter::new()
+    .limit(10_000)
     .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
   let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list ncproxy resources from nanocld")

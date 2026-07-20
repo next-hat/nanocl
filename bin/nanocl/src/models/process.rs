@@ -90,21 +90,31 @@ impl From<Process> for ProcessRow {
     let config = container.config.unwrap_or_default();
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
-    let mut ip_addr = if let Some(network) = networks.get("nanoclbr0") {
-      network.ip_address.clone().unwrap_or("<none>".to_owned())
-    } else {
-      format!(
-        "<{}>",
-        container
-          .host_config
-          .unwrap_or_default()
-          .network_mode
-          .unwrap_or("<none>".to_owned())
-      )
+    let network_mode = container
+      .host_config
+      .unwrap_or_default()
+      .network_mode
+      .unwrap_or("nanoclbr0".to_owned());
+    let ip_addr = match network_mode.as_str() {
+      "host" => "<host>".to_owned(),
+      "none" => "<none>".to_owned(),
+      "bridge" => "<bridge>".to_owned(),
+      s if s.starts_with("container:") => s.to_owned(),
+      _ => {
+        if let Some(network) = networks.get(&network_mode) {
+          let mut ip_addr = network
+            .ip_address
+            .clone()
+            .unwrap_or(network_mode.to_owned());
+          if ip_addr.is_empty() {
+            "<none>".clone_into(&mut ip_addr);
+          }
+          ip_addr
+        } else {
+          format!("<{}>", network_mode)
+        }
+      }
     };
-    if ip_addr.is_empty() {
-      "<none>".clone_into(&mut ip_addr);
-    }
     // Convert the created_at and updated_at to the current timezone
     let created_at = container.created.unwrap_or_default();
     let binding = chrono::Local::now();

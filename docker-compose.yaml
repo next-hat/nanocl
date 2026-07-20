@@ -15,7 +15,7 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: docker.io/cockroachdb/cockroach:v24.3.8
+    image: docker.io/cockroachdb/cockroach:v25.4.13
     entrypoint: /bin/sh
     tty: true
     networks:
@@ -170,7 +170,7 @@ services:
           -- \
           --hosts unix:///run/nanocl/nanocl.sock \
           --gid 1001 \
-          --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb \
+          --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb?options=-c%20autocommit_before_ddl%3Doff \
           --hosts tcp://0.0.0.0:9443 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \

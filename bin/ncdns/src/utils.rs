@@ -30,10 +30,11 @@ async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
 }
 
 async fn get_local_node(client: &NanocldClient) -> IoResult<String> {
-  if let Ok(node) = std::env::var("NANOCL_NODE")
-    && !node.trim().is_empty()
-  {
-    return Ok(node);
+  if let Ok(node) = std::env::var("NANOCL_NODE") {
+    let trimmed = node.trim();
+    if !trimmed.is_empty() {
+      return Ok(trimmed.to_owned());
+    }
   }
   let info = client
     .info()
