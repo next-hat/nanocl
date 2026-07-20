@@ -1,0 +1,57 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-private-api
+  Container:
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
+    HostConfig:
+      NetworkMode: e2e-private
+
+- Name: e2e-private-peer
+  Container:
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"
+    HostConfig:
+      NetworkMode: e2e-private
+
+- Name: e2e-default-client
+  Container:
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"
+
+Jobs:
+- Name: e2e-private-job
+  Containers:
+  - Image: alpine:latest
+    Cmd:
+    - echo
+    - network-ready
+    HostConfig:
+      NetworkMode: e2e-private
+
+Resources:
+- Name: e2e-network-proxy
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: network-partitioning.nanocl.test
+      Network: e2e-private
+      Locations:
+      - Path: /
+        Target:
+          Key: e2e-private-api.global.c
+          Port: 9000
+
+- Name: e2e-network-dns
+  Kind: ncdns.io/rule
+  Data:
+    Network: e2e-private
+    Entries:
+    - Name: network-partitioning.nanocl.test
+      IpAddress: e2e-private

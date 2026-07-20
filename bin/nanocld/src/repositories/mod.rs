@@ -4,6 +4,7 @@ mod event;
 mod job;
 pub mod metric;
 mod namespace;
+mod network;
 mod node;
 mod object_process_status;
 mod process;

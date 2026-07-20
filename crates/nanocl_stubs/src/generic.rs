@@ -340,11 +340,7 @@ pub enum ImagePullPolicy {
 }
 
 /// Network binding kinds
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NetworkKind {
   /// All networks
   All,
@@ -354,9 +350,197 @@ pub enum NetworkKind {
   Public,
   /// Only internal ip addresses
   Internal,
+  /// A user-defined container network
+  Named(String),
   /// Specific ip address
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   Other(IpAddr),
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for NetworkKind {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    match self {
+      Self::All => serializer.serialize_str("All"),
+      Self::Local => serializer.serialize_str("Local"),
+      Self::Public => serializer.serialize_str("Public"),
+      Self::Internal => serializer.serialize_str("Internal"),
+      // Named networks intentionally use the compact string representation so
+      // state files can use `Network: private-api`. Names which would be
+      // interpreted as a reserved selector or IP address keep the tagged
+      // escape form so every variant remains round-trip safe.
+      Self::Named(name) => {
+        if name.is_empty() {
+          return Err(serde::ser::Error::custom(
+            "network name cannot be empty",
+          ));
+        }
+        if matches!(name.as_str(), "All" | "Local" | "Public" | "Internal")
+          || name.parse::<IpAddr>().is_ok()
+        {
+          use serde::ser::SerializeMap;
+          let mut map = serializer.serialize_map(Some(1))?;
+          map.serialize_entry("Named", name)?;
+          map.end()
+        } else {
+          serializer.serialize_str(name)
+        }
+      }
+      // Keep the externally-tagged representation emitted by the previous
+      // derived serde implementation for backwards compatibility.
+      Self::Other(ip) => {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("Other", ip)?;
+        map.end()
+      }
+    }
+  }
+}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for NetworkKind {
+  fn name() -> std::borrow::Cow<'static, str> {
+    "NetworkKind".into()
+  }
+}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for NetworkKind {
+  fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+    use utoipa::openapi::schema::SchemaType;
+    use utoipa::openapi::{ObjectBuilder, OneOfBuilder, Type};
+
+    let string = ObjectBuilder::new()
+      .schema_type(SchemaType::Type(Type::String))
+      .description(Some(
+        "A reserved selector, IP address, or user-defined network name",
+      ));
+    let tagged_named = ObjectBuilder::new()
+      .schema_type(SchemaType::Type(Type::Object))
+      .description(Some(
+        "Tagged escape form for a network name which looks like a reserved selector or IP address",
+      ))
+      .property(
+        "Named",
+        ObjectBuilder::new()
+          .schema_type(SchemaType::Type(Type::String))
+          .build(),
+      )
+      .required("Named");
+    let tagged_ip = ObjectBuilder::new()
+      .schema_type(SchemaType::Type(Type::Object))
+      .description(Some("Backwards-compatible tagged IP address form"))
+      .property(
+        "Other",
+        ObjectBuilder::new()
+          .schema_type(SchemaType::Type(Type::String))
+          .build(),
+      )
+      .required("Other");
+
+    utoipa::openapi::schema::Schema::OneOf(
+      OneOfBuilder::new()
+        .item(string)
+        .item(tagged_named)
+        .item(tagged_ip)
+        .description(Some("Network binding selector"))
+        .build(),
+    )
+    .into()
+  }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for NetworkKind {
+  fn schema_name() -> std::borrow::Cow<'static, str> {
+    "NetworkKind".into()
+  }
+
+  fn schema_id() -> std::borrow::Cow<'static, str> {
+    concat!(module_path!(), "::NetworkKind").into()
+  }
+
+  fn json_schema(
+    _generator: &mut schemars::SchemaGenerator,
+  ) -> schemars::Schema {
+    schemars::json_schema!({
+      "description": "Network binding selector",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "A reserved selector, IP address, or user-defined network name"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Named": { "type": "string", "minLength": 1 }
+          },
+          "required": ["Named"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Other": { "type": "string" }
+          },
+          "required": ["Other"],
+          "additionalProperties": false
+        }
+      ]
+    })
+  }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for NetworkKind {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    use serde::de::Error;
+
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+      serde_json::Value::String(value) => match value.as_str() {
+        "All" => Ok(Self::All),
+        "Local" => Ok(Self::Local),
+        "Public" => Ok(Self::Public),
+        "Internal" => Ok(Self::Internal),
+        "" => Err(D::Error::custom("network name cannot be empty")),
+        value => match value.parse::<IpAddr>() {
+          Ok(ip) => Ok(Self::Other(ip)),
+          Err(_) => Ok(Self::Named(value.to_owned())),
+        },
+      },
+      serde_json::Value::Object(mut value) if value.len() == 1 => {
+        if let Some(value) = value.remove("Other") {
+          let value = value.as_str().ok_or_else(|| {
+            D::Error::custom("Other network must contain an IP address")
+          })?;
+          return value.parse::<IpAddr>().map(Self::Other).map_err(|err| {
+            D::Error::custom(format!("invalid network IP address: {err}"))
+          });
+        }
+        if let Some(value) = value.remove("Named") {
+          let value = value.as_str().ok_or_else(|| {
+            D::Error::custom("Named network must contain a name")
+          })?;
+          if value.is_empty() {
+            return Err(D::Error::custom("network name cannot be empty"));
+          }
+          return Ok(Self::Named(value.to_owned()));
+        }
+        Err(D::Error::custom("unknown network selector"))
+      }
+      _ => Err(D::Error::custom(
+        "network must be All, Local, Public, Internal, an IP address, or a network name",
+      )),
+    }
+  }
 }
 
 impl std::fmt::Display for NetworkKind {
@@ -366,6 +550,7 @@ impl std::fmt::Display for NetworkKind {
       NetworkKind::Local => write!(f, "Local"),
       NetworkKind::Public => write!(f, "Public"),
       NetworkKind::Internal => write!(f, "Internal"),
+      NetworkKind::Named(name) => write!(f, "{name}"),
       NetworkKind::Other(ip) => write!(f, "Ip({})", ip),
     }
   }
@@ -503,5 +688,85 @@ impl utoipa::PartialSchema for PortMap {
           .build(),
       )
       .into()
+  }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod network_kind_tests {
+  use super::NetworkKind;
+
+  #[test]
+  fn named_network_uses_compact_string_serde() {
+    let network: NetworkKind =
+      serde_json::from_str(r#""private-api""#).unwrap();
+    assert_eq!(network, NetworkKind::Named("private-api".to_owned()));
+    assert_eq!(serde_json::to_string(&network).unwrap(), r#""private-api""#);
+  }
+
+  #[test]
+  fn reserved_network_strings_stay_backwards_compatible() {
+    for (value, expected) in [
+      ("All", NetworkKind::All),
+      ("Local", NetworkKind::Local),
+      ("Public", NetworkKind::Public),
+      ("Internal", NetworkKind::Internal),
+    ] {
+      let json = serde_json::to_string(value).unwrap();
+      let network: NetworkKind = serde_json::from_str(&json).unwrap();
+      assert_eq!(network, expected);
+      assert_eq!(serde_json::to_string(&network).unwrap(), json);
+    }
+  }
+
+  #[test]
+  fn ip_network_accepts_legacy_and_compact_forms() {
+    let legacy = r#"{"Other":"10.20.30.40"}"#;
+    let expected = NetworkKind::Other("10.20.30.40".parse().unwrap());
+    assert_eq!(
+      serde_json::from_str::<NetworkKind>(legacy).unwrap(),
+      expected
+    );
+    assert_eq!(serde_json::to_string(&expected).unwrap(), legacy);
+    assert_eq!(
+      serde_json::from_str::<NetworkKind>(r#""10.20.30.40""#).unwrap(),
+      expected
+    );
+  }
+
+  #[test]
+  fn named_tag_is_accepted_but_normalized() {
+    let network: NetworkKind =
+      serde_json::from_str(r#"{"Named":"private-api"}"#).unwrap();
+    assert_eq!(network, NetworkKind::Named("private-api".to_owned()));
+    assert_eq!(serde_json::to_string(&network).unwrap(), r#""private-api""#);
+  }
+
+  #[test]
+  fn ambiguous_named_networks_keep_the_tagged_escape_form() {
+    for name in ["Local", "10.20.30.40", "2001:db8::1"] {
+      let expected = NetworkKind::Named(name.to_owned());
+      let json = serde_json::to_string(&expected).unwrap();
+      assert_eq!(json, format!(r#"{{"Named":"{name}"}}"#));
+      assert_eq!(
+        serde_json::from_str::<NetworkKind>(&json).unwrap(),
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn empty_named_network_cannot_be_serialized() {
+    assert!(serde_json::to_string(&NetworkKind::Named(String::new())).is_err());
+  }
+
+  #[cfg(feature = "utoipa")]
+  #[test]
+  fn openapi_schema_matches_the_compact_and_tagged_forms() {
+    use utoipa::PartialSchema;
+
+    let schema = serde_json::to_value(NetworkKind::schema()).unwrap();
+    assert_eq!(schema["oneOf"][0]["type"], "string");
+    assert_eq!(schema["oneOf"][1]["required"][0], "Named");
+    assert_eq!(schema["oneOf"][2]["required"][0], "Other");
   }
 }

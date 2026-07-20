@@ -9,7 +9,9 @@ cleanup_nanocl_artifacts() {
   cleanup_statefile ./examples/deploy_example.yml
   cleanup_statefile ./examples/job_example.yml
   cleanup_statefile ./tests/job_with_error.yml
+  cleanup_statefile ./tests/network_partitioning.yml
   nanocl cargo rm -yf test >/dev/null 2>&1 || true
+  docker network rm e2e-private >/dev/null 2>&1 || true
 }
 
 setup_file() {
@@ -87,6 +89,97 @@ teardown_file() {
 
 @test "nanocl state rm -ys ./examples/job_example.yml" {
   run nanocl state rm -ys ./examples/job_example.yml
+  [ "$status" -eq 0 ]
+}
+
+@test "nanocl state apply -ys ./tests/network_partitioning.yml" {
+  run docker network inspect e2e-private
+  [ "$status" -ne 0 ]
+
+  run nanocl state apply -ys ./tests/network_partitioning.yml
+  [ "$status" -eq 0 ]
+
+  run docker network inspect e2e-private
+  [ "$status" -eq 0 ]
+
+  api_container="$(docker ps -q --filter label=io.nanocl.c=e2e-private-api.global | head -n 1)"
+  peer_container="$(docker ps -q --filter label=io.nanocl.c=e2e-private-peer.global | head -n 1)"
+  default_container="$(docker ps -q --filter label=io.nanocl.c=e2e-default-client.global | head -n 1)"
+  job_container="$(docker ps -aq --filter label=io.nanocl.j=e2e-private-job | head -n 1)"
+  [ -n "$api_container" ]
+  [ -n "$peer_container" ]
+  [ -n "$default_container" ]
+  [ -n "$job_container" ]
+
+  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$api_container"
+  [ "$status" -eq 0 ]
+  [ "$output" = "e2e-private" ]
+
+  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$job_container"
+  [ "$status" -eq 0 ]
+  [ "$output" = "e2e-private" ]
+
+  run docker inspect --format \
+    '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' \
+    "$api_container"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"e2e-private"* ]]
+  [[ "$output" != *"nanoclbr0"* ]]
+
+  run docker inspect --format \
+    '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' \
+    "$default_container"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"nanoclbr0"* ]]
+  [[ "$output" != *"e2e-private"* ]]
+
+  api_address="$(docker inspect --format \
+    '{{(index .NetworkSettings.Networks "e2e-private").IPAddress}}' \
+    "$api_container")"
+  [ -n "$api_address" ]
+
+  run docker exec "$peer_container" \
+    wget -q -T 5 -O - "http://${api_address}:9000"
+  [ "$status" -eq 0 ]
+
+  run docker exec "$default_container" \
+    wget -q -T 2 -O - "http://${api_address}:9000"
+  [ "$status" -ne 0 ]
+
+  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$peer_container"
+  [ "$status" -eq 0 ]
+  [ "$output" = "e2e-private" ]
+
+  run curl --silent --fail --unix-socket /run/nanocl/nanocl.sock \
+    http://localhost/v0.18.0/networks
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"Name":"e2e-private"'* ]]
+
+  node_name="$(docker inspect --format \
+    '{{range .Config.Env}}{{println .}}{{end}}' ncproxy.system.c | \
+    sed -n 's/^NANOCL_NODE=//p' | head -n 1)"
+  [ -n "$node_name" ]
+
+  run curl --silent --fail --unix-socket /run/nanocl/nanocl.sock \
+    "http://localhost/v0.18.0/networks/${node_name}.e2e-private/inspect"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"Key":"'"${node_name}"'.e2e-private"'* ]]
+
+  gateway="$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' e2e-private)"
+  [ -n "$gateway" ]
+
+  run curl --silent --fail --retry 10 --retry-all-errors \
+    --header 'Host: network-partitioning.nanocl.test' "http://${gateway}"
+  [ "$status" -eq 0 ]
+
+  run docker exec ncdns.system.c sh -c \
+    "nslookup network-partitioning.nanocl.test '$gateway' | tail -n 1"
+  [ "$status" -eq 0 ]
+
+  run nanocl state rm -ys ./tests/network_partitioning.yml
+  [ "$status" -eq 0 ]
+
+  run docker network inspect e2e-private
   [ "$status" -eq 0 ]
 }
 

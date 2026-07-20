@@ -80,7 +80,7 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 jsonschema = { version = "0.47", default-features = false }
 nanocld_client = { version = "0.18", features = ["tokio"] }
-metrsd_client = "0.5"
+metrsd_client = "0.5.8"
 nanocl_stubs = { version = "0.18", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.9", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "5", features = ["yaml"], optional = true }

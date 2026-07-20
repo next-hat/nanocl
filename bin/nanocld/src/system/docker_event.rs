@@ -45,6 +45,88 @@ fn is_runtime_cargo_instance(process_name: &str) -> bool {
   !process_name.starts_with("tmp-") && !process_name.starts_with("init-")
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NetworkEventOperation {
+  Refresh,
+  Remove,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct NetworkEvent {
+  operation: NetworkEventOperation,
+  docker_reference: String,
+  name: Option<String>,
+}
+
+fn parse_network_event(event: &EventMessage) -> Option<NetworkEvent> {
+  if event.typ != Some(EventMessageTypeEnum::NETWORK) {
+    return None;
+  }
+  let operation = match event.action.as_deref()? {
+    "create" | "connect" | "disconnect" | "update" => {
+      NetworkEventOperation::Refresh
+    }
+    "destroy" | "remove" => NetworkEventOperation::Remove,
+    _ => return None,
+  };
+  let actor = event.actor.as_ref()?;
+  let name = actor
+    .attributes
+    .as_ref()
+    .and_then(|attributes| attributes.get("name"))
+    .filter(|name| !name.is_empty())
+    .cloned();
+  let docker_reference = actor
+    .id
+    .as_deref()
+    .filter(|id| !id.is_empty())
+    .map(str::to_owned)
+    .or_else(|| name.clone())?;
+  Some(NetworkEvent {
+    operation,
+    docker_reference,
+    name,
+  })
+}
+
+async fn exec_network_event(
+  event: &EventMessage,
+  state: &SystemState,
+) -> IoResult<()> {
+  let Some(event) = parse_network_event(event) else {
+    return Ok(());
+  };
+  match event.operation {
+    NetworkEventOperation::Refresh => {
+      utils::container::network::refresh_network(
+        &event.docker_reference,
+        event.name.as_deref(),
+        state,
+      )
+      .await?;
+    }
+    NetworkEventOperation::Remove => {
+      let Some(name) = event.name else {
+        log::warn!(
+          "event::network: remove event {} has no network name",
+          event.docker_reference
+        );
+        return Ok(());
+      };
+      // Docker may deliver an old destroy event after another workload has
+      // recreated the same name. Refresh through the old ID first, then the
+      // canonical name, so that a replacement snapshot is preserved.
+      utils::container::network::refresh_network(
+        &event.docker_reference,
+        Some(&name),
+        state,
+      )
+      .await?;
+    }
+  }
+  Ok(())
+}
+
 async fn unhealthy_instances_reason(
   instances: &[nanocl_stubs::process::Process],
   state: &SystemState,
@@ -302,8 +384,12 @@ async fn exec_docker(
   state: &SystemState,
 ) -> IoResult<()> {
   let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
-  if kind != EventMessageTypeEnum::CONTAINER {
-    return Ok(());
+  match kind {
+    EventMessageTypeEnum::NETWORK => {
+      return exec_network_event(event, state).await;
+    }
+    EventMessageTypeEnum::CONTAINER => {}
+    _ => return Ok(()),
   }
   let actor = event.actor.clone().unwrap_or_default();
   let attributes = actor.attributes.unwrap_or_default();
@@ -519,12 +605,35 @@ async fn exec_docker(
 
 /// Create a new thread with his own loop to analyze events from docker
 pub fn analyze(state: &SystemState) {
+  const NETWORK_RECONCILE_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(30);
+
+  let reconcile_state = state.clone();
+  rt::spawn(async move {
+    loop {
+      ntex::time::sleep(NETWORK_RECONCILE_INTERVAL).await;
+      if let Err(err) =
+        utils::container::network::reconcile_networks(&reconcile_state).await
+      {
+        log::warn!("event::network: periodic reconciliation failed: {err}");
+      }
+    }
+  });
+
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
     loop {
       let mut streams =
         state.inner.docker_api.events(None::<EventsOptions<String>>);
       log::info!("event::analyze_docker: stream connected");
+      let reconnect_state = state.clone();
+      rt::spawn(async move {
+        if let Err(err) =
+          utils::container::network::reconcile_networks(&reconnect_state).await
+        {
+          log::warn!("event::network: reconnect reconciliation failed: {err}");
+        }
+      });
       while let Some(event) = streams.next().await {
         match event {
           Ok(event) => {
@@ -541,4 +650,75 @@ pub fn analyze(state: &SystemState) {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     }
   });
+}
+
+#[cfg(test)]
+mod tests {
+  use std::collections::HashMap;
+
+  use bollard_next::service::EventActor as DockerEventActor;
+
+  use super::*;
+
+  fn network_event(action: &str) -> EventMessage {
+    EventMessage {
+      typ: Some(EventMessageTypeEnum::NETWORK),
+      action: Some(action.to_owned()),
+      actor: Some(DockerEventActor {
+        id: Some("network-id".to_owned()),
+        attributes: Some(HashMap::from([
+          ("name".to_owned(), "private-api".to_owned()),
+          ("type".to_owned(), "bridge".to_owned()),
+          ("container".to_owned(), "container-id".to_owned()),
+        ])),
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn network_lifecycle_actions_are_classified() {
+    for action in ["create", "connect", "disconnect", "update"] {
+      let event = parse_network_event(&network_event(action)).unwrap();
+      assert_eq!(event.operation, NetworkEventOperation::Refresh);
+      assert_eq!(event.docker_reference, "network-id");
+      assert_eq!(event.name.as_deref(), Some("private-api"));
+    }
+    for action in ["destroy", "remove"] {
+      let event = parse_network_event(&network_event(action)).unwrap();
+      assert_eq!(event.operation, NetworkEventOperation::Remove);
+    }
+  }
+
+  #[test]
+  fn container_id_is_not_used_as_the_network_reference() {
+    let event = parse_network_event(&network_event("connect")).unwrap();
+    assert_eq!(event.docker_reference, "network-id");
+  }
+
+  #[test]
+  fn remove_event_keeps_old_id_and_canonical_name_for_reconciliation() {
+    let event = parse_network_event(&network_event("destroy")).unwrap();
+    assert_eq!(event.operation, NetworkEventOperation::Remove);
+    assert_eq!(event.docker_reference, "network-id");
+    assert_eq!(event.name.as_deref(), Some("private-api"));
+  }
+
+  #[test]
+  fn unrelated_events_are_ignored() {
+    let mut event = network_event("connect");
+    event.typ = Some(EventMessageTypeEnum::CONTAINER);
+    assert!(parse_network_event(&event).is_none());
+
+    let event = network_event("prune");
+    assert!(parse_network_event(&event).is_none());
+  }
+
+  #[test]
+  fn network_name_is_a_fallback_when_actor_id_is_missing() {
+    let mut event = network_event("create");
+    event.actor.as_mut().unwrap().id = None;
+    let event = parse_network_event(&event).unwrap();
+    assert_eq!(event.docker_reference, "private-api");
+  }
 }

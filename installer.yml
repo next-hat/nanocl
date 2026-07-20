@@ -10,7 +10,7 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: docker.io/cockroachdb/cockroach:v24.3.8
+    Image: docker.io/cockroachdb/cockroach:v25.4.13
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:
@@ -41,9 +41,9 @@ Cargoes:
 - Name: nmetrics
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% else %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% endif %}
     Tty: true
     Cmd:
@@ -67,6 +67,7 @@ Cargoes:
     Tty: true
     Env:
     - STATE_DIR=${{ state_dir }}/proxy
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/proxy
@@ -92,6 +93,7 @@ Cargoes:
     Tty: true
     Env:
     - STATE_DIR=${{ state_dir }}/dns
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/dns
@@ -134,7 +136,7 @@ Cargoes:
     - --gid
     - "${{ gid }}"
     - --store-addr
-    - postgresql://root:root@store.nanocl.internal:26258/defaultdb?sslmode=verify-full&sslcert=${{ state_dir }}/store/certs/client.root.crt&sslkey=${{ state_dir }}/store/certs/client.root.key&sslrootcert=${{ state_dir }}/store/certs/ca.crt
+    - postgresql://root:root@store.nanocl.internal:26258/defaultdb?sslmode=verify-full&sslcert=${{ state_dir }}/store/certs/client.root.crt&sslkey=${{ state_dir }}/store/certs/client.root.key&sslrootcert=${{ state_dir }}/store/certs/ca.crt&options=-c%20autocommit_before_ddl%3Doff
     Env:
     - NANOCL_GID=${{ gid }}
     HostConfig:

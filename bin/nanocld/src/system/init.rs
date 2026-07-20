@@ -31,13 +31,22 @@ async fn maybe_set_uds_perm() -> bool {
       return false;
     }
   };
+  let perms_mode = perms.mode();
+  log::debug!(
+    "boot::set_uds_perm: /run/nanocl/nanocl.sock current permissions: {:o}",
+    perms_mode
+  );
   perms.set_mode(0o770);
-  if let Err(err) = fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
+  if let Err(err) =
+    fs::set_permissions("/run/nanocl/nanocl.sock", perms.clone()).await
   {
     log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
     return false;
   }
-  log::trace!("boot::set_uds_perm: /run/nanocl/nanocl.sock permission set");
+  log::debug!(
+    "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set: {:o}",
+    perms.mode()
+  );
   true
 }
 
@@ -46,7 +55,7 @@ async fn maybe_set_uds_perm() -> bool {
 /// Then close the thread
 ///
 fn set_uds_perm() {
-  log::trace!("boot::set_uds_perm: start thread");
+  log::debug!("boot::set_uds_perm: start thread");
   rt::Arbiter::new().handle().spawn(async move {
     let path = Path::new("/run/nanocl");
     if !path.exists() {
@@ -69,13 +78,7 @@ fn set_uds_perm() {
       log::warn!("boot::set_uds_perm: watcher {err}");
       return;
     }
-    log::trace!("boot::set_uds_perm: watching /run/nanocl");
-
-    // Fast path for cases where the socket already exists.
-    if maybe_set_uds_perm().await {
-      log::trace!("boot::set_uds_perm: stop thread");
-      return;
-    }
+    log::debug!("boot::set_uds_perm: watching /run/nanocl");
 
     for res in rx {
       match res {
@@ -85,7 +88,7 @@ fn set_uds_perm() {
             || event.kind.is_access()
             || event.kind.is_other()
           {
-            log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
+            log::debug!("boot::set_uds_perm: /run/nanocl change detected",);
             if maybe_set_uds_perm().await {
               break;
             }
@@ -97,14 +100,14 @@ fn set_uds_perm() {
         }
       }
     }
-    log::trace!("boot::set_uds_perm: stop thread");
+    log::debug!("boot::set_uds_perm: stop thread");
   });
 }
 
 /// Create a new thread and spawn and manage a crond instance to run cron jobs
 ///
 fn spawn_crond() {
-  log::trace!("boot::spawn_crond: start thread");
+  log::debug!("boot::spawn_crond: start thread");
   rt::Arbiter::new().handle().spawn(async move {
     // Spawn crond in foreground with piped stdout/stderr
     match TokioCommand::new("crond")
@@ -161,7 +164,7 @@ fn spawn_crond() {
         log::error!("boot::spawn_crond: spawn error: {err}");
       }
     }
-    log::trace!("boot::spawn_crond: stop thread");
+    log::debug!("boot::spawn_crond: stop thread");
   });
 }
 
@@ -227,6 +230,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   docker_healthcheck(&system_state);
   spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;
+  utils::container::network::reconcile_networks(&system_state).await?;
   utils::system::register_namespace("global", &system_state).await?;
   utils::system::register_namespace("system", &system_state).await?;
   let system_ptr = system_state.clone();

@@ -1837,16 +1837,16 @@ dependencies = [
 
 [[package]]
 name = "metrsd_client"
-version = "0.5.5"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10e47bf1fc57f55fc309c3fb359cad84664784518e1f550f9b65076a0720a37"
+checksum = "3763526d171df5398b9698b74956cd9f0462a5c14e06bb3d5a28b4cca41dc0db"
 dependencies = [
  "futures",
  "metrs_stubs",
- "ntex 2.18.0",
+ "ntex 3.9.6",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3786,7 +3786,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

@@ -11,6 +11,7 @@ mod exec;
 mod job;
 mod metric;
 mod namespace;
+mod network;
 mod node;
 mod process;
 mod resource;
@@ -50,6 +51,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
           .finish(),
       )
       .configure(exec::ntex_config)
+      .configure(network::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)
       .configure(system::ntex_config)

@@ -15,7 +15,7 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: docker.io/cockroachdb/cockroach:v24.3.8
+    image: docker.io/cockroachdb/cockroach:v25.4.13
     entrypoint: /bin/sh
     tty: true
     networks:
@@ -48,7 +48,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/next-hat/metrsd:0.5.4
+    image: ghcr.io/next-hat/metrsd:0.5.8
     tty: true
     environment:
       - LOG_LEVEL=metrsd=info
@@ -76,6 +76,7 @@ services:
     environment:
       - RUST_BACKTRACE=1
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+      - NANOCL_NODE=nanocl.internal
     command:
       - watch
       - -w
@@ -107,6 +108,7 @@ services:
     environment:
       - RUST_BACKTRACE=1
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+      - NANOCL_NODE=nanocl.internal
     command:
       - watch
       - -w
@@ -168,7 +170,7 @@ services:
           -- \
           --hosts unix:///run/nanocl/nanocl.sock \
           --gid 1001 \
-          --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb \
+          --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb?options=-c%20autocommit_before_ddl%3Doff \
           --hosts tcp://0.0.0.0:9443 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \

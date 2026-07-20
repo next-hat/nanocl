@@ -12,6 +12,22 @@ use nanocld_client::{
 
 use crate::{models::SystemStateRef, vars};
 
+fn workload_target_key(name: &str, namespace: &str, kind: &str) -> String {
+  format!("{name}.{namespace}.{kind}")
+}
+
+pub(crate) async fn list_all(
+  client: &NanocldClient,
+) -> IoResult<Vec<Resource>> {
+  let filter = GenericFilter::new()
+    .limit(10_000)
+    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
+  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list ncproxy resources from nanocld")
+  })?;
+  Ok(resources)
+}
+
 pub async fn list_by_secret(
   name: &str,
   client: &NanocldClient,
@@ -36,13 +52,15 @@ pub async fn list_by_secret(
   Ok(resources)
 }
 
-pub(crate) async fn list_by_cargo(
+async fn list_by_workload(
   name: &str,
   namespace: Option<String>,
+  kind: &str,
+  kind_name: &str,
   client: &NanocldClient,
 ) -> IoResult<Vec<Resource>> {
   let namespace = namespace.unwrap_or("global".into());
-  let target_key = format!("{name}.{namespace}.c");
+  let target_key = workload_target_key(name, &namespace, kind);
   let filter = GenericFilter::new()
   .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()))
   .r#where(
@@ -74,10 +92,26 @@ pub(crate) async fn list_by_cargo(
   if resources.is_empty() {
     return Err(IoError::not_found(
       "Resource",
-      &format!("No resources found matching cargo {target_key}"),
+      &format!("No resources found matching {kind_name} {target_key}"),
     ));
   }
   Ok(resources)
+}
+
+pub(crate) async fn list_by_cargo(
+  name: &str,
+  namespace: Option<String>,
+  client: &NanocldClient,
+) -> IoResult<Vec<Resource>> {
+  list_by_workload(name, namespace, "c", "cargo", client).await
+}
+
+pub(crate) async fn list_by_vm(
+  name: &str,
+  namespace: Option<String>,
+  client: &NanocldClient,
+) -> IoResult<Vec<Resource>> {
+  list_by_workload(name, namespace, "v", "vm", client).await
 }
 
 pub(crate) fn serialize(
@@ -108,4 +142,35 @@ pub(crate) async fn update_rules(
     .into_iter()
     .collect::<Result<Vec<_>, IoError>>()?;
   Ok(())
+}
+
+/// Rebuild the complete generated configuration from committed nanocld state.
+///
+/// The nginx layer clears the managed directories transactionally, which also
+/// removes resources deleted while this controller was offline.
+pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
+  let resources = list_all(&state.client).await?;
+  let mut rules = resources
+    .into_iter()
+    .map(|resource| {
+      let resource: ResourcePartial = resource.into();
+      let rule = serialize(&resource.data)?;
+      Ok::<_, IoError>((resource.name, rule))
+    })
+    .collect::<IoResult<Vec<_>>>()?;
+  rules.sort_by(|left, right| left.0.cmp(&right.0));
+  super::nginx::rebuild_rules(&rules, state).await?;
+  state.event_emitter.emit_reload().await;
+  Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::workload_target_key;
+
+  #[test]
+  fn workload_target_keys_use_the_expected_kind_suffix() {
+    assert_eq!(workload_target_key("api", "global", "c"), "api.global.c");
+    assert_eq!(workload_target_key("db", "private", "v"), "db.private.v");
+  }
 }

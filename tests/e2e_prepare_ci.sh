@@ -9,7 +9,7 @@ NANOCL_CHANNEL="${NANOCL_CHANNEL:-nightly}"
 
 # Set E2E_SKIP_IMAGE_BUILD=1 and/or E2E_SKIP_NANOCL_BUILD=1 for faster local reruns.
 if [ "${E2E_SKIP_IMAGE_BUILD:-0}" != "1" ]; then
-  sh ./scripts/build_images.sh
+  NANOCL_CHANNEL="$NANOCL_CHANNEL" sh ./scripts/build_images.sh
 fi
 
 if [ "${E2E_SKIP_NANOCL_BUILD:-0}" != "1" ]; then
@@ -148,6 +148,6 @@ nanocl version
 docker ps -a
 docker logs ndaemon.system.c || true
 docker logs ncproxy.system.c || true
-docker logs ndns.system.c || true
+docker logs ncdns.system.c || true
 
 echo "E2E CI prepare complete"

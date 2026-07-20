@@ -1,4 +1,4 @@
-use std::{fs, process::Command, sync::Arc, time::Duration};
+use std::{fs, future::Future, process::Command, sync::Arc, time::Duration};
 
 use ntex::rt;
 use ntex::web;
@@ -11,12 +11,15 @@ use nanocld_client::stubs::proxy::{
 
 use crate::models::{
   CONF_TEMPLATE, HTTP_TEMPLATE, LocationTemplate, NginxRuleKind,
-  STREAM_TEMPLATE, SystemStateRef,
+  STREAM_TEMPLATE, Store, StoreConfigSnapshot, SystemStateRef,
 };
+
+use super::rule::{PreparedFile, PreparedUpstream};
 
 const NGINX_PID_PATH: &str = "/run/nginx.pid";
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
+  let _guard = state.config_lock.lock().await;
   let state_ref = Arc::clone(state);
   let conf_path = format!("{}/nginx.conf", state_ref.store.dir);
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
@@ -86,6 +89,32 @@ fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
   Err(IoError::other("exec", &message))
 }
 
+/// Start daemonized nginx without capturing its standard streams.
+///
+/// `Command::output` waits for every writer of its capture pipes to close.
+/// Some packaged nginx builds leave those descriptors inherited by the
+/// daemon process, which keeps this call (and the configuration lock held by
+/// its caller) blocked forever even though nginx started successfully.
+fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
+  let status = Command::new("nginx")
+    .arg("-c")
+    .arg(conf_path)
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null())
+    .status()
+    .map_err(|err| {
+      IoError::other("exec", &format!("unable to start nginx: {err}"))
+    })?;
+  if status.success() {
+    return Ok(());
+  }
+  Err(IoError::other(
+    "exec",
+    &format!("nginx failed to start with status {status}"),
+  ))
+}
+
 pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   let conf_path = gen_conf_path(state_dir);
   web::block(move || {
@@ -93,18 +122,20 @@ pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
       return Ok(());
     }
     let _ = std::fs::remove_file(NGINX_PID_PATH);
-    exec_nginx_cmd(&[], &conf_path)
+    start_nginx_cmd(&conf_path)
   })
   .await?;
   Ok(())
 }
 
-pub fn spawn(state_dir: &str) {
-  let state_dir = state_dir.to_owned();
+pub fn spawn(state: &SystemStateRef) {
+  let state_dir = state.store.dir.clone();
+  let config_lock = Arc::clone(&state.config_lock);
   rt::Arbiter::new().handle().spawn(async move {
     loop {
       if !is_nginx_running() {
         log::warn!("nginx::monitor: nginx is not running, restarting");
+        let _guard = config_lock.lock().await;
         if let Err(err) = ensure_started(&state_dir).await {
           log::warn!("nginx::monitor: {err}");
         }
@@ -131,13 +162,64 @@ pub async fn reload(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
+async fn rollback_config(
+  snapshot: &StoreConfigSnapshot,
+  original_error: IoError,
+  store: &Store,
+) -> IoResult<()> {
+  match store.restore_config(snapshot).await {
+    Ok(()) => Err(original_error),
+    Err(rollback_error) => Err(IoError::other(
+      "nginx configuration rollback",
+      &format!(
+        "candidate failed: {original_error}; rollback failed: {rollback_error}"
+      ),
+    )),
+  }
+}
+
+async fn config_transaction<F, Fut>(store: &Store, operation: F) -> IoResult<()>
+where
+  F: FnOnce() -> Fut,
+  Fut: Future<Output = IoResult<()>>,
+{
+  let snapshot = store.snapshot_config().await?;
+  match operation().await {
+    Ok(()) => Ok(()),
+    Err(err) => rollback_config(&snapshot, err, store).await,
+  }
+}
+
 pub async fn add_rule(
   name: &str,
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
 ) -> IoResult<()> {
+  let prepared = prepare_rule(name, rule, state).await?;
+  let _guard = state.config_lock.lock().await;
+  config_transaction(&state.store, || async {
+    apply_prepared_rule(name, &prepared, state).await?;
+    self::test(&state.store.dir).await
+  })
+  .await
+}
+
+pub(crate) struct PreparedRule {
+  site: Option<String>,
+  stream: Option<String>,
+  upstreams: Vec<(PreparedUpstream, NginxRuleKind)>,
+  files: Vec<PreparedFile>,
+}
+
+async fn prepare_rule(
+  name: &str,
+  rule: &ResourceProxyRule,
+  state: &SystemStateRef,
+) -> IoResult<PreparedRule> {
   let mut stream_conf = String::new();
   let mut http_conf = String::new();
+  let mut upstreams = Vec::new();
+  let mut files = Vec::new();
   for rule in &rule.rules {
     match rule {
       ProxyRule::Stream(stream_rule) => {
@@ -147,25 +229,26 @@ pub async fn add_rule(
           &state.client,
         )
         .await?;
-        let upstream_key = match super::rule::gen_stream_upstream_key(
-          &stream_rule.target,
-          state,
-        )
-        .await
-        {
-          Err(err) => {
-            log::warn!("{err} {:#?}", stream_rule.target);
-            continue;
-          }
-          Ok(upstream_key) => upstream_key,
-        };
+        let upstream =
+          match super::rule::gen_stream_upstream(&stream_rule.target, state)
+            .await
+          {
+            Err(err) => {
+              log::warn!("{err} {:#?}", stream_rule.target);
+              continue;
+            }
+            Ok(upstream) => upstream,
+          };
         let ssl = match &stream_rule.ssl {
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
               None
             }
-            Ok(ssl) => Some(ssl),
+            Ok(prepared) => {
+              files.extend(prepared.files);
+              Some(prepared.config)
+            }
           },
           None => None,
         };
@@ -176,9 +259,10 @@ pub async fn add_rule(
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
           "listen": listen,
           "key": name,
-          "upstream_key": upstream_key,
+          "upstream_key": upstream.key,
           "ssl": ssl,
         }))?;
+        upstreams.push((upstream, NginxRuleKind::Stream));
         stream_conf += &data;
       }
       ProxyRule::Http(http_rule) => {
@@ -201,7 +285,10 @@ pub async fn add_rule(
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
               None
             }
-            Ok(ssl) => Some(ssl),
+            Ok(prepared) => {
+              files.extend(prepared.files);
+              Some(prepared.config)
+            }
           },
           None => None,
         };
@@ -210,19 +297,14 @@ pub async fn add_rule(
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
-              let upstream_key = match super::rule::gen_upstream(
-                upstream,
-                &NginxRuleKind::Site,
-                state,
-              )
-              .await
-              {
-                Err(err) => {
-                  log::warn!("{err} {:#?}", upstream);
-                  continue;
-                }
-                Ok(upstream_key) => upstream_key,
-              };
+              let prepared_upstream =
+                match super::rule::gen_upstream(upstream, state).await {
+                  Err(err) => {
+                    log::warn!("{err} {:#?}", upstream);
+                    continue;
+                  }
+                  Ok(upstream) => upstream,
+                };
               let ssl = match &upstream.ssl {
                 Some(ssl) => {
                   match super::rule::gen_ssl_config(ssl, state).await {
@@ -230,7 +312,10 @@ pub async fn add_rule(
                       log::warn!("Not ssl found for {name} {ssl:#?} {err}");
                       None
                     }
-                    Ok(ssl) => Some(ssl),
+                    Ok(prepared) => {
+                      files.extend(prepared.files);
+                      Some(prepared.config)
+                    }
                   }
                 }
                 None => None,
@@ -239,9 +324,9 @@ pub async fn add_rule(
                 path: location.path.clone(),
                 limit_req: location.limit_req.clone(),
                 upstream_key: if ssl.is_some() {
-                  format!("https://{upstream_key}")
+                  format!("https://{}", prepared_upstream.key)
                 } else {
-                  format!("http://{upstream_key}")
+                  format!("http://{}", prepared_upstream.key)
                 },
                 redirect: None,
                 upstream_path: upstream.path.clone().unwrap_or("/".to_owned()),
@@ -250,18 +335,15 @@ pub async fn add_rule(
                 headers: location.headers.clone(),
                 ssl,
               };
+              upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
             }
             LocationTarget::Unix(unix) => {
-              let upstream_key = super::rule::gen_unix_target_key(
-                unix,
-                &NginxRuleKind::Site,
-                state,
-              )
-              .await?;
+              let prepared_upstream =
+                super::rule::gen_unix_target(unix).await?;
               let location = LocationTemplate {
                 path: location.path.clone(),
-                upstream_key: format!("http://{upstream_key}"),
+                upstream_key: format!("http://{}", prepared_upstream.key),
                 redirect: None,
                 limit_req: location.limit_req.clone(),
                 upstream_path: "/".to_owned(),
@@ -270,6 +352,7 @@ pub async fn add_rule(
                 headers: location.headers.clone(),
                 ssl: None,
               };
+              upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
             }
             LocationTarget::Http(http) => {
@@ -304,32 +387,186 @@ pub async fn add_rule(
       }
     }
   }
-  if !stream_conf.is_empty() {
-    state
-      .store
-      .write_conf_file(name, &stream_conf, &NginxRuleKind::Stream)
-      .await?;
-  }
-  if !http_conf.is_empty() {
-    state
-      .store
-      .write_conf_file(name, &http_conf, &NginxRuleKind::Site)
-      .await?;
-  }
-  if let Err(err) = self::test(&state.store.dir).await {
-    let _ = del_rule(name, state).await;
-    return Err(err);
-  }
-  Ok(())
+  Ok(PreparedRule {
+    site: (!http_conf.is_empty()).then_some(http_conf),
+    stream: (!stream_conf.is_empty()).then_some(stream_conf),
+    upstreams,
+    files,
+  })
 }
 
-pub async fn del_rule(name: &str, state: &SystemStateRef) {
-  let _ = state
+async fn apply_prepared_rule(
+  name: &str,
+  prepared: &PreparedRule,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  for file in &prepared.files {
+    tokio::fs::write(&file.path, &file.data).await?;
+  }
+  for (upstream, kind) in &prepared.upstreams {
+    state
+      .store
+      .write_conf_file(&upstream.key, &upstream.content, kind)
+      .await?;
+  }
+  state
     .store
-    .delete_conf_file(name, &NginxRuleKind::Site)
+    .replace_rule(name, prepared.site.as_deref(), prepared.stream.as_deref())
+    .await
+}
+
+/// Replace every managed rule from a persisted nanocld snapshot.
+///
+/// Clearing first removes resources deleted while ncproxy was offline. The
+/// previous complete directory state is restored when rendering or nginx
+/// validation rejects any candidate rule.
+pub(crate) async fn rebuild_rules(
+  rules: &[(String, ResourceProxyRule)],
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  let mut prepared_rules = Vec::with_capacity(rules.len());
+  for (name, rule) in rules {
+    prepared_rules.push((name, prepare_rule(name, rule, state).await?));
+  }
+  let _guard = state.config_lock.lock().await;
+  config_transaction(&state.store, || async {
+    state.store.clear_config().await?;
+    for (name, prepared) in &prepared_rules {
+      apply_prepared_rule(name, prepared, state).await?;
+    }
+    self::test(&state.store.dir).await
+  })
+  .await
+}
+
+pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
+  let _guard = state.config_lock.lock().await;
+  config_transaction(&state.store, || async {
+    state.store.replace_rule(name, None, None).await
+  })
+  .await
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+  };
+
+  use super::*;
+
+  static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
+
+  struct TestDir(PathBuf);
+
+  impl TestDir {
+    fn new() -> Self {
+      let id = NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed);
+      let path = std::env::temp_dir()
+        .join(format!("ncproxy-config-test-{}-{id}", std::process::id()));
+      for dir in [
+        "sites-available",
+        "sites-enabled",
+        "streams-available",
+        "streams-enabled",
+      ] {
+        std::fs::create_dir_all(path.join(dir)).unwrap();
+      }
+      Self(path)
+    }
+
+    fn path(&self) -> &Path {
+      &self.0
+    }
+  }
+
+  impl Drop for TestDir {
+    fn drop(&mut self) {
+      let _ = std::fs::remove_dir_all(&self.0);
+    }
+  }
+
+  #[ntex::test]
+  async fn rejected_transaction_restores_all_previous_configs() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("rule", "old site", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("rule", "old stream", &NginxRuleKind::Stream)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("shared-upstream", "old upstream", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let before = store.snapshot_config().await.unwrap();
+
+    let result = config_transaction(&store, || async {
+      store.replace_rule("rule", Some("new site"), None).await?;
+      store
+        .write_conf_file(
+          "shared-upstream",
+          "new upstream",
+          &NginxRuleKind::Site,
+        )
+        .await?;
+      Err(IoError::invalid_data("candidate", "rejected"))
+    })
     .await;
-  let _ = state
-    .store
-    .delete_conf_file(name, &NginxRuleKind::Stream)
-    .await;
+
+    assert!(result.is_err());
+    assert_eq!(store.snapshot_config().await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn successful_update_removes_a_disappeared_rule_kind() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("rule", "old site", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    store
+      .write_conf_file("rule", "old stream", &NginxRuleKind::Stream)
+      .await
+      .unwrap();
+
+    config_transaction(&store, || async {
+      store.replace_rule("rule", Some("new site"), None).await
+    })
+    .await
+    .unwrap();
+
+    let snapshot = store.snapshot_config().await.unwrap();
+    assert_eq!(snapshot.sites.get("rule.conf").unwrap(), "new site");
+    assert!(!snapshot.streams.contains_key("rule.conf"));
+    assert!(!test_dir.path().join("streams-enabled/rule.conf").exists());
+  }
+
+  #[ntex::test]
+  async fn full_rebuild_removes_configs_absent_from_committed_state() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    store
+      .write_conf_file("deleted-rule", "stale", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+
+    config_transaction(&store, || async {
+      store.clear_config().await?;
+      store
+        .write_conf_file("live-rule", "committed", &NginxRuleKind::Site)
+        .await
+    })
+    .await
+    .unwrap();
+
+    let snapshot = store.snapshot_config().await.unwrap();
+    assert!(!snapshot.sites.contains_key("deleted-rule.conf"));
+    assert_eq!(snapshot.sites.get("live-rule.conf").unwrap(), "committed");
+  }
 }

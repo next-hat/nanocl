@@ -48,7 +48,7 @@ pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::info!("remove_rule: {}", path.1);
-  utils::nginx::del_rule(&path.1, &state).await;
+  utils::nginx::del_rule(&path.1, &state).await?;
   state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().finish())
 }
