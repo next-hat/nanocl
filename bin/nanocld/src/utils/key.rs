@@ -24,6 +24,11 @@ pub fn gen_key(nsp: &str, name: &str) -> String {
   format!("{name}.{nsp}")
 }
 
+/// Generate the stable key of a node-scoped Docker network.
+pub fn gen_network_key(node_name: &str, network_name: &str) -> String {
+  nanocl_stubs::network::gen_network_key(node_name, network_name)
+}
+
 /// Generate a short id based on the length
 pub fn generate_short_id(length: usize) -> String {
   let rng = rng();
@@ -56,5 +61,18 @@ pub fn gen_kind_key(
       let namespace = resolve_nsp(namespace);
       gen_key(&namespace, name)
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn network_key_contains_node_and_network_name() {
+    assert_eq!(
+      gen_network_key("node-a.nanocl.io", "private.api"),
+      "node-a.nanocl.io.private.api"
+    );
   }
 }

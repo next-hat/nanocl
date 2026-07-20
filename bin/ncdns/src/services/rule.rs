@@ -28,8 +28,10 @@ pub(crate) async fn apply_rule(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  utils::update_entries(&path.1, &payload, &dnsmasq, &client).await?;
-  utils::reload_service(&client).await?;
+  log::debug!("rule::apply: reconciling {}", path.1);
+  utils::reconcile_entries(Some(&path.1), Some(&payload), &dnsmasq, &client)
+    .await?;
+  log::debug!("rule::apply: reconciled {}", path.1);
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
 
@@ -51,13 +53,12 @@ pub(crate) async fn remove_rule(
   dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let rule = client.inspect_resource(&path.1).await?;
-  let dns_rule = serde_json::from_value::<ResourceDnsRule>(rule.spec.data)
-    .map_err(|err| {
-      HttpError::bad_request(format!("Unable to serialize the DnsRule: {err}"))
-    })?;
-  utils::remove_entries(&dns_rule, &dnsmasq, &client).await?;
-  utils::reload_service(&client).await?;
+  // nanocld invokes the controller before deleting the persisted resource, so
+  // reconciliation explicitly excludes the current key.
+  log::debug!("rule::remove: reconciling {}", path.1);
+  client.inspect_resource(&path.1).await?;
+  utils::reconcile_entries(Some(&path.1), None, &dnsmasq, &client).await?;
+  log::debug!("rule::remove: reconciled {}", path.1);
   Ok(web::HttpResponse::Ok().finish())
 }
 

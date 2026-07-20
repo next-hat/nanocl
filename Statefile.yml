@@ -43,29 +43,14 @@ Cargoes:
       Binds:
         - //run/guest-services/nanocl:/run/nanocl
 
-- Name: nproxy
+- Name: ncproxy
   Container:
-    Image: nproxy:dev
+    Image: ghcr.io/next-hat/nanocl-dev:dev
     Tty: true
     Env:
       - STATE_DIR=${{ state_dir }}/proxy
     HostConfig:
       NetworkMode: host
-      Binds:
-        - //run/guest-services/nanocl:/run/nanocl
-        - ${{ state_dir }}/proxy:/${{ state_dir }}/proxy
-
-- Name: ncproxy
-  Container:
-    Image: ghcr.io/next-hat/nanocl-dev:dev
-    Tty: true
-    ExposedPorts:
-      8686/tcp:
-    HostConfig:
-      PortBindings:
-        8686/tcp:
-          - HostPort: "8686"
-            HostIp: "0.0.0.0"
       Binds:
         - ./:/project
         - nanocl-deps:/project/target
@@ -79,27 +64,14 @@ Cargoes:
       - -x
       - run --no-default-features --features dev --bin ncproxy -- --state-dir ${{ state_dir }}/proxy
 
-- Name: ndns
+- Name: ncdns
   Container:
-    Image: ndns:dev
+    Image: ghcr.io/next-hat/nanocl-dev:dev
     Tty: true
     Env:
       - STATE_DIR=${{ state_dir }}/dns
     HostConfig:
       NetworkMode: host
-      Binds:
-        - ${{ state_dir }}/dns:/${{ state_dir }}/dns
-
-- Name: ncdns
-  Container:
-    Image: ghcr.io/next-hat/nanocl-dev:dev
-    Tty: true
-    ExposedPorts:
-      8787/tcp:
-    HostConfig:
-      PortBindings:
-        8787/tcp:
-          - HostPort: "8787"
       Binds:
         - ./:/project
         - nanocl-deps:/project/target

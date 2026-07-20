@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgrade dependencies
 
+### Added
+
+- Cargo health status in command output.
+- Start and delete cargo instances on a specific node.
+
+### Changed
+
+- Statefile rendering and argument handling support required, multiple, described and default values.
+
 ## [0.17.1] - 17-09-2025
 
 ### Fixed
@@ -267,4 +276,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uninstall command
 - Upgrade command
 - Installer fetch template from our official repo or can take custom template path
-
