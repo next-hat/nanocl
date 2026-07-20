@@ -9,10 +9,9 @@ Resources:
     Rules:
       - Domain: deploy-example.com
         Network: Local
-        Ssl:
-          Certificate: /random/path/to/cert
-          CertificateKey: /random/path/to/key
-          SslDhParam: /random/path/to/param
+        # Reference a nanocl.io/tls secret. Its PEM values are persisted in
+        # CockroachDB; ncproxy materializes them only for Nginx at runtime.
+        Ssl: tls.secret
         Locations:
           - Path: /
             Target:

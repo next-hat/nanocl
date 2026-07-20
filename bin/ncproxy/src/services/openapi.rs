@@ -35,6 +35,7 @@ impl utoipa::Modify for VersionModifier {
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    super::health,
     rule::apply_rule,
     rule::remove_rule,
   ),
@@ -57,6 +58,7 @@ impl utoipa::Modify for VersionModifier {
     UnixTarget,
   )),
   tags(
+    (name = "Health", description = "Health check endpoint."),
     (name = "Rules", description = "Rules management endpoints."),
   ),
   modifiers(&VersionModifier),

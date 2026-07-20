@@ -73,6 +73,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    networks (key) {
+        key -> Varchar,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        name -> Varchar,
+        node_name -> Varchar,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     nodes (name) {
         name -> Varchar,
         created_at -> Timestamptz,
@@ -178,6 +190,7 @@ diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
+diesel::joinable!(networks -> nodes (node_name));
 diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
@@ -193,6 +206,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   jobs,
   metrics,
   namespaces,
+  networks,
   nodes,
   object_process_statuses,
   processes,

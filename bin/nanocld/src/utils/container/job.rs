@@ -17,6 +17,18 @@ use crate::{
   utils,
 };
 
+fn network_modes(job: &Job) -> Vec<String> {
+  job
+    .containers
+    .iter()
+    .map(super::network::container_network_mode)
+    .collect()
+}
+
+async fn ensure_networks(job: &Job, state: &SystemState) -> IoResult<()> {
+  super::network::ensure_networks(network_modes(job), state).await
+}
+
 /// Create process (container) for a job
 ///
 async fn create_instance(
@@ -43,16 +55,16 @@ async fn create_instance(
       .env
       .unwrap_or_default()
       .into_iter()
-      .chain(env_secrets.into_iter())
+      .chain(env_secrets)
       .collect(),
   );
   let host_config = container.host_config.unwrap_or_default();
   let mut binds = host_config.binds.clone().unwrap_or_default();
   binds.push(format!("{}/:/opt/nanocl.io/secrets", secret_dir));
   container.host_config = Some(HostConfig {
-    network_mode: Some(
-      host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
-    ),
+    network_mode: Some(super::network::resolve_network_mode(
+      host_config.network_mode,
+    )),
     binds: Some(binds),
     ..host_config
   });
@@ -74,6 +86,8 @@ pub async fn create_instances(
   job: &Job,
   state: &SystemState,
 ) -> IoResult<Vec<Process>> {
+  // Validate every unique network before creating the first job container.
+  ensure_networks(job, state).await?;
   let mut processes = Vec::new();
   for (index, container) in job.containers.iter().enumerate() {
     super::image::download(
@@ -94,6 +108,7 @@ pub async fn create_instances(
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let job = JobDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  ensure_networks(&job, state).await?;
   let mut processes =
     ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool).await?;
   if processes.is_empty() {
@@ -155,4 +170,32 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
     .emit_normal_native_action_sync(&job, NativeEventAction::Destroy)
     .await;
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn container_on(network: &str) -> Config {
+    Config {
+      host_config: Some(HostConfig {
+        network_mode: Some(network.to_owned()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn network_preflight_includes_every_job_container_mode() {
+    let job = Job {
+      containers: vec![container_on("private-api"), container_on("private-db")],
+      ..Default::default()
+    };
+
+    assert_eq!(
+      network_modes(&job),
+      vec!["private-api".to_owned(), "private-db".to_owned()]
+    );
+  }
 }
