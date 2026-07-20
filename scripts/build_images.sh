@@ -9,6 +9,10 @@
 
 REPO=ghcr.io/next-hat
 
+CHANNEL="${NANOCL_CHANNEL:-stable}"
+
+echo "Building images for channel: $CHANNEL"
+
 for project in ./bin/*; do
   ## Extract name from path
   name=$(basename "${project}")
@@ -16,9 +20,13 @@ for project in ./bin/*; do
   if [ "$name" = "nanocl" ]; then
     continue
   fi
+  ## Legacy source-only runtime assets are no longer published by default
+  if [ "$name" = "nproxy" ] || [ "$name" = "ndns" ]; then
+    continue
+  fi
   ## Extract version from Cargo.toml
   version=$(grep -m1 version $project/Cargo.toml | sed -e 's/version = //g' | sed -e 's/"//g')
   TAG="$REPO/$name:$version-nightly"
   echo $TAG
-  docker buildx build --load -t "ghcr.io/next-hat/$name:$version-nightly" -f $project/Dockerfile .
+  docker buildx build --load --build-arg channel=$CHANNEL -t "ghcr.io/next-hat/$name:$version-nightly" -f $project/Dockerfile .
 done

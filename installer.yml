@@ -10,7 +10,7 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: docker.io/cockroachdb/cockroach:v24.3.8
+    Image: docker.io/cockroachdb/cockroach:v25.4.13
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:
@@ -31,14 +31,19 @@ Cargoes:
         cockroach cert create-node 127.0.0.1 *.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
         cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
       fi
+
+      # Keep cert/key modes strict for CockroachDB and nanocld TLS checks.
+      chmod 600 $STATE_DIR/ca/*.key $STATE_DIR/certs/*.key 2>/dev/null || true
+      chmod 644 $STATE_DIR/certs/*.crt 2>/dev/null || true
+
       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
 
 - Name: nmetrics
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% else %}
-    Image: ghcr.io/next-hat/metrsd:0.5.6
+    Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% endif %}
     Tty: true
     Cmd:
@@ -52,27 +57,6 @@ Cargoes:
       - /run/nanocl:/run/nanocl
       # {% endif %}
 
-- Name: nproxy
-  Container:
-    # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nproxy:1.28.0-n0.15.0-nightly
-    # {% else %}
-    Image: ghcr.io/next-hat/nproxy:1.28.0-n0.14.0
-    # {% endif %}
-    Tty: true
-    Env:
-    - STATE_DIR=${{ state_dir }}/proxy
-    HostConfig:
-      NetworkMode: host
-      Binds:
-      # {% if is_docker_desktop %}
-      - //run:/run
-      # {% else %}
-      - /run:/run
-      # {% endif %}
-      - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
-      - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
-
 - Name: ncproxy
   Container:
     # {% if channel == "nightly" %}
@@ -81,31 +65,23 @@ Cargoes:
     Image: ghcr.io/next-hat/ncproxy:0.14.0
     # {% endif %}
     Tty: true
+    Env:
+    - STATE_DIR=${{ state_dir }}/proxy
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/proxy
     HostConfig:
-      Binds:
-      # {% if is_docker_desktop %}
-      - //run/guest-services/nanocl:/run/nanocl
-      # {% else %}
-      - /run/nanocl:/run/nanocl
-      # {% endif %}
-      - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
-
-- Name: ndns
-  Container:
-    # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ndns:2.91.0-n0.10.0-nightly
-    # {% else %}
-    Image: ghcr.io/next-hat/ndns:2.91.0-n0.9.0
-    # {% endif %}
-    Env:
-    - STATE_DIR=${{ state_dir }}/dns
-    HostConfig:
       NetworkMode: host
       Binds:
-      - ${{ state_dir }}/dns:${{ state_dir }}/dns
+      # {% if is_docker_desktop %}
+      - //run:/run
+      - //run/guest-services/nanocl:/run/nanocl
+      # {% else %}
+      - /run:/run
+      # {% endif %}
+      - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
+      - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
 
 - Name: ncdns
   Container:
@@ -115,6 +91,9 @@ Cargoes:
     Image: ghcr.io/next-hat/ncdns:0.9.0
     # {% endif %}
     Tty: true
+    Env:
+    - STATE_DIR=${{ state_dir }}/dns
+    - NANOCL_NODE=${{ hostname }}
     Cmd:
     - --state-dir
     - ${{ state_dir }}/dns
@@ -123,6 +102,7 @@ Cargoes:
     - --dns
     - 1.0.0.1
     HostConfig:
+      NetworkMode: host
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -156,7 +136,7 @@ Cargoes:
     - --gid
     - "${{ gid }}"
     - --store-addr
-    - postgresql://root:root@store.nanocl.internal:26258/defaultdb?sslmode=verify-full&sslcert=${{ state_dir }}/store/certs/client.root.crt&sslkey=${{ state_dir }}/store/certs/client.root.key&sslrootcert=${{ state_dir }}/store/certs/ca.crt
+    - postgresql://root:root@store.nanocl.internal:26258/defaultdb?sslmode=verify-full&sslcert=${{ state_dir }}/store/certs/client.root.crt&sslkey=${{ state_dir }}/store/certs/client.root.key&sslrootcert=${{ state_dir }}/store/certs/ca.crt&options=-c%20autocommit_before_ddl%3Doff
     Env:
     - NANOCL_GID=${{ gid }}
     HostConfig:

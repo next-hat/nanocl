@@ -68,9 +68,6 @@ impl ObjDelByPk for NamespaceDb {
     let item = NamespaceDb::read_by_pk(pk, &state.inner.pool).await?;
     CargoDb::delete_by_namespace(pk, state).await?;
     NamespaceDb::del_by_pk(pk, &state.inner.pool).await?;
-    if let Err(err) = state.inner.docker_api.remove_network(pk).await {
-      log::error!("Unable to remove network {} got error: {}", pk, err);
-    }
     Ok(item.into())
   }
 }

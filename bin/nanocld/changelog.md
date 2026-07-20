@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Docker daemon background thread health check to restart nanocld if docker is not reachable.
-- Check docker health check to send correct even to delete old containers when updating a cargo.
+- Health-aware cargo rollouts: wait for replacement containers to become healthy before removing previous instances, and restore the previous instances when a replacement becomes unhealthy.
+- Persist CockroachDB TLS certificate, private-key and CA PEM values instead of filesystem paths; readable legacy path records are migrated at daemon startup.
+- Node placement and resource requirements for cargoes, and commands to start or delete a cargo on a specific node.
+
+### Changed
+
+- Use init containers for VM image handling.
 
 ## [0.17.0] - 2025-09-12
 
@@ -264,4 +270,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Namespace network information
 - Upgrade ncproxy to 0.3
 - Upgrade nproxy to 1.23.4.0
-

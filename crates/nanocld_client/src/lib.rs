@@ -5,6 +5,7 @@ pub(crate) mod exec;
 pub(crate) mod job;
 pub(crate) mod metric;
 pub(crate) mod namespace;
+pub(crate) mod network;
 pub(crate) mod node;
 pub(crate) mod process;
 pub(crate) mod resource;

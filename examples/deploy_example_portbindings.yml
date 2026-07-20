@@ -1,0 +1,23 @@
+ApiVersion: v0.16
+
+Resources:
+- Name: deploy-example.com
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: deploy-example.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Key: deploy-example.global.c
+          Port: 9000
+
+Cargoes:
+- Name: deploy-example
+  Container:
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
+    HostConfig:
+      PortBindings:
+        "9000/tcp":
+          - HostPort: "9000"

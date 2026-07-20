@@ -41,8 +41,8 @@ bin # Binaries (executable)
 │   ├── specs # OpenApi specification
 │   ├── tests # Test configuration
 │   └── src # Rust source code
-├── ndns # Source to build custom dnsmasq container image
-└── nproxy # Source to build custom nginx container image
+├── ndns # Legacy dnsmasq runtime assets kept as source references
+└── nproxy # Legacy nginx runtime assets kept as source references
 crates # Shared Libraries
 ├── nanocl_error # Error utils used in the project
 ├── nanocl_stubs # Shared data structure mostly used as input and output of the DAEMON

@@ -25,12 +25,12 @@ info:
   license:
     name: MIT OR Apache-2.0
     identifier: MIT OR Apache-2.0
-  version: v0.17.0
+  version: v0.18.0
 servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.17.0
+      default: v0.18.0
       description: API version
 paths:
   /_ping:
@@ -848,6 +848,55 @@ paths:
                   $ref: '#/components/schemas/NamespaceInspect'
         '404':
           description: Namespace doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /networks:
+    get:
+      tags:
+      - Networks
+      summary: List persisted node-scoped Docker network snapshots.
+      operationId: list_network
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+        example: '{ "where": { "node_name": { "eq": "node-a" } } }'
+      responses:
+        '200':
+          description: List of networks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/nanocl.Network'
+  /networks/{key}/inspect:
+    get:
+      tags:
+      - Networks
+      summary: Inspect a persisted Docker network by its deterministic key.
+      operationId: inspect_network
+      parameters:
+      - name: key
+        in: path
+        description: Network key in the form node_name.network_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Network details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nanocl.Network'
+        '404':
+          description: Network not found
           content:
             application/json:
               schema:
@@ -5763,30 +5812,22 @@ components:
     NetworkKind:
       oneOf:
       - type: string
-        description: All networks
-        enum:
-        - All
-      - type: string
-        description: Only 127.0.0.1
-        enum:
-        - Local
-      - type: string
-        description: Only public ip addresses
-        enum:
-        - Public
-      - type: string
-        description: Only internal ip addresses
-        enum:
-        - Internal
+        description: A reserved selector, IP address, or user-defined network name
       - type: object
-        description: Specific ip address
+        description: Tagged escape form for a network name which looks like a reserved selector or IP address
+        required:
+        - Named
+        properties:
+          Named:
+            type: string
+      - type: object
+        description: Backwards-compatible tagged IP address form
         required:
         - Other
         properties:
           Other:
             type: string
-            description: Specific ip address
-      description: Network binding kinds
+      description: Network binding selector
     NetworkSettings:
       type: object
       description: NetworkSettings exposes the network settings in the API
@@ -6387,15 +6428,15 @@ components:
       properties:
         Certificate:
           type: string
-          description: Path to the certificate
+          description: Certificate contents when stored in a TLS secret.
         CertificateKey:
           type: string
-          description: Path to the certificate key
+          description: Private-key contents when stored in a TLS secret.
         CertificateClient:
           type:
           - string
           - 'null'
-          description: Path to the certificate client
+          description: Certificate-authority contents when stored in a TLS secret.
         VerifyClient:
           type:
           - boolean
@@ -6405,7 +6446,7 @@ components:
           type:
           - string
           - 'null'
-          description: Path to the dhparam file
+          description: DH parameter contents when stored in a TLS secret.
       additionalProperties: false
     ProxyStreamProtocol:
       type: string
@@ -8016,10 +8057,11 @@ components:
           - string
           - 'null'
           description: 'Container image name to use for vm (default: nanocl-qemu)'
-        RuntimeNetwork:
+        NetworkMode:
           type:
           - string
           - 'null'
+          description: Container network used by the VM runtime.
         HostTun:
           type:
           - boolean
@@ -8312,9 +8354,44 @@ components:
         Spec:
           $ref: '#/components/schemas/VmSpec'
           description: Specification of the vm
+    nanocl.Network:
+      type: object
+      description: A Docker network snapshot stored by Nanocl for one node.
+      required:
+      - Key
+      - CreatedAt
+      - UpdatedAt
+      - Name
+      - NodeName
+      - Data
+      properties:
+        Key:
+          type: string
+          description: Stable key in the form `{node_name}.{network_name}`.
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When this network was first recorded.
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: When the Docker inspection snapshot was last refreshed.
+        Name:
+          type: string
+          description: Docker network name.
+        NodeName:
+          type: string
+          description: Node whose Docker daemon owns this network.
+        Data:
+          $ref: '#/components/schemas/Network'
+          description: Complete Docker network inspection response.
+        Metadata:
+          description: User-defined metadata retained across snapshot refreshes.
 tags:
 - name: Namespaces
   description: Namespaces management endpoints.
+- name: Networks
+  description: Node-scoped Docker network inspection endpoints.
 - name: Nodes
   description: Nodes management endpoints.
 - name: Resources

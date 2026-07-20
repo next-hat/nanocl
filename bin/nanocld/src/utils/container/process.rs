@@ -2,6 +2,7 @@ use bollard_next::container::{
   Config, CreateContainerOptions, InspectContainerOptions,
   RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
 };
+use bollard_next::service::HostConfig;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -52,6 +53,17 @@ pub async fn create(
   state: &SystemState,
 ) -> IoResult<Process> {
   let mut config = item.clone();
+  let host_config = config.host_config.take().unwrap_or_default();
+  let network_mode =
+    super::network::resolve_network_mode(host_config.network_mode.clone());
+  config.host_config = Some(HostConfig {
+    network_mode: Some(network_mode.clone()),
+    ..host_config
+  });
+  // Keep this defensive check at the final local Docker boundary. Workload
+  // paths also preflight their unique networks before parallel/destructive
+  // operations, but every process creation must remain safe on its own.
+  super::network::ensure_network_exists(&network_mode, state).await?;
   let mut labels = item.labels.to_owned().unwrap_or_default();
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
   labels.insert("io.nanocl.kind".to_owned(), kind.to_string());
