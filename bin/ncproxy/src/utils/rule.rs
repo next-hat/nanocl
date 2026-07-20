@@ -48,10 +48,11 @@ async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
 /// name returned by `/info` keeps development and upgraded installations
 /// working when that environment variable is absent.
 async fn get_local_node(client: &NanocldClient) -> IoResult<String> {
-  if let Ok(node) = std::env::var("NANOCL_NODE")
-    && !node.trim().is_empty()
-  {
-    return Ok(node);
+  if let Ok(node) = std::env::var("NANOCL_NODE") {
+    let trimmed_node = node.trim();
+    if !trimmed_node.is_empty() {
+      return Ok(trimmed_node.to_owned());
+    }
   }
   let info = client
     .info()
@@ -149,12 +150,16 @@ fn parse_upstream_target(key: &str) -> IoResult<(String, String, String)> {
 }
 
 fn process_is_running(process: &Process) -> bool {
-  process
-    .data
-    .state
-    .as_ref()
-    .and_then(|state| state.status.as_ref())
-    .is_some_and(|status| status.to_string() == "running")
+  matches!(
+    process
+      .data
+      .state
+      .as_ref()
+      .and_then(|state| state.status.as_ref()),
+    Some(
+      nanocld_client::bollard_next::service::ContainerStateStatusEnum::RUNNING
+    )
+  )
 }
 
 fn process_network_address(process: &Process) -> Option<String> {

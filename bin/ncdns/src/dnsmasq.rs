@@ -313,9 +313,10 @@ impl Dnsmasq {
     }
     for (name, addresses) in &scope.entries {
       if name.is_empty()
-        || name
-          .chars()
-          .any(|character| matches!(character, '\n' | '\r' | '/' | '='))
+        || name.chars().any(|character| {
+          character.is_whitespace()
+            || matches!(character, '\n' | '\r' | '/' | '=')
+        })
       {
         return Err(IoError::invalid_data(
           "dnsmasq entry",
