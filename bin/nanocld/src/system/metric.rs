@@ -57,8 +57,10 @@ async fn save_metric(
 pub fn spawn(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
-    let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");
     rt::spawn(async move {
+      let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock")
+        .await
+        .expect("Unable to connect to the metrics server");
       loop {
         log::info!("metrics::spawn_logger: subscribing");
         match client.subscribe().await {

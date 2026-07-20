@@ -1,4 +1,4 @@
-use std::{net::ToSocketAddrs, time::Duration};
+use std::{fs, net::ToSocketAddrs, path::Path, time::Duration};
 
 use diesel::{
   PgConnection,
@@ -11,13 +11,76 @@ use ntex::{rt, time, web};
 
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
-  config::DaemonConfig, proxy::ProxySslConfig, secret::SecretPartial,
+  config::DaemonConfig,
+  proxy::ProxySslConfig,
+  secret::{SecretPartial, SecretUpdate},
 };
 
 use crate::{
   models::{DBConn, Pool, SecretDb},
   repositories::generic::*,
 };
+
+const DB_CERT_SECRET_NAME: &str = "cert.db.nanocl.io";
+
+/// Read a legacy certificate path once, otherwise retain its PEM value.
+///
+/// The store URL still needs paths while creating the initial database
+/// connection. The persisted TLS secret must not retain those paths.
+fn load_certificate_value(
+  value: &str,
+  field: &str,
+) -> IoResult<(String, bool)> {
+  let path = Path::new(value);
+  if !path.is_file() {
+    return Ok((value.to_owned(), false));
+  }
+  let value = fs::read_to_string(path).map_err(|err| {
+    IoError::interrupted(
+      "Database certificate",
+      &format!("Unable to read {field} from {}: {err}", path.display()),
+    )
+  })?;
+  Ok((value, true))
+}
+
+fn load_db_tls_config(
+  config: ProxySslConfig,
+) -> IoResult<(ProxySslConfig, bool)> {
+  let (certificate, certificate_changed) =
+    load_certificate_value(&config.certificate, "certificate")?;
+  let (certificate_key, certificate_key_changed) =
+    load_certificate_value(&config.certificate_key, "private key")?;
+  let (certificate_client, certificate_client_changed) =
+    match config.certificate_client {
+      Some(certificate_client) => {
+        let (value, changed) =
+          load_certificate_value(&certificate_client, "certificate authority")?;
+        (Some(value), changed)
+      }
+      None => (None, false),
+    };
+  let (dhparam, dhparam_changed) = match config.dhparam {
+    Some(dhparam) => {
+      let (value, changed) = load_certificate_value(&dhparam, "DH parameters")?;
+      (Some(value), changed)
+    }
+    None => (None, false),
+  };
+  Ok((
+    ProxySslConfig {
+      certificate,
+      certificate_key,
+      certificate_client,
+      verify_client: config.verify_client,
+      dhparam,
+    },
+    certificate_changed
+      || certificate_key_changed
+      || certificate_client_changed
+      || dhparam_changed,
+  ))
+}
 
 /// Create a pool connection to the store `cockroachdb`
 pub async fn create_pool(store_addr: &str) -> IoResult<Pool> {
@@ -91,10 +154,20 @@ async fn wait(store_addr: &str) -> IoResult<()> {
 }
 
 async fn save_db_cert(store_addr: &str, pool: &Pool) -> IoResult<()> {
-  if SecretDb::read_by_pk("cert.db.nanocl.io", pool)
-    .await
-    .is_ok()
-  {
+  if let Ok(existing) = SecretDb::read_by_pk(DB_CERT_SECRET_NAME, pool).await {
+    let config = serde_json::from_value::<ProxySslConfig>(existing.data)?;
+    let (config, changed) = load_db_tls_config(config)?;
+    if changed {
+      SecretDb::update_pk(
+        DB_CERT_SECRET_NAME,
+        &SecretUpdate {
+          data: serde_json::to_value(config)?,
+          metadata: None,
+        },
+        pool,
+      )
+      .await?;
+    }
     return Ok(());
   }
   let url = url::Url::parse(store_addr).map_err(|err| {
@@ -103,7 +176,9 @@ async fn save_db_cert(store_addr: &str, pool: &Pool) -> IoResult<()> {
       &format!("invalid address format {err}"),
     )
   })?;
-  // extract sslcert sslkey sslrootcert from query params
+  // Extract sslcert, sslkey and sslrootcert from query parameters. These
+  // paths are only used to establish this first connection; their PEM values
+  // are what is persisted in CockroachDB.
   let mut query_pairs = url.query_pairs();
   let sslcert = query_pairs.find(|(k, _)| k == "sslcert").map(|(_, v)| v);
   let sslkey = query_pairs.find(|(k, _)| k == "sslkey").map(|(_, v)| v);
@@ -112,16 +187,21 @@ async fn save_db_cert(store_addr: &str, pool: &Pool) -> IoResult<()> {
     .map(|(_, v)| v);
   match (sslcert, sslkey, sslrootcert) {
     (Some(sslcert), Some(sslkey), Some(sslrootcert)) => {
+      let (certificate, _) = load_certificate_value(&sslcert, "certificate")?;
+      let (certificate_key, _) =
+        load_certificate_value(&sslkey, "private key")?;
+      let (certificate_client, _) =
+        load_certificate_value(&sslrootcert, "certificate authority")?;
       SecretDb::create_from(
         &SecretPartial {
-          name: "cert.db.nanocl.io".to_owned(),
+          name: DB_CERT_SECRET_NAME.to_owned(),
           kind: "nanocl.io/tls".to_owned(),
           immutable: false,
           metadata: None,
           data: serde_json::to_value(ProxySslConfig {
-            certificate: sslcert.to_string(),
-            certificate_key: sslkey.to_string(),
-            certificate_client: Some(sslrootcert.to_string()),
+            certificate,
+            certificate_key,
+            certificate_client: Some(certificate_client),
             verify_client: None,
             dhparam: None,
           })?,

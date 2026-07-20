@@ -62,6 +62,20 @@ pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
   })
 }
 
+fn network_modes(cargo: &Cargo) -> Vec<String> {
+  let mut modes = vec![super::network::container_network_mode(
+    &cargo.spec.container,
+  )];
+  if let Some(init_container) = &cargo.spec.init_container {
+    modes.push(super::network::container_network_mode(init_container));
+  }
+  modes
+}
+
+async fn ensure_networks(cargo: &Cargo, state: &SystemState) -> IoResult<()> {
+  super::network::ensure_networks(network_modes(cargo), state).await
+}
+
 async fn rename_instances_back(
   processes: &[Process],
   state: &SystemState,
@@ -117,9 +131,9 @@ async fn create_init_container(
   binds.push(format!("{}:/opt/nanocl.io/secrets", secret_dir));
   init_container.host_config = Some(HostConfig {
     binds: Some(binds),
-    network_mode: Some(
-      host_config.network_mode.unwrap_or("nanoclbr0".to_owned()),
-    ),
+    network_mode: Some(super::network::resolve_network_mode(
+      host_config.network_mode,
+    )),
     ..host_config
   });
   super::image::download(
@@ -209,6 +223,8 @@ pub async fn create(
   number: usize,
   state: &SystemState,
 ) -> IoResult<Vec<Process>> {
+  // Resolve the network once before spawning replica creation futures.
+  ensure_networks(cargo, state).await?;
   let data = serde_json::to_string(&cargo)?;
   let new_data = super::generic::inject_data(&data, state).await?;
   let cargo = &serde_json::from_str::<Cargo>(&new_data)?;
@@ -289,7 +305,9 @@ pub async fn create(
           env: Some(env),
           host_config: Some(HostConfig {
             restart_policy,
-            network_mode: Some("nanoclbr0".to_owned()),
+            network_mode: Some(super::network::resolve_network_mode(
+              host_config.network_mode.clone(),
+            )),
             binds: Some(binds),
             ..host_config
           }),
@@ -320,6 +338,8 @@ pub async fn start(
   replicas: usize,
   state: &SystemState,
 ) -> IoResult<()> {
+  // Ensure both init and runtime networks before creating either container.
+  ensure_networks(cargo, state).await?;
   let filter = GenericFilter::new().r#where(
     "data",
     GenericClause::Contains(serde_json::json!({
@@ -414,6 +434,8 @@ pub async fn start(
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let cargo = CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  // Network failures must happen before old instances are renamed or stopped.
+  ensure_networks(&cargo, state).await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   let old_processes = processes
@@ -470,6 +492,28 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     .await
     .into_iter()
     .collect::<IoResult<Vec<_>>>()?;
+
+  // check if any instance have port bindings
+  let as_port_binding = old_processes.iter().any(|process| {
+    process
+      .data
+      .host_config
+      .as_ref()
+      .and_then(|host_config| host_config.port_bindings.as_ref())
+      .and_then(|port_bindings| {
+        port_bindings.iter().find(|(_, bindings)| {
+          bindings.iter().any(|binding| !binding.is_empty())
+        })
+      })
+      .is_some()
+  });
+  // Stop old instances if they have port bindings to avoid conflicts with the new instances
+  // To avoid this and have true zero downtime, use a proxy rule instead of port bindings
+  if as_port_binding {
+    log::debug!("cargo {key} has port bindings stopping it before update");
+    super::process::stop_instances(key, &ProcessKind::Cargo, state).await?;
+  }
+
   // Create instance with the new spec
   if let Some(init_container) = &cargo.spec.init_container {
     let process = create_init_container(&cargo, init_container, state).await?;
@@ -604,4 +648,31 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
     .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
     .await;
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn container_on(network: &str) -> Config {
+    Config {
+      host_config: Some(HostConfig {
+        network_mode: Some(network.to_owned()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn network_preflight_includes_cargo_and_init_container_modes() {
+    let mut cargo = Cargo::default();
+    cargo.spec.container = container_on("private-api");
+    cargo.spec.init_container = Some(container_on("private-init"));
+
+    assert_eq!(
+      network_modes(&cargo),
+      vec!["private-api".to_owned(), "private-init".to_owned()]
+    );
+  }
 }

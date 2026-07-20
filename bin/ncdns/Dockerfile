@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-FROM --platform=$BUILDPLATFORM rust:1.92.0-alpine3.23 as planner
+FROM --platform=$BUILDPLATFORM rust:1.96.0-alpine3.23 AS planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -15,10 +15,9 @@ COPY ./bin/ncvpnkit/Cargo.toml ./bin/ncvpnkit/Cargo.toml
 COPY ./bin/ncdns/Cargo.toml ./bin/ncdns/Cargo.toml
 
 # stage 2 - Build our project
-FROM --platform=$BUILDPLATFORM rust:1.92.0-alpine3.23 as builder
+FROM --platform=$BUILDPLATFORM rust:1.96.0-alpine3.23 AS builder
 
 ARG channel=stable
-## Build our nanocl daemon binary
 COPY --from=planner /app /app
 WORKDIR /app
 RUN export ARCH=$(uname -m) && \
@@ -49,12 +48,20 @@ RUN export ARCH=$(uname -m) && \
 RUN export ARCH=$(uname -m) && \
   cp /app/target/$ARCH-unknown-linux-musl/release/ncdns /bin/ncdns
 
-# stage 4 - create runtime image
-FROM --platform=$BUILDPLATFORM scratch
+# stage 3 - create runtime image
+FROM --platform=$BUILDPLATFORM alpine:3.22.1
+
+RUN apk --update add ca-certificates dnsmasq && \
+  rm -rf /var/cache/apk/* && \
+  rm -rf /tmp/* && \
+  rm -rf /var/log/* && \
+  rm -rf /var/tmp/*
 
 LABEL org.opencontainers.image.source=https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description="Nanocl Controller Dns"
 
 COPY --from=builder /bin/ncdns /bin/ncdns
+
+USER root
 
 ENTRYPOINT ["ncdns"]

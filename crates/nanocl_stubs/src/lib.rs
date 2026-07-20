@@ -8,6 +8,7 @@ pub mod dns;
 pub mod job;
 pub mod metric;
 pub mod namespace;
+pub mod network;
 pub mod node;
 pub mod process;
 pub mod proxy;

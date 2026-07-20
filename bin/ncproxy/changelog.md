@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default server with reuseport to avoid binding problem
 - More header in logs to support cloudflare real ip
+- Integrated Nginx data plane and health endpoint; proxy rules no longer require updates through a separate `nproxy` container.
 
 ### Changed
 
 - Drop old ssl version support
+- Improve the default global Nginx configuration and HTTP 502 page.
 
 
 ## [0.14.0] - 2025-09-12
@@ -204,4 +206,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Event Watching from nanocl daemon
 - Proxy Rule accept namespace as network
-

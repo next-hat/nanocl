@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default html page with 502
 
+### Removed
+
+- The standalone proxy data plane is superseded by the Nginx integration in `ncproxy`.
+
 ## [1.28.0-n0.14.0] - 2025-09-11
 
 ### Core

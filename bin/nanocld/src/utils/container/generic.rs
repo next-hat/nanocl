@@ -159,6 +159,14 @@ pub async fn inject_data(
   payload: &str,
   state: &SystemState,
 ) -> IoResult<String> {
+  if !payload.contains("$$INTERNAL_GATEWAY") {
+    return Ok(payload.to_owned());
+  }
+  // The token explicitly refers to Nanocl's internal gateway. Ensure it is
+  // available before inspecting it, even when the workload itself uses a
+  // different network.
+  super::network::ensure_network_exists(super::network::DEFAULT_NETWORK, state)
+    .await?;
   let network_gateway = state
     .inner
     .docker_api
