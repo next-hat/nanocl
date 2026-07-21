@@ -289,10 +289,12 @@ pub async fn create(
             maximum_retry_count: None,
           }));
         let env = create_cargo_env(cargo, env_secrets, current, state);
-        let hostname = match &cargo.spec.container.hostname {
-          None => None,
-          Some(hostname) => Some(format!("{}{}", ordinal_index, hostname)),
-        };
+        let hostname = cargo
+          .spec
+          .container
+          .hostname
+          .as_ref()
+          .map(|hostname| format!("{}{}", ordinal_index, hostname));
         // mount the secret directory to the container
         let mut binds = host_config.binds.clone().unwrap_or_default();
         binds.push(format!("{}:/opt/nanocl.io/secrets", secret_dir));
@@ -300,7 +302,7 @@ pub async fn create(
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
-          hostname: hostname,
+          hostname,
           labels: Some(labels),
           env: Some(env),
           host_config: Some(HostConfig {
