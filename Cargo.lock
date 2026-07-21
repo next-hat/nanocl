@@ -1628,9 +1628,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.47.0"
+version = "0.48.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "281c43ff06dcb331e9356d30e38853d559ce3d0a3f693e0b0e102667dec14fb1"
+checksum = "39d785c0683d1027839f1ac6a43b6d07c63d58ecd363d8146dda4531d53465a1"
 dependencies = [
  "ahash",
  "bytecount",
@@ -1649,15 +1649,16 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "strum",
  "unicode-general-category",
  "uuid-simd",
 ]
 
 [[package]]
 name = "jsonschema-regex"
-version = "0.47.0"
+version = "0.48.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee0b351864e7ffbc5db9273daf7fa1b4d5177b0946713d667ca571b83c0b4045"
+checksum = "917b3be16b2662538aafb55201790561e1f1ad1a0454baf42f33bd9de343778b"
 dependencies = [
  "regex-syntax",
 ]
@@ -3212,9 +3213,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.47.0"
+version = "0.48.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "348e860aeb0b7bd035778fd11dd9cd5290d32e4aed3b8f2274a00287a9fd362b"
+checksum = "2d2b21a85c07fcf1cb95ff7ab8a687fcd37fa70db59975b5a032abdaadfdf42e"
 dependencies = [
  "ahash",
  "fluent-uri",
@@ -3712,6 +3713,27 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "swap-buffer-queue"
