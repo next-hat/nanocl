@@ -19,6 +19,7 @@ use crate::{
 
 fn network_modes(job: &Job) -> Vec<String> {
   job
+    .spec
     .containers
     .iter()
     .map(super::network::container_network_mode)
@@ -39,14 +40,14 @@ async fn create_instance(
 ) -> IoResult<Process> {
   let mut container = container.clone();
   let mut labels = container.labels.unwrap_or_default();
-  labels.insert("io.nanocl.j".to_owned(), job.name.to_owned());
+  labels.insert("io.nanocl.j".to_owned(), job.spec.name.to_owned());
   container.labels = Some(labels);
   let env_secrets =
-    utils::secret::load_env_secrets(&job.secrets, state).await?;
+    utils::secret::load_env_secrets(&job.spec.secrets, state).await?;
   let secret_dir = utils::secret::create_tls_secrets(
-    &job.name,
+    &job.spec.name,
     &ProcessKind::Job,
-    &job.secrets,
+    &job.spec.secrets,
     state,
   )
   .await?;
@@ -69,11 +70,11 @@ async fn create_instance(
     ..host_config
   });
   let short_id = utils::key::generate_short_id(6);
-  let container_name = format!("{}-{index}-{short_id}.j", job.name);
+  let container_name = format!("{}-{index}-{short_id}.j", job.spec.name);
   super::process::create(
     &ProcessKind::Job,
     &container_name,
-    &job.name,
+    &job.spec.name,
     &container,
     state,
   )
@@ -89,11 +90,11 @@ pub async fn create_instances(
   // Validate every unique network before creating the first job container.
   ensure_networks(job, state).await?;
   let mut processes = Vec::new();
-  for (index, container) in job.containers.iter().enumerate() {
+  for (index, container) in job.spec.containers.iter().enumerate() {
     super::image::download(
       &container.image.clone().unwrap_or_default(),
-      job.image_pull_secret.clone(),
-      job.image_pull_policy.clone().unwrap_or_default(),
+      job.spec.image_pull_secret.clone(),
+      job.spec.image_pull_policy.clone().unwrap_or_default(),
       job,
       state,
     )
@@ -110,7 +111,8 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let job = JobDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   ensure_networks(&job, state).await?;
   let mut processes =
-    ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&job.spec.name, None, &state.inner.pool)
+      .await?;
   if processes.is_empty() {
     processes = create_instances(&job, state).await?;
   }
@@ -161,9 +163,9 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
     state,
   )
   .await?;
-  log::debug!("JobDb::delete_by_pk({:?})", &job.name);
-  JobDb::clear_by_pk(&job.name, &state.inner.pool).await?;
-  if job.schedule.is_some() {
+  log::debug!("JobDb::delete_by_pk({:?})", &job.spec.name);
+  JobDb::clear_by_pk(&job.spec.name, &state.inner.pool).await?;
+  if job.spec.schedule.is_some() {
     utils::cron::remove_cron_rule(&job, state).await?;
   }
   state
@@ -189,7 +191,13 @@ mod tests {
   #[test]
   fn network_preflight_includes_every_job_container_mode() {
     let job = Job {
-      containers: vec![container_on("private-api"), container_on("private-db")],
+      spec: nanocl_stubs::job::JobSpec {
+        containers: vec![
+          container_on("private-api"),
+          container_on("private-db"),
+        ],
+        ..Default::default()
+      },
       ..Default::default()
     };
 

@@ -137,11 +137,17 @@ mod tests {
       })
       .await
       .unwrap();
-    assert_eq!(job.name, "my_test_job");
-    let mut stream = client.wait_process("job", &job.name, None).await.unwrap();
-    client.start_process("job", &job.name, None).await.unwrap();
+    assert_eq!(job.spec.name, "my_test_job");
+    let mut stream = client
+      .wait_process("job", &job.spec.name, None)
+      .await
+      .unwrap();
+    client
+      .start_process("job", &job.spec.name, None)
+      .await
+      .unwrap();
     while let Some(Ok(_)) = stream.next().await {}
-    let job = client.inspect_job(&job.name).await.unwrap();
+    let job = client.inspect_job(&job.spec.name).await.unwrap();
     client.delete_job(&job.spec.name).await.unwrap();
   }
 }
