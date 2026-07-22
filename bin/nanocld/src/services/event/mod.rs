@@ -108,5 +108,6 @@ mod tests {
     let _ = client
       .send_delete(&format!("/cargoes/{CARGO_NAME}"), None::<String>)
       .await;
+    system.state.wait_event_loop().await;
   }
 }
