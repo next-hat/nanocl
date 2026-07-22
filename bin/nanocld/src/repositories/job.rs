@@ -11,7 +11,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobPartial, JobSummary},
+  job::{Job, JobPartial, JobSpec, JobSummary},
 };
 
 use crate::{
@@ -133,17 +133,19 @@ impl JobDb {
   pub fn try_to_spec(&self, status: &ObjPsStatusDb) -> IoResult<Job> {
     let p = serde_json::from_value::<JobPartial>(self.data.clone())?;
     Ok(Job {
-      name: self.key.clone(),
       created_at: self.created_at,
       updated_at: self.updated_at,
-      metadata: self.metadata.clone(),
-      secrets: p.secrets.clone(),
-      schedule: p.schedule.clone(),
-      ttl: p.ttl,
       status: status.clone().try_into()?,
-      containers: p.containers.clone(),
-      image_pull_secret: p.image_pull_secret.clone(),
-      image_pull_policy: p.image_pull_policy.clone(),
+      spec: JobSpec {
+        name: self.key.clone(),
+        metadata: self.metadata.clone(),
+        secrets: p.secrets.clone(),
+        schedule: p.schedule.clone(),
+        ttl: p.ttl,
+        containers: p.containers.clone(),
+        image_pull_secret: p.image_pull_secret.clone(),
+        image_pull_policy: p.image_pull_policy.clone(),
+      },
     })
   }
 
@@ -157,7 +159,7 @@ impl JobDb {
       .iter()
       .map(|job| async {
         let instances =
-          ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool)
+          ProcessDb::read_by_kind_key(&job.spec.name, None, &state.inner.pool)
             .await?;
         let (
           instance_total,
@@ -166,11 +168,14 @@ impl JobDb {
           instance_running,
         ) = utils::container::generic::count_status(&instances);
         Ok::<_, HttpError>(JobSummary {
+          created_at: job.created_at,
+          updated_at: job.updated_at,
+          status: job.status.clone(),
           instance_total,
           instance_success,
           instance_running,
           instance_failed,
-          spec: job.clone(),
+          spec: job.spec.clone(),
         })
       })
       .collect::<FuturesOrdered<_>>()

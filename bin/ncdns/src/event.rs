@@ -67,10 +67,6 @@ fn dns_rule_actor_key(
   actor.key.clone()
 }
 
-fn dns_rule_event_key(event: &Event) -> Option<String> {
-  dns_rule_actor_key(&event.kind, &event.action, event.actor.as_ref())
-}
-
 async fn reconcile(
   acknowledged_key: Option<&str>,
   client: &NanocldClient,
@@ -97,16 +93,8 @@ async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
       }
       Ok(mut stream) => {
         log::info!("event::loop: subscribed to nanocld events");
-        reconcile(None, client, dnsmasq).await;
         while let Some(event) = stream.next().await {
-          match event {
-            Err(err) => log::warn!("event::loop: {err}"),
-            Ok(event) => {
-              if let Some(key) = dns_rule_event_key(&event) {
-                reconcile(Some(&key), client, dnsmasq).await;
-              }
-            }
-          }
+          // Should only update if containers or VMs are being updated.
         }
       }
     }
@@ -128,13 +116,7 @@ pub(crate) fn spawn(client: &NanocldClient, dnsmasq: &Dnsmasq) {
   let dnsmasq = dnsmasq.clone();
   rt::Arbiter::new().handle().spawn(async move {
     rt::spawn(async move {
-      let periodic_client = client.clone();
-      let periodic_dnsmasq = dnsmasq.clone();
-      futures::future::join(
-        watch_loop(&client, &dnsmasq),
-        periodic_loop(&periodic_client, &periodic_dnsmasq),
-      )
-      .await;
+      watch_loop(&client, &dnsmasq).await;
       rt::Arbiter::current().stop();
     });
   });
