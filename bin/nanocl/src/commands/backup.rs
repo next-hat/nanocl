@@ -13,8 +13,7 @@ const NANOCL_SECRET_MOUNT: &str = "/opt/nanocl.io/secrets";
 
 /// Check if a bind mount is the nanocld auto-mounted secret folder.
 fn is_secret_bind(bind: &str) -> bool {
-  let parts: Vec<&str> = bind.split(':').collect();
-  parts.len() >= 2 && parts[1] == NANOCL_SECRET_MOUNT
+  bind.split(':').nth(1) == Some(NANOCL_SECRET_MOUNT)
 }
 
 /// Remove nanocld auto-mounted secret binds from a container config.
