@@ -9,12 +9,12 @@ use nanocld_client::stubs::{
 use crate::{config::CliConfig, models::BackupOpts, utils};
 
 /// Path inside containers where nanocld automatically mounts TLS secrets.
-const NANOCLO_SECRET_MOUNT: &str = "/opt/nanocl.io/secrets";
+const NANOCL_SECRET_MOUNT: &str = "/opt/nanocl.io/secrets";
 
 /// Check if a bind mount is the nanocld auto-mounted secret folder.
 fn is_secret_bind(bind: &str) -> bool {
   let parts: Vec<&str> = bind.split(':').collect();
-  parts.len() >= 2 && parts[1] == NANOCLO_SECRET_MOUNT
+  parts.len() >= 2 && parts[1] == NANOCL_SECRET_MOUNT
 }
 
 /// Remove nanocld auto-mounted secret binds from a container config.
