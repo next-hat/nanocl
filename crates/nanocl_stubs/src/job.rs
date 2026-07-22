@@ -64,37 +64,16 @@ pub struct JobPartial {
   pub containers: Vec<Config>,
 }
 
-/// Convert a job into a job partial
-impl From<Job> for JobPartial {
-  fn from(job: Job) -> Self {
-    JobPartial {
-      name: job.name,
-      secrets: job.secrets,
-      metadata: job.metadata,
-      schedule: job.schedule,
-      ttl: job.ttl,
-      containers: job.containers,
-      image_pull_secret: job.image_pull_secret,
-      image_pull_policy: job.image_pull_policy,
-    }
-  }
-}
-
-/// A job is a collection of containers to run in sequence as a single unit to act like a command
+/// A job specification is a collection of containers to run in sequence as a
+/// single unit to act like a command.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct Job {
+pub struct JobSpec {
   /// Name of the job
   pub name: String,
-  /// When the job have been created
-  pub created_at: chrono::NaiveDateTime,
-  /// When the job have been updated
-  pub updated_at: chrono::NaiveDateTime,
-  /// Status of the job
-  pub status: ObjPsStatus,
   /// Secrets to load as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -136,15 +115,69 @@ pub struct Job {
   pub containers: Vec<Config>,
 }
 
+impl From<JobSpec> for JobPartial {
+  fn from(spec: JobSpec) -> Self {
+    Self {
+      name: spec.name,
+      secrets: spec.secrets,
+      metadata: spec.metadata,
+      schedule: spec.schedule,
+      ttl: spec.ttl,
+      containers: spec.containers,
+      image_pull_secret: spec.image_pull_secret,
+      image_pull_policy: spec.image_pull_policy,
+    }
+  }
+}
+
+impl From<JobPartial> for JobSpec {
+  fn from(spec: JobPartial) -> Self {
+    Self {
+      name: spec.name,
+      secrets: spec.secrets,
+      metadata: spec.metadata,
+      schedule: spec.schedule,
+      ttl: spec.ttl,
+      containers: spec.containers,
+      image_pull_secret: spec.image_pull_secret,
+      image_pull_policy: spec.image_pull_policy,
+    }
+  }
+}
+
+/// A job and its current runtime state.
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct Job {
+  /// When the job was created
+  pub created_at: chrono::NaiveDateTime,
+  /// When the job was updated
+  pub updated_at: chrono::NaiveDateTime,
+  /// Status of the job
+  pub status: ObjPsStatus,
+  /// Specification of the job
+  pub spec: JobSpec,
+}
+
+/// Convert a job into a job partial.
+impl From<Job> for JobPartial {
+  fn from(job: Job) -> Self {
+    job.spec.into()
+  }
+}
+
 /// Convert a Job into an EventActor
 impl From<Job> for EventActor {
   fn from(job: Job) -> Self {
     Self {
-      key: Some(job.name.clone()),
+      key: Some(job.spec.name.clone()),
       kind: EventActorKind::Job,
       attributes: Some(serde_json::json!({
-        "Name": job.name,
-        "Metadata": job.metadata,
+        "Name": job.spec.name,
+        "Metadata": job.spec.metadata,
       })),
     }
   }
@@ -157,6 +190,12 @@ impl From<Job> for EventActor {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobSummary {
+  /// When the job was created
+  pub created_at: chrono::NaiveDateTime,
+  /// When the job was updated
+  pub updated_at: chrono::NaiveDateTime,
+  /// Status of the job
+  pub status: ObjPsStatus,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded
@@ -166,7 +205,7 @@ pub struct JobSummary {
   /// Number of instance failed
   pub instance_failed: usize,
   /// Specification of the job
-  pub spec: Job,
+  pub spec: JobSpec,
 }
 
 /// Detailed information about a job
@@ -177,6 +216,12 @@ pub struct JobSummary {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobInspect {
+  /// When the job was created
+  pub created_at: chrono::NaiveDateTime,
+  /// When the job was updated
+  pub updated_at: chrono::NaiveDateTime,
+  /// Status of the job
+  pub status: ObjPsStatus,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded
@@ -186,7 +231,7 @@ pub struct JobInspect {
   /// Number of instance failed
   pub instance_failed: usize,
   /// Specification of the job
-  pub spec: Job,
+  pub spec: JobSpec,
   /// List of instances
   pub instances: Vec<Process>,
 }

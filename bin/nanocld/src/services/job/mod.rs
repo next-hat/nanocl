@@ -69,12 +69,12 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create job");
     let job = res.json::<Job>().await.unwrap();
-    let job_endpoint = format!("{ENDPOINT}/{}", &job.name);
+    let job_endpoint = format!("{ENDPOINT}/{}", &job.spec.name);
     let res = client.get(ENDPOINT).send().await.unwrap();
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
       .send_get(
-        &format!("/processes/job/{}/wait", &job.name),
+        &format!("/processes/job/{}/wait", &job.spec.name),
         Some(&serde_json::json!({
           "condition": "yoloh"
         })),
@@ -87,7 +87,7 @@ mod tests {
     );
     client
       .send_post(
-        &format!("/processes/job/{}/start", &job.name),
+        &format!("/processes/job/{}/start", &job.spec.name),
         None::<String>,
         None::<String>,
       )
@@ -98,7 +98,7 @@ mod tests {
     test_status_code!(
       res.status(),
       http::StatusCode::OK,
-      format!("inspect job {}", &job.name)
+      format!("inspect job {}", &job.spec.name)
     );
     let _ = client.send_delete(&job_endpoint, None::<String>).await;
     ntex::time::sleep(std::time::Duration::from_secs(1)).await;
