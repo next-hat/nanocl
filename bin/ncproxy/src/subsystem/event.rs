@@ -238,26 +238,27 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventActorKind::Resource, NativeEventAction::Create)
-    | (EventActorKind::Resource, NativeEventAction::Update) => {
-      if !is_proxy_resource(&actor) {
-        return Ok(());
-      }
-      let name = proxy_resource_name(&actor)?;
-      let rule = proxy_resource_rule(&actor)?;
-      utils::nginx::add_rule(name, &rule, state).await?;
-      state.event_emitter.emit_reload().await;
-      Ok(())
-    }
-    (EventActorKind::Resource, NativeEventAction::Destroy) => {
-      if !is_proxy_resource(&actor) {
-        return Ok(());
-      }
-      let name = proxy_resource_name(&actor)?;
-      utils::nginx::del_rule(name, state).await?;
-      state.event_emitter.emit_reload().await;
-      Ok(())
-    }
+    // This shouldn't be required as nanocld call the endpoint.
+    // (EventActorKind::Resource, NativeEventAction::Create)
+    // | (EventActorKind::Resource, NativeEventAction::Update) => {
+    //   if !is_proxy_resource(&actor) {
+    //     return Ok(());
+    //   }
+    //   let name = proxy_resource_name(&actor)?;
+    //   let rule = proxy_resource_rule(&actor)?;
+    //   utils::nginx::add_rule(name, &rule, state).await?;
+    //   state.event_emitter.emit_reload().await;
+    //   Ok(())
+    // }
+    // (EventActorKind::Resource, NativeEventAction::Destroy) => {
+    //   if !is_proxy_resource(&actor) {
+    //     return Ok(());
+    //   }
+    //   let name = proxy_resource_name(&actor)?;
+    //   utils::nginx::del_rule(name, state).await?;
+    //   state.event_emitter.emit_reload().await;
+    //   Ok(())
+    // }
     (EventActorKind::Secret, NativeEventAction::Create)
     | (EventActorKind::Secret, NativeEventAction::Update) => {
       let resources = utils::resource::list_by_secret(
@@ -350,13 +351,13 @@ pub(crate) fn spawn(state: &SystemStateRef) {
       rt::Arbiter::current().stop();
     });
   });
-  let reconcile_state = Arc::clone(state);
-  rt::Arbiter::new().handle().spawn(async move {
-    rt::spawn(async move {
-      reconcile_loop(&reconcile_state).await;
-      rt::Arbiter::current().stop();
-    });
-  });
+  // let reconcile_state = Arc::clone(state);
+  // rt::Arbiter::new().handle().spawn(async move {
+  //   rt::spawn(async move {
+  //     reconcile_loop(&reconcile_state).await;
+  //     rt::Arbiter::current().stop();
+  //   });
+  // });
 }
 
 #[cfg(test)]
