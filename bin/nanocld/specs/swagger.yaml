@@ -4686,72 +4686,34 @@ components:
             type: string
     Job:
       type: object
-      description: A job is a collection of containers to run in sequence as a single unit to act like a command
+      description: A job and its current runtime state.
       required:
-      - Name
       - CreatedAt
       - UpdatedAt
       - Status
-      - Containers
+      - Spec
       properties:
-        Name:
-          type: string
-          description: Name of the job
         CreatedAt:
           type: string
           format: date-time
-          description: When the job have been created
+          description: When the job was created
         UpdatedAt:
           type: string
           format: date-time
-          description: When the job have been updated
+          description: When the job was updated
         Status:
           $ref: '#/components/schemas/ObjPsStatus'
           description: Status of the job
-        Secrets:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: Secrets to load as environment variables
-        Metadata:
-          type: object
-          description: Metadata (user defined)
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-          propertyNames:
-            type: string
-        Schedule:
-          type:
-          - string
-          - 'null'
-          description: Schedule of the job (cron)
-        Ttl:
-          type:
-          - integer
-          - 'null'
-          description: Remove the job after (x) seconds after execution
-          minimum: 0
-        ImagePullSecret:
-          type:
-          - string
-          - 'null'
-          description: Secret to use when pulling the image
-        ImagePullPolicy:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ImagePullPolicy'
-            description: Image pull policy
-        Containers:
-          type: array
-          items:
-            $ref: '#/components/schemas/Config'
-          description: Containers to run
+        Spec:
+          $ref: '#/components/schemas/JobSpec'
+          description: Specification of the job
     JobInspect:
       type: object
       description: Detailed information about a job
       required:
+      - CreatedAt
+      - UpdatedAt
+      - Status
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
@@ -4759,6 +4721,17 @@ components:
       - Spec
       - Instances
       properties:
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the job was created
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: When the job was updated
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
+          description: Status of the job
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -4776,7 +4749,7 @@ components:
           description: Number of instance failed
           minimum: 0
         Spec:
-          $ref: '#/components/schemas/Job'
+          $ref: '#/components/schemas/JobSpec'
           description: Specification of the job
         Instances:
           type: array
@@ -4833,16 +4806,82 @@ components:
             $ref: '#/components/schemas/Config'
           description: List of container to run
       additionalProperties: false
+    JobSpec:
+      type: object
+      description: |-
+        A job specification is a collection of containers to run in sequence as a
+        single unit to act like a command.
+      required:
+      - Name
+      - Containers
+      properties:
+        Name:
+          type: string
+          description: Name of the job
+        Secrets:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Secrets to load as environment variables
+        Metadata:
+          type: object
+          description: Metadata (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+          propertyNames:
+            type: string
+        Schedule:
+          type:
+          - string
+          - 'null'
+          description: Schedule of the job (cron)
+        Ttl:
+          type:
+          - integer
+          - 'null'
+          description: Remove the job after (x) seconds after execution
+          minimum: 0
+        ImagePullSecret:
+          type:
+          - string
+          - 'null'
+          description: Secret to use when pulling the image
+        ImagePullPolicy:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ImagePullPolicy'
+            description: Image pull policy
+        Containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Config'
+          description: Containers to run
     JobSummary:
       type: object
       description: Summary of a job (used in list)
       required:
+      - CreatedAt
+      - UpdatedAt
+      - Status
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
       - InstanceFailed
       - Spec
       properties:
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the job was created
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: When the job was updated
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
+          description: Status of the job
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -4860,7 +4899,7 @@ components:
           description: Number of instance failed
           minimum: 0
         Spec:
-          $ref: '#/components/schemas/Job'
+          $ref: '#/components/schemas/JobSpec'
           description: Specification of the job
     LimitReq:
       type: object

@@ -242,6 +242,7 @@ impl SystemState {
   /// Wait for the event loop to finish
   pub async fn wait_event_loop(&self) {
     self.inner.event_emitter.clone().flush().await.unwrap();
+    self.inner.arbiter.stop();
     self.inner.arbiter.clone().join().unwrap();
   }
 }

@@ -97,16 +97,16 @@ impl From<JobSummary> for JobRow {
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
     let created_at = tz
-      .timestamp_opt(job.spec.created_at.and_utc().timestamp(), 0)
+      .timestamp_opt(job.created_at.and_utc().timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(job.spec.updated_at.and_utc().timestamp(), 0)
+      .timestamp_opt(job.updated_at.and_utc().timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: job.spec.name,
-      status: format!("{}/{}", job.spec.status.actual, job.spec.status.wanted),
+      status: format!("{}/{}", job.status.actual, job.status.wanted),
       total: job.instance_total,
       running: job.instance_running,
       succeeded: job.instance_success,
