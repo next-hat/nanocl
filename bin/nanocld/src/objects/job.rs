@@ -36,7 +36,7 @@ impl ObjCreate for JobDb {
     let job = JobDb::create_from(db_model, &state.inner.pool)
       .await?
       .try_to_spec(&status)?;
-    if let Some(schedule) = &job.schedule {
+    if let Some(schedule) = &job.spec.schedule {
       utils::cron::add_cron_rule(&job, schedule, state).await?;
     }
     Ok(job)
@@ -83,7 +83,10 @@ impl ObjInspectByPk for JobDb {
     let (instance_total, instance_failed, instance_success, instance_running) =
       utils::container::generic::count_status(&instances);
     let job_inspect = JobInspect {
-      spec: job,
+      created_at: job.created_at,
+      updated_at: job.updated_at,
+      status: job.status,
+      spec: job.spec,
       instance_total,
       instance_success,
       instance_running,

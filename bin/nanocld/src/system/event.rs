@@ -39,12 +39,13 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     _ => {}
   }
   let instances =
-    ProcessDb::read_by_kind_key(&job.name, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&job.spec.name, None, &state.inner.pool)
+      .await?;
   let (_, instance_failed, _, running) =
     utils::container::generic::count_status(&instances);
   log::debug!(
     "event::job_ttl: {} has {running} running instances",
-    job.name
+    job.spec.name
   );
   if running != 0 {
     return Ok(());
@@ -52,7 +53,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   log::debug!("instance_failed: {instance_failed}");
   if instance_failed > 0 {
     ObjPsStatusDb::update_actual_status(
-      &job.name,
+      &job.spec.name,
       &ObjPsStatusKind::Fail,
       &state.inner.pool,
     )
@@ -62,7 +63,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
       .await;
   } else {
     ObjPsStatusDb::update_actual_status(
-      &job.name,
+      &job.spec.name,
       &ObjPsStatusKind::Finish,
       &state.inner.pool,
     )
@@ -71,15 +72,18 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
       .emit_normal_native_action_sync(&job, NativeEventAction::Finish)
       .await;
   }
-  let ttl = match job.ttl {
+  let ttl = match job.spec.ttl {
     None => return Ok(()),
     Some(ttl) => ttl,
   };
   let state = state.clone();
   rt::spawn(async move {
-    log::debug!("event::job_ttl: {} will be deleted in {ttl}s", job.name);
+    log::debug!(
+      "event::job_ttl: {} will be deleted in {ttl}s",
+      job.spec.name
+    );
     ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
-    let _ = JobDb::del_obj_by_pk(&job.name, &(), &state).await;
+    let _ = JobDb::del_obj_by_pk(&job.spec.name, &(), &state).await;
   });
   Ok(())
 }

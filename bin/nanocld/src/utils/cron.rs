@@ -19,7 +19,7 @@ fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
   format!(
     "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start",
     vars::VERSION,
-    &job.name
+    &job.spec.name
   )
 }
 
