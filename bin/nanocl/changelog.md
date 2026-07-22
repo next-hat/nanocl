@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Statefile rendering and argument handling support required, multiple, described and default values.
 
+### Fixed
+
+- `nanocl backup` now strips the nanocld auto-mounted secret bind (`/opt/nanocl.io/secrets`) from cargoes and jobs so backups can be reapplied without manual edits.
+
 ## [0.17.1] - 17-09-2025
 
 ### Fixed

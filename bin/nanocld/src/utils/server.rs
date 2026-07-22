@@ -104,6 +104,7 @@ pub async fn generate(
     );
   }
   server = server.workers(num_cpus::get());
+  server = server.disable_signals();
   log::info!("server::gen: ready");
   Ok(server.run())
 }
