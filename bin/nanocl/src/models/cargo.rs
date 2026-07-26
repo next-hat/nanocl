@@ -5,18 +5,21 @@ use tabled::Tabled;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::stubs::{
-  cargo::CargoSummary,
+  cargo::{CargoKillOptions, CargoSummary},
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate, Config, HostConfig},
 };
 
 use super::{
-  GenericInspectOpts, GenericListOpts, GenericRemoveForceOpts,
-  GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
+  GenericInspectOpts, GenericRemoveForceOpts, GenericRemoveOpts,
+  GenericStartOpts, GenericStopOpts, NamespacedListOpts,
 };
 
 /// `nanocl cargo create` available options
 #[derive(Clone, Parser)]
 pub struct CargoCreateOpts {
+  /// Namespace for the new cargo; defaults to global
+  #[clap(short, long)]
+  pub namespace: Option<String>,
   /// Name of the cargo
   pub name: String,
   /// Image of the cargo
@@ -53,6 +56,9 @@ impl From<CargoCreateOpts> for CargoSpecPartial {
 /// `nanocl cargo run` available options
 #[derive(Clone, Parser)]
 pub struct CargoRunOpts {
+  /// Namespace for the new cargo; defaults to global
+  #[clap(short, long)]
+  pub namespace: Option<String>,
   /// Name of the cargo
   pub name: String,
   /// Image of the cargo
@@ -92,28 +98,18 @@ impl From<CargoRunOpts> for CargoSpecPartial {
   }
 }
 
-/// `nanocl cargo start` available options
-#[derive(Clone, Parser)]
-pub struct CargoStartOpts {
-  // Name of cargo to start
-  pub name: String,
-}
-
 /// `nanocl cargo restart` available options
 #[derive(Clone, Parser)]
 pub struct CargoRestartOpts {
-  // List of cargo to stop
-  pub names: Vec<String>,
+  // Canonical keys of cargoes to restart
+  pub keys: Vec<String>,
 }
 
 /// `nanocl cargo patch` available options
 #[derive(Clone, Parser)]
 pub struct CargoPatchOpts {
-  /// Name of cargo to update
-  pub(crate) name: String,
-  /// New name of cargo
-  #[clap(short = 'n', long = "name")]
-  pub(crate) new_name: Option<String>,
+  /// Canonical key of the cargo to update
+  pub(crate) key: String,
   /// New image of cargo
   #[clap(short, long = "image")]
   pub(crate) image: Option<String>,
@@ -129,7 +125,7 @@ pub struct CargoPatchOpts {
 impl From<CargoPatchOpts> for CargoSpecUpdate {
   fn from(val: CargoPatchOpts) -> Self {
     CargoSpecUpdate {
-      name: val.new_name,
+      name: None,
       container: Some(Config {
         image: val.image,
         env: val.env,
@@ -146,8 +142,8 @@ pub struct CargoExecOpts {
   /// Allocate a pseudo-TTY.
   #[clap(short = 't', long = "tty")]
   pub tty: bool,
-  /// Name of cargo to execute command
-  pub name: String,
+  /// Canonical key of the cargo in which to execute the command
+  pub key: String,
   /// Command to execute
   #[clap(last = true, raw = true)]
   pub command: Vec<String>,
@@ -189,15 +185,15 @@ impl From<CargoExecOpts> for CreateExecOptions {
 /// `nanocl cargo history` available options
 #[derive(Clone, Parser)]
 pub struct CargoHistoryOpts {
-  /// Name of cargo to browse history
-  pub name: String,
+  /// Canonical key of the cargo whose history to browse
+  pub key: String,
 }
 
 /// `nanocl cargo revert` available options
 #[derive(Clone, Parser)]
 pub struct CargoRevertOpts {
-  /// Name of cargo to revert
-  pub name: String,
+  /// Canonical key of the cargo to revert
+  pub key: String,
   /// Revert to a specific historic
   pub history_id: String,
 }
@@ -205,8 +201,8 @@ pub struct CargoRevertOpts {
 /// `nanocl cargo logs` available options
 #[derive(Clone, Parser)]
 pub struct CargoLogsOpts {
-  /// Name of cargo to show logs
-  pub name: String,
+  /// Canonical key of the cargo whose logs to show
+  pub key: String,
   /// Only include logs since unix timestamp
   #[clap(short = 's')]
   pub since: Option<i64>,
@@ -227,8 +223,8 @@ pub struct CargoLogsOpts {
 /// `nanocl cargo stats` available options
 #[derive(Clone, Parser)]
 pub struct CargoStatsOpts {
-  /// Names of cargo to show stats
-  pub names: Vec<String>,
+  /// Canonical keys of cargoes whose stats to show
+  pub keys: Vec<String>,
   /// Disable streaming stats and only pull the first result
   #[clap(long)]
   pub no_stream: bool,
@@ -236,26 +232,44 @@ pub struct CargoStatsOpts {
   // pub all: bool,
 }
 
+/// `nanocl cargo kill` available options
+#[derive(Clone, Parser)]
+pub struct CargoKillOpts {
+  /// Canonical key of the cargo to signal
+  pub key: String,
+  /// Signal to send
+  #[clap(short, long, default_value = "SIGKILL")]
+  pub signal: String,
+}
+
+impl From<CargoKillOpts> for CargoKillOptions {
+  fn from(value: CargoKillOpts) -> Self {
+    Self {
+      signal: value.signal,
+    }
+  }
+}
+
 /// `nanocl cargo` available commands
 #[derive(Clone, Subcommand)]
 pub enum CargoCommand {
   /// List existing cargo
   #[clap(alias("ls"))]
-  List(GenericListOpts),
+  List(NamespacedListOpts),
   /// Create a new cargo
   Create(CargoCreateOpts),
-  /// Start cargoes by names
+  /// Start cargoes by canonical keys
   Start(GenericStartOpts),
-  /// Stop cargoes by names
+  /// Stop cargoes by canonical keys
   Stop(GenericStopOpts),
-  /// Restart a cargo by its name
+  /// Restart cargoes by canonical keys
   Restart(CargoRestartOpts),
-  /// Remove cargo by its name
+  /// Remove cargoes by canonical keys
   #[clap(alias("rm"))]
   Remove(GenericRemoveOpts<GenericRemoveForceOpts>),
-  /// Inspect a cargo by its name
+  /// Inspect a cargo by its canonical key
   Inspect(GenericInspectOpts),
-  /// Update a cargo by its name
+  /// Update a cargo by its canonical key
   Patch(CargoPatchOpts),
   /// Execute a command inside a cargo
   Exec(CargoExecOpts),
@@ -265,6 +279,8 @@ pub enum CargoCommand {
   Revert(CargoRevertOpts),
   /// Show logs
   Logs(CargoLogsOpts),
+  /// Send a signal to a cargo by its canonical key
+  Kill(CargoKillOpts),
   /// Run a cargo
   Run(CargoRunOpts),
   /// Show stats of cargo
@@ -274,9 +290,6 @@ pub enum CargoCommand {
 /// `nanocl cargo` available arguments
 #[derive(Clone, Parser)]
 pub struct CargoArg {
-  /// namespace to target by default global is used
-  #[clap(long, short)]
-  pub namespace: Option<String>,
   #[clap(subcommand)]
   pub command: CargoCommand,
 }
@@ -285,8 +298,8 @@ pub struct CargoArg {
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct CargoRow {
-  /// Name of the cargo
-  pub(crate) name: String,
+  /// Canonical key of the cargo
+  pub(crate) key: String,
   /// Image of the cargo
   pub(crate) image: String,
   /// Status of the cargo
@@ -318,7 +331,7 @@ impl From<CargoSummary> for CargoRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      name: cargo.spec.name,
+      key: cargo.spec.cargo_key,
       image: cargo.spec.container.image.unwrap_or_default(),
       version: cargo.spec.version,
       status: format!(
@@ -329,5 +342,72 @@ impl From<CargoSummary> for CargoRow {
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use clap::Parser;
+
+  use super::*;
+
+  #[test]
+  fn namespace_is_only_available_for_collection_and_creation_commands() {
+    let inspect =
+      CargoArg::try_parse_from(["cargo", "inspect", "same.system"]).unwrap();
+    assert!(matches!(inspect.command, CargoCommand::Inspect(_)));
+    assert!(
+      CargoArg::try_parse_from([
+        "cargo",
+        "--namespace",
+        "system",
+        "inspect",
+        "same.system"
+      ])
+      .is_err()
+    );
+
+    let list =
+      CargoArg::try_parse_from(["cargo", "list", "--namespace", "system"])
+        .unwrap();
+    let CargoCommand::List(list) = list.command else {
+      panic!("expected list command");
+    };
+    assert_eq!(list.namespace.as_deref(), Some("system"));
+
+    let create =
+      CargoArg::try_parse_from(["cargo", "create", "new", "alpine"]).unwrap();
+    let CargoCommand::Create(create) = create.command else {
+      panic!("expected create command");
+    };
+    assert_eq!(create.namespace, None);
+  }
+
+  #[test]
+  fn table_rows_distinguish_duplicate_local_names() {
+    let table = tabled::Table::new([
+      CargoRow {
+        key: "same.global".to_owned(),
+        image: "alpine".to_owned(),
+        status: "running".to_owned(),
+        instances: "1/1".to_owned(),
+        version: "v1".to_owned(),
+        created_at: String::new(),
+        updated_at: String::new(),
+      },
+      CargoRow {
+        key: "same.system".to_owned(),
+        image: "alpine".to_owned(),
+        status: "running".to_owned(),
+        instances: "1/1".to_owned(),
+        version: "v1".to_owned(),
+        created_at: String::new(),
+        updated_at: String::new(),
+      },
+    ])
+    .to_string();
+    assert!(table.contains("KEY"));
+    assert!(table.contains("same.global"));
+    assert!(table.contains("same.system"));
   }
 }

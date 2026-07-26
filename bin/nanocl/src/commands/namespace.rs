@@ -54,14 +54,12 @@ pub async fn exec_namespace(
   let client = &cli_conf.client;
   match &args.command {
     NamespaceCommand::List(opts) => {
-      NamespaceArg::exec_ls(client, args, opts).await
+      NamespaceArg::exec_ls(client, args, opts, None).await
     }
     NamespaceCommand::Create(opts) => exec_namespace_create(client, opts).await,
     NamespaceCommand::Inspect(opts) => {
-      NamespaceArg::exec_inspect(cli_conf, opts, None).await
+      NamespaceArg::exec_inspect(cli_conf, opts).await
     }
-    NamespaceCommand::Remove(opts) => {
-      NamespaceArg::exec_rm(client, opts, None).await
-    }
+    NamespaceCommand::Remove(opts) => NamespaceArg::exec_rm(client, opts).await,
   }
 }

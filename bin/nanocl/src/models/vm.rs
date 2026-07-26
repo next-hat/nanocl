@@ -8,8 +8,8 @@ use nanocld_client::stubs::vm_spec::{
 };
 
 use super::{
-  GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
-  GenericStopOpts,
+  GenericInspectOpts, GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
+  NamespacedListOpts,
 };
 
 /// `nanocl vm` available commands
@@ -21,20 +21,20 @@ pub enum VmCommand {
   Create(VmCreateOpts),
   /// List vms
   #[clap(alias = "ls")]
-  List(GenericListOpts),
-  /// Remove vms
+  List(NamespacedListOpts),
+  /// Remove VMs by canonical keys
   #[clap(alias = "rm")]
   Remove(GenericRemoveOpts),
-  /// Inspect a vm
+  /// Inspect a VM by canonical key
   Inspect(GenericInspectOpts),
-  /// Start a vm
+  /// Start VMs by canonical keys
   Start(GenericStartOpts),
-  /// Stop a vm
+  /// Stop VMs by canonical keys
   Stop(GenericStopOpts),
   /// Attach to a vm
   Attach {
-    /// Name of the vm
-    name: String,
+    /// Canonical key of the VM
+    key: String,
   },
   /// Patch a vm
   Patch(VmPatchOpts),
@@ -43,8 +43,8 @@ pub enum VmCommand {
 /// `nanocl vm patch` available options
 #[derive(Clone, Parser)]
 pub struct VmPatchOpts {
-  /// Name of the vm
-  pub name: String,
+  /// Canonical key of the VM
+  pub key: String,
   /// Default user of the VM
   #[clap(long)]
   pub user: Option<String>,
@@ -75,7 +75,7 @@ pub struct VmPatchOpts {
 impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
     Self {
-      name: Some(val.name),
+      name: None,
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
@@ -95,6 +95,9 @@ impl From<VmPatchOpts> for VmSpecUpdate {
 /// `nanocl vm run` available options
 #[derive(Clone, Parser)]
 pub struct VmRunOpts {
+  /// Namespace for the new VM; defaults to global
+  #[clap(short, long)]
+  pub namespace: Option<String>,
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
@@ -153,6 +156,9 @@ impl From<VmRunOpts> for VmSpecPartial {
 /// `nanocl vm create` available options
 #[derive(Clone, Parser)]
 pub struct VmCreateOpts {
+  /// Namespace for the new VM; defaults to global
+  #[clap(short, long)]
+  pub namespace: Option<String>,
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
@@ -209,8 +215,8 @@ impl From<VmCreateOpts> for VmSpecPartial {
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct VmRow {
-  /// Name of the vm
-  pub(crate) name: String,
+  /// Canonical key of the VM
+  pub(crate) key: String,
   /// Image of the vm
   pub(crate) image: String,
   /// Status of the vm
@@ -243,7 +249,7 @@ impl From<VmSummary> for VmRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      name: vm.spec.name,
+      key: vm.spec.vm_key,
       image: vm.spec.image,
       version: vm.spec.version,
       status: format!("{}/{}", vm.status.actual, vm.status.wanted),
@@ -257,10 +263,67 @@ impl From<VmSummary> for VmRow {
 /// `nanocl vm` available arguments
 #[derive(Clone, Parser)]
 pub struct VmArg {
-  /// namespace to target by default global is used
-  #[clap(long, short)]
-  pub namespace: Option<String>,
   /// subcommand to run
   #[clap(subcommand)]
   pub command: VmCommand,
+}
+
+#[cfg(test)]
+mod tests {
+  use clap::Parser;
+
+  use super::*;
+
+  #[test]
+  fn namespace_is_only_available_for_collection_and_creation_commands() {
+    let inspect =
+      VmArg::try_parse_from(["vm", "inspect", "database.production"]).unwrap();
+    assert!(matches!(inspect.command, VmCommand::Inspect(_)));
+    assert!(
+      VmArg::try_parse_from([
+        "vm",
+        "--namespace",
+        "production",
+        "inspect",
+        "database.production"
+      ])
+      .is_err()
+    );
+
+    let list =
+      VmArg::try_parse_from(["vm", "list", "--namespace", "production"])
+        .unwrap();
+    let VmCommand::List(list) = list.command else {
+      panic!("expected list command");
+    };
+    assert_eq!(list.namespace.as_deref(), Some("production"));
+  }
+
+  #[test]
+  fn table_rows_distinguish_duplicate_local_names() {
+    let table = tabled::Table::new([
+      VmRow {
+        key: "same.global".to_owned(),
+        image: "image.qcow2".to_owned(),
+        status: "running".to_owned(),
+        instances: "1/1".to_owned(),
+        version: "v1".to_owned(),
+        created_at: String::new(),
+        updated_at: String::new(),
+      },
+      VmRow {
+        key: "same.production".to_owned(),
+        image: "image.qcow2".to_owned(),
+        status: "running".to_owned(),
+        instances: "1/1".to_owned(),
+        version: "v1".to_owned(),
+        created_at: String::new(),
+        updated_at: String::new(),
+      },
+    ])
+    .to_string();
+    assert!(table.contains("KEY"));
+    assert!(table.contains("same.global"));
+    assert!(table.contains("same.production"));
+  }
 }

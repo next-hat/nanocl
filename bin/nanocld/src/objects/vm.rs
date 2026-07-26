@@ -1,6 +1,7 @@
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
+  resource_key::ResourceKey,
   system::{
     NativeEventAction, ObjPsHealthStatusKind, ObjPsStatus, ObjPsStatusKind,
     ObjPsStatusPartial,
@@ -35,7 +36,9 @@ impl ObjCreate for VmDb {
     log::debug!(
       "Creating VM {name} in namespace {namespace} with version: {version}",
     );
-    let vm_key = utils::key::gen_key(namespace, name);
+    let vm_key = ResourceKey::new(name, namespace)
+      .map_err(HttpError::bad_request)?
+      .to_string();
     if VmDb::read_by_pk(&vm_key, &state.inner.pool).await.is_ok() {
       return Err(HttpError::conflict(format!(
         "VM with name {name} already exists in namespace {namespace}",

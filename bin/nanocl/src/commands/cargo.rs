@@ -19,9 +19,9 @@ use crate::{
   config::CliConfig,
   models::{
     CargoArg, CargoCommand, CargoCreateOpts, CargoExecOpts, CargoHistoryOpts,
-    CargoLogsOpts, CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow,
-    CargoRunOpts, CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-    ProcessStatsRow,
+    CargoKillOpts, CargoLogsOpts, CargoPatchOpts, CargoRestartOpts,
+    CargoRevertOpts, CargoRow, CargoRunOpts, CargoStatsOpts,
+    GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
   },
   utils,
 };
@@ -43,29 +43,28 @@ impl GenericCommandLs for CargoArg {
   type ApiItem = CargoSummary;
 
   fn get_key(item: &Self::Item) -> String {
-    item.name.clone()
+    item.key.clone()
   }
 
   fn transform_filter(
-    args: &Self::Args,
+    _args: &Self::Args,
     filter: &GenericFilter,
+    namespace: Option<&str>,
   ) -> impl serde::Serialize {
     GenericListQueryNsp::try_from(filter.clone())
       .unwrap()
-      .with_namespace(args.namespace.as_deref())
+      .with_namespace(namespace)
   }
 }
 
 impl GenericCommandRm<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
   fn get_query(
     opts: &GenericRemoveOpts<GenericRemoveForceOpts>,
-    namespace: Option<String>,
   ) -> Option<CargoDeleteQuery>
   where
     CargoDeleteQuery: serde::Serialize,
   {
     Some(CargoDeleteQuery {
-      namespace,
       force: Some(opts.others.force),
     })
   }
@@ -80,13 +79,12 @@ impl GenericCommandInspect for CargoArg {
 }
 
 async fn wait_cargo_state(
-  name: &str,
-  args: &CargoArg,
+  key: &str,
   action: NativeEventAction,
   client: &NanocldClient,
 ) -> IoResult<rt::JoinHandle<IoResult<()>>> {
   let waiter = utils::process::wait_process_state(
-    &format!("{}.{}", name, args.namespace.as_deref().unwrap_or("global")),
+    key,
     EventActorKind::Cargo,
     [action].to_vec(),
     client,
@@ -98,13 +96,13 @@ async fn wait_cargo_state(
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoCreateOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let cargo = opts.clone().into();
   let item = client
-    .create_cargo(&cargo, args.namespace.as_deref())
+    .create_cargo(&cargo, opts.namespace.as_deref())
     .await?;
   println!("{}", &item.spec.cargo_key);
   Ok(())
@@ -113,14 +111,12 @@ async fn exec_cargo_create(
 /// Execute the `nanocl cargo restart` command to restart a cargo
 async fn exec_cargo_restart(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoRestartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  for name in &opts.names {
-    client
-      .restart_process("cargo", name, args.namespace.as_deref())
-      .await?;
+  for key in &opts.keys {
+    client.restart_process("cargo", key).await?;
   }
   Ok(())
 }
@@ -128,16 +124,13 @@ async fn exec_cargo_restart(
 /// Execute the `nanocl cargo patch` command to patch a cargo
 async fn exec_cargo_patch(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let waiter =
-    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
-      .await?;
-  client
-    .patch_cargo(&opts.name, &opts.clone().into(), args.namespace.as_deref())
-    .await?;
+    wait_cargo_state(&opts.key, NativeEventAction::Start, client).await?;
+  client.patch_cargo(&opts.key, &opts.clone().into()).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
   })??;
@@ -147,14 +140,12 @@ async fn exec_cargo_patch(
 /// Execute the `nanocl cargo exec` command to execute a command in a cargo
 async fn exec_cargo_exec(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoExecOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let exec: CreateExecOptions = opts.clone().into();
-  let result = client
-    .create_exec(&opts.name, &exec, args.namespace.as_deref())
-    .await?;
+  let result = client.create_exec(&opts.key, &exec).await?;
   let mut stream = client
     .start_exec(
       &result.id,
@@ -192,13 +183,11 @@ async fn exec_cargo_exec(
 /// Execute the `nanocl cargo history` command to list the history of a cargo
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoHistoryOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let histories = client
-    .list_history_cargo(&opts.name, args.namespace.as_deref())
-    .await?;
+  let histories = client.list_history_cargo(&opts.key).await?;
   utils::print::print_yml(histories)?;
   Ok(())
 }
@@ -206,12 +195,11 @@ async fn exec_cargo_history(
 /// Execute the `nanocl cargo logs` command to list the logs of a cargo
 async fn exec_cargo_logs(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoLogsOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let query = ProcessLogQuery {
-    namespace: args.namespace.clone(),
     tail: opts.tail.clone(),
     since: opts.since,
     until: opts.until,
@@ -221,7 +209,7 @@ async fn exec_cargo_logs(
     stdout: Some(true),
   };
   let stream = client
-    .logs_processes("cargo", &opts.name, Some(&query))
+    .logs_processes("cargo", &opts.key, Some(&query))
     .await?;
   utils::print::logs_process_stream(stream).await?;
   Ok(())
@@ -230,19 +218,18 @@ async fn exec_cargo_logs(
 /// Execute the `nanocl cargo stats` command to list the stats of a cargo
 async fn exec_cargo_stats(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoStatsOpts,
 ) -> IoResult<()> {
   let client = cli_conf.client.clone();
   let query = ProcessStatsQuery {
-    namespace: args.namespace.clone(),
     stream: if opts.no_stream { Some(false) } else { None },
     one_shot: Some(false),
   };
   let mut stats_cargoes = HashMap::new();
   let (tx, mut rx) = mpsc::unbounded();
   let futures = opts
-    .names
+    .keys
     .iter()
     .map(|name| {
       let name = name.clone();
@@ -291,16 +278,13 @@ async fn exec_cargo_stats(
 /// Execute the `nanocl cargo revert` command to revert a cargo to a previous state
 async fn exec_cargo_revert(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let waiter =
-    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
-      .await?;
-  let cargo = client
-    .revert_cargo(&opts.name, &opts.history_id, args.namespace.as_deref())
-    .await?;
+    wait_cargo_state(&opts.key, NativeEventAction::Start, client).await?;
+  let cargo = client.revert_cargo(&opts.key, &opts.history_id).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
   })??;
@@ -311,57 +295,90 @@ async fn exec_cargo_revert(
 /// Execute the `nanocl cargo run` command to run a cargo
 async fn exec_cargo_run(
   cli_conf: &CliConfig,
-  args: &CargoArg,
+  _args: &CargoArg,
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let waiter =
-    wait_cargo_state(&opts.name, args, NativeEventAction::Start, client)
-      .await?;
   let cargo = client
-    .create_cargo(&opts.clone().into(), args.namespace.as_deref())
+    .create_cargo(&opts.clone().into(), opts.namespace.as_deref())
     .await?;
-  client
-    .start_process("cargo", &cargo.spec.name, Some(&cargo.namespace_name))
-    .await?;
+  let waiter =
+    wait_cargo_state(&cargo.spec.cargo_key, NativeEventAction::Start, client)
+      .await?;
+  client.start_process("cargo", &cargo.spec.cargo_key).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
   })??;
   Ok(())
 }
 
+/// Execute the `nanocl cargo kill` command.
+async fn exec_cargo_kill(
+  cli_conf: &CliConfig,
+  opts: &CargoKillOpts,
+) -> IoResult<()> {
+  let query = opts.clone().into();
+  cli_conf
+    .client
+    .kill_process("cargo", &opts.key, Some(&query))
+    .await?;
+  Ok(())
+}
+
 /// Function that execute when running `nanocl cargo`
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
-  let namespace = args.namespace.clone().unwrap_or("global".to_owned());
   match &args.command {
     CargoCommand::List(opts) => {
-      CargoArg::exec_ls(&cli_conf.client, args, opts).await
+      CargoArg::exec_ls(
+        &cli_conf.client,
+        args,
+        &opts.list,
+        opts.namespace.as_deref(),
+      )
+      .await
     }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => {
-      CargoArg::exec_rm(&cli_conf.client, opts, Some(namespace.clone())).await
+      CargoArg::exec_rm(&cli_conf.client, opts).await
     }
     CargoCommand::Start(opts) => {
-      CargoArg::exec_start(&cli_conf.client, opts, Some(namespace.clone()))
-        .await
+      CargoArg::exec_start(&cli_conf.client, opts).await
     }
     CargoCommand::Stop(opts) => {
-      CargoArg::exec_stop(&cli_conf.client, opts, Some(namespace.clone())).await
+      CargoArg::exec_stop(&cli_conf.client, opts).await
     }
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
-    CargoCommand::Inspect(opts) => {
-      CargoArg::exec_inspect(cli_conf, opts, Some(namespace.clone())).await
-    }
+    CargoCommand::Inspect(opts) => CargoArg::exec_inspect(cli_conf, opts).await,
     CargoCommand::Exec(opts) => exec_cargo_exec(cli_conf, args, opts).await,
     CargoCommand::History(opts) => {
       exec_cargo_history(cli_conf, args, opts).await
     }
     CargoCommand::Revert(opts) => exec_cargo_revert(cli_conf, args, opts).await,
     CargoCommand::Logs(opts) => exec_cargo_logs(cli_conf, args, opts).await,
+    CargoCommand::Kill(opts) => exec_cargo_kill(cli_conf, opts).await,
     CargoCommand::Run(opts) => exec_cargo_run(cli_conf, args, opts).await,
     CargoCommand::Restart(opts) => {
       exec_cargo_restart(cli_conf, args, opts).await
     }
     CargoCommand::Stats(opts) => exec_cargo_stats(cli_conf, args, opts).await,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn quiet_output_uses_canonical_key() {
+    let row = CargoRow {
+      key: "same.system".to_owned(),
+      image: String::new(),
+      status: String::new(),
+      instances: String::new(),
+      version: String::new(),
+      created_at: String::new(),
+      updated_at: String::new(),
+    };
+    assert_eq!(<CargoArg as GenericCommandLs>::get_key(&row), "same.system");
   }
 }

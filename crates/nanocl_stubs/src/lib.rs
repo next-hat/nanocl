@@ -13,6 +13,7 @@ pub mod node;
 pub mod process;
 pub mod proxy;
 pub mod resource;
+pub mod resource_key;
 pub mod resource_kind;
 pub mod secret;
 pub mod statefile;

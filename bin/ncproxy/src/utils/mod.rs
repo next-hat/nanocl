@@ -30,12 +30,13 @@ pub(crate) mod tests {
 
   pub async fn ensure_test_cargo() -> IoResult<()> {
     const CARGO_NAME: &str = "ncproxy-test";
+    const CARGO_KEY: &str = "ncproxy-test.global";
     const CARGO_IMAGE: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".to_owned(),
       ..Default::default()
     })?;
-    if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
+    if client.inspect_cargo(CARGO_KEY).await.is_err() {
       let cargo = CargoSpecPartial {
         name: CARGO_NAME.to_owned(),
         container: Config {
@@ -46,27 +47,21 @@ pub(crate) mod tests {
       };
       client.create_cargo(&cargo, None).await?;
     }
-    client.start_process("cargo", CARGO_NAME, None).await?;
+    client.start_process("cargo", CARGO_KEY).await?;
     Ok(())
   }
 
   pub async fn clean_test_cargo() -> IoResult<()> {
-    const CARGO_NAME: &str = "ncproxy-test";
+    const CARGO_KEY: &str = "ncproxy-test.global";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
+    if client.inspect_cargo(CARGO_KEY).await.is_err() {
       return Ok(());
     }
     client
-      .delete_cargo(
-        CARGO_NAME,
-        Some(&CargoDeleteQuery {
-          force: Some(true),
-          ..Default::default()
-        }),
-      )
+      .delete_cargo(CARGO_KEY, Some(&CargoDeleteQuery { force: Some(true) }))
       .await?;
     Ok(())
   }

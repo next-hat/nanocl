@@ -41,7 +41,12 @@ mod tests {
     cargo::{
       Cargo, CargoDeleteQuery, CargoInspect, CargoKillOptions, CargoSummary,
     },
-    cargo_spec::{CargoSpec, CargoSpecPartial},
+    cargo_spec::{CargoSpec, CargoSpecPartial, CargoSpecUpdate},
+    generic::{
+      GenericClause, GenericCount, GenericFilter, GenericListQueryNsp,
+      GenericNspQuery,
+    },
+    namespace::NamespacePartial,
     proxy::ProxySslConfig,
     secret::SecretPartial,
     system::{EventActorKind, EventCondition, EventKind, NativeEventAction},
@@ -50,6 +55,160 @@ mod tests {
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/cargoes";
+
+  #[ntex::test]
+  async fn collection_namespace_and_key_semantics() {
+    const NAME: &str = "same-name-namespace-test";
+    const NAMESPACE: &str = "cargo-collection-test";
+    const GLOBAL_KEY: &str = "same-name-namespace-test.global";
+    const OTHER_KEY: &str = "same-name-namespace-test.cargo-collection-test";
+
+    let system = gen_default_test_system().await;
+    let client = system.client;
+    let response = client
+      .send_post(
+        "/namespaces",
+        Some(NamespacePartial {
+          name: NAMESPACE.to_owned(),
+          metadata: None,
+        }),
+        None::<String>,
+      )
+      .await;
+    assert!(
+      response.status().is_success()
+        || response.status() == http::StatusCode::CONFLICT
+    );
+
+    let spec = CargoSpecPartial {
+      name: NAME.to_owned(),
+      container: bollard_next::container::Config {
+        image: Some("alpine:latest".to_owned()),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    for namespace in [None, Some(NAMESPACE)] {
+      let response = client
+        .send_post(ENDPOINT, Some(&spec), Some(GenericNspQuery::new(namespace)))
+        .await;
+      assert!(
+        response.status().is_success()
+          || response.status() == http::StatusCode::CONFLICT
+      );
+    }
+
+    let filter =
+      GenericFilter::new().r#where("name", GenericClause::Eq(NAME.to_owned()));
+    let query = |namespace: Option<&str>| {
+      let mut query = GenericListQueryNsp::try_from(filter.clone()).unwrap();
+      query.namespace = namespace.map(str::to_owned);
+      query
+    };
+
+    for namespace in [None, Some(""), Some(" \t ")] {
+      let response = client.send_get(ENDPOINT, Some(query(namespace))).await;
+      test_status_code!(
+        response.status(),
+        http::StatusCode::OK,
+        "unscoped cargo list"
+      );
+      let cargoes = response.json::<Vec<CargoSummary>>().await.unwrap();
+      let keys = cargoes
+        .iter()
+        .map(|cargo| cargo.spec.cargo_key.as_str())
+        .collect::<Vec<_>>();
+      assert!(keys.contains(&GLOBAL_KEY));
+      assert!(keys.contains(&OTHER_KEY));
+
+      let response = client
+        .send_get("/cargoes/count", Some(query(namespace)))
+        .await;
+      let count = response.json::<GenericCount>().await.unwrap();
+      assert_eq!(count.count as usize, cargoes.len());
+    }
+
+    for (namespace, expected_key) in
+      [("global", GLOBAL_KEY), (NAMESPACE, OTHER_KEY)]
+    {
+      let response = client
+        .send_get(ENDPOINT, Some(query(Some(namespace))))
+        .await;
+      let cargoes = response.json::<Vec<CargoSummary>>().await.unwrap();
+      assert_eq!(cargoes.len(), 1);
+      assert_eq!(cargoes[0].spec.cargo_key, expected_key);
+
+      let response = client
+        .send_get("/cargoes/count", Some(query(Some(namespace))))
+        .await;
+      let count = response.json::<GenericCount>().await.unwrap();
+      assert_eq!(count.count, 1);
+    }
+
+    let response = client
+      .send_get(&format!("{ENDPOINT}/{OTHER_KEY}/inspect"), None::<String>)
+      .await;
+    let cargo = response.json::<CargoInspect>().await.unwrap();
+    assert_eq!(cargo.namespace_name, NAMESPACE);
+
+    let response = client
+      .send_get(&format!("{ENDPOINT}/not-a-key/inspect"), None::<String>)
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::BAD_REQUEST,
+      "invalid cargo key"
+    );
+
+    let response = client
+      .send_patch(
+        &format!("{ENDPOINT}/{OTHER_KEY}"),
+        Some(CargoSpecUpdate {
+          name: Some("renamed".to_owned()),
+          ..Default::default()
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::BAD_REQUEST,
+      "cargo name is immutable"
+    );
+
+    let response = client
+      .send_patch(
+        &format!("{ENDPOINT}/{OTHER_KEY}"),
+        Some(CargoSpecUpdate {
+          container: Some(bollard_next::container::Config {
+            image: Some("busybox:latest".to_owned()),
+            ..Default::default()
+          }),
+          ..Default::default()
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "patch cargo by canonical key"
+    );
+
+    for key in [GLOBAL_KEY, OTHER_KEY] {
+      let response = client
+        .send_delete(
+          &format!("{ENDPOINT}/{key}"),
+          Some(CargoDeleteQuery { force: Some(true) }),
+        )
+        .await;
+      test_status_code!(
+        response.status(),
+        http::StatusCode::ACCEPTED,
+        "delete cargo by canonical key"
+      );
+    }
+  }
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
@@ -62,6 +221,7 @@ mod tests {
       "2daemon-test-cargo",
     ];
     let main_test_cargo = test_cargoes[0];
+    let main_test_key = format!("{main_test_cargo}.global");
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_owned();
       let res = client
@@ -95,7 +255,7 @@ mod tests {
     }
     let res = client
       .send_get(
-        &format!("{ENDPOINT}/{main_test_cargo}/inspect"),
+        &format!("{ENDPOINT}/{main_test_key}/inspect"),
         None::<String>,
       )
       .await;
@@ -116,7 +276,7 @@ mod tests {
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
     let res = client
       .send_post(
-        &format!("/processes/cargo/{main_test_cargo}/start"),
+        &format!("/processes/cargo/{main_test_key}/start"),
         None::<String>,
         None::<String>,
       )
@@ -127,8 +287,23 @@ mod tests {
       "basic cargo start"
     );
     let res = client
+      .send_get(
+        &format!("/processes/cargo/{main_test_key}/logs"),
+        Some(nanocl_stubs::process::ProcessLogQuery {
+          follow: Some(false),
+          tail: Some("1".to_owned()),
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo logs by canonical key"
+    );
+    let res = client
       .send_post(
-        &format!("/processes/cargo/{main_test_cargo}/kill"),
+        &format!("/processes/cargo/{main_test_key}/kill"),
         Some(&CargoKillOptions {
           signal: "SIGINT".to_owned(),
         }),
@@ -138,7 +313,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
     let res = client
       .send_post(
-        &format!("/processes/cargo/{main_test_cargo}/restart"),
+        &format!("/processes/cargo/{main_test_key}/restart"),
         None::<String>,
         None::<String>,
       )
@@ -150,7 +325,7 @@ mod tests {
     );
     let res = client
       .send_put(
-        &format!("{ENDPOINT}/{main_test_cargo}"),
+        &format!("{ENDPOINT}/{main_test_key}"),
         Some(&CargoSpecPartial {
           name: main_test_cargo.to_owned(),
           container: bollard_next::container::Config {
@@ -179,7 +354,7 @@ mod tests {
     );
     let res = client
       .send_get(
-        &format!("{ENDPOINT}/{main_test_cargo}/histories"),
+        &format!("{ENDPOINT}/{main_test_key}/histories"),
         None::<String>,
       )
       .await;
@@ -193,7 +368,7 @@ mod tests {
     let id = histories[0].key;
     let res = client
       .send_patch(
-        &format!("{ENDPOINT}/{main_test_cargo}/histories/{id}/revert"),
+        &format!("{ENDPOINT}/{main_test_key}/histories/{id}/revert"),
         None::<String>,
         None::<String>,
       )
@@ -201,7 +376,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
     let res = client
       .send_post(
-        &format!("/processes/cargo/{main_test_cargo}/stop"),
+        &format!("/processes/cargo/{main_test_key}/stop"),
         None::<String>,
         None::<String>,
       )
@@ -214,11 +389,8 @@ mod tests {
     for test_cargo in test_cargoes.iter() {
       let res = client
         .send_delete(
-          &format!("{ENDPOINT}/{test_cargo}"),
-          Some(CargoDeleteQuery {
-            force: Some(true),
-            ..Default::default()
-          }),
+          &format!("{ENDPOINT}/{test_cargo}.global"),
+          Some(CargoDeleteQuery { force: Some(true) }),
         )
         .await;
       test_status_code!(
@@ -258,7 +430,7 @@ mod tests {
     assert_eq!(cargo.spec.name, "init-test-cargo", "Invalid cargo name");
     let res = client
       .send_post(
-        "/processes/cargo/init-test-cargo/start",
+        "/processes/cargo/init-test-cargo.global/start",
         None::<String>,
         None::<String>,
       )
@@ -283,11 +455,8 @@ mod tests {
     while let Some(_chunk) = stream.next().await {}
     let res = client
       .send_delete(
-        &format!("{ENDPOINT}/init-test-cargo"),
-        Some(CargoDeleteQuery {
-          force: Some(true),
-          ..Default::default()
-        }),
+        &format!("{ENDPOINT}/init-test-cargo.global"),
+        Some(CargoDeleteQuery { force: Some(true) }),
       )
       .await;
     assert_eq!(
@@ -355,7 +524,7 @@ mod tests {
     // start the cargo
     let res = client
       .send_post(
-        "/processes/cargo/test-cargo-ssl/start",
+        "/processes/cargo/test-cargo-ssl.global/start",
         None::<String>,
         None::<String>,
       )
@@ -382,11 +551,8 @@ mod tests {
     // Delete the cargo
     let res = client
       .send_delete(
-        &format!("{ENDPOINT}/test-cargo-ssl"),
-        Some(CargoDeleteQuery {
-          force: Some(true),
-          ..Default::default()
-        }),
+        &format!("{ENDPOINT}/test-cargo-ssl.global"),
+        Some(CargoDeleteQuery { force: Some(true) }),
       )
       .await;
     assert_eq!(res.status(), http::StatusCode::ACCEPTED, "delete cargo");

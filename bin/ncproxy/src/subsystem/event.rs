@@ -9,20 +9,24 @@ use nanocl_utils::versioning;
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    proxy::ResourceProxyRule,
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActor, EventActorKind, NativeEventAction},
+    system::{EventActorKind, NativeEventAction},
   },
 };
 
 use crate::{models::SystemStateRef, utils, vars};
 
+#[cfg(test)]
+use nanocld_client::stubs::{proxy::ResourceProxyRule, system::EventActor};
+
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+#[allow(dead_code)]
 const RECONCILE_INTERVAL: std::time::Duration =
   std::time::Duration::from_secs(30);
 
+#[cfg(test)]
 fn is_proxy_resource(actor: &EventActor) -> bool {
   actor
     .attributes
@@ -32,6 +36,7 @@ fn is_proxy_resource(actor: &EventActor) -> bool {
     == Some(vars::RULE_KEY)
 }
 
+#[cfg(test)]
 fn proxy_resource_name(actor: &EventActor) -> IoResult<&str> {
   actor
     .key
@@ -40,6 +45,7 @@ fn proxy_resource_name(actor: &EventActor) -> IoResult<&str> {
     .ok_or_else(|| IoError::invalid_data("Resource event", "Missing key"))
 }
 
+#[cfg(test)]
 fn proxy_resource_rule(actor: &EventActor) -> IoResult<ResourceProxyRule> {
   let data = actor
     .attributes
@@ -74,7 +80,10 @@ async fn should_wait_for_healthy_event(
   namespace: &str,
   state: &SystemStateRef,
 ) -> IoResult<bool> {
-  let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
+  let key =
+    nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
+      .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?;
+  let cargo = state.client.inspect_cargo(key.as_str()).await?;
   Ok(has_healthcheck(&cargo))
 }
 
@@ -274,6 +283,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   }
 }
 
+#[allow(dead_code)]
 async fn reconcile_loop(state: &SystemStateRef) {
   loop {
     log::info!("event::reconcile: rebuilding committed proxy resources");

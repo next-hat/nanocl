@@ -85,8 +85,6 @@ impl From<Process> for ProcessRow {
   fn from(process: Process) -> Self {
     let container = process.data;
     let name = container.name.unwrap_or_default().replace('/', "");
-    let mut names = name.split('.');
-    let _next_name = names.next().unwrap_or(&name);
     let config = container.config.unwrap_or_default();
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();

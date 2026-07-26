@@ -1,11 +1,10 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::generic::{GenericClause, GenericCount, GenericListQueryNsp};
+use nanocl_stubs::generic::{GenericCount, GenericListQueryNsp};
 
 use crate::{
   models::{CargoDb, SystemState},
-  repositories::generic::*,
   utils,
 };
 
@@ -16,7 +15,7 @@ use crate::{
   path = "/cargoes/count",
   params(
     ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"my-cargo\" } } } }"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes belongs default to 'global'"),
+    ("namespace" = Option<String>, Query, description = "Optional namespace filter; omitted or blank returns all namespaces"),
   ),
   responses(
     (status = 200, description = "Count result", body = GenericCount),
@@ -27,12 +26,7 @@ pub async fn count_cargo(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQueryNsp>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = utils::query_string::parse_qs_nsp_filter(&qs)?;
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let filter = filter
-    .filter
-    .unwrap_or_default()
-    .r#where("namespace_name", GenericClause::Eq(namespace));
-  let count = CargoDb::count_by(&filter, &state.inner.pool).await?;
+  let query = utils::query_string::parse_qs_nsp_filter(&qs)?;
+  let count = CargoDb::count(&query, &state).await?;
   Ok(web::HttpResponse::Ok().json(&GenericCount { count }))
 }

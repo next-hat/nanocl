@@ -50,7 +50,6 @@ async fn exec_job_logs(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let query = ProcessLogQuery {
-    namespace: None,
     tail: opts.tail.clone(),
     since: opts.since,
     until: opts.until,
@@ -78,7 +77,6 @@ async fn exec_job_wait(
       &opts.name,
       Some(&ProcessWaitQuery {
         condition: opts.condition.clone(),
-        namespace: None,
       }),
     )
     .await?;
@@ -106,18 +104,12 @@ async fn exec_job_wait(
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
     JobCommand::List(opts) => {
-      JobArg::exec_ls(&cli_conf.client, args, opts).await
+      JobArg::exec_ls(&cli_conf.client, args, opts, None).await
     }
-    JobCommand::Remove(opts) => {
-      JobArg::exec_rm(&cli_conf.client, opts, None).await
-    }
-    JobCommand::Inspect(opts) => {
-      JobArg::exec_inspect(cli_conf, opts, None).await
-    }
+    JobCommand::Remove(opts) => JobArg::exec_rm(&cli_conf.client, opts).await,
+    JobCommand::Inspect(opts) => JobArg::exec_inspect(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,
     JobCommand::Wait(opts) => exec_job_wait(cli_conf, opts).await,
-    JobCommand::Start(opts) => {
-      JobArg::exec_start(&cli_conf.client, opts, None).await
-    }
+    JobCommand::Start(opts) => JobArg::exec_start(&cli_conf.client, opts).await,
   }
 }

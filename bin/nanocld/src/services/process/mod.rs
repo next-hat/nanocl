@@ -67,9 +67,8 @@ mod tests {
     let client = system.client;
     let res = client
       .send_get(
-        "/processes/cargo/nstore/stats",
+        "/processes/cargo/nstore.system/stats",
         Some(ProcessStatsQuery {
-          namespace: Some("system".to_owned()),
           stream: Some(false),
           one_shot: Some(true),
         }),

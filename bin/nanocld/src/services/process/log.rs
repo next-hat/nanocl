@@ -65,15 +65,14 @@ async fn logs_process(
   )
 }
 
-/// Get logs of processes of given kind and name (cargo, job, vm)
+/// Get logs of processes for a kind and canonical resource key
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
-  path = "/processes/{kind}/{name}/logs",
+  path = "/processes/{kind}/{key}/logs",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
-    ("namespace" = Option<String>, Query, description = "Namespace of the process"),
+    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
     ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
@@ -84,17 +83,17 @@ async fn logs_process(
     (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
   ),
 ))]
-#[web::get("/processes/{kind}/{name}/logs")]
+#[web::get("/processes/{kind}/{key}/logs")]
 async fn logs_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let (_, kind, name) = path.into_inner();
+  let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let processes =
-    ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
     .into_iter()

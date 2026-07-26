@@ -16,30 +16,30 @@ use crate::{
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
-  path = "/processes/{kind}/{name}/wait",
+  path = "/processes/{kind}/{key}/wait",
   params(
     ("kind" = String, Path, description = "Kind of the process", description = "Kind of the process instance eg: (cargo, job, vm)", example = "cargo"),
-    ("name" = String, Path, description = "Name of the process instance"),
+    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)"),
   ),
   responses(
     (status = 200, description = "Process wait stream", content_type = "application/vdn.nanocl.raw-stream"),
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/processes/{kind}/{name}/wait")]
+#[web::get("/processes/{kind}/{key}/wait")]
 pub async fn wait_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessWaitQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let (_, kind, name) = path.into_inner();
+  let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let opts = WaitContainerOptions {
     condition: qs.condition.clone().unwrap_or_default(),
   };
   let processes =
-    ProcessDb::read_by_kind_key(&kind_pk, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
   let mut streams = Vec::new();
   for process in processes {
     let options = Some(opts.clone());

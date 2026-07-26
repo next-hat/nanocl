@@ -95,6 +95,7 @@ impl Modify for VersionModifier {
     vm::inspect_vm,
     vm::delete_vm,
     vm::create_vm,
+    vm::count_vm,
     vm::list_vm_history,
     vm::patch_vm,
     vm::vm_attach,

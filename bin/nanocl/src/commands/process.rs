@@ -54,7 +54,7 @@ pub async fn inspect_process(
   cli_conf: &CliConfig,
   opts: &GenericInspectOpts,
 ) -> IoResult<()> {
-  ProcessArg::exec_inspect(cli_conf, opts, None).await?;
+  ProcessArg::exec_inspect(cli_conf, opts).await?;
   Ok(())
 }
 
@@ -63,5 +63,5 @@ pub async fn exec_process(
   opts: &GenericListOpts<ProcessFilter>,
 ) -> IoResult<()> {
   let args = &ProcessArg;
-  ProcessArg::exec_ls(&cli_conf.client, args, opts).await
+  ProcessArg::exec_ls(&cli_conf.client, args, opts, None).await
 }

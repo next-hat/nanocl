@@ -8,6 +8,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::CargoSpecPartial,
+  resource_key::ResourceKey,
   system::{
     NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
     ObjPsStatusPartial,
@@ -44,7 +45,9 @@ impl ObjCreate for CargoDb {
         "Cargo name can only contain a-z, A-Z, 0-9, and -_",
       ));
     }
-    let key = utils::key::gen_key(&obj.namespace, &obj.spec.name);
+    let key = ResourceKey::new(&obj.spec.name, &obj.namespace)
+      .map_err(HttpError::bad_request)?
+      .to_string();
     let new_spec =
       SpecDb::try_from_cargo_partial(&key, &obj.version, &obj.spec)?;
     let spec = SpecDb::create_from(new_spec, &state.inner.pool)

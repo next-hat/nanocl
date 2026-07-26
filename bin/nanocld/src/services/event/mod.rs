@@ -99,14 +99,14 @@ mod tests {
       .await;
     let _ = client
       .send_post(
-        &format!("/processes/cargo/{CARGO_NAME}/start"),
+        &format!("/processes/cargo/{CARGO_NAME}.global/start"),
         None::<String>,
         None::<String>,
       )
       .await;
     assert!(wait_task.await.is_ok());
     let _ = client
-      .send_delete(&format!("/cargoes/{CARGO_NAME}"), None::<String>)
+      .send_delete(&format!("/cargoes/{CARGO_NAME}.global"), None::<String>)
       .await;
     system.state.wait_event_loop().await;
   }

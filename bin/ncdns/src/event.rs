@@ -7,9 +7,8 @@ use nanocl_error::io::IoResult;
 
 use nanocl_utils::versioning;
 
-use nanocld_client::stubs::{
-  resource_kind::{ResourceKindPartial, ResourceKindSpec},
-  system::{Event, EventActor, EventActorKind, EventKind},
+use nanocld_client::stubs::resource_kind::{
+  ResourceKindPartial, ResourceKindSpec,
 };
 
 use nanocld_client::NanocldClient;
@@ -17,6 +16,7 @@ use nanocld_client::NanocldClient;
 use crate::{dnsmasq::Dnsmasq, utils, vars};
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
+#[allow(dead_code)]
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(15);
 
 pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
@@ -41,11 +41,14 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
+#[cfg(test)]
 fn dns_rule_actor_key(
-  kind: &EventKind,
+  kind: &nanocld_client::stubs::system::EventKind,
   action: &str,
-  actor: Option<&EventActor>,
+  actor: Option<&nanocld_client::stubs::system::EventActor>,
 ) -> Option<String> {
+  use nanocld_client::stubs::system::{EventActorKind, EventKind};
+
   if *kind != EventKind::Normal
     || !matches!(action, "create" | "update" | "destroy")
   {
@@ -67,6 +70,7 @@ fn dns_rule_actor_key(
   actor.key.clone()
 }
 
+#[allow(dead_code)]
 async fn reconcile(
   acknowledged_key: Option<&str>,
   client: &NanocldClient,
@@ -79,7 +83,7 @@ async fn reconcile(
   }
 }
 
-async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
+async fn watch_loop(client: &NanocldClient, _dnsmasq: &Dnsmasq) {
   loop {
     if let Err(err) = ensure_self_config(client).await {
       log::warn!("event::loop: unable to ensure resource kind: {err}");
@@ -93,7 +97,7 @@ async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
       }
       Ok(mut stream) => {
         log::info!("event::loop: subscribed to nanocld events");
-        while let Some(event) = stream.next().await {
+        while let Some(_event) = stream.next().await {
           // Should only update if containers or VMs are being updated.
         }
       }
@@ -103,6 +107,7 @@ async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
   }
 }
 
+#[allow(dead_code)]
 async fn periodic_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
   loop {
     ntex::time::sleep(RECONCILE_INTERVAL).await;

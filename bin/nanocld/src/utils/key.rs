@@ -7,21 +7,29 @@ use rand::{RngExt, distr::Alphanumeric, rng};
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::process::ProcessKind;
+use nanocl_stubs::{process::ProcessKind, resource_key::ResourceKey};
 
-/// Resolve the namespace from the query paramater
-/// Namespace is an optional query paramater it's resolved with value `global` if it's empty
+/// Resolve a namespace for an operation that creates a resource.
+///
+/// Creation retains the `global` default for omitted, empty, or whitespace-only
+/// namespace values.
 pub fn resolve_nsp(nsp: &Option<String>) -> String {
-  match nsp {
-    None => "global",
-    Some(nsp) => nsp,
-  }
-  .to_owned()
+  normalize_nsp(nsp).unwrap_or("global").to_owned()
 }
 
-/// Generate a key based on the namespace and the name of the model.
-pub fn gen_key(nsp: &str, name: &str) -> String {
-  format!("{name}.{nsp}")
+/// Normalize an optional namespace used to filter a collection.
+///
+/// Omitted, empty, and whitespace-only values all mean that no namespace
+/// filter should be applied.
+pub fn normalize_nsp(nsp: &Option<String>) -> Option<&str> {
+  nsp.as_deref().map(str::trim).filter(|nsp| !nsp.is_empty())
+}
+
+/// Parse and validate a canonical namespaced resource key.
+pub fn parse_resource_key(key: &str) -> IoResult<ResourceKey> {
+  key
+    .parse::<ResourceKey>()
+    .map_err(|err| IoError::invalid_input("Resource key", &err.to_string()))
 }
 
 /// Generate the stable key of a node-scoped Docker network.
@@ -50,16 +58,12 @@ pub fn ensure_kind(kind: &str) -> IoResult<()> {
   Ok(())
 }
 
-pub fn gen_kind_key(
-  kind: &ProcessKind,
-  name: &str,
-  namespace: &Option<String>,
-) -> String {
+pub fn validate_kind_key(kind: &ProcessKind, key: &str) -> IoResult<()> {
   match kind {
-    ProcessKind::Job => name.to_owned(),
+    ProcessKind::Job => Ok(()),
     ProcessKind::Cargo | ProcessKind::Vm => {
-      let namespace = resolve_nsp(namespace);
-      gen_key(&namespace, name)
+      parse_resource_key(key)?;
+      Ok(())
     }
   }
 }
@@ -67,6 +71,21 @@ pub fn gen_kind_key(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn namespace_filter_omits_blank_values() {
+    assert_eq!(normalize_nsp(&None), None);
+    assert_eq!(normalize_nsp(&Some(String::new())), None);
+    assert_eq!(normalize_nsp(&Some(" \t ".to_owned())), None);
+    assert_eq!(normalize_nsp(&Some(" system ".to_owned())), Some("system"));
+  }
+
+  #[test]
+  fn create_namespace_keeps_global_default() {
+    assert_eq!(resolve_nsp(&None), "global");
+    assert_eq!(resolve_nsp(&Some("  ".to_owned())), "global");
+    assert_eq!(resolve_nsp(&Some("system".to_owned())), "system");
+  }
 
   #[test]
   fn network_key_contains_node_and_network_name() {

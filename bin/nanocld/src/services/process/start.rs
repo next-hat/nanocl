@@ -2,7 +2,6 @@ use ntex::web;
 
 use bollard_next::container::StartContainerOptions;
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::{
   models::{ProcessDb, SystemState},
@@ -37,29 +36,27 @@ pub async fn start_process_by_pk(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Start all processes of given kind and name (cargo, job, vm)
+/// Start all processes for a kind and canonical resource key
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
-  path = "/processes/{kind}/{name}/start",
+  path = "/processes/{kind}/{key}/start",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs if needed"),
+    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
   ),
   responses(
     (status = 202, description = "Process instances started"),
   ),
 ))]
-#[web::post("/processes/{kind}/{name}/start")]
+#[web::post("/processes/{kind}/{key}/start")]
 pub async fn start_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let (_, kind, name) = path.into_inner();
+  let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::generic::emit_starting(&kind_key, &kind, &state).await?;
+  utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
+  utils::container::generic::emit_starting(&key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }

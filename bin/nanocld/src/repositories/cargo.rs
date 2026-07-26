@@ -224,13 +224,7 @@ impl CargoDb {
     query: &GenericFilterNsp,
     state: &SystemState,
   ) -> HttpResult<Vec<CargoSummary>> {
-    let namespace = utils::key::resolve_nsp(&query.namespace);
-    let filter = query
-      .filter
-      .clone()
-      .unwrap_or_default()
-      .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
-    NamespaceDb::read_by_pk(&namespace, &state.inner.pool).await?;
+    let filter = Self::collection_filter(query, state).await?;
     let cargoes =
       CargoDb::transform_read_by(&filter, &state.inner.pool).await?;
     let mut cargo_summaries = Vec::new();
@@ -266,6 +260,28 @@ impl CargoDb {
       });
     }
     Ok(cargo_summaries)
+  }
+
+  /// Count cargoes using the same namespace semantics as [`CargoDb::list`].
+  pub async fn count(
+    query: &GenericFilterNsp,
+    state: &SystemState,
+  ) -> HttpResult<i64> {
+    let filter = Self::collection_filter(query, state).await?;
+    Ok(CargoDb::count_by(&filter, &state.inner.pool).await?)
+  }
+
+  async fn collection_filter(
+    query: &GenericFilterNsp,
+    state: &SystemState,
+  ) -> HttpResult<GenericFilter> {
+    let mut filter = query.filter.clone().unwrap_or_default();
+    if let Some(namespace) = utils::key::normalize_nsp(&query.namespace) {
+      NamespaceDb::read_by_pk(namespace, &state.inner.pool).await?;
+      filter = filter
+        .r#where("namespace_name", GenericClause::Eq(namespace.to_owned()));
+    }
+    Ok(filter)
   }
 
   /// Delete a cargo and it's relations (Spec, ObjPsStatus).

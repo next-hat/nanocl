@@ -4,7 +4,7 @@ use nanocl_error::{http::HttpResult, http_client::HttpClientResult};
 
 use nanocl_stubs::{
   cargo::CargoKillOptions,
-  generic::{GenericFilter, GenericNspQuery},
+  generic::GenericFilter,
   process::{
     Process, ProcessLogQuery, ProcessOutputLog, ProcessStats,
     ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
@@ -65,7 +65,7 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// Start a process by it's kind and name and namespace
+  /// Start all processes for a kind and canonical resource key.
   ///
   /// ## Example
   ///
@@ -73,26 +73,25 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.start_process("cargo", "my-cargo", None).await;
+  /// let res = client.start_process("cargo", "my-cargo.global").await;
   /// ```
   ///
   pub async fn start_process(
     &self,
     kind: &str,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<()> {
     self
       .send_post(
-        &format!("{}/{kind}/{name}/start", Self::PROCESS_PATH),
+        &format!("{}/{kind}/{key}/start", Self::PROCESS_PATH),
         None::<String>,
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// Restart a process by it's kind and name and namespace
+  /// Restart all processes for a kind and canonical resource key.
   ///
   /// ## Example
   ///
@@ -100,26 +99,25 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.restart_process("cargo", "my-cargo", None).await;
+  /// let res = client.restart_process("cargo", "my-cargo.global").await;
   /// ```
   ///
   pub async fn restart_process(
     &self,
     kind: &str,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<()> {
     self
       .send_post(
-        &format!("{}/{kind}/{name}/restart", Self::PROCESS_PATH),
+        &format!("{}/{kind}/{key}/restart", Self::PROCESS_PATH),
         None::<String>,
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// Stop a process by it's kind and name and namespace
+  /// Stop all processes for a kind and canonical resource key.
   ///
   /// ## Example
   ///
@@ -133,20 +131,19 @@ impl NanocldClient {
   pub async fn stop_process(
     &self,
     kind: &str,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<()> {
     self
       .send_post(
-        &format!("{}/{kind}/{name}/stop", Self::PROCESS_PATH),
+        &format!("{}/{kind}/{key}/stop", Self::PROCESS_PATH),
         None::<String>,
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// Kill processes by it's kind and name and namespace
+  /// Kill all processes for a kind and canonical resource key.
   ///
   /// ## Example
   ///
@@ -154,21 +151,20 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.kill_process("cargo", "my-cargo", None, None).await;
+  /// let res = client.kill_process("cargo", "my-cargo.global", None).await;
   /// ```
   ///
   pub async fn kill_process(
     &self,
     kind: &str,
-    name: &str,
+    key: &str,
     query: Option<&CargoKillOptions>,
-    namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_post(
-        &format!("{}/{kind}/{name}/kill", Self::PROCESS_PATH),
+        &format!("{}/{kind}/{key}/kill", Self::PROCESS_PATH),
         query,
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
@@ -274,8 +270,8 @@ mod tests {
     let mut rx = client
       .logs_processes(
         "cargo",
-        "nstore",
-        Some(&ProcessLogQuery::of_namespace("system")),
+        "nstore.system",
+        Some(&ProcessLogQuery::default()),
       )
       .await
       .unwrap();

@@ -47,7 +47,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Delete a cargo by it's name and namespace
+  /// Delete a cargo by its canonical key.
   ///
   /// ## Example
   ///
@@ -55,20 +55,20 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.delete_cargo("my-cargo", None).await;
+  /// let res = client.delete_cargo("my-cargo.global", None).await;
   /// ```
   pub async fn delete_cargo(
     &self,
-    name: &str,
+    key: &str,
     query: Option<&CargoDeleteQuery>,
   ) -> HttpClientResult<()> {
     self
-      .send_delete(&format!("{}/{name}", Self::CARGO_PATH), query)
+      .send_delete(&format!("{}/{key}", Self::CARGO_PATH), query)
       .await?;
     Ok(())
   }
 
-  /// Inspect a cargo by it's name to get more information about it
+  /// Inspect a cargo by its canonical key.
   ///
   /// ## Example
   ///
@@ -76,23 +76,25 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.inspect_cargo("my-cargo", None).await;
+  /// let res = client.inspect_cargo("my-cargo.global").await;
   /// ```
   pub async fn inspect_cargo(
     &self,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<CargoInspect> {
     let res = self
       .send_get(
-        &format!("{}/{name}/inspect", Self::CARGO_PATH),
-        Some(GenericNspQuery::new(namespace)),
+        &format!("{}/{key}/inspect", Self::CARGO_PATH),
+        None::<String>,
       )
       .await?;
     Self::res_json(res).await
   }
 
-  /// List all cargoes in a namespace
+  /// List cargoes, optionally filtering by namespace.
+  ///
+  /// An omitted, empty, or whitespace-only namespace returns cargoes from all
+  /// namespaces.
   ///
   /// ## Example
   ///
@@ -111,7 +113,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Patch a cargo by it's name
+  /// Patch a cargo by its canonical key.
   /// This will update the cargo's spec by merging current spec with new spec and creating an history entry
   ///
   /// ## Example
@@ -123,25 +125,24 @@ impl NanocldClient {
   /// let cargo_spec = CargoSpecPatch {
   ///   name: "my-cargo-renamed".into(),
   /// };
-  /// client.patch_cargo("my-cargo", cargo, None).await.unwrap();
+  /// client.patch_cargo("my-cargo.global", cargo).await.unwrap();
   /// ```
   pub async fn patch_cargo(
     &self,
-    name: &str,
+    key: &str,
     spec: &CargoSpecUpdate,
-    namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_patch(
-        &format!("{}/{name}", Self::CARGO_PATH),
+        &format!("{}/{key}", Self::CARGO_PATH),
         Some(spec),
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// Put a cargo by it's name
+  /// Put a cargo by its canonical key.
   /// It will create a new cargo spec and store old one in history
   ///
   /// ## Example
@@ -153,19 +154,18 @@ impl NanocldClient {
   /// let cargo_spec = CargoSpecPartial {
   ///   name: "my-cargo-renamed".into(),
   /// };
-  /// client.put_cargo("my-cargo", &cargo, None).await.unwrap();
+  /// client.put_cargo("my-cargo.global", &cargo).await.unwrap();
   /// ```
   pub async fn put_cargo(
     &self,
-    name: &str,
+    key: &str,
     spec: &CargoSpecPartial,
-    namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_put(
-        &format!("{}/{name}", Self::CARGO_PATH),
+        &format!("{}/{key}", Self::CARGO_PATH),
         Some(spec),
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
@@ -183,13 +183,12 @@ impl NanocldClient {
   /// ```
   pub async fn list_history_cargo(
     &self,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<Vec<CargoSpec>> {
     let res = self
       .send_get(
-        &format!("{}/{name}/histories", Self::CARGO_PATH),
-        Some(GenericNspQuery::new(namespace)),
+        &format!("{}/{key}/histories", Self::CARGO_PATH),
+        None::<String>,
       )
       .await?;
     Self::res_json(res).await
@@ -203,25 +202,24 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo = client.revert_cargo("my-cargo", "my-history-id", None).await.unwrap();
+  /// let cargo = client.revert_cargo("my-cargo.global", "my-history-id").await.unwrap();
   /// ```
   pub async fn revert_cargo(
     &self,
-    name: &str,
+    key: &str,
     id: &str,
-    namespace: Option<&str>,
   ) -> HttpClientResult<Cargo> {
     let res = self
       .send_patch(
-        &format!("{}/{name}/histories/{id}/revert", Self::CARGO_PATH),
+        &format!("{}/{key}/histories/{id}/revert", Self::CARGO_PATH),
         None::<String>,
-        Some(GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Self::res_json(res).await
   }
 
-  /// List all the instances of a cargo by it's name and namespace
+  /// List all instances of a cargo by its canonical key.
   ///
   /// ## Example
   ///
@@ -229,17 +227,16 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.list_cargo_instance("my-cargo", None).await;
+  /// let res = client.list_cargo_instance("my-cargo.global").await;
   /// ```
   pub async fn list_cargo_instance(
     &self,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<Vec<ContainerSummary>> {
     let res = self
       .send_get(
-        &format!("{}/{name}/instances", Self::CARGO_PATH),
-        Some(GenericNspQuery::new(namespace)),
+        &format!("{}/{key}/instances", Self::CARGO_PATH),
+        None::<String>,
       )
       .await?;
     Self::res_json(res).await
@@ -273,11 +270,9 @@ mod tests {
       ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
-    client
-      .start_process("cargo", CARGO_NAME, None)
-      .await
-      .unwrap();
-    client.inspect_cargo(CARGO_NAME, None).await.unwrap();
+    let cargo_key = format!("{CARGO_NAME}.global");
+    client.start_process("cargo", &cargo_key).await.unwrap();
+    client.inspect_cargo(&cargo_key).await.unwrap();
     let cargo_update = CargoSpecUpdate {
       container: Some(bollard_next::container::Config {
         image: Some("ghcr.io/next-hat/nanocl-get-started:latest".into()),
@@ -286,33 +281,18 @@ mod tests {
       }),
       ..Default::default()
     };
-    client
-      .patch_cargo(CARGO_NAME, &cargo_update, None)
-      .await
-      .unwrap();
-    client
-      .put_cargo(CARGO_NAME, &new_cargo, None)
-      .await
-      .unwrap();
-    let histories = client.list_history_cargo(CARGO_NAME, None).await.unwrap();
+    client.patch_cargo(&cargo_key, &cargo_update).await.unwrap();
+    client.put_cargo(&cargo_key, &new_cargo).await.unwrap();
+    let histories = client.list_history_cargo(&cargo_key).await.unwrap();
     assert!(histories.len() > 1);
     let history = histories.first().unwrap();
     client
-      .revert_cargo(CARGO_NAME, &history.key.to_string(), None)
+      .revert_cargo(&cargo_key, &history.key.to_string())
       .await
       .unwrap();
+    client.stop_process("cargo", &cargo_key).await.unwrap();
     client
-      .stop_process("cargo", CARGO_NAME, None)
-      .await
-      .unwrap();
-    client
-      .delete_cargo(
-        CARGO_NAME,
-        Some(&CargoDeleteQuery {
-          force: Some(true),
-          ..Default::default()
-        }),
-      )
+      .delete_cargo(&cargo_key, Some(&CargoDeleteQuery { force: Some(true) }))
       .await
       .unwrap();
   }
@@ -341,7 +321,7 @@ mod tests {
       _ => panic!("Wrong error type"),
     }
     client
-      .delete_cargo("client-test-cargodup", None)
+      .delete_cargo("client-test-cargodup.global", None)
       .await
       .unwrap();
   }

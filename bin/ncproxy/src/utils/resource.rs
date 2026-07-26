@@ -12,8 +12,17 @@ use nanocld_client::{
 
 use crate::{models::SystemStateRef, vars};
 
-fn workload_target_key(name: &str, namespace: &str, kind: &str) -> String {
-  format!("{name}.{namespace}.{kind}")
+fn workload_target_key(
+  name: &str,
+  namespace: &str,
+  kind: &str,
+) -> IoResult<String> {
+  let key =
+    nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
+      .map_err(|err| {
+        IoError::invalid_input("Workload key", &err.to_string())
+      })?;
+  Ok(format!("{key}.{kind}"))
 }
 
 pub(crate) async fn list_all(
@@ -60,7 +69,7 @@ async fn list_by_workload(
   client: &NanocldClient,
 ) -> IoResult<Vec<Resource>> {
   let namespace = namespace.unwrap_or("global".into());
-  let target_key = workload_target_key(name, &namespace, kind);
+  let target_key = workload_target_key(name, &namespace, kind)?;
   let filter = GenericFilter::new()
   .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()))
   .r#where(
@@ -170,7 +179,13 @@ mod tests {
 
   #[test]
   fn workload_target_keys_use_the_expected_kind_suffix() {
-    assert_eq!(workload_target_key("api", "global", "c"), "api.global.c");
-    assert_eq!(workload_target_key("db", "private", "v"), "db.private.v");
+    assert_eq!(
+      workload_target_key("api", "global", "c").unwrap(),
+      "api.global.c"
+    );
+    assert_eq!(
+      workload_target_key("db", "private", "v").unwrap(),
+      "db.private.v"
+    );
   }
 }

@@ -47,11 +47,9 @@ pub async fn watch_event(cli_conf: &CliConfig) -> IoResult<()> {
 pub async fn exec_event(cli_conf: &CliConfig, args: &EventArg) -> IoResult<()> {
   match &args.command {
     EventCommand::List(opts) => {
-      EventArg::exec_ls(&cli_conf.client, args, opts).await
+      EventArg::exec_ls(&cli_conf.client, args, opts, None).await
     }
-    EventCommand::Inspect(opts) => {
-      EventArg::exec_inspect(cli_conf, opts, None).await
-    }
+    EventCommand::Inspect(opts) => EventArg::exec_inspect(cli_conf, opts).await,
     EventCommand::Watch => watch_event(cli_conf).await,
   }
 }

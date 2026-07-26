@@ -58,7 +58,7 @@ paths:
         example: '{ "filter": { "where": { "name": { "eq": "test" } } } }'
       - name: namespace
         in: query
-        description: Namespace where the cargoes belongs default to 'global'
+        description: Optional namespace filter; omitted or blank returns all namespaces
         required: false
         schema:
           type: string
@@ -118,7 +118,7 @@ paths:
         example: '{ "filter": { "where": { "name": { "eq": "my-cargo" } } } }'
       - name: namespace
         in: query
-        description: Namespace where the cargoes belongs default to 'global'
+        description: Optional namespace filter; omitted or blank returns all namespaces
         required: false
         schema:
           type: string
@@ -129,22 +129,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericCount'
-  /cargoes/{cargo_name}/exec:
+  /cargoes/{cargo_key}/exec:
     post:
       tags:
       - Cargoes
       operationId: create_exec_command
       parameters:
-      - name: Name
+      - name: cargo_key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
         schema:
           type: string
       requestBody:
@@ -164,23 +158,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{name}:
+  /cargoes/{cargo_key}/histories/{history_key}/revert:
+    patch:
+      tags:
+      - Cargoes
+      summary: Revert a cargo to a specific history record
+      operationId: revert_cargo
+      parameters:
+      - name: cargo_key
+        in: path
+        description: Canonical cargo key in `{name}.{namespace}` format
+        required: true
+        schema:
+          type: string
+      - name: history_key
+        in: path
+        description: Key of the cargo history
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Cargo revert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cargo'
+        '404':
+          description: Cargo does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /cargoes/{key}:
     put:
       tags:
       - Cargoes
       summary: Update a cargo by it's new specification and create a history record
       operationId: put_cargo
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
         schema:
           type: string
       requestBody:
@@ -205,12 +225,12 @@ paths:
     delete:
       tags:
       - Cargoes
-      summary: Delete a cargo by it's name
+      summary: Delete a cargo by its canonical key
       operationId: delete_cargo
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
         schema:
           type: string
@@ -220,12 +240,6 @@ paths:
         required: true
         schema:
           type: boolean
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
-        schema:
-          type: string
       responses:
         '202':
           description: Cargo deleted
@@ -238,19 +252,13 @@ paths:
     patch:
       tags:
       - Cargoes
-      summary: Patch a cargo with it's specification meaning merging current spec with the new one and add history record
+      summary: Patch a cargo by canonical key and add a history record
       operationId: patch_cargo
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
         schema:
           type: string
       requestBody:
@@ -272,23 +280,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{name}/histories:
+  /cargoes/{key}/histories:
     get:
       tags:
       - Cargoes
       summary: List cargo histories
       operationId: list_cargo_history
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:
@@ -306,61 +308,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{name}/histories/{key}/revert:
-    patch:
-      tags:
-      - Cargoes
-      summary: Revert a cargo to a specific history record
-      operationId: revert_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: key
-        in: path
-        description: Key of the cargo history
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Cargo revert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cargo'
-        '404':
-          description: Cargo does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /cargoes/{name}/inspect:
+  /cargoes/{key}/inspect:
     get:
       tags:
       - Cargoes
-      summary: Get detailed information about a cargo by its name
+      summary: Get detailed information about a cargo by its canonical key
       operationId: inspect_cargo
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Canonical cargo key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargoes belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:
@@ -1045,11 +1003,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericCount'
-  /processes/{kind}/{name}/kill:
+  /processes/{kind}/{key}/kill:
     post:
       tags:
       - Processes
-      summary: Send a signal to all processes of given kind and name (cargo, job, vm)
+      summary: Send a signal to all processes for a kind and canonical resource key
       operationId: kill_processes
       parameters:
       - name: kind
@@ -1059,19 +1017,13 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs if needed
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       requestBody:
         content:
           application/json:
@@ -1081,11 +1033,11 @@ paths:
       responses:
         '200':
           description: Process instances killed
-  /processes/{kind}/{name}/logs:
+  /processes/{kind}/{key}/logs:
     get:
       tags:
       - Processes
-      summary: Get logs of processes of given kind and name (cargo, job, vm)
+      summary: Get logs of processes for a kind and canonical resource key
       operationId: logs_processes
       parameters:
       - name: kind
@@ -1095,19 +1047,13 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace of the process
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       - name: since
         in: query
         description: Only logs returned since timestamp
@@ -1145,11 +1091,11 @@ paths:
           description: Process instances logs
           content:
             application/vdn.nanocl.raw-stream: {}
-  /processes/{kind}/{name}/restart:
+  /processes/{kind}/{key}/restart:
     post:
       tags:
       - Processes
-      summary: Restart all processes of given kind and name (cargo, job, vm)
+      summary: Restart all processes for a kind and canonical resource key
       operationId: restart_processes
       parameters:
       - name: kind
@@ -1159,27 +1105,21 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs if needed
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       responses:
         '202':
           description: Process instances restarted
-  /processes/{kind}/{name}/start:
+  /processes/{kind}/{key}/start:
     post:
       tags:
       - Processes
-      summary: Start all processes of given kind and name (cargo, job, vm)
+      summary: Start all processes for a kind and canonical resource key
       operationId: start_processes
       parameters:
       - name: kind
@@ -1189,27 +1129,21 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs if needed
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       responses:
         '202':
           description: Process instances started
-  /processes/{kind}/{name}/stats:
+  /processes/{kind}/{key}/stats:
     get:
       tags:
       - Processes
-      summary: Get stats of all processes of given kind and name (cargo, job, vm)
+      summary: Get stats of all processes for a kind and canonical resource key
       operationId: stats_processes
       parameters:
       - name: kind
@@ -1219,19 +1153,13 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process group
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs if needed
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       - name: stream
         in: query
         description: Return a stream of stats
@@ -1257,11 +1185,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /processes/{kind}/{name}/stop:
+  /processes/{kind}/{key}/stop:
     post:
       tags:
       - Processes
-      summary: Stop all processes of given kind and name (cargo, job, vm)
+      summary: Stop all processes for a kind and canonical resource key
       operationId: stop_processes
       parameters:
       - name: kind
@@ -1271,23 +1199,17 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs if needed
-        required: false
-        schema:
-          type: string
+        example: deploy-example.global
       responses:
         '202':
           description: Process instances stopped
-  /processes/{kind}/{name}/wait:
+  /processes/{kind}/{key}/wait:
     get:
       tags:
       - Processes
@@ -1301,9 +1223,9 @@ paths:
         schema:
           type: string
         example: cargo
-      - name: name
+      - name: key
         in: path
-        description: Name of the process instance
+        description: Canonical resource key (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
@@ -1961,7 +1883,7 @@ paths:
         example: '{ "filter": { "where": { "name": { "eq": "my-vm" } } } }'
       - name: namespace
         in: query
-        description: Namespace where the virtual machine belongs default to 'global'
+        description: Optional namespace filter; omitted or blank returns all namespaces
         required: false
         schema:
           type: string
@@ -2005,23 +1927,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /vms/{name}:
+  /vms/count:
+    get:
+      tags:
+      - Vms
+      summary: Count vm images
+      operationId: count_vm
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+        example: '{ "filter": { "where": { "name": { "eq": "global" } } } }'
+      - name: namespace
+        in: query
+        description: Optional namespace filter; omitted or blank returns all namespaces
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Count result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
+  /vms/{key}:
     delete:
       tags:
       - Vms
-      summary: Delete a virtual machine by name
+      summary: Delete a virtual machine by canonical key
       operationId: delete_vm
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: The name of the virtual machine
+        description: Canonical VM key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the virtual machine belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:
@@ -2039,16 +1982,10 @@ paths:
       summary: Patch a virtual machine config meaning merging current config with the new one and add history entry
       operationId: patch_vm
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the virtual machine
+        description: Canonical VM key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the virtual machine belongs default to 'global'
-        required: false
         schema:
           type: string
       requestBody:
@@ -2070,45 +2007,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /vms/{name}/attach:
+  /vms/{key}/attach:
     get:
       tags:
       - Vms
       summary: Attach to a virtual machine via websocket
       operationId: vm_attach
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: Name of the virtual machine
+        description: Canonical VM key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the virtual machine belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:
         '101':
           description: Websocket connection
-  /vms/{name}/histories:
+  /vms/{key}/histories:
     get:
       tags:
       - Vms
       summary: List virtual machine histories
       operationId: list_vm_history
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: The name of the virtual machine
+        description: Canonical VM key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the virtual machine belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:
@@ -2126,23 +2051,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /vms/{name}/inspect:
+  /vms/{key}/inspect:
     get:
       tags:
       - Vms
       summary: Get detailed information about a virtual machine
       operationId: inspect_vm
       parameters:
-      - name: name
+      - name: key
         in: path
-        description: The name of the virtual machine
+        description: Canonical VM key in `{name}.{namespace}` format
         required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the virtual machine belongs default to 'global'
-        required: false
         schema:
           type: string
       responses:

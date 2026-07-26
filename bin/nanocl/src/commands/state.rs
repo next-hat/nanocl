@@ -188,15 +188,20 @@ async fn log_jobs(
 pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoSpecPartial>,
+  namespace: &str,
   query: &ProcessLogQuery,
 ) {
   cargoes
     .into_iter()
     .map(|cargo| async move {
-      match client
-        .logs_processes("cargo", &cargo.name, Some(query))
-        .await
-      {
+      let key = match utils::process::resource_key(&cargo.name, namespace) {
+        Ok(key) => key,
+        Err(err) => {
+          eprintln!("Cannot resolve cargo {} key: {err}", &cargo.name);
+          return;
+        }
+      };
+      match client.logs_processes("cargo", &key, Some(query)).await {
         Err(err) => {
           eprintln!("Cannot attach to cargo {}: {err}", &cargo.name);
         }
@@ -844,7 +849,7 @@ async fn state_apply(
       )
       .await?;
       pg.set_message("(starting)");
-      client.start_process("job", &job.name, None).await?;
+      client.start_process("job", &job.name).await?;
       waiter.await.map_err(|err| {
         IoError::interrupted("wait_process_state", &err.to_string())
       })??;
@@ -859,21 +864,20 @@ async fn state_apply(
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
       let metadata = insert_nanocl_group(&cargo.metadata, &nanocl_group);
       cargo.metadata = Some(metadata);
-      match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
+      let key = utils::process::resource_key(&cargo.name, &namespace)?;
+      match client.inspect_cargo(&key).await {
         Err(_) => {
           pg.set_message("(creating)");
           client.create_cargo(&cargo, Some(&namespace)).await?;
           let waiter = utils::process::wait_process_state(
-            &format!("{}.{namespace}", cargo.name),
+            &key,
             EventActorKind::Cargo,
             vec![NativeEventAction::Start],
             client,
           )
           .await?;
           pg.set_message("(starting)");
-          client
-            .start_process("cargo", &cargo.name, Some(&namespace))
-            .await?;
+          client.start_process("cargo", &key).await?;
           waiter.await.map_err(|err| {
             IoError::interrupted("wait_process_state", &err.to_string())
           })??;
@@ -883,15 +887,13 @@ async fn state_apply(
           if (cmp != cargo) || opts.reload {
             pg.set_message("(updating)");
             let waiter = utils::process::wait_process_state(
-              &format!("{}.{namespace}", cargo.name),
+              &key,
               EventActorKind::Cargo,
               vec![NativeEventAction::Start],
               client,
             )
             .await?;
-            client
-              .put_cargo(&cargo.name, &cargo, Some(&namespace))
-              .await?;
+            client.put_cargo(&key, &cargo).await?;
             waiter.await.map_err(|err| {
               IoError::interrupted("wait_process_state", &err.to_string())
             })??;
@@ -913,23 +915,22 @@ async fn state_apply(
       let pg = utils::progress::create_progress("(submitting)", &pg_style);
       let metadata = insert_nanocl_group(&vm.metadata, &nanocl_group);
       vm.metadata = Some(metadata);
-      match client.inspect_vm(&vm.name, Some(&namespace)).await {
+      let key = utils::process::resource_key(&vm.name, &namespace)?;
+      match client.inspect_vm(&key).await {
         Err(_) => {
           pg.set_message("(creating)");
           let image_full_path = utils::path::resolve_full_path(&vm.image)?;
           vm.image = image_full_path;
           client.create_vm(&vm, Some(&namespace)).await?;
           let waiter = utils::process::wait_process_state(
-            &format!("{}.{namespace}", vm.name),
+            &key,
             EventActorKind::Vm,
             vec![NativeEventAction::Start],
             client,
           )
           .await?;
           pg.set_message("(starting)");
-          client
-            .start_process("vm", &vm.name, Some(&namespace))
-            .await?;
+          client.start_process("vm", &key).await?;
           waiter.await.map_err(|err| {
             IoError::interrupted("wait_process_state", &err.to_string())
           })??;
@@ -940,13 +941,13 @@ async fn state_apply(
             let update: VmSpecUpdate = vm.clone().into();
             pg.set_message("(updating)");
             let waiter = utils::process::wait_process_state(
-              &format!("{}.{namespace}", vm.name),
-              EventActorKind::Cargo,
+              &key,
+              EventActorKind::Vm,
               vec![NativeEventAction::Start],
               client,
             )
             .await?;
-            client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
+            client.patch_vm(&key, &update).await?;
             waiter.await.map_err(|err| {
               IoError::interrupted("wait_process_state", &err.to_string())
             })??;
@@ -1019,7 +1020,13 @@ async fn remove_orphans(
     .client
     .list_cargo(Some(&GenericFilterNsp {
       filter: Some(filter.clone()),
-      namespace: state.data.namespace.clone(),
+      namespace: Some(
+        state
+          .data
+          .namespace
+          .clone()
+          .unwrap_or_else(|| "global".to_owned()),
+      ),
     }))
     .await?
     .iter()
@@ -1029,7 +1036,13 @@ async fn remove_orphans(
     .client
     .list_vm(Some(&GenericFilterNsp {
       filter: Some(filter.clone()),
-      namespace: state.data.namespace.clone(),
+      namespace: Some(
+        state
+          .data
+          .namespace
+          .clone()
+          .unwrap_or_else(|| "global".to_owned()),
+      ),
     }))
     .await?
     .iter()
@@ -1139,7 +1152,6 @@ async fn state_logs(
     tail,
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),
-    namespace: state_file.data.namespace.clone(),
     ..Default::default()
   };
   join!(
@@ -1151,6 +1163,7 @@ async fn state_logs(
     log_cargoes(
       client,
       state_file.data.cargoes.clone().unwrap_or_default(),
+      state_file.data.namespace.as_deref().unwrap_or("global"),
       &log_opts
     )
   );
@@ -1191,27 +1204,29 @@ async fn state_remove(
   };
   if let Some(jobs) = &state_file.data.jobs {
     gen_rm_opts.keys = jobs.iter().map(|job| job.name.clone()).collect();
-    if let Err(err) = JobArg::exec_rm(client, &gen_rm_opts, None).await {
+    if let Err(err) = JobArg::exec_rm(client, &gen_rm_opts).await {
       eprintln!("Error while removing jobs {err}");
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
-      keys: cargoes.iter().map(|cargo| cargo.name.clone()).collect(),
+      keys: cargoes
+        .iter()
+        .map(|cargo| utils::process::resource_key(&cargo.name, namespace))
+        .collect::<IoResult<Vec<_>>>()?,
       skip_confirm: true,
       others: GenericRemoveForceOpts { force: true },
     };
-    if let Err(err) =
-      CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await
-    {
+    if let Err(err) = CargoArg::exec_rm(client, &opts).await {
       eprintln!("Error while removing cargoes {err}");
     }
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    gen_rm_opts.keys = vms.iter().map(|vm| vm.name.clone()).collect();
-    if let Err(err) =
-      VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await
-    {
+    gen_rm_opts.keys = vms
+      .iter()
+      .map(|vm| utils::process::resource_key(&vm.name, namespace))
+      .collect::<IoResult<Vec<_>>>()?;
+    if let Err(err) = VmArg::exec_rm(client, &gen_rm_opts).await {
       eprintln!("Error while removing vms {err}");
     }
   }
@@ -1220,14 +1235,14 @@ async fn state_remove(
       .iter()
       .map(|resource| resource.name.clone())
       .collect();
-    if let Err(err) = ResourceArg::exec_rm(client, &gen_rm_opts, None).await {
+    if let Err(err) = ResourceArg::exec_rm(client, &gen_rm_opts).await {
       eprintln!("Error while removing resources {err}");
     }
   }
   if let Some(secrets) = &state_file.data.secrets {
     gen_rm_opts.keys =
       secrets.iter().map(|secret| secret.name.clone()).collect();
-    if let Err(err) = SecretArg::exec_rm(client, &gen_rm_opts, None).await {
+    if let Err(err) = SecretArg::exec_rm(client, &gen_rm_opts).await {
       eprintln!("Error while removing secrets {err}");
     }
   }

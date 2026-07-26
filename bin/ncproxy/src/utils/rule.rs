@@ -136,17 +136,23 @@ fn format_listen_addr(ip: &str, port: u16) -> IoResult<String> {
 }
 
 fn parse_upstream_target(key: &str) -> IoResult<(String, String, String)> {
-  let info = key.split('.').collect::<Vec<&str>>();
-  if info.len() < 3 {
+  let Some((resource_key, kind)) = key.rsplit_once('.') else {
     return Err(IoError::invalid_data(
       "TargetKey",
       "Invalid expected <name>.<namespace>.<kind>",
     ));
+  };
+  if kind.is_empty() {
+    return Err(IoError::invalid_data("TargetKey", "Kind cannot be empty"));
   }
-  let name = info[0].to_owned();
-  let namespace = info[1].to_owned();
-  let kind = info[2].to_owned();
-  Ok((name, namespace, kind))
+  let resource_key = resource_key
+    .parse::<nanocld_client::stubs::resource_key::ResourceKey>()
+    .map_err(|err| IoError::invalid_data("TargetKey", &err.to_string()))?;
+  Ok((
+    resource_key.name().to_owned(),
+    resource_key.namespace().to_owned(),
+    kind.to_owned(),
+  ))
 }
 
 fn process_is_running(process: &Process) -> bool {
@@ -331,50 +337,55 @@ pub async fn gen_upstream(
     parse_upstream_target(&target.key)?;
   let port = target.port;
   let local_node = get_local_node(&state.client).await?;
-  let (key, content) = match target_kind.as_str() {
-    "c" => {
-      let cargo = state
-        .client
-        .inspect_cargo(&target_name, Some(&target_namespace))
-        .await
-        .map_err(|err| {
-          err.map_err_context(|| {
-            format!("Unable to inspect cargo {target_name}")
-          })
-        })?;
-      let addresses = get_addresses(&cargo.instances, &local_node).await?;
-      let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
-      let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
-        "key": key,
-        "port": port,
-        "addresses": addresses,
-      }))?;
-      (key, data)
-    }
-    "v" => {
-      let vm = state
-        .client
-        .inspect_vm(&target_name, Some(&target_namespace))
-        .await
-        .map_err(|err| {
-          err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
-        })?;
-      let addresses = get_addresses(&vm.instances, &local_node).await?;
-      let key = format!("{}-{}-vm", vm.spec.vm_key, port);
-      let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
-        "key": key,
-        "port": port,
-        "addresses": addresses,
-      }))?;
-      (key, data)
-    }
-    _ => {
-      return Err(IoError::invalid_data(
-        "UpstreamTarget",
-        &format!("Unknown Kind {}", target_kind),
-      ));
-    }
-  };
+  let target_key = nanocld_client::stubs::resource_key::ResourceKey::new(
+    &target_name,
+    &target_namespace,
+  )
+  .map_err(|err| IoError::invalid_input("Upstream key", &err.to_string()))?;
+  let (key, content) =
+    match target_kind.as_str() {
+      "c" => {
+        let cargo = state
+          .client
+          .inspect_cargo(target_key.as_str())
+          .await
+          .map_err(|err| {
+            err.map_err_context(|| {
+              format!("Unable to inspect cargo {target_name}")
+            })
+          })?;
+        let addresses = get_addresses(&cargo.instances, &local_node).await?;
+        let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
+        let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
+          "key": key,
+          "port": port,
+          "addresses": addresses,
+        }))?;
+        (key, data)
+      }
+      "v" => {
+        let vm = state.client.inspect_vm(target_key.as_str()).await.map_err(
+          |err| {
+            err
+              .map_err_context(|| format!("Unable to inspect vm {target_name}"))
+          },
+        )?;
+        let addresses = get_addresses(&vm.instances, &local_node).await?;
+        let key = format!("{}-{}-vm", vm.spec.vm_key, port);
+        let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
+          "key": key,
+          "port": port,
+          "addresses": addresses,
+        }))?;
+        (key, data)
+      }
+      _ => {
+        return Err(IoError::invalid_data(
+          "UpstreamTarget",
+          &format!("Unknown Kind {}", target_kind),
+        ));
+      }
+    };
   Ok(PreparedUpstream { key, content })
 }
 
