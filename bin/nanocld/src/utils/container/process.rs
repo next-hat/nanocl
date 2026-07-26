@@ -63,7 +63,7 @@ pub async fn create(
   // Keep this defensive check at the final local Docker boundary. Workload
   // paths also preflight their unique networks before parallel/destructive
   // operations, but every process creation must remain safe on its own.
-  super::network::ensure_network_exists(&network_mode, state).await?;
+  let _ = super::network::ensure_network_exists(&network_mode, state).await?;
   let mut labels = item.labels.to_owned().unwrap_or_default();
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
   labels.insert("io.nanocl.kind".to_owned(), kind.to_string());
