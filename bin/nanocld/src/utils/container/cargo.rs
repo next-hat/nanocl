@@ -226,7 +226,10 @@ pub async fn create(
   // Resolve the network once before spawning replica creation futures.
   ensure_networks(cargo, state).await?;
   let data = serde_json::to_string(&cargo)?;
-  let new_data = super::generic::inject_data(&data, state).await?;
+  let network_mode =
+    super::network::container_network_mode(&cargo.spec.container);
+  let new_data =
+    super::generic::inject_data(&data, &network_mode, state).await?;
   let cargo = &serde_json::from_str::<Cargo>(&new_data)?;
   super::image::download(
     &cargo.spec.container.image.clone().unwrap_or_default(),
