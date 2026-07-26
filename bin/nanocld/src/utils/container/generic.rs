@@ -157,25 +157,31 @@ pub async fn emit_stopping(
 ///
 pub async fn inject_data(
   payload: &str,
+  network_mode: &str,
   state: &SystemState,
 ) -> IoResult<String> {
   if !payload.contains("$$INTERNAL_GATEWAY") {
     return Ok(payload.to_owned());
   }
-  // The token explicitly refers to Nanocl's internal gateway. Ensure it is
-  // available before inspecting it, even when the workload itself uses a
-  // different network.
-  super::network::ensure_network_exists(super::network::DEFAULT_NETWORK, state)
-    .await?;
+  let network_name =
+    match super::network::ensure_network_exists(network_mode, state).await? {
+      Some(network_name) => network_name,
+      None => super::network::ensure_network_exists(
+        super::network::DEFAULT_NETWORK,
+        state,
+      )
+      .await?
+      .unwrap_or_else(|| super::network::DEFAULT_NETWORK.to_owned()),
+    };
   let network_gateway = state
     .inner
     .docker_api
-    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .inspect_network(&network_name, None::<InspectNetworkOptions<String>>)
     .await
     .map_err(|err| {
       IoError::interrupted(
         "Network",
-        &format!("Unable to inspect network nanoclbr0 {err}"),
+        &format!("Unable to inspect network {network_name} {err}"),
       )
     })?;
   let ipam = network_gateway.ipam.unwrap_or_default();
@@ -183,7 +189,7 @@ pub async fn inject_data(
   let Some(network) = ipam_config.first() else {
     return Err(IoError::invalid_data(
       "Network",
-      "No network found for nanoclbr0",
+      &format!("No network found for {network_name}"),
     ));
   };
   let gateway_addr = network.gateway.clone().unwrap_or_default();
