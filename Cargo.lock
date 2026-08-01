@@ -150,6 +150,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
+name = "atoi_simd"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3cdb3708a128e559a30fb830e8a77a5022ee6902806925c216658652b452a44"
+dependencies = [
+ "debug_unsafe",
+ "rustversion",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -701,6 +711,12 @@ name = "data-encoding"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
+
+[[package]]
+name = "debug_unsafe"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eed2c4702fa172d1ce21078faa7c5203e69f5394d48cc436d25928394a867a2"
 
 [[package]]
 name = "defmt"
@@ -1914,7 +1930,7 @@ checksum = "3763526d171df5398b9698b74956cd9f0462a5c14e06bb3d5a28b4cca41dc0db"
 dependencies = [
  "futures",
  "metrs_stubs",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -2014,7 +2030,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "nix",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "openssl",
  "regex",
  "ring",
@@ -2036,7 +2052,7 @@ version = "0.7.0"
 dependencies = [
  "bollard-next",
  "diesel",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -2069,7 +2085,7 @@ dependencies = [
  "libc",
  "log",
  "nanocl_error",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "serde",
  "serde_json",
  "utoipa",
@@ -2099,7 +2115,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "ntex-cors",
  "num_cpus",
  "openssl",
@@ -2122,7 +2138,7 @@ dependencies = [
  "futures",
  "nanocl_error",
  "nanocl_stubs",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "openssl",
  "serde",
  "serde_json",
@@ -2147,7 +2163,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2172,7 +2188,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2191,7 +2207,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.10.1",
+ "ntex 3.11.0",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2277,10 +2293,11 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "3.10.1"
+version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf010b0d2654465c75355a21295e6c9a66cf83719d324fccf8af1e0c941ab023"
+checksum = "7b25d0a06e07b3f8a35159b2cef8f5c6b132fa2070334484991d28f19e4171a2"
 dependencies = [
+ "atoi_simd",
  "base64",
  "bitflags 2.13.1",
  "derive_more",
@@ -2297,6 +2314,7 @@ dependencies = [
  "ntex-error",
  "ntex-h2 3.12.1",
  "ntex-http 1.2.0",
+ "ntex-httparse",
  "ntex-io 3.13.1",
  "ntex-macros 3.3.0",
  "ntex-net 3.13.1",
@@ -2367,7 +2385,7 @@ checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.10.1",
+ "ntex 3.11.0",
 ]
 
 [[package]]
@@ -2472,6 +2490,15 @@ dependencies = [
  "ntex-bytes 1.9.0",
  "serde",
  "thiserror 2.0.19",
+]
+
+[[package]]
+name = "ntex-httparse"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cd04f3587bb190f11af135f652edff77f368d0940db134fa5a48c1f12c60b07"
+dependencies = [
+ "simdutf8",
 ]
 
 [[package]]
@@ -3718,6 +3745,12 @@ name = "simd-adler32"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+
+[[package]]
+name = "simdutf8"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "slab"
