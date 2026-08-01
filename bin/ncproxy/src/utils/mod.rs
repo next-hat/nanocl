@@ -30,7 +30,7 @@ pub(crate) mod tests {
 
   pub async fn ensure_test_cargo() -> IoResult<()> {
     const CARGO_NAME: &str = "ncproxy-test";
-    const CARGO_KEY: &str = "ncproxy-test.global";
+    const CARGO_KEY: &str = "global.ncproxy-test";
     const CARGO_IMAGE: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".to_owned(),
@@ -52,7 +52,7 @@ pub(crate) mod tests {
   }
 
   pub async fn clean_test_cargo() -> IoResult<()> {
-    const CARGO_KEY: &str = "ncproxy-test.global";
+    const CARGO_KEY: &str = "global.ncproxy-test";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()

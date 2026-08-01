@@ -354,7 +354,7 @@ mod tests {
   #[test]
   fn namespace_is_only_available_for_collection_and_creation_commands() {
     let inspect =
-      CargoArg::try_parse_from(["cargo", "inspect", "same.system"]).unwrap();
+      CargoArg::try_parse_from(["cargo", "inspect", "system.same"]).unwrap();
     assert!(matches!(inspect.command, CargoCommand::Inspect(_)));
     assert!(
       CargoArg::try_parse_from([
@@ -362,7 +362,7 @@ mod tests {
         "--namespace",
         "system",
         "inspect",
-        "same.system"
+        "system.same"
       ])
       .is_err()
     );
@@ -387,7 +387,7 @@ mod tests {
   fn table_rows_distinguish_duplicate_local_names() {
     let table = tabled::Table::new([
       CargoRow {
-        key: "same.global".to_owned(),
+        key: "global.same".to_owned(),
         image: "alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
@@ -396,7 +396,7 @@ mod tests {
         updated_at: String::new(),
       },
       CargoRow {
-        key: "same.system".to_owned(),
+        key: "system.same".to_owned(),
         image: "alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
@@ -407,7 +407,7 @@ mod tests {
     ])
     .to_string();
     assert!(table.contains("KEY"));
-    assert!(table.contains("same.global"));
-    assert!(table.contains("same.system"));
+    assert!(table.contains("global.same"));
+    assert!(table.contains("system.same"));
   }
 }

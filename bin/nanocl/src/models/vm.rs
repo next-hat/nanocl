@@ -277,7 +277,7 @@ mod tests {
   #[test]
   fn namespace_is_only_available_for_collection_and_creation_commands() {
     let inspect =
-      VmArg::try_parse_from(["vm", "inspect", "database.production"]).unwrap();
+      VmArg::try_parse_from(["vm", "inspect", "production.database"]).unwrap();
     assert!(matches!(inspect.command, VmCommand::Inspect(_)));
     assert!(
       VmArg::try_parse_from([
@@ -285,7 +285,7 @@ mod tests {
         "--namespace",
         "production",
         "inspect",
-        "database.production"
+        "production.database"
       ])
       .is_err()
     );
@@ -303,7 +303,7 @@ mod tests {
   fn table_rows_distinguish_duplicate_local_names() {
     let table = tabled::Table::new([
       VmRow {
-        key: "same.global".to_owned(),
+        key: "global.same".to_owned(),
         image: "image.qcow2".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
@@ -312,7 +312,7 @@ mod tests {
         updated_at: String::new(),
       },
       VmRow {
-        key: "same.production".to_owned(),
+        key: "production.same".to_owned(),
         image: "image.qcow2".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
@@ -323,7 +323,7 @@ mod tests {
     ])
     .to_string();
     assert!(table.contains("KEY"));
-    assert!(table.contains("same.global"));
-    assert!(table.contains("same.production"));
+    assert!(table.contains("global.same"));
+    assert!(table.contains("production.same"));
   }
 }

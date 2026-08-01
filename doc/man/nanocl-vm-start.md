@@ -7,19 +7,20 @@ sidebar_position: 90
 
 # NAME
 
-start - Start a vm
+start - Start VMs by canonical keys
 
 ## SYNOPSIS
 
-**start** \[**-h**\|**--help**\] \[*NAMES*\]
+**start** \[**-h**\|**--help**\] \[*KEYS*\]
 
 ## DESCRIPTION
 
-Start a vm
+Start VMs by canonical keys
 
 ## OPTIONS
 
 **-h**, **--help**  
 Print help
 
-\[*NAMES*\]  
+\[*KEYS*\]
+Canonical keys of the resources to start

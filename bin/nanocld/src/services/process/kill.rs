@@ -13,7 +13,7 @@ use crate::{models::SystemState, utils};
   path = "/processes/{kind}/{key}/kill",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
   ),
   responses(
     (status = 200, description = "Process instances killed"),
@@ -39,7 +39,7 @@ pub async fn kill_processes(
   request_body = CargoKillOptions,
   path = "/processes/{name}/kill",
   params(
-    ("name" = String, Path, description = "Name or id of the container", example = "nstore.system.c"),
+    ("name" = String, Path, description = "Name or id of the container", example = "system.nstore.c"),
   ),
   responses(
     (status = 200, description = "Process killed"),

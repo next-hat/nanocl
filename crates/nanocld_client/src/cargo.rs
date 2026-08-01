@@ -55,7 +55,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.delete_cargo("my-cargo.global", None).await;
+  /// let res = client.delete_cargo("global.my-cargo", None).await;
   /// ```
   pub async fn delete_cargo(
     &self,
@@ -76,7 +76,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.inspect_cargo("my-cargo.global").await;
+  /// let res = client.inspect_cargo("global.my-cargo").await;
   /// ```
   pub async fn inspect_cargo(
     &self,
@@ -122,10 +122,11 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo_spec = CargoSpecPatch {
-  ///   name: "my-cargo-renamed".into(),
+  /// let cargo_spec = CargoSpecUpdate {
+  ///   name: Some("my-cargo".into()),
+  ///   ..Default::default()
   /// };
-  /// client.patch_cargo("my-cargo.global", cargo).await.unwrap();
+  /// client.patch_cargo("global.my-cargo", &cargo_spec).await.unwrap();
   /// ```
   pub async fn patch_cargo(
     &self,
@@ -152,9 +153,10 @@ impl NanocldClient {
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo_spec = CargoSpecPartial {
-  ///   name: "my-cargo-renamed".into(),
+  ///   name: "my-cargo".into(),
+  ///   ..Default::default()
   /// };
-  /// client.put_cargo("my-cargo.global", &cargo).await.unwrap();
+  /// client.put_cargo("global.my-cargo", &cargo_spec).await.unwrap();
   /// ```
   pub async fn put_cargo(
     &self,
@@ -179,7 +181,10 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let histories = client.list_history("my-cargo", None).await.unwrap();
+  /// let histories = client
+  ///   .list_history_cargo("global.my-cargo")
+  ///   .await
+  ///   .unwrap();
   /// ```
   pub async fn list_history_cargo(
     &self,
@@ -202,7 +207,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo = client.revert_cargo("my-cargo.global", "my-history-id").await.unwrap();
+  /// let cargo = client.revert_cargo("global.my-cargo", "my-history-id").await.unwrap();
   /// ```
   pub async fn revert_cargo(
     &self,
@@ -227,7 +232,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.list_cargo_instance("my-cargo.global").await;
+  /// let res = client.list_cargo_instance("global.my-cargo").await;
   /// ```
   pub async fn list_cargo_instance(
     &self,
@@ -270,7 +275,7 @@ mod tests {
       ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
-    let cargo_key = format!("{CARGO_NAME}.global");
+    let cargo_key = format!("global.{CARGO_NAME}");
     client.start_process("cargo", &cargo_key).await.unwrap();
     client.inspect_cargo(&cargo_key).await.unwrap();
     let cargo_update = CargoSpecUpdate {
@@ -321,7 +326,7 @@ mod tests {
       _ => panic!("Wrong error type"),
     }
     client
-      .delete_cargo("client-test-cargodup.global", None)
+      .delete_cargo("global.client-test-cargodup", None)
       .await
       .unwrap();
   }

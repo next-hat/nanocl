@@ -13,6 +13,7 @@ With `scripts/generate_man.sh` script.
 * [Nanocl cargo history](./nanocl-cargo-history.md)
 * [Nanocl cargo image](./nanocl-cargo-image.md)
 * [Nanocl cargo inspect](./nanocl-cargo-inspect.md)
+* [Nanocl cargo kill](./nanocl-cargo-kill.md)
 * [Nanocl cargo list](./nanocl-cargo-list.md)
 * [Nanocl cargo logs](./nanocl-cargo-logs.md)
 * [Nanocl cargo patch](./nanocl-cargo-patch.md)

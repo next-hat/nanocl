@@ -188,7 +188,7 @@ mod tests {
     // Try to list cargoes
     assert_cli_ok!("cargo", "ls");
     // Try to start a cargo
-    const CARGO_KEY: &str = "cli-test.global";
+    const CARGO_KEY: &str = "global.cli-test";
     assert_cli_ok!("cargo", "start", CARGO_KEY);
     // Try to inspect a cargo
     assert_cli_ok!("cargo", "inspect", CARGO_KEY);
@@ -329,11 +329,11 @@ mod tests {
   /// Test cargo exec command
   #[ntex::test]
   async fn cargo_exec() {
-    assert_cli_ok!("cargo", "exec", "nstore.system", "--", "echo", "hello",);
+    assert_cli_ok!("cargo", "exec", "system.nstore", "--", "echo", "hello",);
     assert_cli_ok!(
       "cargo",
       "exec",
-      "nstore.system",
+      "system.nstore",
       "-e",
       "A=test",
       "--",
@@ -342,13 +342,13 @@ mod tests {
     assert_cli_ok!(
       "cargo",
       "exec",
-      "nstore.system",
+      "system.nstore",
       "--privileged",
       "--",
       "whoami",
     );
-    assert_cli_ok!("cargo", "exec", "nstore.system", "-t", "--", "ls",);
-    assert_cli_ok!("cargo", "exec", "nstore.system", "-u", "0", "--", "whoami",);
+    assert_cli_ok!("cargo", "exec", "system.nstore", "-t", "--", "ls",);
+    assert_cli_ok!("cargo", "exec", "system.nstore", "-u", "0", "--", "whoami",);
   }
 
   #[ntex::test]
@@ -680,7 +680,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_basic() {
-    const CARGO_KEY: &str = "cli-test-run.global";
+    const CARGO_KEY: &str = "global.cli-test-run";
     assert_cli_ok!(
       "cargo",
       "run",
@@ -718,9 +718,9 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_logs() {
-    assert_cli_ok!("cargo", "logs", "nanocld.system");
-    assert_cli_ok!("cargo", "logs", "nstore.system");
-    assert_cli_ok!("cargo", "logs", "nstore.system", "-t", "10");
+    assert_cli_ok!("cargo", "logs", "system.nanocld");
+    assert_cli_ok!("cargo", "logs", "system.nstore");
+    assert_cli_ok!("cargo", "logs", "system.nstore", "-t", "10");
   }
 
   #[ntex::test]
@@ -835,7 +835,7 @@ mod tests {
 
   #[ntex::test]
   async fn virtual_machine() {
-    const VM_KEY: &str = "test-cli-vm.global";
+    const VM_KEY: &str = "global.test-cli-vm";
     assert_cli_ok!(
       "vm",
       "create",
@@ -859,7 +859,7 @@ mod tests {
   #[ntex::test]
   async fn stats() {
     ntex::rt::spawn(async {
-      assert_cli_ok!("stats", "nstore.system.c");
+      assert_cli_ok!("stats", "system.nstore.c");
     });
   }
 
@@ -871,12 +871,12 @@ mod tests {
 
   #[ntex::test]
   async fn logs() {
-    assert_cli_ok!("logs", "nstore.system.c");
-    assert_cli_ok!("logs", "nstore.system.c", "-s", "0");
+    assert_cli_ok!("logs", "system.nstore.c");
+    assert_cli_ok!("logs", "system.nstore.c", "-s", "0");
   }
 
   #[ntex::test]
   async fn inspect() {
-    assert_cli_ok!("inspect", "nstore.system.c");
+    assert_cli_ok!("inspect", "system.nstore.c");
   }
 }

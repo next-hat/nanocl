@@ -45,7 +45,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: e2e-private-api.global.c
+          Key: global.e2e-private-api.c
           Port: 9000
 
 - Name: e2e-network-dns

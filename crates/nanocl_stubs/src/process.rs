@@ -87,7 +87,7 @@ pub struct ProcessPartial {
   pub data: serde_json::Value,
   /// Name of the node where the container is running
   pub node_name: String,
-  /// Key of the related kind
+  /// Canonical resource key for cargoes and VMs; jobs use their name
   pub kind_key: String,
   /// The created at date
   #[cfg_attr(
@@ -116,7 +116,7 @@ pub struct Process {
   pub kind: ProcessKind,
   /// Name of the node where the container is running
   pub node_name: String,
-  /// Key of the related kind
+  /// Canonical resource key for cargoes and VMs; jobs use their name
   pub kind_key: String,
   /// The data of the process a ContainerInspect
   pub data: ContainerInspectResponse,

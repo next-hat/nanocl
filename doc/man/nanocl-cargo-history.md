@@ -11,7 +11,7 @@ history - List cargo history
 
 ## SYNOPSIS
 
-**history** \[**-h**\|**--help**\] \<*NAME*\>
+**history** \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
 
@@ -22,5 +22,5 @@ List cargo history
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of cargo to browse history
+\<*KEY*\>
+Canonical key of the cargo whose history to browse

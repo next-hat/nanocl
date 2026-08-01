@@ -79,3 +79,17 @@ pub async fn wait_process_state(
   });
   Ok(fut)
 }
+
+#[cfg(test)]
+mod tests {
+  use super::resource_key;
+
+  #[test]
+  fn state_resource_keys_use_namespace_name_order() {
+    assert_eq!(resource_key("jellyfin", "media").unwrap(), "media.jellyfin");
+    assert_eq!(
+      resource_key("website", "team.production").unwrap(),
+      "team.production.website"
+    );
+  }
+}

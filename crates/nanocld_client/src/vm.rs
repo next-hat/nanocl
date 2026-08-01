@@ -59,7 +59,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.delete_vm("my-vm.global").await;
+  /// let res = client.delete_vm("global.my-vm").await;
   /// ```
   pub async fn delete_vm(&self, key: &str) -> HttpClientResult<()> {
     self
@@ -77,7 +77,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.inspect_vm("my-vm.global").await;
+  /// let res = client.inspect_vm("global.my-vm").await;
   /// ```
   pub async fn inspect_vm(&self, key: &str) -> HttpClientResult<VmInspect> {
     let res = self
@@ -111,7 +111,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.attach_vm("my-vm.global").await;
+  /// let res = client.attach_vm("global.my-vm").await;
   /// ```
   pub async fn attach_vm(
     &self,

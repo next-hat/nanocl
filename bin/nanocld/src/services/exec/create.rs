@@ -12,7 +12,7 @@ use crate::{models::SystemState, utils};
   request_body = CreateExecOptions,
   path = "/cargoes/{cargo_key}/exec",
   params(
-    ("cargo_key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("cargo_key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Event Stream of the command output", content_type = "text/event-stream"),

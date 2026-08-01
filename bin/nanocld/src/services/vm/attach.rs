@@ -124,7 +124,7 @@ async fn ws_attach_service(
   tag = "Vms",
   path = "/vms/{key}/attach",
   params(
-    ("key" = String, Path, description = "Canonical VM key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 101, description = "Websocket connection"),

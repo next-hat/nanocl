@@ -13,13 +13,13 @@ Resources:
       Port: 8181
       Protocol: Tcp
       Target:
-        Key: deploy-example2.global.c
+        Key: global.deploy-example2.c
         Port: 9000
     - Network: Local
       Port: 8181
       Protocol: Tcp
       Target:
-        Key: deploy-example2.global.c
+        Key: global.deploy-example2.c
         Port: 9000
 
 # See all options:

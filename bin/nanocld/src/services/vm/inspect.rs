@@ -14,7 +14,7 @@ use crate::{
   tag = "Vms",
   path = "/vms/{key}/inspect",
   params(
-    ("key" = String, Path, description = "Canonical VM key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Detailed information about a virtual machine", body = nanocl_stubs::vm::VmInspect),

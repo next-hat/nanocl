@@ -13,7 +13,7 @@ use crate::{
   tag = "Vms",
   path = "/vms/{key}/histories",
   params(
-    ("key" = String, Path, description = "Canonical VM key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "The virtual machine histories have been listed", body = [nanocl_stubs::vm_spec::VmSpec]),

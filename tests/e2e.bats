@@ -102,9 +102,9 @@ teardown_file() {
   run docker network inspect e2e-private
   [ "$status" -eq 0 ]
 
-  api_container="$(docker ps -q --filter label=io.nanocl.c=e2e-private-api.global | head -n 1)"
-  peer_container="$(docker ps -q --filter label=io.nanocl.c=e2e-private-peer.global | head -n 1)"
-  default_container="$(docker ps -q --filter label=io.nanocl.c=e2e-default-client.global | head -n 1)"
+  api_container="$(docker ps -q --filter label=io.nanocl.c=global.e2e-private-api | head -n 1)"
+  peer_container="$(docker ps -q --filter label=io.nanocl.c=global.e2e-private-peer | head -n 1)"
+  default_container="$(docker ps -q --filter label=io.nanocl.c=global.e2e-default-client | head -n 1)"
   job_container="$(docker ps -aq --filter label=io.nanocl.j=e2e-private-job | head -n 1)"
   [ -n "$api_container" ]
   [ -n "$peer_container" ]
@@ -156,7 +156,7 @@ teardown_file() {
   [[ "$output" == *'"Name":"e2e-private"'* ]]
 
   node_name="$(docker inspect --format \
-    '{{range .Config.Env}}{{println .}}{{end}}' ncproxy.system.c | \
+    '{{range .Config.Env}}{{println .}}{{end}}' system.ncproxy.c | \
     sed -n 's/^NANOCL_NODE=//p' | head -n 1)"
   [ -n "$node_name" ]
 
@@ -172,7 +172,7 @@ teardown_file() {
     --header 'Host: network-partitioning.nanocl.test' "http://${gateway}"
   [ "$status" -eq 0 ]
 
-  run docker exec ncdns.system.c sh -c \
+  run docker exec system.ncdns.c sh -c \
     "nslookup network-partitioning.nanocl.test '$gateway' | tail -n 1"
   [ "$status" -eq 0 ]
 

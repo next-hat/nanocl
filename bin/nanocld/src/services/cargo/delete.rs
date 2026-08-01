@@ -15,7 +15,7 @@ use crate::{
   tag = "Cargoes",
   path = "/cargoes/{key}",
   params(
-    ("key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
     ("force" = bool, Query, description = "If true forces the delete operation even if the cargo is started"),
   ),
   responses(

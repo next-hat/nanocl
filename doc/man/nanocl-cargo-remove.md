@@ -7,7 +7,7 @@ sidebar_position: 10
 
 # NAME
 
-remove - Remove cargo by its name
+remove - Remove cargoes by canonical keys
 
 ## SYNOPSIS
 
@@ -16,7 +16,7 @@ remove - Remove cargo by its name
 
 ## DESCRIPTION
 
-Remove cargo by its name
+Remove cargoes by canonical keys
 
 ## OPTIONS
 

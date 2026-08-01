@@ -16,7 +16,7 @@ use crate::{
   request_body = CargoSpecPartial,
   path = "/cargoes/{key}",
   params(
-    ("key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Cargo updated", body = nanocl_stubs::cargo::Cargo),

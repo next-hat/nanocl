@@ -371,7 +371,7 @@ mod tests {
   #[test]
   fn quiet_output_uses_canonical_key() {
     let row = CargoRow {
-      key: "same.system".to_owned(),
+      key: "system.same".to_owned(),
       image: String::new(),
       status: String::new(),
       instances: String::new(),
@@ -379,6 +379,6 @@ mod tests {
       created_at: String::new(),
       updated_at: String::new(),
     };
-    assert_eq!(<CargoArg as GenericCommandLs>::get_key(&row), "same.system");
+    assert_eq!(<CargoArg as GenericCommandLs>::get_key(&row), "system.same");
   }
 }

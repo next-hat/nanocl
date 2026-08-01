@@ -13,7 +13,7 @@ use crate::{
   tag = "Cargoes",
   path = "/cargoes/{key}/histories",
   params(
-    ("key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "List of cargo histories", body = Vec<nanocl_stubs::cargo_spec::CargoSpec>),

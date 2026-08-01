@@ -15,7 +15,7 @@ use crate::{
   tag = "Cargoes",
   path = "/cargoes/{cargo_key}/histories/{history_key}/revert",
   params(
-    ("cargo_key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("cargo_key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
     ("history_key" = String, Path, description = "Key of the cargo history"),
   ),
   responses(

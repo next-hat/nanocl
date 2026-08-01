@@ -73,7 +73,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.start_process("cargo", "my-cargo.global").await;
+  /// let res = client.start_process("cargo", "global.my-cargo").await;
   /// ```
   ///
   pub async fn start_process(
@@ -99,7 +99,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.restart_process("cargo", "my-cargo.global").await;
+  /// let res = client.restart_process("cargo", "global.my-cargo").await;
   /// ```
   ///
   pub async fn restart_process(
@@ -125,7 +125,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.stop_cargo("my-cargo", None).await;
+  /// let res = client.stop_process("cargo", "global.my-cargo").await;
   /// ```
   ///
   pub async fn stop_process(
@@ -151,7 +151,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.kill_process("cargo", "my-cargo.global", None).await;
+  /// let res = client.kill_process("cargo", "global.my-cargo", None).await;
   /// ```
   ///
   pub async fn kill_process(
@@ -216,7 +216,7 @@ impl NanocldClient {
   /// ```no_run, ignore
   /// use nanocld_client::NanocldClient;
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let stats = client.stats_process_by_name("nstore.system.c");
+  /// let stats = client.stats_process_by_name("system.nstore.c");
   /// ```
   ///
   pub async fn stats_process_by_name(
@@ -238,7 +238,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let process = client.inspect_process("nstore.system.c").await.unwrap();
+  /// let process = client.inspect_process("system.nstore.c").await.unwrap();
   /// ```
   ///
   pub async fn inspect_process(&self, name: &str) -> HttpClientResult<Process> {
@@ -270,7 +270,7 @@ mod tests {
     let mut rx = client
       .logs_processes(
         "cargo",
-        "nstore.system",
+        "system.nstore",
         Some(&ProcessLogQuery::default()),
       )
       .await
@@ -286,7 +286,7 @@ mod tests {
     })
     .expect("Failed to create a nanocl client");
     let mut rx = client
-      .stats_process_by_name("nstore.system.c")
+      .stats_process_by_name("system.nstore.c")
       .await
       .unwrap();
     let _out = rx.next().await.unwrap().unwrap();
@@ -299,6 +299,6 @@ mod tests {
       ..Default::default()
     })
     .expect("Failed to create a nanocl client");
-    let _out = client.inspect_process("nstore.system.c").await.unwrap();
+    let _out = client.inspect_process("system.nstore.c").await.unwrap();
   }
 }

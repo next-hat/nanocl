@@ -27,7 +27,7 @@ impl NanocldClient {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo.global", exec).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// println!("{}", result);
   /// ```
   pub async fn create_exec(
@@ -54,7 +54,7 @@ impl NanocldClient {
   ///   cmd: Some(vec!["echo".into(), "hello".into()]),
   ///   ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo.global", exec).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// let mut rx = client
   ///   .start_exec(&result.id, StartExecOptions::default())
   ///   .await
@@ -62,7 +62,6 @@ impl NanocldClient {
   /// while let Some(_out) = rx.next().await {}
   ///
   /// client.inspect_exec(&result.id).await.unwrap();
-  /// let result = client.inspect_exec("my-cargo", exec, None).await.unwrap();
   /// println!("{}", result);
   /// ```
   pub async fn inspect_exec(
@@ -89,7 +88,7 @@ impl NanocldClient {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo.global", exec).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// let mut rx = client.start_exec(&result.id, StartExec::default(), None).await.unwrap();
   /// while let Some(output) = rx.next().await {
   ///  println!("{}", output);
@@ -129,7 +128,7 @@ mod tests {
       cmd: Some(vec!["echo".into(), "hello".into()]),
       ..Default::default()
     };
-    let result = client.create_exec("nstore.system", &exec).await.unwrap();
+    let result = client.create_exec("system.nstore", &exec).await.unwrap();
     let mut rx = client
       .start_exec(&result.id, &StartExecOptions::default())
       .await

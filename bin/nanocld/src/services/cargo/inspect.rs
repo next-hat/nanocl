@@ -14,7 +14,7 @@ use crate::{
   tag = "Cargoes",
   path = "/cargoes/{key}/inspect",
   params(
-    ("key" = String, Path, description = "Canonical cargo key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Cargo details", body = nanocl_stubs::cargo::CargoInspect),

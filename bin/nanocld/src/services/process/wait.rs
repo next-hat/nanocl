@@ -19,7 +19,7 @@ use crate::{
   path = "/processes/{kind}/{key}/wait",
   params(
     ("kind" = String, Path, description = "Kind of the process", description = "Kind of the process instance eg: (cargo, job, vm)", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)"),
   ),
   responses(
     (status = 200, description = "Process wait stream", content_type = "application/vdn.nanocl.raw-stream"),

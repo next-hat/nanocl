@@ -60,8 +60,8 @@ mod tests {
   async fn collection_namespace_and_key_semantics() {
     const NAME: &str = "same-name-namespace-test";
     const NAMESPACE: &str = "cargo-collection-test";
-    const GLOBAL_KEY: &str = "same-name-namespace-test.global";
-    const OTHER_KEY: &str = "same-name-namespace-test.cargo-collection-test";
+    const GLOBAL_KEY: &str = "global.same-name-namespace-test";
+    const OTHER_KEY: &str = "cargo-collection-test.same-name-namespace-test";
 
     let system = gen_default_test_system().await;
     let client = system.client;
@@ -221,7 +221,7 @@ mod tests {
       "2daemon-test-cargo",
     ];
     let main_test_cargo = test_cargoes[0];
-    let main_test_key = format!("{main_test_cargo}.global");
+    let main_test_key = format!("global.{main_test_cargo}");
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_owned();
       let res = client
@@ -389,7 +389,7 @@ mod tests {
     for test_cargo in test_cargoes.iter() {
       let res = client
         .send_delete(
-          &format!("{ENDPOINT}/{test_cargo}.global"),
+          &format!("{ENDPOINT}/global.{test_cargo}"),
           Some(CargoDeleteQuery { force: Some(true) }),
         )
         .await;
@@ -430,7 +430,7 @@ mod tests {
     assert_eq!(cargo.spec.name, "init-test-cargo", "Invalid cargo name");
     let res = client
       .send_post(
-        "/processes/cargo/init-test-cargo.global/start",
+        "/processes/cargo/global.init-test-cargo/start",
         None::<String>,
         None::<String>,
       )
@@ -440,7 +440,7 @@ mod tests {
       .send_post(
         "/events/watch",
         Some(vec![EventCondition {
-          actor_key: Some("init-test-cargo.global".to_owned()),
+          actor_key: Some("global.init-test-cargo".to_owned()),
           actor_kind: Some(EventActorKind::Cargo),
           related_key: None,
           related_kind: None,
@@ -455,7 +455,7 @@ mod tests {
     while let Some(_chunk) = stream.next().await {}
     let res = client
       .send_delete(
-        &format!("{ENDPOINT}/init-test-cargo.global"),
+        &format!("{ENDPOINT}/global.init-test-cargo"),
         Some(CargoDeleteQuery { force: Some(true) }),
       )
       .await;
@@ -524,7 +524,7 @@ mod tests {
     // start the cargo
     let res = client
       .send_post(
-        "/processes/cargo/test-cargo-ssl.global/start",
+        "/processes/cargo/global.test-cargo-ssl/start",
         None::<String>,
         None::<String>,
       )
@@ -535,7 +535,7 @@ mod tests {
       .send_post(
         "/events/watch",
         Some(vec![EventCondition {
-          actor_key: Some("test-cargo-ssl.global".to_owned()),
+          actor_key: Some("global.test-cargo-ssl".to_owned()),
           actor_kind: Some(EventActorKind::Cargo),
           related_key: None,
           related_kind: None,
@@ -551,7 +551,7 @@ mod tests {
     // Delete the cargo
     let res = client
       .send_delete(
-        &format!("{ENDPOINT}/test-cargo-ssl.global"),
+        &format!("{ENDPOINT}/global.test-cargo-ssl"),
         Some(CargoDeleteQuery { force: Some(true) }),
       )
       .await;

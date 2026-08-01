@@ -17,7 +17,7 @@ use crate::{
   path = "/processes/{kind}/{key}/stats",
   params(
     ("kind" = String, Path, description = "Kind of process", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
     ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
     ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
   ),

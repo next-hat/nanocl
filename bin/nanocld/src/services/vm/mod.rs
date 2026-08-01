@@ -50,8 +50,8 @@ mod tests {
   async fn collection_namespace_and_key_semantics() {
     const NAME: &str = "same-name-vm-test";
     const NAMESPACE: &str = "vm-collection-test";
-    const GLOBAL_KEY: &str = "same-name-vm-test.global";
-    const OTHER_KEY: &str = "same-name-vm-test.vm-collection-test";
+    const GLOBAL_KEY: &str = "global.same-name-vm-test";
+    const OTHER_KEY: &str = "vm-collection-test.same-name-vm-test";
 
     let system = gen_default_test_system().await;
     let client = system.client;
@@ -189,7 +189,7 @@ mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let name = "api-test-vm";
-    let key = "api-test-vm.global";
+    let key = "global.api-test-vm";
     let image = "/tmp/ubuntu-22-test.img";
     let res = client
       .post("/vms")

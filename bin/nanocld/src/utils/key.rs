@@ -2,7 +2,7 @@
 /// The key property is based on the `namespace` and the `name` of the given model
 /// or on the key of the parent for relational purpose.
 /// For example if we create a cargo `get-started` in the default namespace `global`
-/// The cargo key will be `get-started.global`
+/// The cargo key will be `global.get-started`
 use rand::{RngExt, distr::Alphanumeric, rng};
 
 use nanocl_error::io::{IoError, IoResult};

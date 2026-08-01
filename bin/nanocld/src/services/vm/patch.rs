@@ -16,7 +16,7 @@ use crate::{
   request_body = VmSpecUpdate,
   path = "/vms/{key}",
   params(
-    ("key" = String, Path, description = "Canonical VM key in `{name}.{namespace}` format"),
+    ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Updated virtual machine", body = nanocl_stubs::vm::Vm),

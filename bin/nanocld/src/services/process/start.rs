@@ -43,7 +43,7 @@ pub async fn start_process_by_pk(
   path = "/processes/{kind}/{key}/start",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
   ),
   responses(
     (status = 202, description = "Process instances started"),

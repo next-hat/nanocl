@@ -66,7 +66,7 @@ mod tests {
     let client_ptr = client.clone();
     let conditions = [EventCondition {
       actor_kind: Some(EventActorKind::Cargo),
-      actor_key: Some(format!("{CARGO_NAME}.global")),
+      actor_key: Some(format!("global.{CARGO_NAME}")),
       kind: [EventKind::Normal].to_vec(),
       action: [NativeEventAction::Start].to_vec(),
       ..Default::default()
@@ -99,14 +99,14 @@ mod tests {
       .await;
     let _ = client
       .send_post(
-        &format!("/processes/cargo/{CARGO_NAME}.global/start"),
+        &format!("/processes/cargo/global.{CARGO_NAME}/start"),
         None::<String>,
         None::<String>,
       )
       .await;
     assert!(wait_task.await.is_ok());
     let _ = client
-      .send_delete(&format!("/cargoes/{CARGO_NAME}.global"), None::<String>)
+      .send_delete(&format!("/cargoes/global.{CARGO_NAME}"), None::<String>)
       .await;
     system.state.wait_event_loop().await;
   }

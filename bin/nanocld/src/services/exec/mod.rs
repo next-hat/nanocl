@@ -33,7 +33,7 @@ mod tests {
     let client = system.client;
     let res = client
       .send_post(
-        &format!("/cargoes/{CARGO_NAME}.system/exec"),
+        &format!("/cargoes/system.{CARGO_NAME}/exec"),
         Some(&CreateExecOptions {
           cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
           attach_stderr: Some(true),

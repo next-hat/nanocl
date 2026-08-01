@@ -181,11 +181,11 @@ mod tests {
   fn workload_target_keys_use_the_expected_kind_suffix() {
     assert_eq!(
       workload_target_key("api", "global", "c").unwrap(),
-      "api.global.c"
+      "global.api.c"
     );
     assert_eq!(
       workload_target_key("db", "private", "v").unwrap(),
-      "db.private.v"
+      "private.db.v"
     );
   }
 }

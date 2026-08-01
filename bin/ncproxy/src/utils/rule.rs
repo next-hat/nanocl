@@ -139,7 +139,7 @@ fn parse_upstream_target(key: &str) -> IoResult<(String, String, String)> {
   let Some((resource_key, kind)) = key.rsplit_once('.') else {
     return Err(IoError::invalid_data(
       "TargetKey",
-      "Invalid expected <name>.<namespace>.<kind>",
+      "Invalid expected <namespace>.<name>.<kind>",
     ));
   };
   if kind.is_empty() {
@@ -454,7 +454,7 @@ mod tests {
       name: name.to_owned(),
       kind: ProcessKind::Cargo,
       node_name: node.to_owned(),
-      kind_key: "api.global.c".to_owned(),
+      kind_key: "global.api.c".to_owned(),
       data: ContainerInspectResponse {
         host_config: Some(HostConfig {
           network_mode: Some(mode.to_owned()),
@@ -470,6 +470,24 @@ mod tests {
         }),
         ..Default::default()
       },
+    }
+  }
+
+  #[test]
+  fn parses_canonical_upstream_targets_with_dotted_namespaces() {
+    assert_eq!(
+      parse_upstream_target("team.production.api.c").unwrap(),
+      (
+        "api".to_owned(),
+        "team.production".to_owned(),
+        "c".to_owned()
+      )
+    );
+    for key in ["api", "global.api.", "global.api/name.c"] {
+      assert!(
+        parse_upstream_target(key).is_err(),
+        "{key:?} must be invalid"
+      );
     }
   }
 

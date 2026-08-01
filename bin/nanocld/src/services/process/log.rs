@@ -72,7 +72,7 @@ async fn logs_process(
   path = "/processes/{kind}/{key}/logs",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
     ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),

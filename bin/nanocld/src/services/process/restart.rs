@@ -11,7 +11,7 @@ use crate::{models::SystemState, utils};
   path = "/processes/{kind}/{key}/restart",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("key" = String, Path, description = "Canonical resource key (jobs use their non-namespaced key)", example = "deploy-example.global"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
   ),
   responses(
     (status = 202, description = "Process instances restarted"),
@@ -35,7 +35,7 @@ pub async fn restart_processes(
   tag = "Processes",
   path = "/processes/{name}/restart",
   params(
-    ("name" = String, Path, description = "Name or id of the container", example = "nstore.system.c"),
+    ("name" = String, Path, description = "Name or id of the container", example = "system.nstore.c"),
   ),
   responses(
     (status = 202, description = "Process restarted"),

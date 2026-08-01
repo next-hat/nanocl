@@ -13,7 +13,7 @@ networks:
 
 services:
   nstore:
-    container_name: nstore.system.c
+    container_name: system.nstore.c
     hostname: store.nanocl.internal
     image: docker.io/cockroachdb/cockroach:v25.4.13
     entrypoint: /bin/sh
@@ -30,7 +30,7 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=nstore.system
+      - io.nanocl.c=system.nstore
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     command:
@@ -47,7 +47,7 @@ services:
         cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --store=$$STATE_DIR/data --insecure
 
   nmetrics:
-    container_name: nmetrics.system.c
+    container_name: system.nmetrics.c
     image: ghcr.io/next-hat/metrsd:0.5.8
     tty: true
     environment:
@@ -60,14 +60,14 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=nmetrics.system
+      - io.nanocl.c=system.nmetrics
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
   ncproxy:
-    container_name: ncproxy.system.c
+    container_name: system.ncproxy.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
@@ -86,7 +86,7 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ncproxy.system
+      - io.nanocl.c=system.ncproxy
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     volumes:
@@ -99,7 +99,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
 
   ncdns:
-    container_name: ncdns.system.c
+    container_name: system.ncdns.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
@@ -118,7 +118,7 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ncdns.system
+      - io.nanocl.c=system.ncdns
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     volumes:
@@ -131,7 +131,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
 
   nanocld:
-    container_name: ndaemon.system.c
+    container_name: system.ndaemon.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
@@ -144,7 +144,7 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
+      - io.nanocl.c=system.ndaemon
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     environment:
@@ -178,7 +178,7 @@ services:
           --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
   dbeaver:
-    container_name: dbeaver.system.c
+    container_name: system.dbeaver.c
     image: dbeaver/cloudbeaver:25.0
     tty: true
     user: root
@@ -195,14 +195,14 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=dbeaver.system
+      - io.nanocl.c=system.dbeaver
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev}/dbeaver:/opt/cloudbeaver/workspace
 
   ncvpnkit:
-    container_name: ncvpnkit.system.c
+    container_name: system.ncvpnkit.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     networks:
@@ -216,7 +216,7 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
+      - io.nanocl.c=system.ndaemon
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
     volumes:

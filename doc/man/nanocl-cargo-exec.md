@@ -13,7 +13,7 @@ exec - Execute a command inside a cargo
 
 **exec** \[**-t**\|**--tty**\] \[**--detach-keys**\] \[**-e **\]
 \[**--privileged**\] \[**-u **\] \[**-w**\|**--workdir**\]
-\[**-h**\|**--help**\] \<*NAME*\> \[*COMMAND*\]
+\[**-h**\|**--help**\] \<*KEY*\> \[*COMMAND*\]
 
 ## DESCRIPTION
 
@@ -42,8 +42,8 @@ Working directory inside the container
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of cargo to execute command
+\<*KEY*\>
+Canonical key of the cargo in which to execute the command
 
 \[*COMMAND*\]  
 Command to execute

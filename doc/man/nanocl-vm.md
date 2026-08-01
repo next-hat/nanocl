@@ -11,17 +11,13 @@ vm - Manage virtual machines
 
 ## SYNOPSIS
 
-**vm** \[**-n**\|**--namespace**\] \[**-h**\|**--help**\]
-\<*subcommands*\>
+**vm** \[**-h**\|**--help**\] \<*subcommands*\>
 
 ## DESCRIPTION
 
 Manage virtual machines
 
 ## OPTIONS
-
-**-n**, **--namespace** *\<NAMESPACE\>*
-namespace to target by default global is used
 
 **-h**, **--help**
 Print help
@@ -38,16 +34,16 @@ vm-list(1)
 List vms
 
 vm-remove(1)
-Remove vms
+Remove VMs by canonical keys
 
 vm-inspect(1)
-Inspect a vm
+Inspect a VM by canonical key
 
 vm-start(1)
-Start a vm
+Start VMs by canonical keys
 
 vm-stop(1)
-Stop a vm
+Stop VMs by canonical keys
 
 vm-attach(1)
 Attach to a vm

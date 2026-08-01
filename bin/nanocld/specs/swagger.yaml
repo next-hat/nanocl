@@ -137,7 +137,7 @@ paths:
       parameters:
       - name: cargo_key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -167,7 +167,7 @@ paths:
       parameters:
       - name: cargo_key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -199,7 +199,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -230,7 +230,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -257,7 +257,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -289,7 +289,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -317,7 +317,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical cargo key in `{name}.{namespace}` format
+        description: Canonical cargo key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -1019,11 +1019,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       requestBody:
         content:
           application/json:
@@ -1049,11 +1049,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       - name: since
         in: query
         description: Only logs returned since timestamp
@@ -1107,11 +1107,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       responses:
         '202':
           description: Process instances restarted
@@ -1131,11 +1131,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       responses:
         '202':
           description: Process instances started
@@ -1155,11 +1155,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       - name: stream
         in: query
         description: Return a stream of stats
@@ -1201,11 +1201,11 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
-        example: deploy-example.global
+        example: global.deploy-example
       responses:
         '202':
           description: Process instances stopped
@@ -1225,7 +1225,7 @@ paths:
         example: cargo
       - name: key
         in: path
-        description: Canonical resource key (jobs use their non-namespaced key)
+        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
         required: true
         schema:
           type: string
@@ -1963,7 +1963,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical VM key in `{name}.{namespace}` format
+        description: Canonical VM key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -1984,7 +1984,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical VM key in `{name}.{namespace}` format
+        description: Canonical VM key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -2016,7 +2016,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical VM key in `{name}.{namespace}` format
+        description: Canonical VM key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -2032,7 +2032,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical VM key in `{name}.{namespace}` format
+        description: Canonical VM key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -2060,7 +2060,7 @@ paths:
       parameters:
       - name: key
         in: path
-        description: Canonical VM key in `{name}.{namespace}` format
+        description: Canonical VM key in `{namespace}.{name}` format
         required: true
         schema:
           type: string
@@ -2520,7 +2520,7 @@ components:
           description: Unique identifier of the cargo spec
         CargoKey:
           type: string
-          description: The key of the cargo
+          description: Canonical cargo key in `{namespace}.{name}` format
         Version:
           type: string
           description: Version of the spec
@@ -6145,7 +6145,7 @@ components:
           description: Name of the node where the container is running
         KindKey:
           type: string
-          description: Key of the related kind
+          description: Canonical resource key for cargoes and VMs; jobs use their name
         Data:
           $ref: '#/components/schemas/ContainerInspectResponse'
           description: The data of the process a ContainerInspect
@@ -6945,6 +6945,7 @@ components:
       properties:
         CargoKey:
           type: string
+          description: Canonical cargo key in `{namespace}.{name}` format
         Replicas:
           type: integer
           minimum: 0
@@ -8099,7 +8100,7 @@ components:
           description: Version of the spec
         VmKey:
           type: string
-          description: The key of the vm
+          description: Canonical VM key in `{namespace}.{name}` format
         Metadata:
           type: object
           description: The metadata (user defined)

@@ -29,6 +29,7 @@ pub struct Node {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StartNodeCargoParams {
+  /// Canonical cargo key in `{namespace}.{name}` format
   pub cargo_key: String,
   pub replicas: usize,
 }
@@ -39,5 +40,6 @@ pub struct StartNodeCargoParams {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct DeleteNodeCargoParams {
+  /// Canonical cargo key in `{namespace}.{name}` format
   pub cargo_key: String,
 }

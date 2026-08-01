@@ -11,7 +11,7 @@ run - Run a cargo
 
 ## SYNOPSIS
 
-**run** \[**-v**\|**--volume**\] \[**-e**\|**--env**\] \[**--rm**\]
+**run** \[**-n**\|**--namespace**\] \[**-v**\|**--volume**\] \[**-e**\|**--env**\] \[**--rm**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\> \[*COMMAND*\]
 
 ## DESCRIPTION
@@ -19,6 +19,9 @@ run - Run a cargo
 Run a cargo
 
 ## OPTIONS
+
+**-n**, **--namespace** *\<NAMESPACE\>*
+Namespace for the new cargo; defaults to global
 
 **-v**, **--volume** *\<VOLUMES\>*  
 Volumes of the cargo
