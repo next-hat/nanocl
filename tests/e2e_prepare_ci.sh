@@ -50,15 +50,15 @@ while [ "$i" -lt 240 ]; do
     echo "readiness: daemon=${daemon_status}"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^ndaemon.system.c$'; then
-    echo "ndaemon.system.c exited unexpectedly" >&2
-    docker logs ndaemon.system.c || true
+  if ! docker ps --format '{{.Names}}' | grep -q '^system.ndaemon.c$'; then
+    echo "system.ndaemon.c exited unexpectedly" >&2
+    docker logs system.ndaemon.c || true
     exit 1
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^ncproxy.system.c$'; then
-    echo "ncproxy.system.c exited unexpectedly" >&2
-    docker logs ncproxy.system.c || true
+  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncproxy.c$'; then
+    echo "system.ncproxy.c exited unexpectedly" >&2
+    docker logs system.ncproxy.c || true
     exit 1
   fi
 
@@ -69,8 +69,8 @@ done
 if [ "$daemon_ready" -ne 1 ]; then
   echo "nanocld did not become ready in time" >&2
   docker ps -a
-  docker logs ndaemon.system.c || true
-  docker logs ncproxy.system.c || true
+  docker logs system.ndaemon.c || true
+  docker logs system.ncproxy.c || true
   exit 1
 fi
 
@@ -91,9 +91,9 @@ while [ "$p" -lt 240 ]; do
     echo "readiness: proxy=waiting (${p}s)"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^ncproxy.system.c$'; then
-    echo "ncproxy.system.c exited unexpectedly" >&2
-    docker logs ncproxy.system.c || true
+  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncproxy.c$'; then
+    echo "system.ncproxy.c exited unexpectedly" >&2
+    docker logs system.ncproxy.c || true
     exit 1
   fi
 
@@ -104,8 +104,8 @@ done
 if [ "$proxy_ready" -ne 1 ]; then
   echo "ncproxy did not become ready in time" >&2
   docker ps -a
-  docker logs ndaemon.system.c || true
-  docker logs ncproxy.system.c || true
+  docker logs system.ndaemon.c || true
+  docker logs system.ncproxy.c || true
 fi
 
 # Wait for ncdns to bind its socket and accept connections.
@@ -125,9 +125,9 @@ while [ "$p" -lt 240 ]; do
     echo "readiness: dns=waiting (${p}s)"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^ncdns.system.c$'; then
-    echo "ncdns.system.c exited unexpectedly" >&2
-    docker logs ncdns.system.c || true
+  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncdns.c$'; then
+    echo "system.ncdns.c exited unexpectedly" >&2
+    docker logs system.ncdns.c || true
     exit 1
   fi
 
@@ -138,16 +138,16 @@ done
 if [ "$dns_ready" -ne 1 ]; then
   echo "ncdns did not become ready in time" >&2
   docker ps -a
-  docker logs ndaemon.system.c || true
-  docker logs ncdns.system.c || true
+  docker logs system.ndaemon.c || true
+  docker logs system.ncdns.c || true
 fi
 
 sudo chmod 777 -R /run/nanocl
 
 nanocl version
 docker ps -a
-docker logs ndaemon.system.c || true
-docker logs ncproxy.system.c || true
-docker logs ncdns.system.c || true
+docker logs system.ndaemon.c || true
+docker logs system.ncproxy.c || true
+docker logs system.ncdns.c || true
 
 echo "E2E CI prepare complete"

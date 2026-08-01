@@ -181,10 +181,14 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     sync_process(key, kind, &container, state).await?;
     ids.push(id);
     if kind == "cargo" {
-      let metadata = key.split('.').collect::<Vec<&str>>();
-      let [name, namespace] = metadata[..] else {
+      let Ok(resource_key) =
+        key.parse::<nanocl_stubs::resource_key::ResourceKey>()
+      else {
+        log::warn!("system::sync_processes: invalid cargo key {key}");
         continue;
       };
+      let name = resource_key.name();
+      let namespace = resource_key.namespace();
       // We inspect the container to have all the information we need
       // If we already inspected this cargo we skip it
       if cargo_inspected.contains_key(key) {

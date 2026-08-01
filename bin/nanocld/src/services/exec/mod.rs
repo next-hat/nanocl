@@ -24,8 +24,6 @@ mod tests {
   use futures::{StreamExt, TryStreamExt};
   use ntex::http;
 
-  use nanocl_stubs::generic::GenericNspQuery;
-
   use crate::utils::tests::*;
 
   #[ntex::test]
@@ -35,16 +33,14 @@ mod tests {
     let client = system.client;
     let res = client
       .send_post(
-        &format!("/cargoes/{CARGO_NAME}/exec"),
+        &format!("/cargoes/system.{CARGO_NAME}/exec"),
         Some(&CreateExecOptions {
           cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           ..Default::default()
         }),
-        Some(&GenericNspQuery {
-          namespace: Some("system".into()),
-        }),
+        None::<String>,
       )
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "cargo create exec");

@@ -13,7 +13,7 @@ use tokio::io::AsyncWriteExt;
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_error::http::HttpError;
-use nanocl_stubs::{generic::GenericNspQuery, process::OutputLog};
+use nanocl_stubs::process::OutputLog;
 
 use crate::{
   models::{SystemState, WsConState},
@@ -122,10 +122,9 @@ async fn ws_attach_service(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Vms",
-  path = "/vms/{name}/attach",
+  path = "/vms/{key}/attach",
   params(
-    ("name" = String, Path, description = "Name of the virtual machine"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the virtual machine belongs default to 'global'"),
+    ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 101, description = "Websocket connection"),
@@ -135,10 +134,10 @@ pub async fn vm_attach(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, web::Error> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
+  let key = utils::key::parse_resource_key(&path.1)
+    .map_err(nanocl_error::http::HttpError::bad_request)?
+    .to_string();
   web::ws::start(
     req,
     None::<&str>,

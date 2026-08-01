@@ -34,21 +34,21 @@
               {
                 "Path": "/",
                 "Target": {
-                  "Key": "deploy-example2.global.c",
+                  "Key": "global.deploy-example2.c",
                   "Port": 9000
                 }
               },
               {
                 "Path": "/v1",
                 "Target": {
-                  "Key": "deploy-example.global.c",
+                  "Key": "global.deploy-example.c",
                   "Port": 9000
                 }
               },
               {
                 "Path": "/v2",
                 "Target": {
-                  "Key": "deploy-example2.global.c",
+                  "Key": "global.deploy-example2.c",
                   "Port": 9000
                 }
               }

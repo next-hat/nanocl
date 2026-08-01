@@ -228,7 +228,10 @@ pub async fn create_cargo_container(
   let hooked_cargo = hook_binds(cargo)?;
   let name = &hooked_cargo.name;
   let config = &hooked_cargo.container;
-  let key = format!("{name}.{namespace}");
+  let key =
+    nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
+      .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?
+      .to_string();
   let host_config = config.host_config.clone().unwrap_or_default();
   let hooked_container = Config {
     labels: Some(hook_labels(

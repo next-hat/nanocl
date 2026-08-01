@@ -76,7 +76,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: ${{ Args.name }}.global.c
+          Key: global.${{ Args.name }}.c
           Port: 9000
 
 Cargoes:

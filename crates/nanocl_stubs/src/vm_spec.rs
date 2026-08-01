@@ -262,7 +262,7 @@ pub struct VmSpec {
   pub name: String,
   /// Version of the spec
   pub version: String,
-  /// The key of the vm
+  /// Canonical VM key in `{namespace}.{name}` format
   pub vm_key: String,
   /// The metadata (user defined)
   #[cfg_attr(

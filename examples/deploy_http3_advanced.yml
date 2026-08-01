@@ -78,7 +78,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: secret-tls.global.c
+          Key: global.secret-tls.c
           Port: 9000
 
 Cargoes:

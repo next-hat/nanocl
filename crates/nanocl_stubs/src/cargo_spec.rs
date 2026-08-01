@@ -363,7 +363,7 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
 pub struct CargoSpec {
   /// Unique identifier of the cargo spec
   pub key: uuid::Uuid,
-  /// The key of the cargo
+  /// Canonical cargo key in `{namespace}.{name}` format
   pub cargo_key: String,
   /// Version of the spec
   pub version: String,

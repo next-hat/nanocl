@@ -82,7 +82,6 @@ pub struct LogsOpts {
 impl From<LogsOpts> for ProcessLogQuery {
   fn from(opts: LogsOpts) -> Self {
     Self {
-      namespace: None,
       since: opts.since,
       until: opts.until,
       tail: opts.tail,

@@ -38,7 +38,7 @@ impl NanocldClient {
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let params = StartNodeCargoParams {
-  ///   cargo_key: "my-cargo".to_string(),
+  ///   cargo_key: "global.my-cargo".to_string(),
   ///   replicas: 3,
   /// };
   /// let res = client.start_node_cargo(&params).await;
@@ -67,7 +67,7 @@ impl NanocldClient {
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let params = DeleteNodeCargoParams {
-  ///   cargo_key: "my-cargo".to_string(),
+  ///   cargo_key: "global.my-cargo".to_string(),
   /// };
   /// let res = client.delete_node_cargo(&params).await;
   /// ```

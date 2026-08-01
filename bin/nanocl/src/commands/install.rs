@@ -214,7 +214,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
             ..Default::default()
           };
           let mut stream =
-            docker_ptr.logs(&format!("{}.system.c", cargo.name), Some(opts));
+            docker_ptr.logs(&format!("system.{}.c", cargo.name), Some(opts));
           while let Some(log) = stream.next().await {
             match log {
               Ok(log) => {

@@ -5,21 +5,17 @@ use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::{
   NanocldClient,
-  stubs::{
-    generic::GenericNspQuery,
-    system::{
-      EventActorKind, EventCondition, EventKind, NativeEventAction, ObjPsStatus,
-    },
+  stubs::system::{
+    EventActorKind, EventCondition, EventKind, NativeEventAction, ObjPsStatus,
   },
 };
 
 use crate::models::GenericProcessStatus;
 
-pub fn gen_key(name: &str, namespace: Option<String>) -> String {
-  match namespace {
-    Some(ns) => format!("{name}.{ns}"),
-    None => name.to_owned(),
-  }
+pub fn resource_key(name: &str, namespace: &str) -> IoResult<String> {
+  nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
+    .map(|key| key.to_string())
+    .map_err(|err| IoError::invalid_input("Resource key", &err.to_string()))
 }
 
 pub fn get_actor_kind(object_name: &str) -> EventActorKind {
@@ -35,15 +31,11 @@ pub fn get_actor_kind(object_name: &str) -> EventActorKind {
 
 pub async fn get_process_status(
   object_name: &str,
-  name: &str,
-  namespace: Option<String>,
+  key: &str,
   client: &NanocldClient,
 ) -> IoResult<ObjPsStatus> {
   let res = client
-    .send_get(
-      &format!("/{object_name}/{name}/inspect"),
-      Some(GenericNspQuery::new(namespace.as_deref())),
-    )
+    .send_get(&format!("/{object_name}/{key}/inspect"), None::<String>)
     .await?;
   Ok(
     NanocldClient::res_json::<GenericProcessStatus>(res)
@@ -86,4 +78,18 @@ pub async fn wait_process_state(
     Ok::<_, IoError>(())
   });
   Ok(fut)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::resource_key;
+
+  #[test]
+  fn state_resource_keys_use_namespace_name_order() {
+    assert_eq!(resource_key("jellyfin", "media").unwrap(), "media.jellyfin");
+    assert_eq!(
+      resource_key("website", "team.production").unwrap(),
+      "team.production.website"
+    );
+  }
 }

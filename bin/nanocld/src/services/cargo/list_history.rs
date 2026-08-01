@@ -1,7 +1,6 @@
 use ntex::web;
 
 use nanocl_error::{http::HttpResult, io::IoResult};
-use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::{
   models::{SpecDb, SystemState},
@@ -12,25 +11,22 @@ use crate::{
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{name}/histories",
+  path = "/cargoes/{key}/histories",
   params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes belongs default to 'global'"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "List of cargo histories", body = Vec<nanocl_stubs::cargo_spec::CargoSpec>),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/cargoes/{name}/histories")]
+#[web::get("/cargoes/{key}/histories")]
 pub async fn list_cargo_history(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = SpecDb::read_by_kind_key(&key, &state.inner.pool)
+  let key = utils::key::parse_resource_key(&path.1)?;
+  let histories = SpecDb::read_by_kind_key(key.as_str(), &state.inner.pool)
     .await?
     .into_iter()
     .map(|e| e.try_to_cargo_spec())

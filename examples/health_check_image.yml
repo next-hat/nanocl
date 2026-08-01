@@ -15,5 +15,5 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: health-check.global.c
+          Key: global.health-check.c
           Port: 8080

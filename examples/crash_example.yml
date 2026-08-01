@@ -14,7 +14,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: crash-example.global.c
+          Key: global.crash-example.c
           Port: 9000
 
 # See all options:

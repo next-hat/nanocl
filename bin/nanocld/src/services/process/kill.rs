@@ -1,37 +1,34 @@
 use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::{cargo::CargoKillOptions, generic::GenericNspQuery};
+use nanocl_stubs::cargo::CargoKillOptions;
 
 use crate::{models::SystemState, utils};
 
-/// Send a signal to all processes of given kind and name (cargo, job, vm)
+/// Send a signal to all processes for a kind and canonical resource key
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
   request_body = CargoKillOptions,
-  path = "/processes/{kind}/{name}/kill",
+  path = "/processes/{kind}/{key}/kill",
   params(
     ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
-    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs if needed"),
+    ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
   ),
   responses(
     (status = 200, description = "Process instances killed"),
   ),
 ))]
-#[web::post("/processes/{kind}/{name}/kill")]
+#[web::post("/processes/{kind}/{key}/kill")]
 pub async fn kill_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   payload: web::types::Json<CargoKillOptions>,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let (_, kind, name) = path.into_inner();
+  let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::process::kill_by_kind_key(&kind_pk, &payload, &state)
-    .await?;
+  utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
+  utils::container::process::kill_by_kind_key(&key, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -42,7 +39,7 @@ pub async fn kill_processes(
   request_body = CargoKillOptions,
   path = "/processes/{name}/kill",
   params(
-    ("name" = String, Path, description = "Name or id of the container", example = "nstore.system.c"),
+    ("name" = String, Path, description = "Name or id of the container", example = "system.nstore.c"),
   ),
   responses(
     (status = 200, description = "Process killed"),

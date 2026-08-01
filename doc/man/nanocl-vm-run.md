@@ -11,7 +11,7 @@ run - Run a vm
 
 ## SYNOPSIS
 
-**run** \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
+**run** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
 \[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
 \[**--img-size**\] \[**--kvm**\] \[**-a**\|**--attach**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
@@ -21,6 +21,9 @@ run - Run a vm
 Run a vm
 
 ## OPTIONS
+
+**-n**, **--namespace** *\<NAMESPACE\>*
+Namespace for the new VM; defaults to global
 
 **--hostname** *\<HOSTNAME\>*
 hostname of the vm

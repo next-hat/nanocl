@@ -27,6 +27,6 @@ impl GenericCommandLs for NodeArg {
 pub async fn exec_node(cli_conf: &CliConfig, args: &NodeArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {
-    NodeCommand::List(opts) => NodeArg::exec_ls(client, args, opts).await,
+    NodeCommand::List(opts) => NodeArg::exec_ls(client, args, opts, None).await,
   }
 }

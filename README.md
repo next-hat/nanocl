@@ -111,8 +111,22 @@ Apply & inspect:
 ```bash
 nanocl state apply -s ./state.yml
 nanocl cargo ls
-nanocl cargo logs hello
+nanocl cargo logs global.hello
 ```
+
+Cargoes and virtual machines use canonical keys in
+`{namespace}.{name}` order, such as `global.hello` or `system.ncproxy`.
+Collection commands return every namespace unless `--namespace` is provided:
+
+```bash
+nanocl cargo ls
+nanocl cargo ls --namespace system
+nanocl vm ls
+```
+
+Commands targeting an existing Cargo or VM take that key directly and do not
+accept a namespace option. Creation commands still default to `global` when
+`--namespace` is omitted.
 
 Remove it:
 
@@ -153,7 +167,7 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Key: doc.global.c
+                Key: global.doc.c
                 Port: 80
 ```
 

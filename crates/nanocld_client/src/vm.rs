@@ -29,7 +29,10 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// List existing vms
+  /// List existing VMs, optionally filtering by namespace.
+  ///
+  /// An omitted, empty, or whitespace-only namespace returns VMs from all
+  /// namespaces.
   ///
   /// ## Example
   ///
@@ -48,7 +51,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Delete a vm by it's name and namespace
+  /// Delete a VM by its canonical key.
   ///
   /// ## Example
   ///
@@ -56,23 +59,16 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.delete_vm("my-vm", None).await;
+  /// let res = client.delete_vm("global.my-vm").await;
   /// ```
-  pub async fn delete_vm(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
+  pub async fn delete_vm(&self, key: &str) -> HttpClientResult<()> {
     self
-      .send_delete(
-        &format!("{}/{name}", Self::VM_PATH),
-        Some(&GenericNspQuery::new(namespace)),
-      )
+      .send_delete(&format!("{}/{key}", Self::VM_PATH), None::<String>)
       .await?;
     Ok(())
   }
 
-  /// Inspect a vm by it's name and namespace
+  /// Inspect a VM by its canonical key.
   /// And get detailed information about it
   ///
   /// ## Example
@@ -81,40 +77,32 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.inspect_vm("my-vm", None).await;
+  /// let res = client.inspect_vm("global.my-vm").await;
   /// ```
-  pub async fn inspect_vm(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<VmInspect> {
+  pub async fn inspect_vm(&self, key: &str) -> HttpClientResult<VmInspect> {
     let res = self
-      .send_get(
-        &format!("{}/{name}/inspect", Self::VM_PATH),
-        Some(&GenericNspQuery::new(namespace)),
-      )
+      .send_get(&format!("{}/{key}/inspect", Self::VM_PATH), None::<String>)
       .await?;
     Self::res_json(res).await
   }
 
-  /// Patch a vm by it's name and namespace to update it's spec
+  /// Patch a VM by its canonical key.
   pub async fn patch_vm(
     &self,
-    name: &str,
+    key: &str,
     vm: &VmSpecUpdate,
-    namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_patch(
-        &format!("{}/{name}", Self::VM_PATH),
+        &format!("{}/{key}", Self::VM_PATH),
         Some(vm),
-        Some(&GenericNspQuery::new(namespace)),
+        None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// Attach to a vm by it's name and namespace
+  /// Attach to a VM by its canonical key.
   /// and return websocket stream to send input and receive output from the vm tty
   ///
   /// ## Example
@@ -123,19 +111,13 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.attach_vm("my-vm", None).await;
+  /// let res = client.attach_vm("global.my-vm").await;
   /// ```
   pub async fn attach_vm(
     &self,
-    name: &str,
-    namespace: Option<&str>,
+    key: &str,
   ) -> HttpClientResult<ws::WsConnection<io::Base>> {
-    let qs = if let Some(namespace) = namespace {
-      format!("?Namespace={}", namespace)
-    } else {
-      "".to_owned()
-    };
-    let url = format!("{}/{}/vms/{name}/attach{qs}", self.url, &self.version);
+    let url = format!("{}/{}/vms/{key}/attach", self.url, &self.version);
     // open websockets connection over http transport
     #[cfg(not(target_os = "windows"))]
     {

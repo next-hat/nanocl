@@ -290,7 +290,7 @@ Resources:
         Locations:
         - Path: /
           Target:
-            Key: test-web-tls.global.c
+            Key: global.test-web-tls.c
             Port: 443
             Ssl: test-client
 

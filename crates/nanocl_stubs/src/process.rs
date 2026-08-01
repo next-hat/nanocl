@@ -87,7 +87,7 @@ pub struct ProcessPartial {
   pub data: serde_json::Value,
   /// Name of the node where the container is running
   pub node_name: String,
-  /// Key of the related kind
+  /// Canonical resource key for cargoes and VMs; jobs use their name
   pub kind_key: String,
   /// The created at date
   #[cfg_attr(
@@ -116,7 +116,7 @@ pub struct Process {
   pub kind: ProcessKind,
   /// Name of the node where the container is running
   pub node_name: String,
-  /// Key of the related kind
+  /// Canonical resource key for cargoes and VMs; jobs use their name
   pub kind_key: String,
   /// The data of the process a ContainerInspect
   pub data: ContainerInspectResponse,
@@ -192,12 +192,6 @@ pub struct ProcessOutputLog {
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessLogQuery {
-  /// Name of the namespace
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub namespace: Option<String>,
   /// Only include logs since unix timestamp
   #[cfg_attr(
     feature = "serde",
@@ -240,22 +234,6 @@ pub struct ProcessLogQuery {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub stdout: Option<bool>,
-}
-
-impl ProcessLogQuery {
-  /// Set namespace of a ProcessLogQuery
-  pub fn of_namespace(nsp: &str) -> ProcessLogQuery {
-    ProcessLogQuery {
-      namespace: Some(nsp.to_owned()),
-      since: None,
-      until: None,
-      timestamps: None,
-      follow: None,
-      tail: None,
-      stderr: None,
-      stdout: None,
-    }
-  }
 }
 
 /// Convert a ProcessLogQuery into a LogsOptions
@@ -336,12 +314,6 @@ pub struct ProcessWaitQuery {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub condition: Option<WaitCondition>,
-  /// Namespace where belong the process
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub namespace: Option<String>,
 }
 
 /// Stream of wait response of a process
@@ -380,12 +352,6 @@ impl ProcessWaitResponse {
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessStatsQuery {
-  /// Name of the namespace
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub namespace: Option<String>,
   /// Stream the output. If false, the stats will be output once and then it will disconnect.
   #[cfg_attr(
     feature = "serde",

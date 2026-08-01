@@ -6,7 +6,6 @@ use nanocl_error::http_client::HttpClientResult;
 use bollard_next::exec::{CreateExecResults, StartExecOptions};
 use bollard_next::service::ExecInspectResponse;
 use nanocl_stubs::cargo::CreateExecOptions;
-use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::process::OutputLog;
 
 use super::http_client::NanocldClient;
@@ -28,21 +27,16 @@ impl NanocldClient {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo", exec, None).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// println!("{}", result);
   /// ```
   pub async fn create_exec(
     &self,
-    name: &str,
+    key: &str,
     exec: &CreateExecOptions,
-    namespace: Option<&str>,
   ) -> HttpClientResult<CreateExecResults> {
     let res = self
-      .send_post(
-        &format!("/cargoes/{name}/exec"),
-        Some(exec),
-        Some(GenericNspQuery::new(namespace)),
-      )
+      .send_post(&format!("/cargoes/{key}/exec"), Some(exec), None::<String>)
       .await?;
     Self::res_json(res).await
   }
@@ -60,7 +54,7 @@ impl NanocldClient {
   ///   cmd: Some(vec!["echo".into(), "hello".into()]),
   ///   ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo", exec, None).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// let mut rx = client
   ///   .start_exec(&result.id, StartExecOptions::default())
   ///   .await
@@ -68,7 +62,6 @@ impl NanocldClient {
   /// while let Some(_out) = rx.next().await {}
   ///
   /// client.inspect_exec(&result.id).await.unwrap();
-  /// let result = client.inspect_exec("my-cargo", exec, None).await.unwrap();
   /// println!("{}", result);
   /// ```
   pub async fn inspect_exec(
@@ -95,7 +88,7 @@ impl NanocldClient {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
   /// };
-  /// let result = client.create_exec("my-cargo", exec, None).await.unwrap();
+  /// let result = client.create_exec("global.my-cargo", exec).await.unwrap();
   /// let mut rx = client.start_exec(&result.id, StartExec::default(), None).await.unwrap();
   /// while let Some(output) = rx.next().await {
   ///  println!("{}", output);
@@ -135,10 +128,7 @@ mod tests {
       cmd: Some(vec!["echo".into(), "hello".into()]),
       ..Default::default()
     };
-    let result = client
-      .create_exec("nstore", &exec, Some("system"))
-      .await
-      .unwrap();
+    let result = client.create_exec("system.nstore", &exec).await.unwrap();
     let mut rx = client
       .start_exec(&result.id, &StartExecOptions::default())
       .await

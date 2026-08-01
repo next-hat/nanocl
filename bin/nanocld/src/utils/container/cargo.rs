@@ -159,8 +159,8 @@ async fn create_init_container(
   init_container.labels = Some(labels);
   let short_id = utils::key::generate_short_id(6);
   let name = format!(
-    "init-{}-{}.{}.c",
-    cargo.spec.name, short_id, cargo.namespace_name
+    "init-{}.{}-{}.c",
+    cargo.namespace_name, cargo.spec.name, short_id
   );
   let process = super::process::create(
     &ProcessKind::Cargo,
@@ -262,8 +262,8 @@ pub async fn create(
         };
         let short_id = utils::key::generate_short_id(6);
         let name = format!(
-          "{}-{}.{}.c",
-          cargo.spec.name, short_id, cargo.namespace_name
+          "{}.{}-{}.c",
+          cargo.namespace_name, cargo.spec.name, short_id
         );
         let spec = cargo.spec.clone();
         let container = spec.container;

@@ -252,6 +252,7 @@ pub(crate) async fn reconcile_entries(
 /// Rebuild from the committed nanocld snapshot. A resource event acknowledges
 /// the matching pre-commit override; periodic calls expire any event that was
 /// missed so stale desired state cannot survive indefinitely.
+#[allow(dead_code)]
 pub(crate) async fn reconcile_persisted_entries(
   acknowledged_key: Option<&str>,
   dnsmasq: &Dnsmasq,

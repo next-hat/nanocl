@@ -8,7 +8,7 @@ use nanocl_error::{
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+    generic::{GenericFilter, GenericListQuery},
     system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
   },
 };
@@ -71,6 +71,7 @@ pub trait GenericCommandLs: GenericCommand {
   fn transform_filter(
     _args: &Self::Args,
     filter: &GenericFilter,
+    _namespace: Option<&str>,
   ) -> impl serde::Serialize {
     GenericListQuery::try_from(filter.clone()).unwrap()
   }
@@ -79,6 +80,7 @@ pub trait GenericCommandLs: GenericCommand {
     client: &NanocldClient,
     args: &Self::Args,
     opts: &GenericListOpts<T>,
+    namespace: Option<&str>,
   ) -> IoResult<()>
   where
     Self::ApiItem: serde::de::DeserializeOwned + Send + 'static,
@@ -86,7 +88,7 @@ pub trait GenericCommandLs: GenericCommand {
     T: Into<GenericFilter> + Args + Clone + Default,
   {
     let filter = Self::gen_default_filter(args, opts);
-    let transform_filter = Self::transform_filter(args, &filter);
+    let transform_filter = Self::transform_filter(args, &filter, namespace);
     let res = client
       .send_get(&format!("/{}", Self::object_name()), Some(transform_filter))
       .await?;
@@ -105,10 +107,7 @@ where
   T: Args + Clone,
   Q: serde::Serialize,
 {
-  fn get_query(
-    _opts: &GenericRemoveOpts<T>,
-    _namespace: Option<String>,
-  ) -> Option<Q>
+  fn get_query(_opts: &GenericRemoveOpts<T>) -> Option<Q>
   where
     Q: serde::Serialize,
   {
@@ -118,7 +117,6 @@ where
   async fn exec_rm(
     client: &NanocldClient,
     opts: &GenericRemoveOpts<T>,
-    namespace: Option<String>,
   ) -> IoResult<()> {
     let object_name = Self::object_name();
     if !opts.skip_confirm {
@@ -128,26 +126,20 @@ where
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
-    for name in &opts.keys {
-      let token = format!("{object_name}/{name}");
+    for key in &opts.keys {
+      let token = format!("{object_name}/{key}");
       let pg_style = utils::progress::create_spinner_style(&token, "red");
       let pg = utils::progress::create_progress("(destroying)", &pg_style);
-      let (key, waiter_kind) = match object_name {
-        "vms" => (
-          format!("{name}.{}", namespace.clone().unwrap_or_default()),
-          Some(EventActorKind::Vm),
-        ),
-        "cargoes" => (
-          format!("{name}.{}", namespace.clone().unwrap_or_default()),
-          Some(EventActorKind::Cargo),
-        ),
-        "jobs" => (name.clone(), Some(EventActorKind::Job)),
-        _ => (name.clone(), None),
+      let waiter_kind = match object_name {
+        "vms" => Some(EventActorKind::Vm),
+        "cargoes" => Some(EventActorKind::Cargo),
+        "jobs" => Some(EventActorKind::Job),
+        _ => None,
       };
       let waiter = match waiter_kind {
         Some(kind) => {
           let waiter = utils::process::wait_process_state(
-            &key,
+            key,
             kind,
             vec![NativeEventAction::Destroy],
             client,
@@ -159,8 +151,8 @@ where
       };
       if let Err(err) = client
         .send_delete(
-          &format!("/{}/{name}", Self::object_name()),
-          Self::get_query(opts, namespace.clone()),
+          &format!("/{}/{key}", Self::object_name()),
+          Self::get_query(opts),
         )
         .await
       {
@@ -171,7 +163,7 @@ where
           continue;
         }
         pg.finish();
-        eprintln!("{name}: {err}");
+        eprintln!("{key}: {err}");
         continue;
       }
       if let Some(waiter) = waiter {
@@ -189,45 +181,34 @@ pub trait GenericCommandStart: GenericCommand {
   async fn exec_start(
     client: &NanocldClient,
     opts: &GenericStartOpts,
-    namespace: Option<String>,
   ) -> IoResult<()> {
     let object_name = Self::object_name();
-    for name in &opts.names {
-      let status = utils::process::get_process_status(
-        object_name,
-        name,
-        namespace.clone(),
-        client,
-      )
-      .await?;
+    for key in &opts.keys {
+      let status =
+        utils::process::get_process_status(object_name, key, client).await?;
       if status.actual == ObjPsStatusKind::Start {
-        eprintln!("{name} is already started");
+        eprintln!("{key} is already started");
         continue;
       }
-      let key = utils::process::gen_key(name, namespace.clone());
       let process_kind = utils::process::get_actor_kind(object_name);
       let waiter = utils::process::wait_process_state(
-        &key,
+        key,
         process_kind.clone(),
         [NativeEventAction::Start].to_vec(),
         client,
       )
       .await?;
       if let Err(err) = client
-        .start_process(
-          process_kind.to_string().to_lowercase().as_str(),
-          name,
-          namespace.as_deref(),
-        )
+        .start_process(process_kind.to_string().to_lowercase().as_str(), key)
         .await
       {
-        eprintln!("{err} {name}");
+        eprintln!("{err} {key}");
         continue;
       };
       if let Err(err) = waiter.await.map_err(|err| {
         IoError::interrupted("wait_process_state", &err.to_string())
       })? {
-        eprintln!("{err} {name}");
+        eprintln!("{err} {key}");
       }
     }
     Ok(())
@@ -238,45 +219,34 @@ pub trait GenericCommandStop: GenericCommand {
   async fn exec_stop(
     client: &NanocldClient,
     opts: &GenericStopOpts,
-    namespace: Option<String>,
   ) -> IoResult<()> {
     let object_name = Self::object_name();
-    for name in &opts.names {
-      let status = utils::process::get_process_status(
-        object_name,
-        name,
-        namespace.clone(),
-        client,
-      )
-      .await?;
+    for key in &opts.keys {
+      let status =
+        utils::process::get_process_status(object_name, key, client).await?;
       if status.actual == ObjPsStatusKind::Stop {
-        eprintln!("{name} is already stopped");
+        eprintln!("{key} is already stopped");
         continue;
       }
-      let key = utils::process::gen_key(name, namespace.clone());
       let process_kind = utils::process::get_actor_kind(object_name);
       let waiter = utils::process::wait_process_state(
-        &key,
+        key,
         process_kind.clone(),
         [NativeEventAction::Stop].to_vec(),
         client,
       )
       .await?;
       if let Err(err) = client
-        .stop_process(
-          process_kind.to_string().to_lowercase().as_str(),
-          name,
-          namespace.as_deref(),
-        )
+        .stop_process(process_kind.to_string().to_lowercase().as_str(), key)
         .await
       {
-        eprintln!("{err} {name}");
+        eprintln!("{err} {key}");
         continue;
       }
       if let Err(err) = waiter.await.map_err(|err| {
         IoError::interrupted("wait_process_state", &err.to_string())
       })? {
-        eprintln!("{err} {name}");
+        eprintln!("{err} {key}");
       }
     }
     Ok(())
@@ -289,7 +259,6 @@ pub trait GenericCommandInspect: GenericCommand {
   async fn exec_inspect(
     cli_conf: &CliConfig,
     opts: &GenericInspectOpts,
-    namespace: Option<String>,
   ) -> IoResult<()>
   where
     Self::ApiItem: Serialize + DeserializeOwned + Send + 'static,
@@ -298,7 +267,7 @@ pub trait GenericCommandInspect: GenericCommand {
       .client
       .send_get(
         &format!("/{}/{}/inspect", Self::object_name(), opts.key),
-        Some(GenericNspQuery::new(namespace.as_deref())),
+        None::<String>,
       )
       .await?;
     let item = NanocldClient::res_json::<Self::ApiItem>(res).await?;

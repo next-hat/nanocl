@@ -67,9 +67,8 @@ mod tests {
     let client = system.client;
     let res = client
       .send_get(
-        "/processes/cargo/nstore/stats",
+        "/processes/cargo/system.nstore/stats",
         Some(ProcessStatsQuery {
-          namespace: Some("system".to_owned()),
           stream: Some(false),
           one_shot: Some(true),
         }),
@@ -82,7 +81,7 @@ mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let res = client
-      .send_get("/process/nstore.system.c/stats", None::<String>)
+      .send_get("/process/system.nstore.c/stats", None::<String>)
       .await;
     test_status_code!(
       res.status(),
@@ -109,7 +108,7 @@ mod tests {
     let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
-    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
+    assert!(items.iter().any(|i| i.name == "system.nstore.c"));
     // Filter by limit and offset
     let filter = GenericFilter::new().limit(1).offset(1);
     let qs = GenericListQuery::try_from(filter).unwrap();
@@ -119,13 +118,13 @@ mod tests {
     assert_eq!(items.len(), 1);
     // Filter by name and kind
     let filter = GenericFilter::new()
-      .r#where("name", GenericClause::Like("nstore%".to_owned()))
+      .r#where("name", GenericClause::Like("system.nstore%".to_owned()))
       .r#where("kind", GenericClause::Eq("cargo".to_owned()));
     let qs = GenericListQuery::try_from(filter).unwrap();
     let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
-    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
+    assert!(items.iter().any(|i| i.name == "system.nstore.c"));
   }
 
   #[ntex::test]
@@ -133,7 +132,7 @@ mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let res = client
-      .send_get("/processes/nstore.system.c/inspect", None::<String>)
+      .send_get("/processes/system.nstore.c/inspect", None::<String>)
       .await;
     test_status_code!(
       res.status(),

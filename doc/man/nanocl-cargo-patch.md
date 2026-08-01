@@ -7,22 +7,18 @@ sidebar_position: 9
 
 # NAME
 
-patch - Update a cargo by its name
+patch - Update a cargo by its canonical key
 
 ## SYNOPSIS
 
-**patch** \[**-n**\|**--name**\] \[**-i**\|**--image**\]
-\[**-e**\|**--env**\] \[**-v**\|**--volume**\] \[**-h**\|**--help**\]
-\<*NAME*\>
+**patch** \[**-i**\|**--image**\] \[**-e**\|**--env**\]
+\[**-v**\|**--volume**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
 
-Update a cargo by its name
+Update a cargo by its canonical key
 
 ## OPTIONS
-
-**-n**, **--name** *\<NEW_NAME\>*  
-New name of cargo
 
 **-i**, **--image** *\<IMAGE\>*  
 New image of cargo
@@ -36,5 +32,5 @@ New volumes of cargo
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of cargo to update
+\<*KEY*\>
+Canonical key of the cargo to update

@@ -188,31 +188,32 @@ mod tests {
     // Try to list cargoes
     assert_cli_ok!("cargo", "ls");
     // Try to start a cargo
-    assert_cli_ok!("cargo", "start", CARGO_NAME);
+    const CARGO_KEY: &str = "global.cli-test";
+    assert_cli_ok!("cargo", "start", CARGO_KEY);
     // Try to inspect a cargo
-    assert_cli_ok!("cargo", "inspect", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", CARGO_KEY);
     // Try to inspect cargo json
-    assert_cli_ok!("cargo", "inspect", "--display", "toml", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", "--display", "toml", CARGO_KEY);
     // Try to inspect cargo toml
-    assert_cli_ok!("cargo", "inspect", "--display", "json", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", "--display", "json", CARGO_KEY);
     // Try to patch a cargo
     assert_cli_ok!(
-      "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env", "TEST=1",
+      "cargo", "patch", CARGO_KEY, "--image", IMAGE_NAME, "--env", "TEST=1",
     );
-    assert_cli_ok!("cargo", "history", CARGO_NAME);
+    assert_cli_ok!("cargo", "history", CARGO_KEY);
     let client = get_test_client();
     let history = client
-      .list_history_cargo(CARGO_NAME, None)
+      .list_history_cargo(CARGO_KEY)
       .await
       .unwrap()
       .last()
       .unwrap()
       .clone();
-    assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
+    assert_cli_ok!("cargo", "revert", CARGO_KEY, &history.key.to_string());
     // Try to stop a cargo
-    assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    assert_cli_ok!("cargo", "stop", CARGO_KEY);
     // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_KEY);
   }
 
   /// Test state file when then include other state files
@@ -328,22 +329,11 @@ mod tests {
   /// Test cargo exec command
   #[ntex::test]
   async fn cargo_exec() {
+    assert_cli_ok!("cargo", "exec", "system.nstore", "--", "echo", "hello",);
     assert_cli_ok!(
       "cargo",
-      "--namespace",
-      "system",
       "exec",
-      "nstore",
-      "--",
-      "echo",
-      "hello",
-    );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
+      "system.nstore",
       "-e",
       "A=test",
       "--",
@@ -351,35 +341,14 @@ mod tests {
     );
     assert_cli_ok!(
       "cargo",
-      "--namespace",
-      "system",
       "exec",
-      "nstore",
+      "system.nstore",
       "--privileged",
       "--",
       "whoami",
     );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "-t",
-      "--",
-      "ls",
-    );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "-u",
-      "0",
-      "--",
-      "whoami",
-    );
+    assert_cli_ok!("cargo", "exec", "system.nstore", "-t", "--", "ls",);
+    assert_cli_ok!("cargo", "exec", "system.nstore", "-u", "0", "--", "whoami",);
   }
 
   #[ntex::test]
@@ -711,7 +680,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_basic() {
-    const CARGO_NAME: &str = "cli-test-run";
+    const CARGO_KEY: &str = "global.cli-test-run";
     assert_cli_ok!(
       "cargo",
       "run",
@@ -721,12 +690,12 @@ mod tests {
       "MESSAGE=GREETING",
     );
     ntex::rt::spawn(async {
-      assert_cli_ok!("cargo", "stats", CARGO_NAME);
+      assert_cli_ok!("cargo", "stats", CARGO_KEY);
     });
-    assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    assert_cli_ok!("cargo", "stop", CARGO_KEY);
     assert_cli_ok!("cargo", "ls");
     assert_cli_ok!("cargo", "ls", "-q");
-    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_KEY);
   }
 
   #[ntex::test]
@@ -749,9 +718,9 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_logs() {
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nanocld");
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore");
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore", "-t", "10");
+    assert_cli_ok!("cargo", "logs", "system.nanocld");
+    assert_cli_ok!("cargo", "logs", "system.nstore");
+    assert_cli_ok!("cargo", "logs", "system.nstore", "-t", "10");
   }
 
   #[ntex::test]
@@ -866,6 +835,7 @@ mod tests {
 
   #[ntex::test]
   async fn virtual_machine() {
+    const VM_KEY: &str = "global.test-cli-vm";
     assert_cli_ok!(
       "vm",
       "create",
@@ -873,23 +843,23 @@ mod tests {
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
     assert_cli_ok!("vm", "ls");
-    assert_cli_ok!("vm", "inspect", "test-cli-vm");
-    assert_cli_ok!("vm", "start", "test-cli-vm");
-    assert_cli_ok!("vm", "stop", "test-cli-vm");
-    assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
+    assert_cli_ok!("vm", "inspect", VM_KEY);
+    assert_cli_ok!("vm", "start", VM_KEY);
+    assert_cli_ok!("vm", "stop", VM_KEY);
+    assert_cli_ok!("vm", "rm", "-y", VM_KEY);
     assert_cli_ok!(
       "vm",
       "run",
       "test-cli-vm",
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
-    assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
+    assert_cli_ok!("vm", "rm", "-y", VM_KEY);
   }
 
   #[ntex::test]
   async fn stats() {
     ntex::rt::spawn(async {
-      assert_cli_ok!("stats", "nstore.system.c");
+      assert_cli_ok!("stats", "system.nstore.c");
     });
   }
 
@@ -901,12 +871,12 @@ mod tests {
 
   #[ntex::test]
   async fn logs() {
-    assert_cli_ok!("logs", "nstore.system.c");
-    assert_cli_ok!("logs", "nstore.system.c", "-s", "0");
+    assert_cli_ok!("logs", "system.nstore.c");
+    assert_cli_ok!("logs", "system.nstore.c", "-s", "0");
   }
 
   #[ntex::test]
   async fn inspect() {
-    assert_cli_ok!("inspect", "nstore.system.c");
+    assert_cli_ok!("inspect", "system.nstore.c");
   }
 }

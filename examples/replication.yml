@@ -14,7 +14,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: replication-example.global.c
+          Key: global.replication-example.c
           Port: 9000
 
 # See all options:
