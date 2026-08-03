@@ -1930,7 +1930,7 @@ checksum = "3763526d171df5398b9698b74956cd9f0462a5c14e06bb3d5a28b4cca41dc0db"
 dependencies = [
  "futures",
  "metrs_stubs",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -2030,7 +2030,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "nix",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "openssl",
  "regex",
  "ring",
@@ -2052,7 +2052,7 @@ version = "0.7.0"
 dependencies = [
  "bollard-next",
  "diesel",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
@@ -2085,7 +2085,7 @@ dependencies = [
  "libc",
  "log",
  "nanocl_error",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "serde",
  "serde_json",
  "utoipa",
@@ -2115,7 +2115,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "ntex-cors",
  "num_cpus",
  "openssl",
@@ -2138,7 +2138,7 @@ dependencies = [
  "futures",
  "nanocl_error",
  "nanocl_stubs",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "openssl",
  "serde",
  "serde_json",
@@ -2163,7 +2163,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2188,7 +2188,7 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "notify",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "num_cpus",
  "openssl",
  "serde",
@@ -2207,7 +2207,7 @@ dependencies = [
  "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
- "ntex 3.11.0",
+ "ntex 3.12.0",
  "openssl",
  "serde_json",
  "vpnkitrc",
@@ -2293,9 +2293,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "3.11.0"
+version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b25d0a06e07b3f8a35159b2cef8f5c6b132fa2070334484991d28f19e4171a2"
+checksum = "a88a41f743131001b46dc25a68044c296577234a2b46448a94789aa561670674"
 dependencies = [
  "atoi_simd",
  "base64",
@@ -2312,7 +2312,7 @@ dependencies = [
  "ntex-codec 1.2.1",
  "ntex-dispatcher",
  "ntex-error",
- "ntex-h2 3.12.1",
+ "ntex-h2 3.13.0",
  "ntex-http 1.2.0",
  "ntex-httparse",
  "ntex-io 3.13.1",
@@ -2385,7 +2385,7 @@ checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.11.0",
+ "ntex 3.12.0",
 ]
 
 [[package]]
@@ -2438,9 +2438,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-h2"
-version = "3.12.1"
+version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b543a519d376078207afe562fdccd22098cee7e0ddfcd0aaf2198fd26ba0a4"
+checksum = "b9169669ce11efc5ff8f14e419a982e53529c9d40e4f44be61766731ebf6590b"
 dependencies = [
  "bitflags 2.13.1",
  "foldhash",
