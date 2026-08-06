@@ -250,7 +250,6 @@ impl From<CargoCompilerError> for IoError {
     match error {
       CargoCompilerError::InvalidContainerSpec { .. }
       | CargoCompilerError::InvalidNetworkCombination { .. }
-      | CargoCompilerError::InvalidContainerRole { .. }
       | CargoCompilerError::InvalidCargoPortBindingCombination { .. }
       | CargoCompilerError::InvalidCargoPortBinding { .. }
       | CargoCompilerError::InternalGatewayMapKeyCollision { .. }
@@ -261,6 +260,7 @@ impl From<CargoCompilerError> for IoError {
       CargoCompilerError::MissingSandboxId { .. }
       | CargoCompilerError::UnexpectedSandboxId { .. }
       | CargoCompilerError::InvalidSandboxId { .. }
+      | CargoCompilerError::InvalidContainerRole { .. }
       | CargoCompilerError::UnresolvedInternalGateway { .. }
       | CargoCompilerError::InvalidSandboxImage
       | CargoCompilerError::InvalidEffectiveConfiguration { .. } => {
@@ -1669,49 +1669,118 @@ mod tests {
   }
 
   #[test]
-  fn io_conversion_preserves_message_and_sets_compiler_context() {
-    let error = CargoCompilerError::InvalidEffectiveConfiguration {
-      container: "app".to_owned(),
-      reason: "typed reconstruction invariant".to_owned(),
-    };
-    let expected_message = error.to_string();
+  fn every_error_variant_has_exactly_one_io_mapping() {
+    let mappings = [
+      (
+        CargoCompilerError::InvalidContainerSpec {
+          container: "app".to_owned(),
+          source: ContainerSpecValidationError::MissingImage,
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::MissingSandboxId {
+          container: "app".to_owned(),
+          cargo_network_mode: "nanoclbr0".to_owned(),
+        },
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::UnexpectedSandboxId {
+          container: "app".to_owned(),
+          cargo_network_mode: "host".to_owned(),
+        },
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::InvalidSandboxId {
+          container: "app".to_owned(),
+          reason: "sandbox Docker ID cannot be empty",
+        },
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::InvalidNetworkCombination {
+          container: "app".to_owned(),
+          cargo_network_mode: "nanoclbr0".to_owned(),
+          reason: "authored network field is incompatible with sharing",
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::InvalidContainerRole {
+          container: "init".to_owned(),
+          role: "init",
+          reason: "init containers must be essential",
+        },
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::InvalidCargoPortBindingCombination {
+          cargo_network_mode: "host".to_owned(),
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::InvalidCargoPortBinding {
+          port_key: "invalid".to_owned(),
+          host_port: None,
+          reason: "port key must use port/protocol syntax",
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::UnresolvedInternalGateway {
+          container: "app".to_owned(),
+        },
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::InternalGatewayMapKeyCollision {
+          container: "app".to_owned(),
+          key: "example.172.18.0.1".to_owned(),
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::ReservedLabelCollision {
+          container: "app".to_owned(),
+          label: "io.nanocl.user-value".to_owned(),
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::ReservedEnvironmentCollision {
+          container: "app".to_owned(),
+          variable: "NANOCL_USER_VALUE".to_owned(),
+        },
+        std::io::ErrorKind::InvalidInput,
+      ),
+      (
+        CargoCompilerError::InvalidSandboxImage,
+        std::io::ErrorKind::Other,
+      ),
+      (
+        CargoCompilerError::InvalidEffectiveConfiguration {
+          container: "app".to_owned(),
+          reason: "typed reconstruction invariant".to_owned(),
+        },
+        std::io::ErrorKind::Other,
+      ),
+    ];
+    let mut covered_variants = Vec::with_capacity(mappings.len());
 
-    let io_error: IoError = error.into();
-
-    assert_eq!(io_error.inner.kind(), std::io::ErrorKind::Other);
-    assert_eq!(io_error.context(), Some("CargoCompiler"));
-    assert_eq!(io_error.inner.to_string(), expected_message);
-  }
-
-  #[test]
-  fn remaining_error_variants_keep_their_io_classification() {
-    for error in [
-      CargoCompilerError::InvalidNetworkCombination {
-        container: "app".to_owned(),
-        cargo_network_mode: "nanoclbr0".to_owned(),
-        reason: "authored network field is incompatible with sharing",
-      },
-      CargoCompilerError::InvalidContainerRole {
-        container: "init".to_owned(),
-        role: "init",
-        reason: "init containers must be essential",
-      },
-      CargoCompilerError::InvalidCargoPortBindingCombination {
-        cargo_network_mode: "host".to_owned(),
-      },
-    ] {
-      assert_io_conversion(error, std::io::ErrorKind::InvalidInput);
+    for (error, expected_kind) in mappings {
+      let variant = std::mem::discriminant(&error);
+      assert!(
+        !covered_variants.contains(&variant),
+        "duplicate mapping for {error:?}"
+      );
+      covered_variants.push(variant);
+      assert_io_conversion(error, expected_kind);
     }
 
-    for error in [
-      CargoCompilerError::UnexpectedSandboxId {
-        container: "app".to_owned(),
-        cargo_network_mode: "host".to_owned(),
-      },
-      CargoCompilerError::InvalidSandboxImage,
-    ] {
-      assert_io_conversion(error, std::io::ErrorKind::Other);
-    }
+    assert_eq!(covered_variants.len(), 14);
   }
 
   #[test]
