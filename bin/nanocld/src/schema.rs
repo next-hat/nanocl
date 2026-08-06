@@ -12,6 +12,30 @@ diesel::table! {
 }
 
 diesel::table! {
+    cargo_replica_processes (key) {
+        key -> Uuid,
+        replica_key -> Uuid,
+        process_key -> Nullable<Varchar>,
+        container_name -> Varchar,
+        role -> Varchar,
+        essential -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    cargo_replicas (key) {
+        key -> Uuid,
+        cargo_key -> Varchar,
+        ordinal -> Int4,
+        node_name -> Nullable<Varchar>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     distributed_mutexes (key) {
         key -> Uuid,
         action -> Text,
@@ -189,6 +213,10 @@ diesel::table! {
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
+diesel::joinable!(cargo_replica_processes -> cargo_replicas (replica_key));
+diesel::joinable!(cargo_replica_processes -> processes (process_key));
+diesel::joinable!(cargo_replicas -> cargoes (cargo_key));
+diesel::joinable!(cargo_replicas -> nodes (node_name));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
 diesel::joinable!(networks -> nodes (node_name));
 diesel::joinable!(processes -> nodes (node_name));
@@ -201,6 +229,8 @@ diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
   cargoes,
+  cargo_replica_processes,
+  cargo_replicas,
   distributed_mutexes,
   events,
   jobs,

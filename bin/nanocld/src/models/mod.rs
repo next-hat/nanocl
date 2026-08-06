@@ -23,6 +23,10 @@ pub use network::*;
 mod cargo;
 pub use cargo::*;
 
+#[cfg_attr(not(test), allow(dead_code))]
+mod cargo_replica;
+pub(crate) use cargo_replica::*;
+
 mod distributed_mutex;
 pub use distributed_mutex::*;
 
