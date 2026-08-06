@@ -1,15 +1,26 @@
+use std::collections::HashSet;
+
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult};
 
 use crate::{
   models::{
-    CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
-    CargoReplicaProcessUpdateDb, CargoReplicaUpdateDb, NewCargoReplicaDb,
-    NewCargoReplicaProcessDb, Pool,
+    CargoReplicaAssignment, CargoReplicaDb, CargoReplicaProcessDb,
+    CargoReplicaProcessRole, CargoReplicaProcessUpdateDb, CargoReplicaUpdateDb,
+    NewCargoReplicaDb, NewCargoReplicaProcessDb, Pool,
   },
-  schema::{cargo_replica_processes, cargo_replicas},
-  utils,
+  schema::{cargo_replica_processes, cargo_replicas, cargoes, nodes},
+  utils::{
+    self,
+    container::{
+      cargo_replica::{
+        CargoReplicaReconcileError, placement_node_names, plan_reconciliation,
+        validate_persisted_assignments,
+      },
+      generic::SelectionPlan,
+    },
+  },
 };
 
 use super::generic::RepositoryBase;
@@ -43,7 +54,219 @@ fn map_process_error(error: diesel::result::Error) -> IoError {
   CargoReplicaProcessDb::map_err(error).into()
 }
 
+#[derive(Debug)]
+enum CargoReplicaTransactionError {
+  Reconcile(CargoReplicaReconcileError),
+  Database(diesel::result::Error),
+  #[cfg(test)]
+  InjectedFailure {
+    operation: &'static str,
+    ordinal: i32,
+  },
+}
+
+impl std::fmt::Display for CargoReplicaTransactionError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Reconcile(error) => error.fmt(f),
+      Self::Database(error) => {
+        write!(f, "Cargo replica reconciliation database failure: {error}")
+      }
+      #[cfg(test)]
+      Self::InjectedFailure { operation, ordinal } => write!(
+        f,
+        "injected Cargo replica reconciliation failure after {operation} ordinal {ordinal}"
+      ),
+    }
+  }
+}
+
+impl std::error::Error for CargoReplicaTransactionError {
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    match self {
+      Self::Reconcile(error) => Some(error),
+      Self::Database(error) => Some(error),
+      #[cfg(test)]
+      Self::InjectedFailure { .. } => None,
+    }
+  }
+}
+
+impl From<CargoReplicaReconcileError> for CargoReplicaTransactionError {
+  fn from(error: CargoReplicaReconcileError) -> Self {
+    Self::Reconcile(error)
+  }
+}
+
+impl From<diesel::result::Error> for CargoReplicaTransactionError {
+  fn from(error: diesel::result::Error) -> Self {
+    Self::Database(error)
+  }
+}
+
+impl From<CargoReplicaTransactionError> for IoError {
+  fn from(error: CargoReplicaTransactionError) -> Self {
+    IoError::other("CargoReplicaReconcile", error.to_string().as_str())
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReconcileMutation {
+  Created(i32),
+  Reassigned(i32),
+  Deleted(i32),
+}
+
+fn reconcile_assignments_on_conn<F>(
+  conn: &mut diesel::PgConnection,
+  cargo_key: &str,
+  selection: &SelectionPlan,
+  hook: &mut F,
+) -> Result<Vec<CargoReplicaAssignment>, CargoReplicaTransactionError>
+where
+  F: FnMut(ReconcileMutation) -> Result<(), CargoReplicaTransactionError>,
+{
+  cargoes::table
+    .find(cargo_key)
+    .select(cargoes::key)
+    .for_update()
+    .first::<String>(conn)?;
+
+  let requested_nodes = placement_node_names(cargo_key, selection)?;
+  let locked_nodes = nodes::table
+    .filter(nodes::name.eq_any(&requested_nodes))
+    .select(nodes::name)
+    .order(nodes::name.asc())
+    .for_update()
+    .load::<String>(conn)?;
+  if locked_nodes != requested_nodes {
+    let locked_nodes = locked_nodes.into_iter().collect::<HashSet<_>>();
+    let node_name = requested_nodes
+      .into_iter()
+      .find(|node_name| !locked_nodes.contains(node_name))
+      .expect("different sorted node sets contain a missing requested node");
+    return Err(
+      CargoReplicaReconcileError::MissingPlacementNode {
+        cargo_key: cargo_key.to_owned(),
+        node_name,
+      }
+      .into(),
+    );
+  }
+
+  let existing = cargo_replicas::table
+    .filter(cargo_replicas::cargo_key.eq(cargo_key))
+    .order(cargo_replicas::ordinal.asc())
+    .select(CargoReplicaDb::as_select())
+    .for_update()
+    .load::<CargoReplicaDb>(conn)?;
+
+  // Lock existing process mappings before the pure planner can authorize a
+  // scale-down. The planner rejects mapped surplus rows before any mutation.
+  let mapped_replica_keys = if existing.is_empty() {
+    HashSet::new()
+  } else {
+    let replica_keys = existing
+      .iter()
+      .map(|replica| replica.key)
+      .collect::<Vec<_>>();
+    cargo_replica_processes::table
+      .filter(cargo_replica_processes::replica_key.eq_any(replica_keys))
+      .select(cargo_replica_processes::replica_key)
+      .order(cargo_replica_processes::replica_key.asc())
+      .for_update()
+      .load::<uuid::Uuid>(conn)?
+      .into_iter()
+      .collect::<HashSet<_>>()
+  };
+  let plan =
+    plan_reconciliation(cargo_key, selection, &existing, &mapped_replica_keys)?;
+
+  for (key, ordinal, node_name) in &plan.node_updates {
+    diesel::update(cargo_replicas::table.find(key))
+      .set(CargoReplicaUpdateDb::node(node_name.as_deref()))
+      .execute(conn)?;
+    hook(ReconcileMutation::Reassigned(*ordinal))?;
+  }
+  for replica in &plan.creates {
+    diesel::insert_into(cargo_replicas::table)
+      .values(replica)
+      .execute(conn)?;
+    hook(ReconcileMutation::Created(replica.ordinal))?;
+  }
+  for replica in plan.deletes.iter().rev() {
+    diesel::delete(cargo_replicas::table.find(replica.key)).execute(conn)?;
+    hook(ReconcileMutation::Deleted(replica.ordinal))?;
+  }
+
+  let final_rows = cargo_replicas::table
+    .filter(cargo_replicas::cargo_key.eq(cargo_key))
+    .order(cargo_replicas::ordinal.asc())
+    .select(CargoReplicaDb::as_select())
+    .load::<CargoReplicaDb>(conn)?;
+  let assignments =
+    validate_persisted_assignments(cargo_key, selection, final_rows)?;
+  if assignments != plan.assignments {
+    return Err(
+      CargoReplicaReconcileError::IncompleteAssignment {
+        cargo_key: cargo_key.to_owned(),
+        reason: "persisted assignments differ from the reconciliation plan",
+      }
+      .into(),
+    );
+  }
+  Ok(assignments)
+}
+
 impl CargoReplicaDb {
+  /// Atomically reconcile stable replica identities and node assignments for
+  /// one Cargo, returning the committed source-of-truth assignments in ordinal
+  /// order.
+  pub(crate) async fn reconcile_assignments(
+    cargo_key: &str,
+    selection: &SelectionPlan,
+    pool: &Pool,
+  ) -> IoResult<Vec<CargoReplicaAssignment>> {
+    Self::reconcile_assignments_with_hook(
+      cargo_key,
+      selection,
+      pool,
+      |_| Ok(()),
+    )
+    .await
+  }
+
+  async fn reconcile_assignments_with_hook<F>(
+    cargo_key: &str,
+    selection: &SelectionPlan,
+    pool: &Pool,
+    mut hook: F,
+  ) -> IoResult<Vec<CargoReplicaAssignment>>
+  where
+    F: FnMut(ReconcileMutation) -> Result<(), CargoReplicaTransactionError>
+      + Send
+      + 'static,
+  {
+    let cargo_key = cargo_key.to_owned();
+    let selection = selection.clone();
+    run_query(
+      pool,
+      "Interrupted while reconciling Cargo replica assignments",
+      move |conn| {
+        conn
+          .build_transaction()
+          .serializable()
+          .run::<_, CargoReplicaTransactionError, _>(|conn| {
+            reconcile_assignments_on_conn(
+              conn, &cargo_key, &selection, &mut hook,
+            )
+          })
+          .map_err(IoError::from)
+      },
+    )
+    .await
+  }
+
   /// Create one stable Cargo replica identity.
   pub(crate) async fn create(
     replica: NewCargoReplicaDb,
@@ -350,7 +573,10 @@ mod tests {
     repositories::generic::{
       RepositoryCreate, RepositoryDelByPk, RepositoryReadBy,
     },
-    utils::tests::{TestSystem, gen_test_system},
+    utils::{
+      container::generic::{SelectionAssignment, SelectionPlan},
+      tests::{TestSystem, gen_test_system},
+    },
     vars,
   };
 
@@ -401,6 +627,11 @@ mod tests {
       let key = create_cargo(&self.system.state, &self.namespace, name).await;
       self.cargo_keys.push(key.clone());
       key
+    }
+
+    async fn create_node(&mut self, name: &str) {
+      create_node(&self.system.state, name).await;
+      self.node_names.push(name.to_owned());
     }
 
     async fn create_process(
@@ -491,6 +722,37 @@ mod tests {
   ) {
     let error = result.unwrap_err();
     assert_eq!(error.inner.kind(), expected, "{error}");
+  }
+
+  fn selection(
+    total_replicas: usize,
+    assignments: &[(&str, usize)],
+  ) -> SelectionPlan {
+    SelectionPlan {
+      total_replicas,
+      assignments: assignments
+        .iter()
+        .map(|(node_name, replicas)| SelectionAssignment {
+          node: NodeDb {
+            name: (*node_name).to_owned(),
+            created_at: chrono::Utc::now().naive_utc(),
+            endpoint: "tcp://127.0.0.1:0".to_owned(),
+            version: vars::VERSION.to_owned(),
+            metadata: None,
+          },
+          replicas: *replicas,
+        })
+        .collect(),
+    }
+  }
+
+  fn assignment_nodes(
+    assignments: &[CargoReplicaAssignment],
+  ) -> Vec<(i32, Option<&str>)> {
+    assignments
+      .iter()
+      .map(|assignment| (assignment.ordinal, assignment.node_name.as_deref()))
+      .collect()
   }
 
   #[ntex::test]
@@ -931,6 +1193,406 @@ mod tests {
           .is_err()
       );
     }
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn reconcile_stable_identity_scale_up_down_and_order() {
+    let mut fixture = Fixture::new().await;
+    let node_a = fixture.node_name.clone();
+    let node_b = format!("{}-b", fixture.node_name);
+    fixture.create_node(&node_b).await;
+
+    let initial_cargo = fixture.create_cargo("initial-contiguous").await;
+    let initial_three = CargoReplicaDb::reconcile_assignments(
+      &initial_cargo,
+      &selection(3, &[(node_a.as_str(), 3)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      initial_three
+        .iter()
+        .map(|assignment| assignment.ordinal)
+        .collect::<Vec<_>>(),
+      [0, 1, 2],
+      "the first reconciliation must create every contiguous desired ordinal"
+    );
+
+    let first = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(1, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(assignment_nodes(&first), [(0, Some(node_a.as_str()))]);
+    let ordinal_zero_key = first[0].replica_key;
+    let first_rows =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+
+    let identical = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(1, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(identical, first);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      first_rows,
+      "an identical reconciliation must not rewrite timestamps"
+    );
+
+    let scaled = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_b.as_str(), 1), (node_a.as_str(), 2)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      assignment_nodes(&scaled),
+      [
+        (0, Some(node_a.as_str())),
+        (1, Some(node_a.as_str())),
+        (2, Some(node_b.as_str()))
+      ]
+    );
+    assert_eq!(scaled[0].replica_key, ordinal_zero_key);
+    assert_ne!(scaled[1].replica_key, ordinal_zero_key);
+    assert_ne!(scaled[2].replica_key, ordinal_zero_key);
+    assert_ne!(scaled[1].replica_key, scaled[2].replica_key);
+
+    let scaled_rows =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+    let reordered = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 2), (node_b.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(reordered, scaled);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      scaled_rows
+    );
+
+    for _ in 0..3 {
+      let repeated = CargoReplicaDb::reconcile_assignments(
+        &fixture.cargo_key,
+        &selection(3, &[(node_b.as_str(), 1), (node_a.as_str(), 2)]),
+        fixture.pool(),
+      )
+      .await
+      .unwrap();
+      assert_eq!(repeated, scaled);
+      let ordinals = repeated
+        .iter()
+        .map(|assignment| assignment.ordinal)
+        .collect::<HashSet<_>>();
+      assert_eq!(ordinals.len(), 3);
+      assert!(ordinals.contains(&0));
+      assert!(ordinals.contains(&1));
+      assert!(ordinals.contains(&2));
+    }
+
+    let ordinal_one_key = scaled[1].replica_key;
+    let ordinal_two_key = scaled[2].replica_key;
+    let reduced = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(1, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(reduced.len(), 1);
+    assert_eq!(reduced[0].ordinal, 0);
+    assert_eq!(reduced[0].replica_key, ordinal_zero_key);
+    assert_error_kind(
+      CargoReplicaDb::get(ordinal_one_key, fixture.pool()).await,
+      std::io::ErrorKind::NotFound,
+    );
+    assert_error_kind(
+      CargoReplicaDb::get(ordinal_two_key, fixture.pool()).await,
+      std::io::ErrorKind::NotFound,
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn reconcile_persists_partial_assignments_and_reuses_null_rows() {
+    let mut fixture = Fixture::new().await;
+    let node_a = fixture.node_name.clone();
+    let node_b = format!("{}-b", fixture.node_name);
+    fixture.create_node(&node_b).await;
+
+    let initial = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      assignment_nodes(&initial),
+      [(0, Some(node_a.as_str())), (1, None), (2, None)]
+    );
+    let initial_rows =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+
+    let repeated = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(repeated, initial);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      initial_rows,
+      "repeated partial placement must not rewrite durable rows"
+    );
+
+    let filled = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 1), (node_b.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      assignment_nodes(&filled),
+      [
+        (0, Some(node_a.as_str())),
+        (1, Some(node_b.as_str())),
+        (2, None)
+      ]
+    );
+    assert_eq!(
+      filled
+        .iter()
+        .map(|assignment| assignment.replica_key)
+        .collect::<Vec<_>>(),
+      initial
+        .iter()
+        .map(|assignment| assignment.replica_key)
+        .collect::<Vec<_>>(),
+      "new capacity must assign an existing null replica"
+    );
+
+    let reduced_capacity = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      assignment_nodes(&reduced_capacity),
+      [(0, Some(node_a.as_str())), (1, None), (2, None)]
+    );
+    assert_eq!(
+      reduced_capacity
+        .iter()
+        .map(|assignment| assignment.replica_key)
+        .collect::<Vec<_>>(),
+      initial
+        .iter()
+        .map(|assignment| assignment.replica_key)
+        .collect::<Vec<_>>()
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn reconcile_scale_down_mapping_conflict_is_atomic() {
+    let mut fixture = Fixture::new().await;
+    let node_a = fixture.node_name.clone();
+    let node_b = format!("{}-b", fixture.node_name);
+    fixture.create_node(&node_b).await;
+    let assignments = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(3, &[(node_a.as_str(), 3)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let mapping = CargoReplicaProcessDb::create(
+      NewCargoReplicaProcessDb::new(
+        assignments[2].replica_key,
+        "web",
+        CargoReplicaProcessRole::App,
+        true,
+      ),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let before =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+    let mapping_before =
+      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+        .await
+        .unwrap();
+
+    let error = CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(1, &[(node_b.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
+    assert_eq!(error.context(), Some("CargoReplicaReconcile"));
+    assert!(error.to_string().contains(&fixture.cargo_key));
+    assert!(error.to_string().contains("ordinal 2"));
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      before
+    );
+    assert_eq!(
+      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+        .await
+        .unwrap(),
+      mapping_before
+    );
+
+    CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(4, &[(node_a.as_str(), 3), (node_b.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+        .await
+        .unwrap(),
+      mapping_before,
+      "successful scheduling must not alter existing process mappings"
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn reconcile_injected_failures_roll_back_every_mutation_kind() {
+    let mut fixture = Fixture::new().await;
+    let node_a = fixture.node_name.clone();
+    let node_b = format!("{}-b", fixture.node_name);
+    fixture.create_node(&node_b).await;
+
+    let create_error = CargoReplicaDb::reconcile_assignments_with_hook(
+      &fixture.cargo_key,
+      &selection(1, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+      |mutation| match mutation {
+        ReconcileMutation::Created(ordinal) => {
+          Err(CargoReplicaTransactionError::InjectedFailure {
+            operation: "creating",
+            ordinal,
+          })
+        }
+        _ => Ok(()),
+      },
+    )
+    .await;
+    assert_error_kind(create_error, std::io::ErrorKind::Other);
+    assert!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap()
+        .is_empty()
+    );
+
+    CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(1, &[(node_a.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let before_update =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+    let update_error = CargoReplicaDb::reconcile_assignments_with_hook(
+      &fixture.cargo_key,
+      &selection(1, &[(node_b.as_str(), 1)]),
+      fixture.pool(),
+      |mutation| match mutation {
+        ReconcileMutation::Reassigned(ordinal) => {
+          Err(CargoReplicaTransactionError::InjectedFailure {
+            operation: "reassigning",
+            ordinal,
+          })
+        }
+        _ => Ok(()),
+      },
+    )
+    .await;
+    assert_error_kind(update_error, std::io::ErrorKind::Other);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      before_update
+    );
+
+    CargoReplicaDb::reconcile_assignments(
+      &fixture.cargo_key,
+      &selection(2, &[(node_a.as_str(), 1), (node_b.as_str(), 1)]),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let before_delete =
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap();
+    let delete_error = CargoReplicaDb::reconcile_assignments_with_hook(
+      &fixture.cargo_key,
+      &selection(1, &[(node_b.as_str(), 1)]),
+      fixture.pool(),
+      |mutation| match mutation {
+        ReconcileMutation::Deleted(ordinal) => {
+          Err(CargoReplicaTransactionError::InjectedFailure {
+            operation: "deleting",
+            ordinal,
+          })
+        }
+        _ => Ok(()),
+      },
+    )
+    .await;
+    assert_error_kind(delete_error, std::io::ErrorKind::Other);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&fixture.cargo_key, fixture.pool())
+        .await
+        .unwrap(),
+      before_delete,
+      "the reassignment and deletion must both roll back"
+    );
     fixture.cleanup().await;
   }
 }

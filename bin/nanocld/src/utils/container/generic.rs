@@ -212,10 +212,23 @@ pub struct SelectionAssignment {
 ///
 #[derive(Debug, Clone)]
 pub struct SelectionPlan {
-  /// Total replicas is currently not in use but may be useful for logging or future features
-  #[allow(dead_code)]
+  /// Desired replica count used to validate and persist the placement result.
   pub total_replicas: usize,
   pub assignments: Vec<SelectionAssignment>,
+}
+
+/// Read the currently active Cargo replica count semantics in one place.
+///
+/// The future public-spec cutover can replace this helper without spreading
+/// references to `Placement.Replicas` through scheduling and reconciliation.
+pub(crate) fn desired_replica_count(cargo: &Cargo) -> usize {
+  cargo
+    .spec
+    .placement
+    .as_ref()
+    .and_then(|placement| placement.replicas)
+    .unwrap_or(1)
+    .max(1)
 }
 
 /// Select nodes for the given cargo based on its placement and resource requirements.
@@ -227,14 +240,7 @@ pub async fn plan_selection(
 ) -> IoResult<SelectionPlan> {
   // Default metrics recency window (in seconds) to consider a node's metrics as fresh
   const METRIC_RECENCY_DEFAULT_SECS: i64 = 300;
-  // Determine desired replicas (default: 1)
-  let replicas = cargo
-    .spec
-    .placement
-    .as_ref()
-    .and_then(|p| p.replicas)
-    .unwrap_or(1)
-    .max(1);
+  let replicas = desired_replica_count(cargo);
   // Extract and normalize minimal resource requirements and caps
   let (cpu_req, mem_req, storage_req, cpu_cap, mem_cap) = cargo
     .spec
@@ -484,4 +490,26 @@ pub async fn plan_selection(
     total_replicas: replicas,
     assignments,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocl_stubs::cargo_spec::CargoPlacementSpec;
+
+  use super::*;
+
+  #[test]
+  fn desired_replica_count_preserves_current_default_and_lower_bound() {
+    let mut cargo = Cargo::default();
+    assert_eq!(desired_replica_count(&cargo), 1);
+
+    cargo.spec.placement = Some(CargoPlacementSpec {
+      replicas: Some(0),
+      ..Default::default()
+    });
+    assert_eq!(desired_replica_count(&cargo), 1);
+
+    cargo.spec.placement.as_mut().unwrap().replicas = Some(7);
+    assert_eq!(desired_replica_count(&cargo), 7);
+  }
 }

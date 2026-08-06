@@ -60,6 +60,14 @@ impl CargoReplicaUpdateDb {
   }
 }
 
+/// Persisted scheduling identity and current optional node for one replica.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CargoReplicaAssignment {
+  pub(crate) replica_key: uuid::Uuid,
+  pub(crate) ordinal: i32,
+  pub(crate) node_name: Option<String>,
+}
+
 /// Logical role of one process inside a Cargo replica.
 #[derive(
   Debug,
