@@ -1,4 +1,7 @@
-use std::{collections::BTreeSet, net::IpAddr};
+use std::{
+  collections::{BTreeMap, BTreeSet},
+  net::IpAddr,
+};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
@@ -12,12 +15,18 @@ use nanocld_client::{
       Hsts, HstsConfig, ProxySsl, ProxySslConfig, StreamTarget, UnixTarget,
       UpstreamTarget,
     },
+    system::ObjPsStatusKind,
   },
 };
 
 use crate::models::{
   SystemStateRef, UNIX_UPSTREAM_TEMPLATE, UPSTREAM_TEMPLATE,
 };
+
+const LABEL_REPLICA: &str = "io.nanocl.cargo.replica";
+const LABEL_CONTAINER: &str = "io.nanocl.cargo.container";
+const LABEL_ROLE: &str = "io.nanocl.cargo.role";
+const LABEL_ESSENTIAL: &str = "io.nanocl.cargo.essential";
 
 pub(crate) struct PreparedFile {
   pub(crate) path: String,
@@ -200,6 +209,352 @@ fn process_network_address(process: &Process) -> Option<String> {
     .cloned()
 }
 
+fn process_labels(
+  process: &Process,
+) -> Option<&std::collections::HashMap<String, String>> {
+  process.data.config.as_ref()?.labels.as_ref()
+}
+
+fn process_has_enabled_healthcheck(process: &Process) -> bool {
+  let Some(healthcheck) = process
+    .data
+    .config
+    .as_ref()
+    .and_then(|config| config.healthcheck.as_ref())
+  else {
+    return false;
+  };
+  !matches!(
+    healthcheck.test.as_deref(),
+    Some([mode, ..]) if mode.eq_ignore_ascii_case("NONE")
+  )
+}
+
+fn essential_app_is_ready(process: &Process) -> bool {
+  if !process_is_running(process) {
+    return false;
+  }
+  if !process_has_enabled_healthcheck(process) {
+    return true;
+  }
+  matches!(
+    process
+      .data
+      .state
+      .as_ref()
+      .and_then(|state| state.health.as_ref())
+      .and_then(|health| health.status.as_ref()),
+    Some(nanocld_client::bollard_next::service::HealthStatusEnum::HEALTHY)
+  )
+}
+
+fn process_network_mode(process: &Process) -> Option<&str> {
+  process
+    .data
+    .host_config
+    .as_ref()
+    .and_then(|config| config.network_mode.as_deref())
+}
+
+struct CargoRuntimeGroup<'a> {
+  sandbox: Option<&'a Process>,
+  apps: BTreeMap<String, (&'a Process, bool)>,
+  retained: bool,
+  host_mode: bool,
+  invalid: bool,
+}
+
+impl<'a> CargoRuntimeGroup<'a> {
+  fn sandbox(process: &'a Process) -> Self {
+    Self {
+      sandbox: Some(process),
+      apps: BTreeMap::new(),
+      retained: process.name.starts_with("tmp-"),
+      host_mode: false,
+      invalid: false,
+    }
+  }
+
+  fn missing_sandbox(retained: bool) -> Self {
+    Self {
+      sandbox: None,
+      apps: BTreeMap::new(),
+      retained,
+      host_mode: false,
+      invalid: false,
+    }
+  }
+
+  fn host(retained: bool) -> Self {
+    Self {
+      sandbox: None,
+      apps: BTreeMap::new(),
+      retained,
+      host_mode: true,
+      invalid: false,
+    }
+  }
+
+  fn add_app(&mut self, process: &'a Process) {
+    let Some(labels) = process_labels(process) else {
+      self.invalid = true;
+      return;
+    };
+    let Some(container) = labels
+      .get(LABEL_CONTAINER)
+      .filter(|container| !container.is_empty())
+    else {
+      self.invalid = true;
+      return;
+    };
+    let essential = match labels.get(LABEL_ESSENTIAL).map(String::as_str) {
+      Some("true") => true,
+      Some("false") => false,
+      _ => {
+        self.invalid = true;
+        return;
+      }
+    };
+    if self
+      .apps
+      .insert(container.clone(), (process, essential))
+      .is_some()
+    {
+      self.invalid = true;
+    }
+  }
+
+  fn serving_address(
+    &self,
+    desired_essential_apps: &BTreeSet<String>,
+    enforce_desired_apps: bool,
+  ) -> Option<String> {
+    let essential_apps = self
+      .apps
+      .values()
+      .filter_map(|(process, essential)| essential.then_some(*process))
+      .collect::<Vec<_>>();
+    let observed_essential_names = self
+      .apps
+      .iter()
+      .filter_map(|(name, (_, essential))| essential.then_some(name.clone()))
+      .collect::<BTreeSet<_>>();
+    if self.invalid
+      || essential_apps.is_empty()
+      // A committed active attempt is compiled from the inspected current
+      // revision. Exact membership protects it against incomplete observation.
+      // Retained, pre-rename Updating, and restored Fail attempts belong to a
+      // previous revision whose desired set is not carried by process labels.
+      || (enforce_desired_apps
+        && observed_essential_names != *desired_essential_apps)
+      || essential_apps
+        .iter()
+        .any(|process| !essential_app_is_ready(process))
+    {
+      return None;
+    }
+
+    if let Some(sandbox) = self.sandbox {
+      return process_is_running(sandbox)
+        .then(|| process_network_address(sandbox))
+        .flatten();
+    }
+    if !self.host_mode {
+      return None;
+    }
+
+    // Cargo-level host mode has no sandbox. Container-level `none` escapes do
+    // not provide an endpoint, while every host app shares the node address.
+    self.apps.values().find_map(|(process, _)| {
+      (process_is_running(process)
+        && process_network_mode(process) == Some("host"))
+      .then(|| process_network_address(process))
+      .flatten()
+    })
+  }
+}
+
+/// Resolve one serving endpoint per local Cargo replica.
+///
+/// Networked Cargoes publish their running sandbox address. During a rollout,
+/// apps are joined to an old or candidate runtime through their effective
+/// `container:<sandbox-id>` network mode, so duplicate logical roles across
+/// generations remain independent. Cargo-level host mode has no sandbox and
+/// is conservatively partitioned by the retained `tmp-` marker instead.
+fn get_cargo_addresses(
+  processes: &[Process],
+  local_node: &str,
+  desired_essential_apps: &BTreeSet<String>,
+  cargo_status: &ObjPsStatusKind,
+) -> IoResult<Vec<String>> {
+  let mut replicas = BTreeMap::<String, Vec<&Process>>::new();
+  for process in processes {
+    if process.node_name != local_node || process.name.starts_with("candidate-")
+    {
+      continue;
+    }
+    let Some(replica) = process_labels(process)
+      .and_then(|labels| labels.get(LABEL_REPLICA))
+      .filter(|replica| !replica.is_empty())
+    else {
+      continue;
+    };
+    replicas.entry(replica.clone()).or_default().push(process);
+  }
+
+  let mut addresses = BTreeSet::new();
+  for processes in replicas.into_values() {
+    let mut groups = BTreeMap::<String, CargoRuntimeGroup>::new();
+
+    // Register every observed sandbox before assigning apps. Its Docker ID is
+    // the generation-safe runtime identity carried by shared-network apps.
+    for process in &processes {
+      if process_labels(process)
+        .and_then(|labels| labels.get(LABEL_ROLE))
+        .map(String::as_str)
+        != Some("sandbox")
+        || process.key.is_empty()
+      {
+        continue;
+      }
+      match groups.entry(process.key.clone()) {
+        std::collections::btree_map::Entry::Vacant(entry) => {
+          entry.insert(CargoRuntimeGroup::sandbox(process));
+        }
+        std::collections::btree_map::Entry::Occupied(mut entry) => {
+          entry.get_mut().invalid = true;
+        }
+      }
+    }
+
+    let has_sandbox = groups.values().any(|group| group.sandbox.is_some());
+    for process in processes {
+      if process_labels(process)
+        .and_then(|labels| labels.get(LABEL_ROLE))
+        .map(String::as_str)
+        != Some("app")
+      {
+        continue;
+      }
+      let retained = process.name.starts_with("tmp-");
+      let Some(mode) = process_network_mode(process) else {
+        continue;
+      };
+
+      if let Some(sandbox_id) = mode
+        .strip_prefix("container:")
+        .filter(|sandbox_id| !sandbox_id.is_empty())
+      {
+        let group = groups
+          .entry(sandbox_id.to_owned())
+          .or_insert_with(|| CargoRuntimeGroup::missing_sandbox(retained));
+        if group.retained != retained || group.host_mode {
+          group.invalid = true;
+        }
+        group.add_app(process);
+        continue;
+      }
+
+      if !matches!(mode, "host" | "none") {
+        continue;
+      }
+      if !has_sandbox {
+        let key = if retained { "host:tmp" } else { "host:active" };
+        groups
+          .entry(key.to_owned())
+          .or_insert_with(|| CargoRuntimeGroup::host(retained))
+          .add_app(process);
+        continue;
+      }
+
+      // A container-level host/none escape cannot carry its sandbox ID. The
+      // retained marker still separates the normal one-old/one-candidate
+      // rollout. Ambiguous same-generation sandboxes are invalidated without
+      // poisoning an independently identifiable old or candidate group.
+      let matching = groups
+        .iter()
+        .filter_map(|(key, group)| {
+          (group.sandbox.is_some() && group.retained == retained)
+            .then_some(key.clone())
+        })
+        .collect::<Vec<_>>();
+      if let [key] = matching.as_slice() {
+        groups.get_mut(key).unwrap().add_app(process);
+      } else {
+        for key in matching {
+          groups.get_mut(&key).unwrap().invalid = true;
+        }
+      }
+    }
+
+    let has_retained_group = groups.values().any(|group| group.retained);
+    let enforce_active_desired_apps = !matches!(
+      cargo_status,
+      ObjPsStatusKind::Updating | ObjPsStatusKind::Fail
+    );
+    let mut active = Vec::new();
+    let mut retained = Vec::new();
+    for group in groups.into_values() {
+      let enforce_desired_apps = !group.retained && enforce_active_desired_apps;
+      let Some(address) =
+        group.serving_address(desired_essential_apps, enforce_desired_apps)
+      else {
+        continue;
+      };
+      if group.retained {
+        retained.push(address);
+      } else {
+        active.push(address);
+      }
+    }
+
+    // Once Updating or Fail has a retained group, even an apparently ready
+    // active group must not replace the rollout/rollback source of truth.
+    // Before the rename (or after restoration), the sole active group remains
+    // the previous committed generation. In other states, exactly one active
+    // attempt wins and exactly one retained attempt is its fallback. Ambiguous
+    // classes are never guessed.
+    let selected = if matches!(
+      cargo_status,
+      ObjPsStatusKind::Updating | ObjPsStatusKind::Fail
+    ) {
+      if has_retained_group {
+        match retained.as_slice() {
+          [address] => Some(address),
+          _ => None,
+        }
+      } else {
+        match active.as_slice() {
+          [address] => Some(address),
+          _ => None,
+        }
+      }
+    } else {
+      match active.as_slice() {
+        [address] => Some(address),
+        [] => match retained.as_slice() {
+          [address] => Some(address),
+          _ => None,
+        },
+        _ => None,
+      }
+    };
+    if let Some(address) = selected {
+      addresses.insert(address.clone());
+    }
+  }
+
+  if addresses.is_empty() {
+    return Err(IoError::invalid_data(
+      "Cargo",
+      &format!(
+        "No serving Cargo replica endpoint found on local node {local_node}"
+      ),
+    ));
+  }
+  Ok(addresses.into_iter().collect())
+}
+
 pub async fn get_addresses(
   processes: &[Process],
   local_node: &str,
@@ -354,7 +709,20 @@ pub async fn gen_upstream(
               format!("Unable to inspect cargo {target_name}")
             })
           })?;
-        let addresses = get_addresses(&cargo.instances, &local_node).await?;
+        let desired_essential_apps = cargo
+          .spec
+          .containers
+          .iter()
+          .filter_map(|container| {
+            container.essential.then_some(container.name.clone())
+          })
+          .collect::<BTreeSet<_>>();
+        let addresses = get_cargo_addresses(
+          &cargo.instances,
+          &local_node,
+          &desired_essential_apps,
+          &cargo.status.actual,
+        )?;
         let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
         let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
           "key": key,
@@ -420,8 +788,9 @@ mod tests {
 
   use nanocld_client::{
     bollard_next::service::{
-      ContainerInspectResponse, ContainerState, ContainerStateStatusEnum,
-      EndpointSettings, HostConfig, NetworkSettings,
+      ContainerConfig, ContainerInspectResponse, ContainerState,
+      ContainerStateStatusEnum, EndpointSettings, Health, HealthConfig,
+      HealthStatusEnum, HostConfig, NetworkSettings,
     },
     stubs::process::{Process, ProcessKind},
   };
@@ -471,6 +840,139 @@ mod tests {
         ..Default::default()
       },
     }
+  }
+
+  #[derive(Clone, Copy)]
+  enum Probe {
+    None,
+    Disabled,
+    Starting,
+    Healthy,
+    Unhealthy,
+  }
+
+  fn cargo_process(
+    name: &str,
+    replica: &str,
+    logical_name: &str,
+    role: &str,
+    essential: bool,
+    node: &str,
+    mode: &str,
+    status: ContainerStateStatusEnum,
+    networks: &[(&str, &str)],
+    probe: Probe,
+  ) -> Process {
+    let mut process = process(name, node, mode, status, networks);
+    let (healthcheck, health) = match probe {
+      Probe::None => (None, None),
+      Probe::Disabled => (
+        Some(HealthConfig {
+          test: Some(vec!["none".to_owned(), "ignored".to_owned()]),
+          ..Default::default()
+        }),
+        None,
+      ),
+      probe => {
+        let status = match probe {
+          Probe::Starting => HealthStatusEnum::STARTING,
+          Probe::Healthy => HealthStatusEnum::HEALTHY,
+          Probe::Unhealthy => HealthStatusEnum::UNHEALTHY,
+          Probe::None | Probe::Disabled => unreachable!(),
+        };
+        (
+          Some(HealthConfig {
+            test: Some(vec!["CMD".to_owned(), "true".to_owned()]),
+            ..Default::default()
+          }),
+          Some(Health {
+            status: Some(status),
+            ..Default::default()
+          }),
+        )
+      }
+    };
+    process.data.config = Some(ContainerConfig {
+      labels: Some(HashMap::from([
+        (LABEL_REPLICA.to_owned(), replica.to_owned()),
+        (LABEL_CONTAINER.to_owned(), logical_name.to_owned()),
+        (LABEL_ROLE.to_owned(), role.to_owned()),
+        (LABEL_ESSENTIAL.to_owned(), essential.to_string()),
+      ])),
+      healthcheck,
+      ..Default::default()
+    });
+    process.data.state.as_mut().unwrap().health = health;
+    process
+  }
+
+  fn sandbox_attempt(
+    replica: &str,
+    attempt: &str,
+    address: &str,
+    app_status: ContainerStateStatusEnum,
+    probe: Probe,
+    retained: bool,
+  ) -> Vec<Process> {
+    let mut sandbox = cargo_process(
+      &format!("sandbox-{replica}-{attempt}"),
+      replica,
+      "_sandbox",
+      "sandbox",
+      true,
+      "node-a",
+      "private",
+      ContainerStateStatusEnum::RUNNING,
+      &[("private", address)],
+      Probe::None,
+    );
+    let sandbox_mode = format!("container:{}", sandbox.key);
+    let mut app = cargo_process(
+      &format!("api-{replica}-{attempt}"),
+      replica,
+      "api",
+      "app",
+      true,
+      "node-a",
+      &sandbox_mode,
+      app_status,
+      &[],
+      probe,
+    );
+    if retained {
+      sandbox.name = format!("tmp-{}", sandbox.name);
+      app.name = format!("tmp-{}", app.name);
+    }
+    vec![sandbox, app]
+  }
+
+  fn sandbox_replica(
+    replica: &str,
+    address: &str,
+    app_status: ContainerStateStatusEnum,
+    probe: Probe,
+  ) -> Vec<Process> {
+    sandbox_attempt(replica, "active", address, app_status, probe, false)
+  }
+
+  fn cargo_addresses(
+    processes: &[Process],
+    local_node: &str,
+  ) -> IoResult<Vec<String>> {
+    cargo_addresses_with_status(processes, local_node, ObjPsStatusKind::Start)
+  }
+
+  fn cargo_addresses_with_status(
+    processes: &[Process],
+    local_node: &str,
+    status: ObjPsStatusKind,
+  ) -> IoResult<Vec<String>> {
+    get_cargo_addresses(
+      processes,
+      local_node,
+      &BTreeSet::from(["api".to_owned()]),
+      &status,
+    )
   }
 
   #[test]
@@ -549,6 +1051,537 @@ mod tests {
     assert_eq!(
       get_addresses(&processes, "node-a").await.unwrap(),
       vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_uses_one_sandbox_endpoint_and_ignores_app_network_escapes() {
+    let mut processes = sandbox_replica(
+      "replica-a",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    processes.push(cargo_process(
+      "metrics-replica-a",
+      "replica-a",
+      "metrics",
+      "app",
+      false,
+      "node-a",
+      "host",
+      ContainerStateStatusEnum::RUNNING,
+      &[],
+      Probe::Unhealthy,
+    ));
+    processes.push(cargo_process(
+      "debug-replica-a",
+      "replica-a",
+      "debug",
+      "app",
+      false,
+      "node-a",
+      "none",
+      ContainerStateStatusEnum::RUNNING,
+      &[],
+      Probe::None,
+    ));
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_serving_readiness_accepts_no_disabled_or_healthy_checks_only() {
+    let mut processes = Vec::new();
+    for (replica, address, probe) in [
+      ("no-check", "10.0.0.2", Probe::None),
+      ("disabled", "10.0.0.3", Probe::Disabled),
+      ("healthy", "10.0.0.4", Probe::Healthy),
+      ("starting", "10.0.0.5", Probe::Starting),
+      ("unhealthy", "10.0.0.6", Probe::Unhealthy),
+    ] {
+      processes.extend(sandbox_replica(
+        replica,
+        address,
+        ContainerStateStatusEnum::RUNNING,
+        probe,
+      ));
+    }
+    processes.extend(sandbox_replica(
+      "stopped",
+      "10.0.0.7",
+      ContainerStateStatusEnum::EXITED,
+      Probe::None,
+    ));
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["10.0.0.2", "10.0.0.3", "10.0.0.4"]
+    );
+  }
+
+  #[test]
+  fn cargo_host_replicas_publish_one_deduplicated_host_endpoint() {
+    let processes = vec![
+      cargo_process(
+        "api-host-a",
+        "host-a",
+        "api",
+        "app",
+        true,
+        "node-a",
+        "host",
+        ContainerStateStatusEnum::RUNNING,
+        &[],
+        Probe::None,
+      ),
+      cargo_process(
+        "worker-host-a",
+        "host-a",
+        "worker",
+        "app",
+        false,
+        "node-a",
+        "host",
+        ContainerStateStatusEnum::RUNNING,
+        &[],
+        Probe::Healthy,
+      ),
+      cargo_process(
+        "api-host-b",
+        "host-b",
+        "api",
+        "app",
+        true,
+        "node-a",
+        "host",
+        ContainerStateStatusEnum::RUNNING,
+        &[],
+        Probe::Disabled,
+      ),
+    ];
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["127.0.0.1"]
+    );
+  }
+
+  #[test]
+  fn cargo_ignores_remote_init_and_duplicates_within_one_attempt() {
+    let mut processes = sandbox_replica(
+      "valid",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    processes.push(cargo_process(
+      "init-valid",
+      "valid",
+      "migrate",
+      "init",
+      true,
+      "node-a",
+      "container:sandbox",
+      ContainerStateStatusEnum::EXITED,
+      &[],
+      Probe::None,
+    ));
+
+    let mut duplicate_app = sandbox_replica(
+      "duplicate-app",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    let mut second_app = duplicate_app[1].clone();
+    second_app.key = "api-duplicate-app-second".to_owned();
+    second_app.name = second_app.key.clone();
+    duplicate_app.push(second_app);
+    processes.extend(duplicate_app);
+
+    let mut duplicate_sandbox = sandbox_replica(
+      "duplicate-sandbox",
+      "10.0.0.4",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    let mut second_sandbox = duplicate_sandbox[0].clone();
+    second_sandbox.name = "sandbox-duplicate-sandbox-second".to_owned();
+    duplicate_sandbox.push(second_sandbox);
+    processes.extend(duplicate_sandbox);
+
+    let mut remote = sandbox_replica(
+      "remote",
+      "10.0.0.6",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    for process in &mut remote {
+      process.node_name = "node-b".to_owned();
+    }
+    processes.extend(remote);
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_falls_back_to_ready_retained_attempt_during_rollout() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(sandbox_attempt(
+      "rollout",
+      "candidate",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Starting,
+      false,
+    ));
+
+    // Both generations have the same replica, role, and logical app labels.
+    // Their distinct sandbox IDs keep the candidate from invalidating the old
+    // serving group while it is still starting.
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_partial_candidate_cannot_replace_complete_retained_attempt() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+      true,
+    );
+    let candidate = sandbox_attempt(
+      "rollout",
+      "candidate",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+      false,
+    );
+    let candidate_mode = format!("container:{}", candidate[0].key);
+    processes.extend(candidate.clone());
+    let desired = BTreeSet::from(["api".to_owned(), "worker".to_owned()]);
+
+    assert_eq!(
+      get_cargo_addresses(
+        &processes,
+        "node-a",
+        &desired,
+        &ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+
+    processes.push(cargo_process(
+      "worker-rollout-candidate",
+      "rollout",
+      "worker",
+      "app",
+      true,
+      "node-a",
+      &candidate_mode,
+      ContainerStateStatusEnum::RUNNING,
+      &[],
+      Probe::None,
+    ));
+    assert_eq!(
+      get_cargo_addresses(
+        &processes,
+        "node-a",
+        &desired,
+        &ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.3"]
+    );
+  }
+
+  #[test]
+  fn cargo_never_routes_a_healthy_unpromoted_candidate() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    let mut candidate = sandbox_attempt(
+      "rollout",
+      "new",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    );
+    for process in &mut candidate {
+      process.name = format!("candidate-{}", process.name);
+    }
+    processes.extend(candidate);
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_updating_routes_only_the_ready_retained_attempt() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(sandbox_attempt(
+      "rollout",
+      "active",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+
+    assert_eq!(
+      cargo_addresses_with_status(
+        &processes,
+        "node-a",
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_updating_before_rename_preserves_the_ready_active_attempt() {
+    let processes = sandbox_attempt(
+      "rollout",
+      "active",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    );
+
+    assert_eq!(
+      get_cargo_addresses(
+        &processes,
+        "node-a",
+        &BTreeSet::from(["api".to_owned(), "new-worker".to_owned()]),
+        &ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.3"]
+    );
+  }
+
+  #[test]
+  fn cargo_start_prefers_ready_active_over_ready_retained_attempt() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(sandbox_attempt(
+      "rollout",
+      "active",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+
+    assert_eq!(
+      cargo_addresses_with_status(
+        &processes,
+        "node-a",
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.3"]
+    );
+  }
+
+  #[test]
+  fn cargo_fail_preserves_a_restored_previous_revision() {
+    let processes = sandbox_attempt(
+      "rollout",
+      "restored",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    );
+
+    assert_eq!(
+      get_cargo_addresses(
+        &processes,
+        "node-a",
+        &BTreeSet::from(["api".to_owned(), "new-worker".to_owned()]),
+        &ObjPsStatusKind::Fail,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_fail_prefers_ready_retained_over_ready_active_attempt() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(sandbox_attempt(
+      "rollout",
+      "active",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+
+    assert_eq!(
+      cargo_addresses_with_status(&processes, "node-a", ObjPsStatusKind::Fail,)
+        .unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_scopes_essential_host_escapes_to_their_rollout_attempt() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+      true,
+    );
+    processes.push(cargo_process(
+      "tmp-worker-rollout-old",
+      "rollout",
+      "worker",
+      "app",
+      true,
+      "node-a",
+      "host",
+      ContainerStateStatusEnum::RUNNING,
+      &[],
+      Probe::Healthy,
+    ));
+    processes.extend(sandbox_attempt(
+      "rollout",
+      "candidate",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+      false,
+    ));
+    processes.push(cargo_process(
+      "worker-rollout-candidate",
+      "rollout",
+      "worker",
+      "app",
+      true,
+      "node-a",
+      "host",
+      ContainerStateStatusEnum::RUNNING,
+      &[],
+      Probe::Unhealthy,
+    ));
+
+    assert_eq!(
+      get_cargo_addresses(
+        &processes,
+        "node-a",
+        &BTreeSet::from(["api".to_owned(), "worker".to_owned()]),
+        &ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+  }
+
+  #[test]
+  fn cargo_host_rollout_uses_the_ready_retained_group_as_fallback() {
+    let processes = vec![
+      cargo_process(
+        "tmp-api-host",
+        "host",
+        "api",
+        "app",
+        true,
+        "node-a",
+        "host",
+        ContainerStateStatusEnum::RUNNING,
+        &[],
+        Probe::Healthy,
+      ),
+      cargo_process(
+        "api-host-candidate",
+        "host",
+        "api",
+        "app",
+        true,
+        "node-a",
+        "host",
+        ContainerStateStatusEnum::RUNNING,
+        &[],
+        Probe::Starting,
+      ),
+    ];
+
+    assert_eq!(
+      cargo_addresses(&processes, "node-a").unwrap(),
+      vec!["127.0.0.1"]
+    );
+  }
+
+  #[test]
+  fn cargo_returns_an_error_without_a_serving_replica_endpoint() {
+    let processes = sandbox_replica(
+      "unhealthy",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Unhealthy,
+    );
+
+    let error = cargo_addresses(&processes, "node-a").unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(
+      error
+        .to_string()
+        .contains("No serving Cargo replica endpoint")
     );
   }
 

@@ -7,6 +7,31 @@ cd "$ROOT_DIR"
 
 NANOCL_CHANNEL="${NANOCL_CHANNEL:-nightly}"
 
+system_app_id() {
+  local name="$1"
+  local ids
+  local count
+  ids="$(docker ps --no-trunc --quiet \
+    --filter "label=io.nanocl.c=system.${name}" \
+    --filter label=io.nanocl.not-init-c=true)"
+  count="$(printf '%s\n' "$ids" | awk 'NF { count++ } END { print count + 0 }')"
+  [ "$count" -eq 1 ] || return 1
+  printf '%s\n' "$ids"
+}
+
+log_system_app() {
+  local name="$1"
+  local id
+  id="$(docker ps --all --no-trunc --quiet \
+    --filter "label=io.nanocl.c=system.${name}" \
+    --filter label=io.nanocl.not-init-c=true | head -n 1)"
+  if [ -n "$id" ]; then
+    docker logs "$id" || true
+  else
+    echo "No system.${name} application container found" >&2
+  fi
+}
+
 # Set E2E_SKIP_IMAGE_BUILD=1 and/or E2E_SKIP_NANOCL_BUILD=1 for faster local reruns.
 if [ "${E2E_SKIP_IMAGE_BUILD:-0}" != "1" ]; then
   NANOCL_CHANNEL="$NANOCL_CHANNEL" sh ./scripts/build_images.sh
@@ -50,15 +75,15 @@ while [ "$i" -lt 240 ]; do
     echo "readiness: daemon=${daemon_status}"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^system.ndaemon.c$'; then
-    echo "system.ndaemon.c exited unexpectedly" >&2
-    docker logs system.ndaemon.c || true
+  if ! system_app_id ndaemon >/dev/null; then
+    echo "system.ndaemon application container exited unexpectedly" >&2
+    log_system_app ndaemon
     exit 1
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncproxy.c$'; then
-    echo "system.ncproxy.c exited unexpectedly" >&2
-    docker logs system.ncproxy.c || true
+  if ! system_app_id ncproxy >/dev/null; then
+    echo "system.ncproxy application container exited unexpectedly" >&2
+    log_system_app ncproxy
     exit 1
   fi
 
@@ -69,8 +94,8 @@ done
 if [ "$daemon_ready" -ne 1 ]; then
   echo "nanocld did not become ready in time" >&2
   docker ps -a
-  docker logs system.ndaemon.c || true
-  docker logs system.ncproxy.c || true
+  log_system_app ndaemon
+  log_system_app ncproxy
   exit 1
 fi
 
@@ -91,9 +116,9 @@ while [ "$p" -lt 240 ]; do
     echo "readiness: proxy=waiting (${p}s)"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncproxy.c$'; then
-    echo "system.ncproxy.c exited unexpectedly" >&2
-    docker logs system.ncproxy.c || true
+  if ! system_app_id ncproxy >/dev/null; then
+    echo "system.ncproxy application container exited unexpectedly" >&2
+    log_system_app ncproxy
     exit 1
   fi
 
@@ -104,8 +129,9 @@ done
 if [ "$proxy_ready" -ne 1 ]; then
   echo "ncproxy did not become ready in time" >&2
   docker ps -a
-  docker logs system.ndaemon.c || true
-  docker logs system.ncproxy.c || true
+  log_system_app ndaemon
+  log_system_app ncproxy
+  exit 1
 fi
 
 # Wait for ncdns to bind its socket and accept connections.
@@ -125,9 +151,9 @@ while [ "$p" -lt 240 ]; do
     echo "readiness: dns=waiting (${p}s)"
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -q '^system.ncdns.c$'; then
-    echo "system.ncdns.c exited unexpectedly" >&2
-    docker logs system.ncdns.c || true
+  if ! system_app_id ncdns >/dev/null; then
+    echo "system.ncdns application container exited unexpectedly" >&2
+    log_system_app ncdns
     exit 1
   fi
 
@@ -138,16 +164,17 @@ done
 if [ "$dns_ready" -ne 1 ]; then
   echo "ncdns did not become ready in time" >&2
   docker ps -a
-  docker logs system.ndaemon.c || true
-  docker logs system.ncdns.c || true
+  log_system_app ndaemon
+  log_system_app ncdns
+  exit 1
 fi
 
 sudo chmod 777 -R /run/nanocl
 
 nanocl version
 docker ps -a
-docker logs system.ndaemon.c || true
-docker logs system.ncproxy.c || true
-docker logs system.ncdns.c || true
+log_system_app ndaemon
+log_system_app ncproxy
+log_system_app ncdns
 
 echo "E2E CI prepare complete"

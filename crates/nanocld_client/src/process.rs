@@ -3,7 +3,6 @@ use ntex::channel::mpsc::Receiver;
 use nanocl_error::{http::HttpResult, http_client::HttpClientResult};
 
 use nanocl_stubs::{
-  cargo::CargoKillOptions,
   generic::GenericFilter,
   process::{
     Process, ProcessLogQuery, ProcessOutputLog, ProcessStats,
@@ -137,33 +136,6 @@ impl NanocldClient {
       .send_post(
         &format!("{}/{kind}/{key}/stop", Self::PROCESS_PATH),
         None::<String>,
-        None::<String>,
-      )
-      .await?;
-    Ok(())
-  }
-
-  /// Kill all processes for a kind and canonical resource key.
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.kill_process("cargo", "global.my-cargo", None).await;
-  /// ```
-  ///
-  pub async fn kill_process(
-    &self,
-    kind: &str,
-    key: &str,
-    query: Option<&CargoKillOptions>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{kind}/{key}/kill", Self::PROCESS_PATH),
-        query,
         None::<String>,
       )
       .await?;

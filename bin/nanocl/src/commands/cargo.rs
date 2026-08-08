@@ -1,6 +1,5 @@
-use std::{collections::HashMap, process};
+use std::collections::HashMap;
 
-use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use ntex::rt;
 
@@ -10,7 +9,7 @@ use nanocld_client::{
   stubs::{
     cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
     generic::{GenericFilter, GenericListQueryNsp},
-    process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
+    process::{ProcessLogQuery, ProcessStatsQuery},
     system::{EventActorKind, NativeEventAction},
   },
 };
@@ -18,10 +17,10 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    CargoArg, CargoCommand, CargoCreateOpts, CargoExecOpts, CargoHistoryOpts,
-    CargoKillOpts, CargoLogsOpts, CargoPatchOpts, CargoRestartOpts,
-    CargoRevertOpts, CargoRow, CargoRunOpts, CargoStatsOpts,
-    GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
+    CargoArg, CargoCommand, CargoCreateOpts, CargoHistoryOpts, CargoLogsOpts,
+    CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow, CargoRunOpts,
+    CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
+    build_cargo_patch,
   },
   utils,
 };
@@ -128,56 +127,15 @@ async fn exec_cargo_patch(
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let cargo = client.inspect_cargo(&opts.key).await?;
+  let patch = build_cargo_patch(opts, &cargo.spec.containers)?;
   let waiter =
     wait_cargo_state(&opts.key, NativeEventAction::Start, client).await?;
-  client.patch_cargo(&opts.key, &opts.clone().into()).await?;
+  client.patch_cargo(&opts.key, &patch).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
   })??;
   Ok(())
-}
-
-/// Execute the `nanocl cargo exec` command to execute a command in a cargo
-async fn exec_cargo_exec(
-  cli_conf: &CliConfig,
-  _args: &CargoArg,
-  opts: &CargoExecOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let exec: CreateExecOptions = opts.clone().into();
-  let result = client.create_exec(&opts.key, &exec).await?;
-  let mut stream = client
-    .start_exec(
-      &result.id,
-      &StartExecOptions {
-        tty: opts.tty,
-        ..Default::default()
-      },
-    )
-    .await?;
-  while let Some(output) = stream.next().await {
-    let output = output?;
-    match output.kind {
-      OutputKind::StdOut => {
-        print!("{}", &output.data);
-      }
-      OutputKind::StdErr => {
-        eprint!("{}", output.data);
-      }
-      OutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
-      OutputKind::Console => print!("{}", &output.data),
-    }
-  }
-  let exec_infos = client.inspect_exec(&result.id).await?;
-  match exec_infos.exit_code {
-    Some(code) => {
-      if code == 0 {
-        return Ok(());
-      }
-      process::exit(code.try_into().unwrap_or(1))
-    }
-    None => Ok(()),
-  }
 }
 
 /// Execute the `nanocl cargo history` command to list the history of a cargo
@@ -312,19 +270,6 @@ async fn exec_cargo_run(
   Ok(())
 }
 
-/// Execute the `nanocl cargo kill` command.
-async fn exec_cargo_kill(
-  cli_conf: &CliConfig,
-  opts: &CargoKillOpts,
-) -> IoResult<()> {
-  let query = opts.clone().into();
-  cli_conf
-    .client
-    .kill_process("cargo", &opts.key, Some(&query))
-    .await?;
-  Ok(())
-}
-
 /// Function that execute when running `nanocl cargo`
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   match &args.command {
@@ -349,13 +294,11 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
     }
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
     CargoCommand::Inspect(opts) => CargoArg::exec_inspect(cli_conf, opts).await,
-    CargoCommand::Exec(opts) => exec_cargo_exec(cli_conf, args, opts).await,
     CargoCommand::History(opts) => {
       exec_cargo_history(cli_conf, args, opts).await
     }
     CargoCommand::Revert(opts) => exec_cargo_revert(cli_conf, args, opts).await,
     CargoCommand::Logs(opts) => exec_cargo_logs(cli_conf, args, opts).await,
-    CargoCommand::Kill(opts) => exec_cargo_kill(cli_conf, opts).await,
     CargoCommand::Run(opts) => exec_cargo_run(cli_conf, args, opts).await,
     CargoCommand::Restart(opts) => {
       exec_cargo_restart(cli_conf, args, opts).await
@@ -372,7 +315,7 @@ mod tests {
   fn quiet_output_uses_canonical_key() {
     let row = CargoRow {
       key: "system.same".to_owned(),
-      image: String::new(),
+      containers: String::new(),
       status: String::new(),
       instances: String::new(),
       version: String::new(),

@@ -51,6 +51,12 @@ pub(crate) enum CargoReplicaReconcileError {
     cargo_key: String,
     ordinal: i32,
   },
+  ProcessMappingsPreventReassignment {
+    cargo_key: String,
+    ordinal: i32,
+    current_node: Option<String>,
+    requested_node: Option<String>,
+  },
   IncompleteAssignment {
     cargo_key: String,
     reason: &'static str,
@@ -122,6 +128,15 @@ impl std::fmt::Display for CargoReplicaReconcileError {
       Self::ProcessMappingsPreventScaleDown { cargo_key, ordinal } => write!(
         f,
         "Cargo {cargo_key:?} replica ordinal {ordinal} cannot be removed while it has logical process mappings"
+      ),
+      Self::ProcessMappingsPreventReassignment {
+        cargo_key,
+        ordinal,
+        current_node,
+        requested_node,
+      } => write!(
+        f,
+        "Cargo {cargo_key:?} replica ordinal {ordinal} cannot move from {current_node:?} to {requested_node:?} while it has logical process mappings"
       ),
       Self::IncompleteAssignment { cargo_key, reason } => write!(
         f,
@@ -300,6 +315,16 @@ pub(crate) fn plan_reconciliation(
   for replica in pending_existing {
     let node_name = take_next_node(&mut remaining_assignments);
     if replica.node_name != node_name {
+      if mapped_replica_keys.contains(&replica.key) {
+        return Err(
+          CargoReplicaReconcileError::ProcessMappingsPreventReassignment {
+            cargo_key: cargo_key.to_owned(),
+            ordinal: replica.ordinal,
+            current_node: replica.node_name.clone(),
+            requested_node: node_name,
+          },
+        );
+      }
       node_updates.push((replica.key, replica.ordinal, node_name.clone()));
     }
     assignments.push(CargoReplicaAssignment {
@@ -628,6 +653,25 @@ mod tests {
     let error = IoError::from(error);
     assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
     assert_eq!(error.context(), Some("CargoReplicaReconcile"));
+  }
+
+  #[test]
+  fn mapped_replica_reassignment_is_rejected_before_mutation() {
+    let existing = vec![replica(0, Some("node-a"))];
+    let selection = selection(1, &[("node-b", 1)]);
+    let mapped = HashSet::from([existing[0].key]);
+    let error = plan_reconciliation(CARGO_KEY, &selection, &existing, &mapped)
+      .unwrap_err();
+
+    assert!(matches!(
+      error,
+      CargoReplicaReconcileError::ProcessMappingsPreventReassignment {
+        ordinal: 0,
+        current_node: Some(ref current),
+        requested_node: Some(ref requested),
+        ..
+      } if current == "node-a" && requested == "node-b"
+    ));
   }
 
   #[test]

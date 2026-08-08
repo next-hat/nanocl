@@ -55,27 +55,13 @@ fn proxy_resource_rule(actor: &EventActor) -> IoResult<ResourceProxyRule> {
   utils::resource::serialize(data)
 }
 
-fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
-  if cargo.spec.container.healthcheck.is_some() {
-    return true;
-  }
-  cargo.instances.iter().any(|instance| {
-    instance
-      .data
-      .config
-      .as_ref()
-      .and_then(|config| config.healthcheck.as_ref())
-      .is_some()
-      || instance
-        .data
-        .state
-        .as_ref()
-        .and_then(|container_state| container_state.health.as_ref())
-        .is_some()
-  })
+fn cargo_has_committed_start(
+  cargo: &nanocld_client::stubs::cargo::CargoInspect,
+) -> bool {
+  cargo.status.actual == nanocld_client::stubs::system::ObjPsStatusKind::Start
 }
 
-async fn should_wait_for_healthy_event(
+async fn cargo_is_committed_started(
   name: &str,
   namespace: &str,
   state: &SystemStateRef,
@@ -84,7 +70,7 @@ async fn should_wait_for_healthy_event(
     nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
       .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?;
   let cargo = state.client.inspect_cargo(key.as_str()).await?;
-  Ok(has_healthcheck(&cargo))
+  Ok(cargo_has_committed_start(&cargo))
 }
 
 /// Get workload name and namespace attributes from a nanocld event.
@@ -211,19 +197,27 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
-    (EventActorKind::Cargo, NativeEventAction::Healthy) => {
+    (EventActorKind::Cargo, NativeEventAction::Start)
+    | (EventActorKind::Cargo, NativeEventAction::Healthy) => {
       let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      if cargo_is_committed_started(&name, &namespace, state).await? {
+        update_cargo_rule(&name, &namespace, state).await?;
+        let _ = state.event_emitter.emit_reload().await;
+      }
+      Ok(())
+    }
+    (EventActorKind::Cargo, NativeEventAction::Unhealthy) => {
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      // Recompute the serving replica set. A failed candidate can leave an
+      // older ready generation routable, while an actually unhealthy replica
+      // must disappear from the generated upstream.
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventActorKind::Cargo, NativeEventAction::Start)
-    | (EventActorKind::Cargo, NativeEventAction::Update) => {
-      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
-      if !should_wait_for_healthy_event(&name, &namespace, state).await? {
-        update_cargo_rule(&name, &namespace, state).await?;
-        let _ = state.event_emitter.emit_reload().await;
-      }
+    (EventActorKind::Cargo, NativeEventAction::Update) => {
+      // Updating is not a committed serving state. Keep the existing nginx
+      // routes until Start/Healthy or recompute them after Unhealthy rollback.
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)
@@ -372,7 +366,41 @@ pub(crate) fn spawn(state: &SystemStateRef) {
 
 #[cfg(test)]
 mod tests {
+  use nanocld_client::stubs::{cargo::CargoInspect, system::ObjPsStatusKind};
+
   use super::*;
+
+  fn cargo(actual: ObjPsStatusKind) -> CargoInspect {
+    CargoInspect {
+      namespace_name: "global".to_owned(),
+      created_at: chrono::Utc::now().naive_utc(),
+      instance_total: 0,
+      instance_running: 0,
+      status: nanocld_client::stubs::system::ObjPsStatus {
+        actual,
+        ..Default::default()
+      },
+      spec: nanocld_client::stubs::cargo_spec::CargoSpecRevision {
+        name: "api".to_owned(),
+        cargo_key: "global.api".to_owned(),
+        ..Default::default()
+      },
+      instances: Vec::new(),
+    }
+  }
+
+  #[test]
+  fn only_committed_start_is_ready_for_route_refresh() {
+    assert!(cargo_has_committed_start(&cargo(ObjPsStatusKind::Start)));
+    for status in [
+      ObjPsStatusKind::Starting,
+      ObjPsStatusKind::Updating,
+      ObjPsStatusKind::Fail,
+      ObjPsStatusKind::Stop,
+    ] {
+      assert!(!cargo_has_committed_start(&cargo(status)));
+    }
+  }
 
   #[test]
   fn workload_attributes_are_shared_by_cargo_and_vm_events() {

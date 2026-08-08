@@ -5,14 +5,16 @@ Namespace = "global"
 [[Cargoes]]
 Name = "deploy-example"
 
-[Cargoes.Container]
+[[Cargoes.Containers]]
+Name = "deploy-example"
 Image = "ghcr.io/next-hat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED1"]
 
 [[Cargoes]]
 Name = "deploy-example2"
 
-[Cargoes.Container]
+[[Cargoes.Containers]]
+Name = "deploy-example2"
 Image = "ghcr.io/next-hat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED2"]
 

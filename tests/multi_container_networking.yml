@@ -1,0 +1,23 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-multi-container
+  Replicas: 1
+  PortBindings:
+    "9000/tcp":
+    - HostIp: 127.0.0.1
+      HostPort: "0"
+  Containers:
+  - Name: server
+    Image: alpine:latest
+    Cmd:
+    - sh
+    - -c
+    - mkdir -p /www && echo multi-container-ok > /www/index.html && exec httpd -f -p 9000 -h /www
+  - Name: client
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"

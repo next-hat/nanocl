@@ -7,7 +7,15 @@ Namespace: system
 
 Cargoes:
 - Name: nstore
-  Container:
+  PortBindings:
+    26257/tcp:
+      - HostPort: "26257"
+        HostIp: "0.0.0.0"
+    26258/tcp:
+      - HostPort: "26258"
+        HostIp: "0.0.0.0"
+  Containers:
+  - Name: nstore
     Hostname: store.nanocl.internal
     Image: cockroachdb/cockroach:v24.3.8
     Entrypoint:
@@ -16,13 +24,6 @@ Cargoes:
     Env:
       - STATE_DIR=${{ state_dir }}/store
     HostConfig:
-      PortBindings:
-        26257/tcp:
-          - HostPort: "26257"
-            HostIp: "0.0.0.0"
-        26258/tcp:
-          - HostPort: "26258"
-            HostIp: "0.0.0.0"
       Binds:
         - ${{ state_dir }}/store:${{ state_dir }}/store
     Cmd:
@@ -32,7 +33,8 @@ Cargoes:
        cockroach start-single-node --insecure --store=$STATE_DIR/data
 
 - Name: nmetrics
-  Container:
+  Containers:
+  - Name: nmetrics
     Image: ghcr.io/next-hat/metrsd:0.5.4
     Tty: true
     Env: [LOG_LEVEL=metrsd=info]
@@ -44,13 +46,14 @@ Cargoes:
         - //run/guest-services/nanocl:/run/nanocl
 
 - Name: ncproxy
-  Container:
+  NetworkMode: host
+  Containers:
+  - Name: ncproxy
     Image: ghcr.io/next-hat/nanocl-dev:dev
     Tty: true
     Env:
       - STATE_DIR=${{ state_dir }}/proxy
     HostConfig:
-      NetworkMode: host
       Binds:
         - ./:/project
         - nanocl-deps:/project/target
@@ -65,13 +68,14 @@ Cargoes:
       - run --no-default-features --features dev --bin ncproxy -- --state-dir ${{ state_dir }}/proxy
 
 - Name: ncdns
-  Container:
+  NetworkMode: host
+  Containers:
+  - Name: ncdns
     Image: ghcr.io/next-hat/nanocl-dev:dev
     Tty: true
     Env:
       - STATE_DIR=${{ state_dir }}/dns
     HostConfig:
-      NetworkMode: host
       Binds:
         - ./:/project
         - nanocl-deps:/project/target
@@ -86,7 +90,15 @@ Cargoes:
       - run --no-default-features --features dev --bin ncdns -- --state-dir ${{ state_dir }}/dns
 
 - Name: ndaemon
-  Container:
+  PortBindings:
+    8585/tcp:
+    - HostPort: "8585"
+      HostIp: "0.0.0.0"
+    9443/tcp:
+    - HostPort: "9443"
+      HostIp: "0.0.0.0"
+  Containers:
+  - Name: ndaemon
     Image: ghcr.io/next-hat/nanocl-dev:dev
     Tty: true
     Hostname: nanocl.internal
@@ -115,13 +127,6 @@ Cargoes:
       8585/tcp:
       9443/tcp:
     HostConfig:
-      PortBindings:
-        8585/tcp:
-        - HostPort: "8585"
-          HostIp: "0.0.0.0"
-        9443/tcp:
-        - HostPort: "9443"
-          HostIp: "0.0.0.0"
       Binds:
         - ./:/project
         - nanocl-deps:/project/target

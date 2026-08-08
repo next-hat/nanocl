@@ -11,14 +11,18 @@ patch - Update a cargo by its canonical key
 
 ## SYNOPSIS
 
-**patch** \[**-i**\|**--image**\] \[**-e**\|**--env**\]
-\[**-v**\|**--volume**\] \[**-h**\|**--help**\] \<*KEY*\>
+**patch** \[**--container**\] \[**-i**\|**--image**\]
+\[**-e**\|**--env**\] \[**-v**\|**--volume**\] \[**-h**\|**--help**\]
+\<*KEY*\>
 
 ## DESCRIPTION
 
 Update a cargo by its canonical key
 
 ## OPTIONS
+
+**--container** *\<CONTAINER\>*
+Name of the application container to update
 
 **-i**, **--image** *\<IMAGE\>*  
 New image of cargo

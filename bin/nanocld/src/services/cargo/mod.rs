@@ -38,13 +38,13 @@ mod tests {
   use ntex::http;
 
   use nanocl_stubs::{
-    cargo::{
-      Cargo, CargoDeleteQuery, CargoInspect, CargoKillOptions, CargoSummary,
+    cargo::{Cargo, CargoDeleteQuery, CargoInspect, CargoSummary},
+    cargo_spec::{
+      CargoSpec, CargoSpecPatch, CargoSpecRevision, Config, ContainerSpec,
     },
-    cargo_spec::{CargoSpec, CargoSpecPartial, CargoSpecUpdate},
     generic::{
       GenericClause, GenericCount, GenericFilter, GenericListQueryNsp,
-      GenericNspQuery,
+      GenericNspQuery, ImagePullPolicy,
     },
     namespace::NamespacePartial,
     proxy::ProxySslConfig,
@@ -55,6 +55,28 @@ mod tests {
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/cargoes";
+
+  fn container(name: &str, image: &str) -> ContainerSpec {
+    ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: ImagePullPolicy::IfNotPresent,
+      container_config: Config {
+        image: Some(image.to_owned()),
+        ..Default::default()
+      },
+    }
+  }
+
+  fn cargo_spec(name: &str, image: &str) -> CargoSpec {
+    CargoSpec {
+      name: name.to_owned(),
+      containers: vec![container("main", image)],
+      ..Default::default()
+    }
+  }
 
   #[ntex::test]
   async fn collection_namespace_and_key_semantics() {
@@ -80,14 +102,7 @@ mod tests {
         || response.status() == http::StatusCode::CONFLICT
     );
 
-    let spec = CargoSpecPartial {
-      name: NAME.to_owned(),
-      container: bollard_next::container::Config {
-        image: Some("alpine:latest".to_owned()),
-        ..Default::default()
-      },
-      ..Default::default()
-    };
+    let spec = cargo_spec(NAME, "alpine:latest");
     for namespace in [None, Some(NAMESPACE)] {
       let response = client
         .send_post(ENDPOINT, Some(&spec), Some(GenericNspQuery::new(namespace)))
@@ -163,7 +178,7 @@ mod tests {
     let response = client
       .send_patch(
         &format!("{ENDPOINT}/{OTHER_KEY}"),
-        Some(CargoSpecUpdate {
+        Some(CargoSpecPatch {
           name: Some("renamed".to_owned()),
           ..Default::default()
         }),
@@ -179,11 +194,8 @@ mod tests {
     let response = client
       .send_patch(
         &format!("{ENDPOINT}/{OTHER_KEY}"),
-        Some(CargoSpecUpdate {
-          container: Some(bollard_next::container::Config {
-            image: Some("busybox:latest".to_owned()),
-            ..Default::default()
-          }),
+        Some(CargoSpecPatch {
+          containers: Some(vec![container("main", "busybox:latest")]),
           ..Default::default()
         }),
         None::<String>,
@@ -193,6 +205,35 @@ mod tests {
       response.status(),
       http::StatusCode::OK,
       "patch cargo by canonical key"
+    );
+
+    let response = client
+      .send_get(
+        &format!("{ENDPOINT}/{GLOBAL_KEY}/histories"),
+        None::<String>,
+      )
+      .await;
+    let global_history = response
+      .json::<Vec<CargoSpecRevision>>()
+      .await
+      .unwrap()
+      .into_iter()
+      .next()
+      .unwrap();
+    let response = client
+      .send_patch(
+        &format!(
+          "{ENDPOINT}/{OTHER_KEY}/histories/{}/revert",
+          global_history.key
+        ),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::BAD_REQUEST,
+      "reject another Cargo's history even when its name matches"
     );
 
     for key in [GLOBAL_KEY, OTHER_KEY] {
@@ -224,21 +265,10 @@ mod tests {
     let main_test_key = format!("global.{main_test_cargo}");
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_owned();
+      let expected =
+        cargo_spec(&test_cargo, "ghcr.io/next-hat/nanocl-get-started:latest");
       let res = client
-        .send_post(
-          ENDPOINT,
-          Some(&CargoSpecPartial {
-            name: test_cargo.to_owned(),
-            container: bollard_next::container::Config {
-              image: Some(
-                "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
-              ),
-              ..Default::default()
-            },
-            ..Default::default()
-          }),
-          None::<String>,
-        )
+        .send_post(ENDPOINT, Some(&expected), None::<String>)
         .await;
       test_status_code!(
         res.status(),
@@ -248,10 +278,7 @@ mod tests {
       let cargo = TestClient::res_json::<Cargo>(res).await;
       assert_eq!(cargo.spec.name, test_cargo, "Invalid cargo name");
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
-      assert_eq!(
-        cargo.spec.container.image,
-        Some("ghcr.io/next-hat/nanocl-get-started:latest".to_owned())
-      );
+      assert_eq!(cargo.spec.containers, expected.containers);
     }
     let res = client
       .send_get(
@@ -303,16 +330,6 @@ mod tests {
     );
     let res = client
       .send_post(
-        &format!("/processes/cargo/{main_test_key}/kill"),
-        Some(&CargoKillOptions {
-          signal: "SIGINT".to_owned(),
-        }),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
-    let res = client
-      .send_post(
         &format!("/processes/cargo/{main_test_key}/restart"),
         None::<String>,
         None::<String>,
@@ -323,20 +340,19 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "basic cargo restart"
     );
+    let mut replacement_container =
+      container("main", "ghcr.io/next-hat/nanocl-get-started:latest");
+    replacement_container.container_config.env =
+      Some(vec!["TEST=1".to_owned()]);
+    let replacement = CargoSpec {
+      name: main_test_cargo.to_owned(),
+      containers: vec![replacement_container],
+      ..Default::default()
+    };
     let res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_key}"),
-        Some(&CargoSpecPartial {
-          name: main_test_cargo.to_owned(),
-          container: bollard_next::container::Config {
-            image: Some(
-              "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
-            ),
-            env: Some(vec!["TEST=1".to_owned()]),
-            ..Default::default()
-          },
-          ..Default::default()
-        }),
+        Some(&replacement),
         None::<String>,
       )
       .await;
@@ -344,14 +360,7 @@ mod tests {
     let patch_response = res.json::<Cargo>().await.unwrap();
     assert_eq!(patch_response.spec.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
-    assert_eq!(
-      patch_response.spec.container.image,
-      Some("ghcr.io/next-hat/nanocl-get-started:latest".to_owned())
-    );
-    assert_eq!(
-      patch_response.spec.container.env,
-      Some(vec!["TEST=1".to_owned()])
-    );
+    assert_eq!(patch_response.spec.containers, replacement.containers);
     let res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_key}/histories"),
@@ -363,9 +372,14 @@ mod tests {
       http::StatusCode::OK,
       "basic cargo history"
     );
-    let histories = res.json::<Vec<CargoSpec>>().await.unwrap();
+    let histories = res.json::<Vec<CargoSpecRevision>>().await.unwrap();
     assert!(histories.len() > 1, "Expected to find cargo histories");
-    let id = histories[0].key;
+    let history = histories
+      .iter()
+      .find(|history| history.containers != replacement.containers)
+      .expect("Expected to find the original Cargo declaration")
+      .clone();
+    let id = history.key;
     let res = client
       .send_patch(
         &format!("{ENDPOINT}/{main_test_key}/histories/{id}/revert"),
@@ -374,6 +388,20 @@ mod tests {
       )
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
+    let reverted = res.json::<Cargo>().await.unwrap();
+    assert_eq!(reverted.spec.name, history.name);
+    assert_eq!(reverted.spec.metadata, history.metadata);
+    assert_eq!(reverted.spec.replicas, history.replicas);
+    assert_eq!(reverted.spec.network_mode, history.network_mode);
+    assert_eq!(reverted.spec.port_bindings, history.port_bindings);
+    assert_eq!(reverted.spec.secrets, history.secrets);
+    assert_eq!(reverted.spec.placement, history.placement);
+    assert_eq!(
+      reverted.spec.resource_requirement,
+      history.resource_requirement
+    );
+    assert_eq!(reverted.spec.init_containers, history.init_containers);
+    assert_eq!(reverted.spec.containers, history.containers);
     let res = client
       .send_post(
         &format!("/processes/cargo/{main_test_key}/stop"),
@@ -400,26 +428,20 @@ mod tests {
       );
     }
     // test init container
+    let mut init = container("init", "alpine:latest");
+    init.container_config.cmd =
+      Some(vec!["echo".to_owned(), "hello".to_owned()]);
+    let init_spec = CargoSpec {
+      name: "init-test-cargo".to_owned(),
+      init_containers: vec![init],
+      containers: vec![container(
+        "main",
+        "ghcr.io/next-hat/nanocl-get-started:latest",
+      )],
+      ..Default::default()
+    };
     let res = client
-      .send_post(
-        ENDPOINT,
-        Some(&CargoSpecPartial {
-          name: "init-test-cargo".to_owned(),
-          init_container: Some(bollard_next::container::Config {
-            image: Some("alpine:latest".to_owned()),
-            cmd: Some(vec!["echo".to_owned(), "hello".to_owned()]),
-            ..Default::default()
-          }),
-          container: bollard_next::container::Config {
-            image: Some(
-              "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
-            ),
-            ..Default::default()
-          },
-          ..Default::default()
-        }),
-        None::<String>,
-      )
+      .send_post(ENDPOINT, Some(&init_spec), None::<String>)
       .await;
     test_status_code!(
       res.status(),
@@ -497,30 +519,18 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create secret");
     // create a cargo using the secret
+    let mut spec = cargo_spec(
+      "test-cargo-ssl",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
+    );
+    spec.secrets = vec!["test-secret-ssl".to_owned()];
     let res = client
-      .send_post(
-        ENDPOINT,
-        Some(CargoSpecPartial {
-          name: "test-cargo-ssl".to_owned(),
-          container: bollard_next::container::Config {
-            image: Some(
-              "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
-            ),
-            ..Default::default()
-          },
-          secrets: Some(vec!["test-secret-ssl".to_owned()]),
-          ..Default::default()
-        }),
-        None::<String>,
-      )
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create cargo");
     let cargo = TestClient::res_json::<Cargo>(res).await;
     assert_eq!(cargo.spec.name, "test-cargo-ssl", "Invalid cargo name");
-    assert_eq!(
-      cargo.spec.container.image,
-      Some("ghcr.io/next-hat/nanocl-get-started:latest".to_owned())
-    );
+    assert_eq!(cargo.spec.containers, spec.containers);
     // start the cargo
     let res = client
       .send_post(

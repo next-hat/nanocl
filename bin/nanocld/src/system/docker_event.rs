@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use futures_util::StreamExt;
 use ntex::rt;
 
-use nanocl_error::io::{FromIo, IoError, IoResult};
+use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
   container::InspectContainerOptions,
@@ -15,34 +17,69 @@ use nanocl_stubs::system::{
 
 use crate::{
   models::{
-    CargoDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb, SystemState, VmDb,
+    CargoDb, CargoReplicaDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb,
+    SystemState, VmDb,
   },
   repositories::generic::*,
   utils, vars,
 };
 
-fn truncate_health_output(output: &str) -> String {
-  const LIMIT: usize = 180;
-  let mut compact = output
-    .chars()
-    .map(|character| {
-      if character == '\n' || character == '\r' {
-        ' '
-      } else {
-        character
-      }
-    })
-    .collect::<String>();
-  compact = compact.trim().to_owned();
-  if compact.chars().count() <= LIMIT {
-    return compact;
+const LABEL_CARGO_ROLE: &str = "io.nanocl.cargo.role";
+const LABEL_CARGO_ESSENTIAL: &str = "io.nanocl.cargo.essential";
+const LABEL_LEGACY_APPLICATION: &str = "io.nanocl.not-init-c";
+
+fn labels_describe_active_cargo_application(
+  process_name: &str,
+  labels: Option<&HashMap<String, String>>,
+) -> bool {
+  if process_name.starts_with("tmp-")
+    || process_name.starts_with("candidate-")
+    || process_name.starts_with("init-")
+  {
+    return false;
   }
-  let truncated = compact.chars().take(LIMIT).collect::<String>();
-  format!("{truncated}...")
+  let Some(labels) = labels else {
+    return false;
+  };
+  match labels.get(LABEL_CARGO_ROLE).map(String::as_str) {
+    Some("app") => labels
+      .get(LABEL_CARGO_ESSENTIAL)
+      .is_some_and(|value| value == "true"),
+    Some(_) => false,
+    None => labels
+      .get(LABEL_LEGACY_APPLICATION)
+      .is_some_and(|value| value == "true"),
+  }
 }
 
-fn is_runtime_cargo_instance(process_name: &str) -> bool {
-  !process_name.starts_with("tmp-") && !process_name.starts_with("init-")
+fn labels_describe_active_cargo_runtime(
+  process_name: &str,
+  labels: Option<&HashMap<String, String>>,
+) -> bool {
+  if process_name.starts_with("tmp-")
+    || process_name.starts_with("candidate-")
+    || process_name.starts_with("init-")
+  {
+    return false;
+  }
+  let Some(labels) = labels else {
+    return false;
+  };
+  match labels.get(LABEL_CARGO_ROLE).map(String::as_str) {
+    Some("sandbox") => true,
+    Some("app") => labels
+      .get(LABEL_CARGO_ESSENTIAL)
+      .is_some_and(|value| value == "true"),
+    Some(_) => false,
+    None => labels
+      .get(LABEL_LEGACY_APPLICATION)
+      .is_some_and(|value| value == "true"),
+  }
+}
+
+fn reconciliation_owns_cargo_health(actual: &str) -> bool {
+  actual == ObjPsStatusKind::Updating.to_string()
+    || actual == ObjPsStatusKind::Starting.to_string()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,101 +164,119 @@ async fn exec_network_event(
   Ok(())
 }
 
-async fn unhealthy_instances_reason(
-  instances: &[nanocl_stubs::process::Process],
+async fn refresh_process_observation(
+  id: &str,
+  name: &str,
   state: &SystemState,
-) -> IoResult<Option<String>> {
-  let mut reasons: Vec<String> = Vec::new();
-  for process in instances {
-    let inspected = match state
-      .inner
-      .docker_api
-      .inspect_container(&process.key, None::<InspectContainerOptions>)
-      .await
-    {
-      Ok(inspected) => inspected,
-      Err(err) => {
-        log::debug!("skip unhealthy reason for {}: {err}", process.name);
-        continue;
-      }
-    };
-    let Some(health) = inspected
-      .state
-      .as_ref()
-      .and_then(|container_state| container_state.health.as_ref())
-    else {
-      continue;
-    };
-    let status = health
-      .status
-      .as_ref()
-      .map(|status| status.to_string())
-      .unwrap_or_else(|| "unknown".to_owned());
-    if status != "unhealthy" {
-      continue;
-    }
-    let failing_streak = health.failing_streak.unwrap_or_default();
-    let (exit_code, output) = health
-      .log
-      .as_ref()
-      .and_then(|logs| logs.last())
-      .map(|entry| {
-        (
-          entry.exit_code.unwrap_or_default(),
-          entry
-            .output
-            .as_ref()
-            .map(|output| truncate_health_output(output))
-            .unwrap_or_default(),
-        )
-      })
-      .unwrap_or_default();
-    reasons.push(format!(
-      "{} status={status} failing_streak={failing_streak} exit_code={exit_code} output='{}'",
-      process.name,
-      if output.is_empty() {
-        "no probe output".to_owned()
-      } else {
-        output
-      }
-    ));
-  }
-  if reasons.is_empty() {
-    return Ok(None);
-  }
-  Ok(Some(reasons.join("; ")))
+) -> IoResult<()> {
+  let instance = state
+    .inner
+    .docker_api
+    .inspect_container(id, None::<InspectContainerOptions>)
+    .await
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  let data = serde_json::to_value(instance)
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  ProcessDb::update_pk(
+    id,
+    ProcessUpdateDb {
+      updated_at: Some(chrono::Utc::now().naive_utc()),
+      data: Some(data),
+      name: Some(name.to_owned()),
+      ..Default::default()
+    },
+    &state.inner.pool,
+  )
+  .await?;
+  Ok(())
 }
 
-async fn count_health_states(
-  instances: &[nanocl_stubs::process::Process],
+async fn reduce_cargo_runtime_readiness(
+  kind_key: &str,
+  trigger: &str,
   state: &SystemState,
-) -> IoResult<(usize, usize, usize, usize)> {
-  let mut healthy = 0usize;
-  let mut unhealthy = 0usize;
-  let mut starting = 0usize;
-  let mut unknown = 0usize;
-  for process in instances {
-    let inspected = state
-      .inner
-      .docker_api
-      .inspect_container(&process.key, None::<InspectContainerOptions>)
-      .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-    let status = inspected
-      .state
-      .as_ref()
-      .and_then(|container_state| container_state.health.as_ref())
-      .and_then(|health| health.status.as_ref())
-      .map(|status| status.to_string())
-      .unwrap_or_else(|| "unknown".to_owned());
-    match status.as_str() {
-      "healthy" => healthy += 1,
-      "unhealthy" => unhealthy += 1,
-      "starting" => starting += 1,
-      _ => unknown += 1,
-    }
+) -> IoResult<bool> {
+  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
+  if status.wanted != ObjPsStatusKind::Start.to_string() {
+    log::debug!(
+      "ignore Cargo readiness trigger while wanted={}: key={kind_key} trigger={trigger}",
+      status.wanted
+    );
+    return Ok(false);
   }
-  Ok((healthy, unhealthy, starting, unknown))
+  if reconciliation_owns_cargo_health(&status.actual) {
+    // Cargo reconciliation performs a synchronous, per-replica readiness
+    // gate and owns promotion or rollback. Docker events can be delivered out
+    // of order, so they must not mutate aggregate state or delete/restore a
+    // generation while reconciliation is in progress.
+    log::debug!(
+      "ignore Cargo readiness trigger during {}: key={kind_key} trigger={trigger}",
+      status.actual
+    );
+    return Ok(false);
+  }
+  let cargo =
+    CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
+  let instances =
+    ProcessDb::read_by_kind_key(kind_key, None, &state.inner.pool).await?;
+  let desired_replica_keys =
+    CargoReplicaDb::list_by_cargo(kind_key, &state.inner.pool)
+      .await?
+      .into_iter()
+      .map(|replica| replica.key)
+      .collect();
+  let ready = utils::container::cargo::all_desired_replicas_ready(
+    &cargo,
+    &desired_replica_keys,
+    &instances,
+  );
+  if !ready {
+    let health_changed = ObjPsStatusDb::update_health_status(
+      kind_key,
+      &ObjPsHealthStatusKind::Unhealthy,
+      &state.inner.pool,
+    )
+    .await?;
+    let actual_changed = status.actual != ObjPsStatusKind::Fail.to_string();
+    if actual_changed {
+      ObjPsStatusDb::update_actual_status(
+        kind_key,
+        &ObjPsStatusKind::Fail,
+        &state.inner.pool,
+      )
+      .await?;
+    }
+    if health_changed || actual_changed {
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
+        .await;
+    }
+    return Ok(false);
+  }
+  let health_changed = ObjPsStatusDb::update_health_status(
+    kind_key,
+    &ObjPsHealthStatusKind::Healthy,
+    &state.inner.pool,
+  )
+  .await?;
+  let actual_changed = status.actual != ObjPsStatusKind::Start.to_string();
+  if actual_changed {
+    ObjPsStatusDb::update_actual_status(
+      kind_key,
+      &ObjPsStatusKind::Start,
+      &state.inner.pool,
+    )
+    .await?;
+    state
+      .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
+      .await;
+  }
+  if health_changed {
+    state
+      .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
+      .await;
+  }
+  Ok(true)
 }
 
 async fn handle_cargo_health_event(
@@ -229,152 +284,7 @@ async fn handle_cargo_health_event(
   action: &str,
   state: &SystemState,
 ) -> IoResult<()> {
-  let cargo =
-    CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-  let instances =
-    ProcessDb::read_by_kind_key(kind_key, None, &state.inner.pool).await?;
-  let runtime_instances = instances
-    .iter()
-    .filter(|process| is_runtime_cargo_instance(&process.name))
-    .cloned()
-    .collect::<Vec<_>>();
-  if runtime_instances.is_empty() {
-    return Ok(());
-  }
-  if !utils::container::cargo::has_container_healthcheck(
-    &cargo,
-    &runtime_instances,
-  ) {
-    return Ok(());
-  }
-  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-
-  if action == "health_status: unhealthy" {
-    let reason = unhealthy_instances_reason(&runtime_instances, state)
-      .await?
-      .unwrap_or_else(|| "Cargo healthcheck reported unhealthy".to_owned());
-    let should_emit_rollout_error = status.actual
-      == ObjPsStatusKind::Updating.to_string()
-      || status.actual == ObjPsStatusKind::Starting.to_string();
-    let health_changed = ObjPsStatusDb::update_health_status(
-      kind_key,
-      &ObjPsHealthStatusKind::Unhealthy,
-      &state.inner.pool,
-    )
-    .await?;
-    if !health_changed && !should_emit_rollout_error {
-      return Ok(());
-    }
-    let old_instances = instances
-      .iter()
-      .filter(|process| process.name.starts_with("tmp-"))
-      .cloned()
-      .collect::<Vec<_>>();
-    if should_emit_rollout_error {
-      if !old_instances.is_empty() {
-        let new_instance_keys = runtime_instances
-          .iter()
-          .map(|process| process.key.clone())
-          .collect::<Vec<_>>();
-        if !new_instance_keys.is_empty() {
-          let _ = utils::container::process::delete_instances(
-            &new_instance_keys,
-            state,
-          )
-          .await;
-        }
-      }
-      for process in old_instances {
-        let name = process.name.trim_start_matches("tmp-").to_owned();
-        let _ = state
-          .inner
-          .docker_api
-          .rename_container(
-            &process.key,
-            bollard_next::container::RenameContainerOptions { name: &name },
-          )
-          .await;
-      }
-    }
-    ObjPsStatusDb::update_actual_status(
-      kind_key,
-      &ObjPsStatusKind::Fail,
-      &state.inner.pool,
-    )
-    .await?;
-    if should_emit_rollout_error {
-      state.emit_error_native_action(
-        &cargo,
-        NativeEventAction::Start,
-        Some(format!(
-          "CargoStart: Cargo {} became unhealthy: {reason}",
-          cargo.spec.cargo_key,
-        )),
-      );
-    }
-    if health_changed {
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
-        .await;
-    }
-    return Ok(());
-  }
-
-  if action == "health_status: healthy" {
-    let (healthy, unhealthy, starting, unknown) =
-      count_health_states(&runtime_instances, state).await?;
-    if unhealthy > 0 || starting > 0 || unknown > 0 {
-      log::debug!(
-        "cargo health not ready {}: healthy={healthy} unhealthy={unhealthy} starting={starting} unknown={unknown}",
-        cargo.spec.cargo_key
-      );
-      return Ok(());
-    }
-    if healthy != runtime_instances.len() {
-      return Ok(());
-    }
-
-    let old_instance_keys = instances
-      .iter()
-      .filter(|process| process.name.starts_with("tmp-"))
-      .map(|process| process.key.clone())
-      .collect::<Vec<_>>();
-    if !old_instance_keys.is_empty() {
-      utils::container::process::delete_instances(&old_instance_keys, state)
-        .await
-        .map_err(|err| {
-          IoError::interrupted(
-            "CargoHealthCleanup",
-            &format!("Unable to delete old cargo instances: {err}"),
-          )
-        })?;
-    }
-
-    let health_changed = ObjPsStatusDb::update_health_status(
-      kind_key,
-      &ObjPsHealthStatusKind::Healthy,
-      &state.inner.pool,
-    )
-    .await?;
-
-    let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-    if status.actual != ObjPsStatusKind::Start.to_string() {
-      ObjPsStatusDb::update_actual_status(
-        kind_key,
-        &ObjPsStatusKind::Start,
-        &state.inner.pool,
-      )
-      .await?;
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
-        .await;
-    }
-    if health_changed {
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
-        .await;
-    }
-  }
+  let _ = reduce_cargo_runtime_readiness(kind_key, action, state).await?;
   Ok(())
 }
 
@@ -416,11 +326,12 @@ async fn exec_docker(
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   let name = attributes.get("name").cloned().unwrap_or_default();
-  let is_not_init_cargo_instance = attributes
-    .get("io.nanocl.not-init-c")
-    .map(|value| value == "true")
-    .unwrap_or_default();
+  let is_active_cargo_application_event =
+    labels_describe_active_cargo_application(&name, Some(&attributes));
+  let is_active_cargo_runtime_event =
+    labels_describe_active_cargo_runtime(&name, Some(&attributes));
   let action = action.as_str();
+  let mut observation_refreshed = false;
   let mut event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
     reporting_node: state.inner.config.hostname.clone(),
@@ -445,36 +356,23 @@ async fn exec_docker(
   };
   match action {
     "start" => {
+      if kind == EventActorKind::Cargo {
+        refresh_process_observation(&id, &name, state).await?;
+        observation_refreshed = true;
+      }
       let actual_status =
         ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
       match (&kind, &actual_status.actual) {
-        (EventActorKind::Cargo, status)
-          if status != &ObjPsStatusKind::Start.to_string() =>
+        // Cargo start and rollout readiness are reduced synchronously by the
+        // Cargo reconciler. A sandbox, init container, or the first app start
+        // event must never promote the whole Cargo.
+        (EventActorKind::Cargo, actual)
+          if !reconciliation_owns_cargo_health(actual)
+            && actual_status.wanted == ObjPsStatusKind::Start.to_string() =>
         {
-          let cargo =
-            CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-          let instances =
-            ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool)
+          let _ =
+            reduce_cargo_runtime_readiness(&kind_key, "container start", state)
               .await?;
-          let runtime_instances = instances
-            .iter()
-            .filter(|process| is_runtime_cargo_instance(&process.name))
-            .cloned()
-            .collect::<Vec<_>>();
-          let has_hc = utils::container::cargo::has_container_healthcheck(
-            &cargo,
-            &runtime_instances,
-          )
-            || utils::container::process::container_has_healthcheck(&id, state)
-              .await?;
-          if !has_hc {
-            ObjPsStatusDb::update_actual_status(
-              &kind_key,
-              &ObjPsStatusKind::Start,
-              &state.inner.pool,
-            )
-            .await?;
-          }
         }
         (EventActorKind::Vm, status)
           if status != &ObjPsStatusKind::Start.to_string() =>
@@ -490,11 +388,11 @@ async fn exec_docker(
       }
     }
     action if action.starts_with("health_status:") => {
+      refresh_process_observation(&id, &name, state).await?;
+      observation_refreshed = true;
       event.action = NativeEventAction::Update.to_string();
       if kind == EventActorKind::Cargo
-        && is_not_init_cargo_instance
-        && !name.starts_with("tmp-")
-        && !name.starts_with("init-")
+        && is_active_cargo_application_event
         && let Err(err) =
           handle_cargo_health_event(&kind_key, action, state).await
       {
@@ -502,43 +400,32 @@ async fn exec_docker(
       }
     }
     "die" => {
-      if !name.starts_with("tmp-") && !name.starts_with("init-") {
+      refresh_process_observation(&id, &name, state).await?;
+      observation_refreshed = true;
+      if kind != EventActorKind::Cargo || is_active_cargo_runtime_event {
         let actual_status =
           ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
         log::debug!(
-          "Event status wanted/prev_actual {}/{}",
+          "Event status wanted/actual {}/{}",
           actual_status.wanted,
-          actual_status.prev_actual
+          actual_status.actual
         );
-        match (&kind, &actual_status.wanted, &actual_status.prev_actual) {
-          (EventActorKind::Cargo, wanted, prev_actual)
+        match (&kind, &actual_status.wanted, &actual_status.actual) {
+          (EventActorKind::Cargo, wanted, actual)
             if wanted != &ObjPsStatusKind::Stop.to_string()
               && wanted != &ObjPsStatusKind::Destroy.to_string()
-              && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
+              && !reconciliation_owns_cargo_health(actual) =>
           {
             let cargo =
               CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
                 .await?;
-            let instances =
-              ProcessDb::read_by_kind_key(&kind_key, None, &state.inner.pool)
-                .await?;
-            let runtime_instances = instances
-              .iter()
-              .filter(|process| is_runtime_cargo_instance(&process.name))
-              .cloned()
-              .collect::<Vec<_>>();
-            let has_hc = utils::container::cargo::has_container_healthcheck(
-              &cargo,
-              &runtime_instances,
-            );
-            if !has_hc {
-              log::debug!("Set cargo status to fail");
-              ObjPsStatusDb::update_actual_status(
-                &kind_key,
-                &ObjPsStatusKind::Fail,
-                &state.inner.pool,
-              )
-              .await?;
+            if !reduce_cargo_runtime_readiness(
+              &kind_key,
+              "container die",
+              state,
+            )
+            .await?
+            {
               state.emit_error_native_action(
                 &cargo,
                 NativeEventAction::Die,
@@ -546,10 +433,11 @@ async fn exec_docker(
               );
             }
           }
-          (EventActorKind::Vm, wanted, prev_actual)
+          (EventActorKind::Vm, wanted, _)
             if wanted != &ObjPsStatusKind::Stop.to_string()
               && wanted != &ObjPsStatusKind::Destroy.to_string()
-              && prev_actual != &ObjPsStatusKind::Updating.to_string() =>
+              && actual_status.prev_actual
+                != ObjPsStatusKind::Updating.to_string() =>
           {
             ObjPsStatusDb::update_actual_status(
               &kind_key,
@@ -585,21 +473,9 @@ async fn exec_docker(
     }
   }
   state.spawn_emit_event(event);
-  let instance = state
-    .inner
-    .docker_api
-    .inspect_container(&id, None::<InspectContainerOptions>)
-    .await
-    .map_err(|err| err.map_err_context(|| "Docker event"))?;
-  let data = serde_json::to_value(instance)
-    .map_err(|err| err.map_err_context(|| "Docker event"))?;
-  let new_instance = ProcessUpdateDb {
-    updated_at: Some(chrono::Utc::now().naive_utc()),
-    data: Some(data),
-    name: Some(name),
-    ..Default::default()
-  };
-  ProcessDb::update_pk(&id, new_instance, &state.inner.pool).await?;
+  if !observation_refreshed {
+    refresh_process_observation(&id, &name, state).await?;
+  }
   Ok(())
 }
 
@@ -720,5 +596,68 @@ mod tests {
     event.actor.as_mut().unwrap().id = None;
     let event = parse_network_event(&event).unwrap();
     assert_eq!(event.docker_reference, "private-api");
+  }
+
+  #[test]
+  fn only_active_application_labels_participate_in_cargo_health() {
+    let app = HashMap::from([
+      (LABEL_CARGO_ROLE.to_owned(), "app".to_owned()),
+      (LABEL_CARGO_ESSENTIAL.to_owned(), "true".to_owned()),
+    ]);
+    let nonessential = HashMap::from([
+      (LABEL_CARGO_ROLE.to_owned(), "app".to_owned()),
+      (LABEL_CARGO_ESSENTIAL.to_owned(), "false".to_owned()),
+    ]);
+    let init =
+      HashMap::from([(LABEL_CARGO_ROLE.to_owned(), "init".to_owned())]);
+    let sandbox =
+      HashMap::from([(LABEL_CARGO_ROLE.to_owned(), "sandbox".to_owned())]);
+    let legacy =
+      HashMap::from([(LABEL_LEGACY_APPLICATION.to_owned(), "true".to_owned())]);
+
+    assert!(labels_describe_active_cargo_application(
+      "demo-api.c",
+      Some(&app)
+    ));
+    assert!(labels_describe_active_cargo_application(
+      "demo-api.c",
+      Some(&legacy)
+    ));
+    assert!(!labels_describe_active_cargo_application(
+      "demo-sidecar.c",
+      Some(&nonessential)
+    ));
+    assert!(!labels_describe_active_cargo_application(
+      "tmp-demo-api.c",
+      Some(&app)
+    ));
+    assert!(!labels_describe_active_cargo_application(
+      "init-demo-db.c",
+      Some(&init)
+    ));
+    assert!(!labels_describe_active_cargo_application(
+      "sandbox-demo.c",
+      Some(&sandbox)
+    ));
+    assert!(!labels_describe_active_cargo_application(
+      "demo-api.c",
+      None
+    ));
+  }
+
+  #[test]
+  fn reconciliation_owns_starting_and_updating_health_events() {
+    assert!(reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Starting.to_string()
+    ));
+    assert!(reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Updating.to_string()
+    ));
+    assert!(!reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Start.to_string()
+    ));
+    assert!(!reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Fail.to_string()
+    ));
   }
 }

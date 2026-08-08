@@ -19,10 +19,12 @@ const LABEL_NAMESPACE: &str = "io.nanocl.n";
 const LABEL_INIT_CONTAINER: &str = "io.nanocl.init-c";
 const LABEL_APPLICATION_CONTAINER: &str = "io.nanocl.not-init-c";
 const LABEL_COMPOSE_PROJECT: &str = "com.docker.compose.project";
-const LABEL_REPLICA: &str = "io.nanocl.cargo.replica";
-const LABEL_REPLICA_ORDINAL: &str = "io.nanocl.cargo.replica-ordinal";
-const LABEL_CONTAINER: &str = "io.nanocl.cargo.container";
-const LABEL_ROLE: &str = "io.nanocl.cargo.role";
+pub(crate) const LABEL_REPLICA: &str = "io.nanocl.cargo.replica";
+pub(crate) const LABEL_REPLICA_ORDINAL: &str =
+  "io.nanocl.cargo.replica-ordinal";
+pub(crate) const LABEL_CONTAINER: &str = "io.nanocl.cargo.container";
+pub(crate) const LABEL_ROLE: &str = "io.nanocl.cargo.role";
+pub(crate) const LABEL_ESSENTIAL: &str = "io.nanocl.cargo.essential";
 
 /// Role of a declared container in a Cargo replica.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -301,7 +303,7 @@ pub(super) fn compile_container(
 
   let declared_container_mode = input
     .declared
-    .container
+    .container_config
     .host_config
     .as_ref()
     .and_then(|host_config| host_config.network_mode.as_deref());
@@ -339,7 +341,7 @@ pub(super) fn compile_container(
     )?;
   }
 
-  let mut config = input.declared.container.clone();
+  let mut config = input.declared.container_config.clone();
   expand_internal_gateway(
     &mut config,
     input.internal_gateway,
@@ -363,6 +365,7 @@ pub(super) fn compile_container(
     input.runtime,
     input.role.label_value(),
     &input.declared.name,
+    input.declared.essential,
   ));
   labels.insert(
     LABEL_COMPOSE_PROJECT.to_owned(),
@@ -420,7 +423,8 @@ pub(super) fn compile_sandbox(
       .map(|port| (port, EmptyObject::default()))
       .collect::<HashMap<_, _>>()
   });
-  let labels = identity_labels(input.runtime, "sandbox", SANDBOX_LOGICAL_NAME);
+  let labels =
+    identity_labels(input.runtime, "sandbox", SANDBOX_LOGICAL_NAME, true);
   let config = DockerConfig {
     image: Some(input.sandbox_image.to_owned()),
     exposed_ports,
@@ -428,6 +432,10 @@ pub(super) fn compile_sandbox(
     host_config: Some(HostConfig {
       network_mode: Some(cargo_mode.to_owned()),
       port_bindings,
+      restart_policy: Some(RestartPolicy {
+        name: Some(RestartPolicyNameEnum::ALWAYS),
+        maximum_retry_count: None,
+      }),
       ..Default::default()
     }),
     ..Default::default()
@@ -447,6 +455,7 @@ fn identity_labels(
   runtime: CargoRuntimeMetadata<'_>,
   role: &str,
   logical_name: &str,
+  essential: bool,
 ) -> HashMap<String, String> {
   HashMap::from([
     (LABEL_MANAGED.to_owned(), "enabled".to_owned()),
@@ -460,6 +469,7 @@ fn identity_labels(
     ),
     (LABEL_CONTAINER.to_owned(), logical_name.to_owned()),
     (LABEL_ROLE.to_owned(), role.to_owned()),
+    (LABEL_ESSENTIAL.to_owned(), essential.to_string()),
   ])
 }
 
@@ -478,7 +488,7 @@ fn validate_shared_network_fields(
   cargo_network_mode: &str,
   container: &str,
 ) -> Result<(), CargoCompilerError> {
-  let config = &declared.container;
+  let config = &declared.container_config;
   let host_config = config.host_config.as_ref();
   let reason = [
     (
@@ -600,7 +610,7 @@ fn valid_host_port(host_port: &str) -> bool {
 fn reject_reserved_values(
   declared: &ContainerSpec,
 ) -> Result<(), CargoCompilerError> {
-  if let Some(labels) = declared.container.labels.as_ref()
+  if let Some(labels) = declared.container_config.labels.as_ref()
     && let Some(label) =
       labels.keys().filter(|label| is_reserved_label(label)).min()
   {
@@ -610,7 +620,7 @@ fn reject_reserved_values(
     });
   }
 
-  if let Some(env) = declared.container.env.as_ref() {
+  if let Some(env) = declared.container_config.env.as_ref() {
     for value in env {
       let variable =
         value.split_once('=').map_or(value.as_str(), |(key, _)| key);
@@ -742,7 +752,7 @@ mod tests {
       secrets: Vec::new(),
       image_pull_secret: None,
       image_pull_policy: ImagePullPolicy::IfNotPresent,
-      container: DockerConfig {
+      container_config: DockerConfig {
         image: Some("example/app:1".to_owned()),
         ..Default::default()
       },
@@ -825,7 +835,7 @@ mod tests {
   #[test]
   fn compilation_does_not_mutate_the_declared_container_spec() {
     let mut declared = minimal_spec();
-    declared.container.env =
+    declared.container_config.env =
       Some(vec![format!("PROXY=http://{INTERNAL_GATEWAY_TOKEN}:8080")]);
     let original = declared.clone();
 
@@ -840,7 +850,7 @@ mod tests {
 
     assert_eq!(declared, original);
     assert_eq!(
-      declared.container.env.as_ref().unwrap()[0],
+      declared.container_config.env.as_ref().unwrap()[0],
       "PROXY=http://$$INTERNAL_GATEWAY:8080"
     );
     assert_eq!(
@@ -852,26 +862,26 @@ mod tests {
   #[test]
   fn unrelated_bollard_configuration_survives_compilation() {
     let mut declared = minimal_spec();
-    declared.container.cmd =
+    declared.container_config.cmd =
       Some(vec!["serve".to_owned(), "--http".to_owned()]);
-    declared.container.entrypoint = Some(vec!["/entrypoint".to_owned()]);
-    declared.container.env = Some(vec!["USER_VALUE=present".to_owned()]);
-    declared.container.working_dir = Some("/srv/app".to_owned());
-    declared.container.hostname = Some("authored-hostname".to_owned());
-    declared.container.attach_stdout = Some(false);
-    declared.container.attach_stderr = Some(false);
-    declared.container.tty = Some(false);
-    declared.container.healthcheck = Some(HealthConfig {
+    declared.container_config.entrypoint = Some(vec!["/entrypoint".to_owned()]);
+    declared.container_config.env = Some(vec!["USER_VALUE=present".to_owned()]);
+    declared.container_config.working_dir = Some("/srv/app".to_owned());
+    declared.container_config.hostname = Some("authored-hostname".to_owned());
+    declared.container_config.attach_stdout = Some(false);
+    declared.container_config.attach_stderr = Some(false);
+    declared.container_config.tty = Some(false);
+    declared.container_config.healthcheck = Some(HealthConfig {
       test: Some(vec!["CMD".to_owned(), "check".to_owned()]),
       interval: Some(1_000_000_000),
       retries: Some(3),
       ..Default::default()
     });
-    declared.container.exposed_ports = Some(HashMap::from([(
+    declared.container_config.exposed_ports = Some(HashMap::from([(
       "9000/tcp".to_owned(),
       EmptyObject::default(),
     )]));
-    declared.container.labels = Some(HashMap::from([(
+    declared.container_config.labels = Some(HashMap::from([(
       "example.owner".to_owned(),
       "user".to_owned(),
     )]));
@@ -879,7 +889,7 @@ mod tests {
       name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
       maximum_retry_count: None,
     };
-    declared.container.host_config = Some(HostConfig {
+    declared.container_config.host_config = Some(HostConfig {
       binds: Some(vec!["/srv/config:/config:ro".to_owned()]),
       mounts: Some(vec![Mount {
         target: Some("/data".to_owned()),
@@ -904,27 +914,45 @@ mod tests {
     let compiled = compile_application(&declared, None, None).unwrap().config;
     let host = compiled.host_config.as_ref().unwrap();
 
-    assert_eq!(compiled.image, declared.container.image);
-    assert_eq!(compiled.cmd, declared.container.cmd);
-    assert_eq!(compiled.entrypoint, declared.container.entrypoint);
-    assert_eq!(compiled.working_dir, declared.container.working_dir);
-    assert_eq!(compiled.hostname, declared.container.hostname);
-    assert_eq!(compiled.healthcheck, declared.container.healthcheck);
-    assert_eq!(compiled.exposed_ports, declared.container.exposed_ports);
+    assert_eq!(compiled.image, declared.container_config.image);
+    assert_eq!(compiled.cmd, declared.container_config.cmd);
+    assert_eq!(compiled.entrypoint, declared.container_config.entrypoint);
+    assert_eq!(compiled.working_dir, declared.container_config.working_dir);
+    assert_eq!(compiled.hostname, declared.container_config.hostname);
+    assert_eq!(compiled.healthcheck, declared.container_config.healthcheck);
+    assert_eq!(
+      compiled.exposed_ports,
+      declared.container_config.exposed_ports
+    );
     assert_eq!(compiled.attach_stdout, Some(false));
     assert_eq!(compiled.attach_stderr, Some(false));
     assert_eq!(compiled.tty, Some(false));
     assert_eq!(
       host.binds,
-      declared.container.host_config.as_ref().unwrap().binds
+      declared
+        .container_config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .binds
     );
     assert_eq!(
       host.mounts,
-      declared.container.host_config.as_ref().unwrap().mounts
+      declared
+        .container_config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .mounts
     );
     assert_eq!(
       host.devices,
-      declared.container.host_config.as_ref().unwrap().devices
+      declared
+        .container_config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .devices
     );
     assert_eq!(host.cap_add, Some(vec!["SYS_ADMIN".to_owned()]));
     assert_eq!(host.memory, Some(128 * 1024 * 1024));
@@ -996,7 +1024,7 @@ mod tests {
   fn cargo_host_preserves_an_explicit_container_none_override() {
     let cargo_mode = CargoNetworkMode::new("host").unwrap();
     let mut declared = minimal_spec();
-    declared.container.host_config = Some(HostConfig {
+    declared.container_config.host_config = Some(HostConfig {
       network_mode: Some("none".to_owned()),
       ..Default::default()
     });
@@ -1027,7 +1055,7 @@ mod tests {
   fn explicit_container_host_and_none_bypass_the_cargo_sandbox() {
     for override_mode in ["host", "none"] {
       let mut declared = minimal_spec();
-      declared.container.host_config = Some(HostConfig {
+      declared.container_config.host_config = Some(HostConfig {
         network_mode: Some(override_mode.to_owned()),
         ..Default::default()
       });
@@ -1040,7 +1068,7 @@ mod tests {
   #[test]
   fn invalid_nested_network_mode_cannot_be_compiled_without_validation() {
     let mut declared = minimal_spec();
-    declared.container.host_config = Some(HostConfig {
+    declared.container_config.host_config = Some(HostConfig {
       network_mode: Some("bridge".to_owned()),
       ..Default::default()
     });
@@ -1066,12 +1094,18 @@ mod tests {
     ] {
       let mut declared = minimal_spec();
       match field {
-        "Hostname" => declared.container.hostname = Some("app".to_owned()),
+        "Hostname" => {
+          declared.container_config.hostname = Some("app".to_owned())
+        }
         "MacAddress" => {
-          declared.container.mac_address = Some("02:42:ac:11:00:02".to_owned());
+          declared.container_config.mac_address =
+            Some("02:42:ac:11:00:02".to_owned());
         }
         _ => {
-          let host = declared.container.host_config.get_or_insert_default();
+          let host = declared
+            .container_config
+            .host_config
+            .get_or_insert_default();
           match field {
             "Dns" => host.dns = Some(vec!["1.1.1.1".to_owned()]),
             "DnsOptions" => host.dns_options = Some(vec!["ndots:1".to_owned()]),
@@ -1101,9 +1135,10 @@ mod tests {
   fn cargo_host_preserves_container_owned_network_settings() {
     let cargo_mode = CargoNetworkMode::new("host").unwrap();
     let mut declared = minimal_spec();
-    declared.container.hostname = Some("app".to_owned());
-    declared.container.mac_address = Some("02:42:ac:11:00:02".to_owned());
-    declared.container.host_config = Some(HostConfig {
+    declared.container_config.hostname = Some("app".to_owned());
+    declared.container_config.mac_address =
+      Some("02:42:ac:11:00:02".to_owned());
+    declared.container_config.host_config = Some(HostConfig {
       dns: Some(vec!["1.1.1.1".to_owned()]),
       dns_options: Some(vec!["ndots:1".to_owned()]),
       dns_search: Some(vec!["example.test".to_owned()]),
@@ -1114,10 +1149,10 @@ mod tests {
     let compiled = compile_application(&declared, Some(&cargo_mode), None)
       .unwrap()
       .config;
-    assert_eq!(compiled.hostname, declared.container.hostname);
-    assert_eq!(compiled.mac_address, declared.container.mac_address);
+    assert_eq!(compiled.hostname, declared.container_config.hostname);
+    assert_eq!(compiled.mac_address, declared.container_config.mac_address);
     let host = compiled.host_config.unwrap();
-    let declared_host = declared.container.host_config.unwrap();
+    let declared_host = declared.container_config.host_config.unwrap();
     assert_eq!(host.dns, declared_host.dns);
     assert_eq!(host.dns_options, declared_host.dns_options);
     assert_eq!(host.dns_search, declared_host.dns_search);
@@ -1173,6 +1208,16 @@ mod tests {
     assert_eq!(
       config.host_config.as_ref().unwrap().port_bindings,
       Some(ports.clone())
+    );
+    assert_eq!(
+      config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .restart_policy
+        .as_ref()
+        .and_then(|policy| policy.name),
+      Some(RestartPolicyNameEnum::ALWAYS)
     );
     let exposed = config.exposed_ports.unwrap();
     assert_eq!(exposed.len(), 2);
@@ -1333,19 +1378,20 @@ mod tests {
   fn gateway_replacement_covers_all_declared_bollard_string_locations() {
     let token = INTERNAL_GATEWAY_TOKEN;
     let mut declared = minimal_spec();
-    declared.container.env = Some(vec![format!("UPSTREAM=http://{token}:80")]);
-    declared.container.cmd = Some(vec![format!("--gateway={token}")]);
-    declared.container.entrypoint = Some(vec![format!("/run-{token}")]);
-    declared.container.working_dir = Some(format!("/work/{token}"));
-    declared.container.healthcheck = Some(HealthConfig {
+    declared.container_config.env =
+      Some(vec![format!("UPSTREAM=http://{token}:80")]);
+    declared.container_config.cmd = Some(vec![format!("--gateway={token}")]);
+    declared.container_config.entrypoint = Some(vec![format!("/run-{token}")]);
+    declared.container_config.working_dir = Some(format!("/work/{token}"));
+    declared.container_config.healthcheck = Some(HealthConfig {
       test: Some(vec!["CMD".to_owned(), format!("probe-{token}")]),
       ..Default::default()
     });
-    declared.container.labels = Some(HashMap::from([(
+    declared.container_config.labels = Some(HashMap::from([(
       format!("example.{token}"),
       format!("value-{token}"),
     )]));
-    declared.container.host_config = Some(HostConfig {
+    declared.container_config.host_config = Some(HostConfig {
       binds: Some(vec![format!("/host/{token}:/container/{token}:ro")]),
       mounts: Some(vec![Mount {
         source: Some(format!("volume-{token}")),
@@ -1417,7 +1463,7 @@ mod tests {
   #[test]
   fn gateway_replacement_replaces_multiple_tokens_in_one_value() {
     let mut declared = minimal_spec();
-    declared.container.cmd = Some(vec![format!(
+    declared.container_config.cmd = Some(vec![format!(
       "{INTERNAL_GATEWAY_TOKEN}:{INTERNAL_GATEWAY_TOKEN}"
     )]);
 
@@ -1440,7 +1486,7 @@ mod tests {
   #[test]
   fn unresolved_gateway_token_is_a_typed_error() {
     let mut declared = minimal_spec();
-    declared.container.env =
+    declared.container_config.env =
       Some(vec![format!("HOST={INTERNAL_GATEWAY_TOKEN}")]);
 
     assert_eq!(
@@ -1530,7 +1576,7 @@ mod tests {
       "io.nanocl.future-field",
     ] {
       let mut declared = minimal_spec();
-      declared.container.labels =
+      declared.container_config.labels =
         Some(HashMap::from([(label.to_owned(), "user-value".to_owned())]));
       assert_eq!(
         compile_application(&declared, None, Some(SANDBOX_ID)).unwrap_err(),
@@ -1550,7 +1596,7 @@ mod tests {
       "NANOCL_FUTURE_VALUE=reserved",
     ] {
       let mut declared = minimal_spec();
-      declared.container.env = Some(vec![value.to_owned()]);
+      declared.container_config.env = Some(vec![value.to_owned()]);
       let variable = value.split_once('=').map_or(value, |(key, _)| key);
       assert_eq!(
         compile_application(&declared, None, Some(SANDBOX_ID)).unwrap_err(),
@@ -1565,7 +1611,7 @@ mod tests {
   #[test]
   fn invalid_container_spec_converts_to_invalid_input() {
     let mut declared = minimal_spec();
-    declared.container.image = None;
+    declared.container_config.image = None;
 
     let error =
       compile_application(&declared, None, Some(SANDBOX_ID)).unwrap_err();
@@ -1592,7 +1638,7 @@ mod tests {
   #[test]
   fn reserved_declarations_convert_to_invalid_input() {
     let mut declared = minimal_spec();
-    declared.container.labels = Some(HashMap::from([(
+    declared.container_config.labels = Some(HashMap::from([(
       "io.nanocl.user-value".to_owned(),
       "reserved".to_owned(),
     )]));
@@ -1605,7 +1651,7 @@ mod tests {
     assert_io_conversion(label_error, std::io::ErrorKind::InvalidInput);
 
     let mut declared = minimal_spec();
-    declared.container.env =
+    declared.container_config.env =
       Some(vec!["NANOCL_USER_VALUE=reserved".to_owned()]);
     let environment_error =
       compile_application(&declared, None, Some(SANDBOX_ID)).unwrap_err();
@@ -1629,7 +1675,7 @@ mod tests {
   #[test]
   fn unresolved_internal_gateway_converts_to_other() {
     let mut declared = minimal_spec();
-    declared.container.env =
+    declared.container_config.env =
       Some(vec![format!("HOST={INTERNAL_GATEWAY_TOKEN}")]);
 
     let error =
@@ -1644,7 +1690,7 @@ mod tests {
   #[test]
   fn gateway_map_key_collision_converts_to_invalid_input() {
     let mut declared = minimal_spec();
-    declared.container.labels = Some(HashMap::from([
+    declared.container_config.labels = Some(HashMap::from([
       (
         format!("example.{INTERNAL_GATEWAY_TOKEN}"),
         "token-key".to_owned(),
@@ -1786,11 +1832,11 @@ mod tests {
   #[test]
   fn unrelated_user_labels_and_environment_remain_accepted() {
     let mut declared = minimal_spec();
-    declared.container.labels = Some(HashMap::from([
+    declared.container_config.labels = Some(HashMap::from([
       ("example.owner".to_owned(), "platform".to_owned()),
       ("io.example.nanocl".to_owned(), "allowed".to_owned()),
     ]));
-    declared.container.env = Some(vec![
+    declared.container_config.env = Some(vec![
       "APP_ENV=production".to_owned(),
       "BARE_USER_KEY".to_owned(),
     ]);

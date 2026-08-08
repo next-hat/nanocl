@@ -509,6 +509,58 @@ impl CargoReplicaProcessDb {
     Self::set_process(key, Some(process_key), pool).await
   }
 
+  /// Atomically replace the concrete-process attachments for a rollout.
+  ///
+  /// Every requested mapping is locked before any update. This keeps a
+  /// multi-container replica from exposing a partially promoted generation if
+  /// one attachment fails.
+  pub(crate) async fn set_processes(
+    attachments: Vec<(uuid::Uuid, Option<String>, bool)>,
+    pool: &Pool,
+  ) -> IoResult<Vec<Self>> {
+    run_query(
+      pool,
+      "Interrupted while promoting Cargo replica processes",
+      move |conn| {
+        conn
+          .transaction::<_, diesel::result::Error, _>(|conn| {
+            let mut keys = attachments
+              .iter()
+              .map(|(key, _, _)| *key)
+              .collect::<Vec<_>>();
+            keys.sort_unstable();
+            keys.dedup();
+            let locked = cargo_replica_processes::table
+              .filter(cargo_replica_processes::key.eq_any(&keys))
+              .order(cargo_replica_processes::key.asc())
+              .select(cargo_replica_processes::key)
+              .for_update()
+              .load::<uuid::Uuid>(conn)?;
+            if locked != keys {
+              return Err(diesel::result::Error::NotFound);
+            }
+            let now = chrono::Utc::now().naive_utc();
+            for (key, process_key, essential) in &attachments {
+              diesel::update(cargo_replica_processes::table.find(key))
+                .set((
+                  cargo_replica_processes::process_key.eq(process_key),
+                  cargo_replica_processes::essential.eq(essential),
+                  cargo_replica_processes::updated_at.eq(now),
+                ))
+                .execute(conn)?;
+            }
+            cargo_replica_processes::table
+              .filter(cargo_replica_processes::key.eq_any(keys))
+              .order(cargo_replica_processes::key.asc())
+              .select(Self::as_select())
+              .load(conn)
+          })
+          .map_err(map_process_error)
+      },
+    )
+    .await
+  }
+
   /// Clear a missing or deleted concrete process while preserving identity.
   pub(crate) async fn clear_process(
     key: uuid::Uuid,
@@ -561,7 +613,8 @@ mod tests {
     container::Config as DockerConfig, service::ContainerInspectResponse,
   };
   use nanocl_stubs::{
-    cargo_spec::CargoSpecPartial,
+    cargo_spec::{CargoSpec, ContainerSpec},
+    generic::ImagePullPolicy,
     process::{ProcessKind, ProcessPartial},
   };
 
@@ -684,12 +737,19 @@ mod tests {
     let cargo = CargoDb::fn_create_obj(
       &CargoObjCreateIn {
         namespace: namespace.to_owned(),
-        spec: CargoSpecPartial {
+        spec: CargoSpec {
           name: name.to_owned(),
-          container: DockerConfig {
-            image: Some("example/app:1".to_owned()),
-            ..Default::default()
-          },
+          containers: vec![ContainerSpec {
+            name: "main".to_owned(),
+            essential: true,
+            secrets: Vec::new(),
+            image_pull_secret: None,
+            image_pull_policy: ImagePullPolicy::IfNotPresent,
+            container_config: DockerConfig {
+              image: Some("example/app:1".to_owned()),
+              ..Default::default()
+            },
+          }],
           ..Default::default()
         },
         version: vars::VERSION.to_owned(),

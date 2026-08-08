@@ -1,0 +1,20 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-none
+  Replicas: 1
+  NetworkMode: none
+  Containers:
+  - Name: server
+    Image: alpine:latest
+    Cmd:
+    - sh
+    - -c
+    - mkdir -p /www && echo cargo-none-ok > /www/index.html && exec httpd -f -p 9000 -h /www
+  - Name: client
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"

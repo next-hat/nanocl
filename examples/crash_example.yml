@@ -21,7 +21,8 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: crash-example
-  Container:
+  Containers:
+  - Name: crash-example
     Image: ubuntu:latest
     Cmd:
     - bash

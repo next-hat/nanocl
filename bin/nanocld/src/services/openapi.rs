@@ -7,7 +7,7 @@ use nanocl_stubs::{
 use crate::vars;
 
 use super::{
-  cargo, event, exec, job, metric, namespace, network, node, process, resource,
+  cargo, event, job, metric, namespace, network, node, process, resource,
   resource_kind, secret, system, vm,
 };
 
@@ -86,10 +86,6 @@ impl Modify for VersionModifier {
     cargo::list_cargo_history,
     cargo::revert_cargo,
     cargo::count_cargo,
-    // Exec
-    exec::create_exec_command,
-    exec::start_exec_command,
-    exec::inspect_exec_command,
     // Vm
     vm::list_vm,
     vm::inspect_vm,
@@ -127,7 +123,6 @@ impl Modify for VersionModifier {
     process::stop_processes,
     process::list_processes,
     process::restart_processes,
-    process::kill_processes,
     process::wait_processes,
     process::stats_processes,
     process::count_processes,

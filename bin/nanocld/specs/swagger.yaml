@@ -87,7 +87,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoSpecPartial'
+              $ref: '#/components/schemas/CargoSpec'
         required: true
       responses:
         '201':
@@ -129,35 +129,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericCount'
-  /cargoes/{cargo_key}/exec:
-    post:
-      tags:
-      - Cargoes
-      operationId: create_exec_command
-      parameters:
-      - name: cargo_key
-        in: path
-        description: Canonical cargo key in `{namespace}.{name}` format
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateExecOptions'
-        required: true
-      responses:
-        '200':
-          description: Event Stream of the command output
-          content:
-            text/event-stream: {}
-        '404':
-          description: Cargo does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /cargoes/{cargo_key}/histories/{history_key}/revert:
     patch:
       tags:
@@ -207,7 +178,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoSpecPartial'
+              $ref: '#/components/schemas/CargoSpec'
         required: true
       responses:
         '200':
@@ -265,7 +236,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoSpecUpdate'
+              $ref: '#/components/schemas/CargoSpecPatch'
         required: true
       responses:
         '200':
@@ -301,7 +272,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/CargoSpec'
+                  $ref: '#/components/schemas/CargoSpecRevision'
         '404':
           description: Cargo does not exist
           content:
@@ -414,61 +385,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
-  /exec/{id}/cargo/inspect:
-    post:
-      tags:
-      - Exec
-      summary: Inspect a command executed in a cargo
-      operationId: inspect_exec_command
-      parameters:
-      - name: id
-        in: path
-        description: Exec id to inspect
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Inspect exec infos
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExecInspectResponse'
-        '404':
-          description: Exec instance does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /exec/{id}/cargo/start:
-    post:
-      tags:
-      - Exec
-      operationId: start_exec_command
-      parameters:
-      - name: id
-        in: path
-        description: Exec command id
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartExecOptions'
-        required: true
-      responses:
-        '200':
-          description: Event Stream of the command output
-          content:
-            text/event-stream: {}
-        '404':
-          description: Cargo does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /info:
     get:
       tags:
@@ -883,7 +799,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Node'
   /nodes/cargoes/start:
-    get:
+    post:
       tags:
       - Nodes
       summary: Start cargo instances on the node used for node to node communication
@@ -1003,36 +919,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericCount'
-  /processes/{kind}/{key}/kill:
-    post:
-      tags:
-      - Processes
-      summary: Send a signal to all processes for a kind and canonical resource key
-      operationId: kill_processes
-      parameters:
-      - name: kind
-        in: path
-        description: Kind of the process
-        required: true
-        schema:
-          type: string
-        example: cargo
-      - name: key
-        in: path
-        description: Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)
-        required: true
-        schema:
-          type: string
-        example: global.deploy-example
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CargoKillOptions'
-        required: true
-      responses:
-        '200':
-          description: Process instances killed
   /processes/{kind}/{key}/logs:
     get:
       tags:
@@ -2270,10 +2156,9 @@ components:
     Cargo:
       type: object
       description: |-
-        A Cargo is a replicable container
-        It is used to run one or multiple instances of the same container
+        A Cargo is a replicable group of application containers.
+        It is used to run one or multiple instances of the same container group.
         You can define the number of replicas you want to run
-        You can also define the minimum and maximum number of replicas
         The cluster will automatically scale the number of replicas to match the number of replicas you want
         Cargo contain a specification which is used to create the container
         The specification can be updated and the old specification will be kept in the history
@@ -2295,7 +2180,7 @@ components:
           $ref: '#/components/schemas/ObjPsStatus'
           description: Status of the cargo
         Spec:
-          $ref: '#/components/schemas/CargoSpec'
+          $ref: '#/components/schemas/CargoSpecRevision'
           description: Specification of the cargo
     CargoInspect:
       type: object
@@ -2331,22 +2216,21 @@ components:
           $ref: '#/components/schemas/ObjPsStatus'
           description: Status of the cargo
         Spec:
-          $ref: '#/components/schemas/CargoSpec'
+          $ref: '#/components/schemas/CargoSpecRevision'
           description: Specification of the cargo
         Instances:
           type: array
           items:
             $ref: '#/components/schemas/Process'
           description: List of instances
-    CargoKillOptions:
-      type: object
-      description: Options for the kill command
-      required:
-      - signal
-      properties:
-        signal:
-          type: string
-          description: 'Signal to send to the container default: SIGKILL'
+    CargoNetworkMode:
+      type: string
+      description: |-
+        Docker network mode used by a Cargo.
+
+        Docker accepts any non-blank network name in addition to its built-in
+        modes. Nanocl reserves `container:<id>` because users must not join a
+        container-owned network namespace directly.
     CargoPlacementSelectorSpec:
       type: object
       description: |
@@ -2359,7 +2243,6 @@ components:
           items:
             type: string
           description: Select by labels
-          default: null
         Regions:
           type:
           - array
@@ -2367,7 +2250,6 @@ components:
           items:
             type: string
           description: Select by regions
-          default: null
         Groups:
           type:
           - array
@@ -2375,7 +2257,6 @@ components:
           items:
             type: string
           description: Select by groups
-          default: null
         Cargoes:
           type:
           - array
@@ -2383,7 +2264,6 @@ components:
           items:
             type: string
           description: Select by cargoes running on the nodes
-          default: null
         Vms:
           type:
           - array
@@ -2391,7 +2271,6 @@ components:
           items:
             type: string
           description: Select by vms running on the nodes
-          default: null
         Constraints:
           type:
           - array
@@ -2399,7 +2278,6 @@ components:
           items:
             $ref: '#/components/schemas/NodeConstraint'
           description: Optional advanced constraints (key/operator/value)
-          default: null
       additionalProperties: false
     CargoPlacementSpec:
       type: object
@@ -2407,19 +2285,11 @@ components:
         Structure to control the placement of the cargo
         It can be used to define on which nodes the cargo will be deployed
       properties:
-        Replicas:
-          type:
-          - integer
-          - 'null'
-          description: Number of replicas to deploy on the selected nodes
-          default: null
-          minimum: 0
         Strategy:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementStrategy'
             description: Strategy to use to place the cargo on the nodes
-          default: null
         Regions:
           type:
           - array
@@ -2427,31 +2297,50 @@ components:
           items:
             type: string
           description: Regions to deploy the cargo
-          default: null
         Require:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: requirements to select nodes to deploy the cargo
-          default: null
         Prefer:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: preferences to select nodes to deploy the cargo
-          default: null
       additionalProperties: false
     CargoPlacementStrategy:
       oneOf:
-      - type: 'null'
-        default: null
-      - type: 'null'
-        default: null
-      - type: 'null'
-        default: null
       - type: string
+        enum:
+        - Distinct
+      - type: string
+        enum:
+        - LeastLoaded
+      - type: string
+        enum:
+        - Balanced
+      - type: object
+        required:
+        - UserDefined
+        properties:
+          UserDefined:
+            type: string
       description: |
         Enum to define the strategy to place the cargo on the nodes
+    CargoReplicaTask:
+      type: object
+      required:
+      - Key
+      - Ordinal
+      properties:
+        Key:
+          type: string
+          format: uuid
+          description: Stable persisted Cargo replica identity.
+        Ordinal:
+          type: integer
+          format: int32
+          description: Stable Cargo-wide ordinal for the replica.
     CargoResourceRequirementSpec:
       type: object
       description: |
@@ -2502,17 +2391,144 @@ components:
       additionalProperties: false
     CargoSpec:
       type: object
-      description: |
-        A cargo spec is the specification of a cargo
-        It used to know the state of the cargo
-        It keep tracking of an history when you patch an existing cargo
+      description: Desired declaration used to create or apply a Cargo.
+      required:
+      - Name
+      - Containers
+      properties:
+        Name:
+          type: string
+          description: Name of the cargo
+        Metadata:
+          type: object
+          description: Metadata of the cargo (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+          propertyNames:
+            type: string
+        Replicas:
+          type: integer
+          description: Number of durable Cargo replicas.
+          default: 1
+          minimum: 1
+        NetworkMode:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoNetworkMode'
+            description: Cargo-owned network shared by the replica's containers.
+        PortBindings:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/HashMap'
+            description: Cargo-owned host port bindings.
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets inherited by every regular and init container.
+        Placement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoPlacementSpec'
+            description: Fine tune how the cargo is placed on the nodes
+        ResourceRequirement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
+            description: Define minimal resource requirements for the cargo
+        InitContainers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContainerSpec'
+          description: |-
+            Init containers executed in declaration order before application
+            containers.
+        Containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContainerSpec'
+          description: Application containers in each Cargo replica.
+      additionalProperties: false
+    CargoSpecPatch:
+      type: object
+      description: |-
+        Payload used to replace selected fields of a Cargo declaration.
+
+        Collection values replace the complete corresponding collection after the
+        patch is merged by the API layer.
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: New name of the cargo
+        Metadata:
+          type: object
+          description: New metadata of the cargo (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+          propertyNames:
+            type: string
+        Replicas:
+          type:
+          - integer
+          - 'null'
+          description: New replica count.
+          minimum: 1
+        NetworkMode:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoNetworkMode'
+            description: New Cargo-owned network mode.
+        PortBindings:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/HashMap'
+            description: Replacement Cargo-owned port bindings.
+        Secrets:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Replacement Cargo-level shared secrets.
+        Placement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoPlacementSpec'
+            description: Fine tune how the cargo is placed on the nodes
+        ResourceRequirement:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
+            description: Define minimal resource requirements for the cargo
+        InitContainers:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpec'
+          description: Replacement ordered init-container declaration.
+        Containers:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpec'
+          description: Replacement application-container declaration.
+      additionalProperties: false
+    CargoSpecRevision:
+      type: object
+      description: |-
+        Stored revision of a Cargo declaration, including immutable revision
+        metadata.
       required:
       - Key
       - CargoKey
       - Version
       - CreatedAt
       - Name
-      - Container
+      - Containers
       properties:
         Key:
           type: string
@@ -2538,31 +2554,26 @@ components:
             $ref: '#/components/schemas/Any'
           propertyNames:
             type: string
-        InitContainer:
+        Replicas:
+          type: integer
+          description: Number of durable Cargo replicas.
+          default: 1
+          minimum: 1
+        NetworkMode:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/Config'
-            description: Action to run before the container
+          - $ref: '#/components/schemas/CargoNetworkMode'
+            description: Cargo-owned network shared by the revision's containers.
+        PortBindings:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/HashMap'
+            description: Cargo-owned host port bindings.
         Secrets:
-          type:
-          - array
-          - 'null'
+          type: array
           items:
             type: string
-          description: List of secrets to use as environment variables
-        ImagePullSecret:
-          type:
-          - string
-          - 'null'
-          description: Secret to use when pulling the image
-        ImagePullPolicy:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ImagePullPolicy'
-            description: Image pull policy of the cargo
-        Container:
-          $ref: '#/components/schemas/Config'
-          description: Container specification of the cargo
+          description: Secrets inherited by every regular and init container.
         Placement:
           oneOf:
           - type: 'null'
@@ -2572,132 +2583,16 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
-    CargoSpecPartial:
-      type: object
-      description: A cargo spec partial is used to create a Cargo
-      properties:
-        Name:
-          type: string
-          description: Name of the cargo
-          default: ''
-        Metadata:
-          type: object
-          description: Metadata of the cargo (user defined)
-          default: null
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-          propertyNames:
-            type: string
-        InitContainer:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
-            description: Action to run before the container
-          default: null
-        Secrets:
-          type:
-          - array
-          - 'null'
+        InitContainers:
+          type: array
           items:
-            type: string
-          description: List of secrets to use as environment variables
-          default: null
-        ImagePullSecret:
-          type:
-          - string
-          - 'null'
-          description: Secret to use when pulling the image
-          default: null
-        ImagePullPolicy:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ImagePullPolicy'
-            description: Image pull policy of the cargo
-          default: null
-        Container:
-          oneOf:
-          - $ref: '#/components/schemas/Config'
-            description: Container specification of the cargo
-          default: {}
-        Placement:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/CargoPlacementSpec'
-            description: Fine tune how the cargo is placed on the nodes
-          default: null
-        ResourceRequirement:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
-            description: Define minimal resource requirements for the cargo
-          default: null
-      additionalProperties: false
-    CargoSpecUpdate:
-      type: object
-      description: |
-        Payload used to patch a cargo
-        It will create a new [CargoSpec](CargoSpec) with the new values
-        It will keep the old values in the history
-      properties:
-        Name:
-          type:
-          - string
-          - 'null'
-          description: New name of the cargo
-          default: null
-        Metadata:
-          type: object
-          description: New metadata of the cargo (user defined)
-          default: null
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-          propertyNames:
-            type: string
-        InitContainer:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
-            description: Action to run before the container
-          default: null
-        Secrets:
-          type:
-          - array
-          - 'null'
+            $ref: '#/components/schemas/ContainerSpec'
+          description: Init containers executed in declaration order.
+        Containers:
+          type: array
           items:
-            type: string
-          description: List of secrets to use as environment variables
-          default: null
-        ImagePullSecret:
-          type:
-          - string
-          - 'null'
-          description: Secret to use when pulling the image
-          default: null
-        ImagePullPolicy:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ImagePullPolicy'
-            description: Image pull policy of the cargo
-          default: null
-        Container:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
-            description: New container specification of the cargo
-          default: null
-        Placement:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/CargoPlacementSpec'
-            description: Fine tune how the cargo is placed on the nodes
-          default: null
-        ResourceRequirement:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/CargoResourceRequirementSpec'
-            description: Define minimal resource requirements for the cargo
-          default: null
-      additionalProperties: false
+            $ref: '#/components/schemas/ContainerSpec'
+          description: Application containers in each Cargo replica.
     CargoSummary:
       type: object
       description: |-
@@ -2730,7 +2625,7 @@ components:
           description: Number of running instances
           minimum: 0
         Spec:
-          $ref: '#/components/schemas/CargoSpec'
+          $ref: '#/components/schemas/CargoSpecRevision'
           description: Specification of the cargo
     ClusterInfo:
       type: object
@@ -3262,6 +3157,38 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/NetworkSettings'
+    ContainerSpec:
+      allOf:
+      - $ref: '#/components/schemas/Config'
+        description: |-
+          Raw authored Docker container configuration.
+
+          This remains distinct in Rust but is flattened beside Nanocl-owned fields
+          in every public serialization format.
+      - type: object
+        required:
+        - Name
+        properties:
+          Name:
+            type: string
+            description: Name unique within the Cargo declaration.
+          Essential:
+            type: boolean
+            description: Whether failure of this container makes the Cargo replica unhealthy.
+          Secrets:
+            type: array
+            items:
+              type: string
+            description: Secrets injected into only this container.
+          ImagePullSecret:
+            type:
+            - string
+            - 'null'
+            description: Secret used to pull this container's image.
+          ImagePullPolicy:
+            $ref: '#/components/schemas/ImagePullPolicy'
+            description: Policy used to pull this container's image.
+      description: Declaration of one named container in a multi-container Cargo.
     ContainerState:
       type: object
       description: ContainerState stores container's running state. It's part of ContainerJSONBase and will be returned by the \"inspect\" command.
@@ -3336,68 +3263,6 @@ components:
       - removing
       - exited
       - dead
-    CreateExecOptions:
-      type: object
-      description: Exec configuration used in the [Create Exec API](Docker::create_exec())
-      properties:
-        AttachStdin:
-          type:
-          - boolean
-          - 'null'
-          description: Attach to `stdin` of the exec command.
-        AttachStdout:
-          type:
-          - boolean
-          - 'null'
-          description: Attach to stdout of the exec command.
-        AttachStderr:
-          type:
-          - boolean
-          - 'null'
-          description: Attach to stderr of the exec command.
-        Tty:
-          type:
-          - boolean
-          - 'null'
-          description: Allocate a pseudo-TTY.
-        DetachKeys:
-          type:
-          - string
-          - 'null'
-          description: |-
-            Override the key sequence for detaching a container. Format is a single character `[a-Z]`
-            or `ctrl-<value>` where `<value>` is one of: `a-z`, `@`, `^`, `[`, `,` or `_`.
-        Env:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: A list of environment variables in the form `["VAR=value", ...].`
-        Cmd:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: Command to run, as a string or array of strings.
-        Privileged:
-          type:
-          - boolean
-          - 'null'
-          description: Runs the exec process with extended privileges.
-        User:
-          type:
-          - string
-          - 'null'
-          description: |-
-            The user, and optionally, group to run the exec process inside the container. Format is one
-            of: `user`, `user:group`, `uid`, or `uid:gid`.
-        WorkingDir:
-          type:
-          - string
-          - 'null'
-          description: The working directory for the exec process inside the container.
     DaemonConfig:
       type: object
       description: |-
@@ -3762,56 +3627,6 @@ components:
       - error
       - normal
       - warning
-    ExecInspectResponse:
-      type: object
-      properties:
-        CanRemove:
-          type:
-          - boolean
-          - 'null'
-        DetachKeys:
-          type:
-          - string
-          - 'null'
-        ID:
-          type:
-          - string
-          - 'null'
-        Running:
-          type:
-          - boolean
-          - 'null'
-        ExitCode:
-          type:
-          - integer
-          - 'null'
-          format: int64
-        ProcessConfig:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ProcessConfig'
-        OpenStdin:
-          type:
-          - boolean
-          - 'null'
-        OpenStderr:
-          type:
-          - boolean
-          - 'null'
-        OpenStdout:
-          type:
-          - boolean
-          - 'null'
-        ContainerID:
-          type:
-          - string
-          - 'null'
-        Pid:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: The system process ID for the exec process.
     GenericCount:
       type: object
       description: Generic count response
@@ -6149,31 +5964,6 @@ components:
         Data:
           $ref: '#/components/schemas/ContainerInspectResponse'
           description: The data of the process a ContainerInspect
-    ProcessConfig:
-      type: object
-      properties:
-        privileged:
-          type:
-          - boolean
-          - 'null'
-        user:
-          type:
-          - string
-          - 'null'
-        tty:
-          type:
-          - boolean
-          - 'null'
-        entrypoint:
-          type:
-          - string
-          - 'null'
-        arguments:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
     ProcessKind:
       type: string
       description: Kind of process (Vm, Job, Cargo)
@@ -6918,25 +6708,6 @@ components:
           - string
           - 'null'
           description: The certificate password if any
-    StartExecOptions:
-      type: object
-      description: Exec configuration used in the [Create Exec API](Docker::create_exec())
-      required:
-      - Detach
-      - Tty
-      properties:
-        Detach:
-          type: boolean
-          description: Detach from the command.
-        Tty:
-          type: boolean
-          description: Allocate a pseudo-TTY.
-        OutputCapacity:
-          type:
-          - integer
-          - 'null'
-          description: The maximum size for a line of output. The default is 8 * 1024 (roughly 1024 characters).
-          minimum: 0
     StartNodeCargoParams:
       type: object
       required:
@@ -6947,8 +6718,10 @@ components:
           type: string
           description: Canonical cargo key in `{namespace}.{name}` format
         Replicas:
-          type: integer
-          minimum: 0
+          type: array
+          items:
+            $ref: '#/components/schemas/CargoReplicaTask'
+          description: Exact durable replicas assigned to this node, ordered by ordinal.
     Statefile:
       type: object
       description: Structure that represent a Statefile
@@ -7006,7 +6779,7 @@ components:
           - array
           - 'null'
           items:
-            $ref: '#/components/schemas/CargoSpecPartial'
+            $ref: '#/components/schemas/CargoSpec'
           description: List of cargoes to create and run
         VirtualMachines:
           type:

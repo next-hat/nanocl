@@ -515,7 +515,7 @@ Forward compatibility is explicit: new Bollard fields become accepted only after
 | Published ports | Cargo `PortBindings: bollard_next::models::PortMap` | Compiler installs mappings only on the sandbox; observed allocations appear per replica. |
 | Shared secrets | Cargo `Secrets` | Inherited by every app/init, never sandbox; compiled env/files only. |
 | Container collection/order | Cargo | Application names are identity; init list order is lifecycle order. No general dependency graph. |
-| Stable logical name | `ContainerSpec.Name` | Written to labels/mapping rows and used by inspect/log/exec/restart selectors. |
+| Stable logical name | `ContainerSpec.Name` | Written to labels/mapping rows and used by Cargo inspect/log/restart selectors. Future process-level exec/kill commands target a concrete process identity instead. |
 | Essentiality | `ContainerSpec.Essential` | Default true; participates in readiness reducer, not Docker config. |
 | Container secrets | `ContainerSpec.Secrets` | Added after shared secrets under deterministic semantics. |
 | Pull policy/credential | `ContainerSpec` | Applied separately for each distinct image. Never supplied to sandbox. |
@@ -791,7 +791,7 @@ Migration tests must cover both a fresh database and upgrades from released sche
 
 ## 15. API and CLI impact
 
-Current Cargo routes are registered at `bin/nanocld/src/services/cargo/mod.rs:23-33`: create/list, inspect, PUT, PATCH, delete, count, history, and revert. Keep those route identities where their meaning remains coherent. Current process-wide routes act by `{kind}/{key}` and naturally remain Cargo-wide (`bin/nanocld/src/services/process/mod.rs:25-42`).
+Current Cargo routes are registered at `bin/nanocld/src/services/cargo/mod.rs:23-33`: create/list, inspect, PUT, PATCH, delete, count, history, and revert. Keep those route identities where their meaning remains coherent. Process-wide start, stop, restart, logs, stats, and wait routes act by `{kind}/{key}` and naturally remain Cargo-wide. Grouped kill is deliberately removed because a raw signal must target one concrete process.
 
 ### API responses and mutations
 
@@ -808,10 +808,9 @@ GET  /cargoes/{key}/replicas/{replica}
 GET  /cargoes/{key}/replicas/{replica}/containers/{name}
 GET  /cargoes/{key}/replicas/{replica}/containers/{name}/logs
 POST /cargoes/{key}/replicas/{replica}/containers/{name}/restart
-POST /cargoes/{key}/exec   # body includes replica and container selectors
 ```
 
-The existing client method for `/cargoes/{key}/instances` has no matching daemon/OpenAPI route (`crates/nanocld_client/src/cargo.rs:227-248`) and should be replaced during the breaking client change. Current exec hardcodes `{cargo_key}.c`, which does not even match current random creation names (`bin/nanocld/src/utils/exec.rs:16-28` versus `utils/container/cargo.rs:263-267`); require replica/container when ambiguous and permit omission only for exactly one replica with one app.
+The existing client method for `/cargoes/{key}/instances` has no matching daemon/OpenAPI route (`crates/nanocld_client/src/cargo.rs:227-248`) and should be replaced during the breaking client change. Remove the Cargo-keyed exec API and grouped kill API instead of preserving implicit single-container shortcuts: a Cargo can contain multiple replicas, apps, init containers, and an internal sandbox, so it is not a concrete process target. A later pull request should add top-level process commands and process-targeted endpoints equivalent to `nanocl exec PROCESS -- COMMAND...` and `nanocl kill PROCESS`; until then, no Cargo exec/kill compatibility endpoint is exposed. The existing singular process kill endpoint may remain as the foundation for that follow-up, with its Cargo-named payload type renamed separately.
 
 ### CLI
 
@@ -820,12 +819,11 @@ Retain Cargo-wide start, stop, restart, and remove. Extend existing commands wit
 - `cargo inspect KEY [--replica N] [--container NAME]`;
 - `cargo logs KEY [--replica N] [--container NAME]`, defaulting to all app logs with `replica/container` prefixes and excluding sandbox/init;
 - `cargo restart KEY` remains group-wide; `--replica N --container NAME` targets one app;
-- `cargo exec KEY --replica N --container NAME ...`, with the single/single implicit shortcut;
 - create/run/patch flags that assume one image/config are replaced by the new spec input or deliberately limited single-container shorthand.
 
-`bin/nanocl/src/models/cargo.rs:17-183,297-345` currently assumes one image for create/run/patch/exec/list; `bin/nanocl/src/commands/cargo.rs:195-215` aggregates all process logs. Generated man pages under `doc/man/` and shell completions must follow the final CLI contract.
+Remove `nanocl cargo exec` and `nanocl cargo kill`; raw command execution and signals belong to the deferred top-level process commands described above. `bin/nanocl/src/models/cargo.rs:17-183,297-345` currently assumes one image for create/run/patch/list; `bin/nanocl/src/commands/cargo.rs:195-215` aggregates all process logs. Generated man pages under `doc/man/` and shell completions must follow the final CLI contract.
 
-All node operations must become replica-aware and execute Docker calls only on the assigned node. Current group start/stop/restart/kill/log/stats paths can load cluster-wide rows and use a local Docker daemon (`bin/nanocld/src/utils/container/process.rs:176-297`; `services/process/log.rs:87-133`; `services/process/stats.rs:29-63`).
+All node operations must become replica-aware and execute Docker calls only on the assigned node. Current group start/stop/restart/log/stats paths can load cluster-wide rows and use a local Docker daemon (`bin/nanocld/src/utils/container/process.rs:176-297`; `services/process/log.rs:87-133`; `services/process/stats.rs:29-63`).
 
 ## 16. Update, rollout, and failure-recovery behavior
 
@@ -865,10 +863,10 @@ Old and new apps sharing one namespace often cannot listen on the same internal 
 | Models/repositories | `bin/nanocld/src/models/{cargo,spec,process,object_process_status,job,vm,network}.rs`, corresponding `repositories/*`, plus new replica/mapping modules. |
 | Desired-object mutations | `bin/nanocld/src/objects/cargo.rs`: transactions, validation, removal of bespoke singular Config merge. |
 | Scheduling/node RPC | `bin/nanocld/src/utils/container/generic.rs`, `tasks/cargo.rs`, `services/node/cargo.rs`, `crates/nanocl_stubs/src/node.rs`, client node methods: stable replica assignments instead of counts. |
-| Runtime compiler/controller | `bin/nanocld/src/utils/container/{cargo,process,network,generic,image,job,vm}.rs`, `utils/{secret,system,exec}.rs`: sandbox, per-container compilation, local-only actions, declared/compiled boundary. Job/VM paths must be regression-protected, not redesigned. |
+| Runtime compiler/controller | `bin/nanocld/src/utils/container/{cargo,process,network,generic,image,job,vm}.rs`, `utils/{secret,system}.rs`: sandbox, per-container compilation, local-only actions, declared/compiled boundary. The Cargo-only exec utility is removed; Job/VM paths must be regression-protected, not redesigned. |
 | Observation/events | `bin/nanocld/src/system/{docker_event,event,init}.rs`, `models/raw_emitter.rs`: labels, local inspection, periodic resync, durable generation conditions. |
-| Daemon API | `bin/nanocld/src/services/cargo/*`, `process/*`, `exec/*`, `openapi.rs`: new payloads/inspect/selectors/waits. |
-| Rust client | `crates/nanocld_client/src/{cargo,process,node}.rs`: response tree, selectors, accepted generation, remove stale instances call. |
+| Daemon API | `bin/nanocld/src/services/cargo/*`, `process/*`, `openapi.rs`: new payloads/inspect/selectors/waits and removal of Cargo-keyed exec/grouped kill routes. |
+| Rust client | `crates/nanocld_client/src/{cargo,process,node}.rs`: response tree, selectors, accepted generation, removal of Cargo exec/grouped kill methods, and removal of the stale instances call. |
 | CLI | `bin/nanocl/src/models/cargo.rs`, `commands/{cargo,state,backup,install,uninstall,process}.rs`, `utils/{state,docker,process}.rs`: multi-container flags/output, bounded generation waits, authored/effective bind handling. |
 | Proxy/DNS | `bin/ncproxy/src/subsystem/event.rs`, `utils/{rule,resource}.rs`: serving-ready replica endpoint abstraction instead of app `container:*` inspect. `bin/ncdns/src/event.rs` and `bin/ncdns/README.md` should be checked because the README's Cargo-DNS claim is stale. |
 | Examples/docs | `README.md`, root `Statefile.yml`, `installer.yml`, all Cargo-bearing `examples/*`, backup fixtures, `doc/man/nanocl-cargo*.md`, and state command pages. There are at least 28 YAML Cargo examples plus JSON/TOML/extensionless variants. |
@@ -907,7 +905,7 @@ Important current consumers that must not be missed include `ncproxy`'s singular
 ### API, CLI, and downstream
 
 - Atomic PUT and explicitly defined whole-field PATCH behavior.
-- Replica-grouped inspect and selectors for logs/exec/restart; single/single implicit exec and ambiguity error.
+- Replica-grouped inspect and selectors for logs/restart; absence of Cargo exec/grouped kill routes and methods; singular process kill remains independently covered.
 - Default accepted wait completing while a serial rollout is still health-progressing; explicit reconciled/ready/stopped/deleted success; targeted-restart generation; intentionally Created/Stopped Cargoes; reconciliation failure; partial availability as Degraded; recoverable late Unhealthy; one command-wide timeout across multiple resources; clean EOF; missed event/restart recovery; and consistent exit codes across apply/run/start/stop/restart/remove/put/revert.
 - Proxy includes only serving-ready endpoint abstractions (sandbox, routable host, or none) and handles old-generation/degraded/partial replicas; app/sandbox/init logs are separated.
 - Non-destructive E2E fixtures for shared localhost/IP, custom network, both Cargo escapes, both container escapes, ports, secrets, binds, init, delayed health, permanently unhealthy, disabled healthcheck, and multi-node replicas. These are future implementation tests, not part of this audit run.
@@ -1017,8 +1015,8 @@ Each task should compile and be reviewable independently. Dependencies are expli
 
 - **Depends on:** Tasks 4, 7, and 8.
 - **Objective:** Switch create/PUT/PATCH/history/inspect to the new contract and add minimal logical replica/container selectors.
-- **Likely files:** daemon Cargo/process/exec services, OpenAPI, `nanocld_client`, public inspect/stub types.
-- **Boundaries:** Keep existing Cargo-wide lifecycle routes; use whole-field PATCH semantics; no new general dependency/namespace/volume APIs.
+- **Likely files:** daemon Cargo/process services, removal of Cargo-only exec services, OpenAPI, `nanocld_client`, public inspect/stub types.
+- **Boundaries:** Keep Cargo-wide start/stop/restart lifecycle routes, remove Cargo exec/grouped kill routes, and defer new process-level exec/kill commands and API design; use whole-field PATCH semantics; no new general dependency/namespace/volume APIs.
 - **Tests:** payload/schema snapshots, history/revert, grouped inspect, UUID/ordinal selector resolution, authorization/errors, async accepted spec revision/runtime generation.
 - **Migration:** Require the forward data/runtime transition; no dual old/new public compatibility path.
 - **Must not change yet:** Remove old DB structures only after all consumers are switched.

@@ -152,17 +152,12 @@ pub async fn emit_stopping(
   Ok(())
 }
 
-/// Inject internal data into the payload
-/// eg: $$INTERNAL_GATEWAY
-///
-pub async fn inject_data(
-  payload: &str,
+/// Resolve the gateway used by the Cargo compiler for
+/// `$$INTERNAL_GATEWAY` without mutating an authored declaration.
+pub async fn resolve_internal_gateway(
   network_mode: &str,
   state: &SystemState,
 ) -> IoResult<String> {
-  if !payload.contains("$$INTERNAL_GATEWAY") {
-    return Ok(payload.to_owned());
-  }
   let network_name =
     match super::network::ensure_network_exists(network_mode, state).await? {
       Some(network_name) => network_name,
@@ -192,9 +187,7 @@ pub async fn inject_data(
       &format!("No network found for {network_name}"),
     ));
   };
-  let gateway_addr = network.gateway.clone().unwrap_or_default();
-  let new_data = payload.replace("$$INTERNAL_GATEWAY", &gateway_addr);
-  Ok(new_data)
+  Ok(network.gateway.clone().unwrap_or_default())
 }
 
 /// Plan node selection for a cargo based on placement and resource requirements.
@@ -217,18 +210,9 @@ pub struct SelectionPlan {
   pub assignments: Vec<SelectionAssignment>,
 }
 
-/// Read the currently active Cargo replica count semantics in one place.
-///
-/// The future public-spec cutover can replace this helper without spreading
-/// references to `Placement.Replicas` through scheduling and reconciliation.
+/// Read the desired Cargo replica count from its canonical top-level field.
 pub(crate) fn desired_replica_count(cargo: &Cargo) -> usize {
-  cargo
-    .spec
-    .placement
-    .as_ref()
-    .and_then(|placement| placement.replicas)
-    .unwrap_or(1)
-    .max(1)
+  cargo.spec.replicas
 }
 
 /// Select nodes for the given cargo based on its placement and resource requirements.
@@ -494,22 +478,14 @@ pub async fn plan_selection(
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::cargo_spec::CargoPlacementSpec;
-
   use super::*;
 
   #[test]
-  fn desired_replica_count_preserves_current_default_and_lower_bound() {
+  fn desired_replica_count_uses_the_top_level_cargo_field() {
     let mut cargo = Cargo::default();
     assert_eq!(desired_replica_count(&cargo), 1);
 
-    cargo.spec.placement = Some(CargoPlacementSpec {
-      replicas: Some(0),
-      ..Default::default()
-    });
-    assert_eq!(desired_replica_count(&cargo), 1);
-
-    cargo.spec.placement.as_mut().unwrap().replicas = Some(7);
+    cargo.spec.replicas = 7;
     assert_eq!(desired_replica_count(&cargo), 7);
   }
 }

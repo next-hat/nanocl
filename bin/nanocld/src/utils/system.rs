@@ -4,27 +4,155 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use bollard_next::{
   container::{InspectContainerOptions, ListContainersOptions},
-  secret::ContainerStateStatusEnum,
   service::ContainerInspectResponse,
 };
 use nanocl_stubs::{
-  cargo::Cargo,
-  cargo_spec::CargoSpecPartial,
   generic::{GenericClause, GenericFilter},
   namespace::NamespacePartial,
   process::ProcessPartial,
-  system::ObjPsStatusKind,
 };
 
 use crate::{
   models::{
-    CargoDb, CargoObjCreateIn, NamespaceDb, ObjPsStatusDb, ObjPsStatusUpdate,
-    ProcessDb, ProcessUpdateDb, SystemState,
+    CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+    NamespaceDb, NewCargoReplicaProcessDb, ProcessDb, ProcessUpdateDb,
+    SystemState,
   },
-  objects::generic::ObjCreate,
   repositories::generic::*,
-  vars,
+  utils::container::cargo_compiler::{
+    LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_REPLICA_ORDINAL,
+    LABEL_ROLE,
+  },
 };
+
+async fn reattach_cargo_process(
+  cargo_key: &str,
+  process_key: &str,
+  process_name: &str,
+  labels: &HashMap<String, String>,
+  state: &SystemState,
+) -> IoResult<()> {
+  let Some(replica_key) = labels.get(LABEL_REPLICA) else {
+    return Ok(());
+  };
+  let replica_key = replica_key.parse::<uuid::Uuid>().map_err(|error| {
+    IoError::other(
+      "CargoRuntimeIdentity",
+      &format!("Cargo process {process_key} has invalid replica UUID: {error}"),
+    )
+  })?;
+  let ordinal = labels
+    .get(LABEL_REPLICA_ORDINAL)
+    .ok_or_else(|| {
+      IoError::other(
+        "CargoRuntimeIdentity",
+        &format!("Cargo process {process_key} has no replica ordinal"),
+      )
+    })?
+    .parse::<i32>()
+    .map_err(|error| {
+      IoError::other(
+        "CargoRuntimeIdentity",
+        &format!(
+          "Cargo process {process_key} has invalid replica ordinal: {error}"
+        ),
+      )
+    })?;
+  let role = labels
+    .get(LABEL_ROLE)
+    .ok_or_else(|| {
+      IoError::other(
+        "CargoRuntimeIdentity",
+        &format!("Cargo process {process_key} has no Cargo role"),
+      )
+    })?
+    .parse::<CargoReplicaProcessRole>()?;
+  let container_name = labels.get(LABEL_CONTAINER).ok_or_else(|| {
+    IoError::other(
+      "CargoRuntimeIdentity",
+      &format!("Cargo process {process_key} has no logical container name"),
+    )
+  })?;
+  let essential = labels
+    .get(LABEL_ESSENTIAL)
+    .ok_or_else(|| {
+      IoError::other(
+        "CargoRuntimeIdentity",
+        &format!("Cargo process {process_key} has no essential marker"),
+      )
+    })?
+    .parse::<bool>()
+    .map_err(|error| {
+      IoError::other(
+        "CargoRuntimeIdentity",
+        &format!(
+          "Cargo process {process_key} has invalid essential marker: {error}"
+        ),
+      )
+    })?;
+  let replica = CargoReplicaDb::get(replica_key, &state.inner.pool).await?;
+  if replica.cargo_key != cargo_key
+    || replica.ordinal != ordinal
+    || replica.node_name.as_deref() != Some(&state.inner.config.hostname)
+  {
+    return Err(IoError::other(
+      "CargoRuntimeIdentity",
+      &format!(
+        "Cargo process {process_key} does not match replica {replica_key} assignment"
+      ),
+    ));
+  }
+  let mapping = match CargoReplicaProcessDb::find(
+    replica_key,
+    role,
+    container_name,
+    &state.inner.pool,
+  )
+  .await
+  {
+    Ok(mapping) => mapping,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      CargoReplicaProcessDb::create(
+        NewCargoReplicaProcessDb::new(
+          replica_key,
+          container_name,
+          role,
+          essential,
+        ),
+        &state.inner.pool,
+      )
+      .await?
+    }
+    Err(error) => return Err(error),
+  };
+  if mapping
+    .process_key
+    .as_deref()
+    .is_some_and(|attached| attached != process_key)
+  {
+    if process_name.starts_with("tmp-")
+      || process_name.starts_with("candidate-")
+    {
+      // A retained or pending rollout process intentionally shares the stable
+      // logical identity with the attached generation. It is observed but
+      // must not steal the durable attachment during startup inventory.
+      return Ok(());
+    }
+    return Err(IoError::other(
+      "CargoRuntimeIdentity",
+      &format!(
+        "Cargo mapping {} is already attached to process {:?}, not observed process {process_key}",
+        mapping.key, mapping.process_key
+      ),
+    ));
+  }
+  CargoReplicaProcessDb::set_processes(
+    vec![(mapping.key, Some(process_key.to_owned()), essential)],
+    &state.inner.pool,
+  )
+  .await?;
+  Ok(())
+}
 
 /// Will determine if the instance is registered by nanocl
 /// and sync his data with our store accordingly
@@ -110,39 +238,11 @@ pub async fn register_namespace(
   Ok(())
 }
 
-/// Sync the cargo status with the container status.
-/// We use it at startup to be sure that the cargo status is up to date.
-async fn sync_cargo_status(
-  cargo: &Cargo,
-  container: &ContainerInspectResponse,
-  state: &SystemState,
-) -> IoResult<()> {
-  if let Some(status) = container.state.clone().unwrap_or_default().status {
-    let new_status = match status {
-      ContainerStateStatusEnum::RUNNING => Some(ObjPsStatusKind::Start),
-      ContainerStateStatusEnum::RESTARTING => Some(ObjPsStatusKind::Fail),
-      ContainerStateStatusEnum::DEAD => Some(ObjPsStatusKind::Stop),
-      ContainerStateStatusEnum::EXITED => Some(ObjPsStatusKind::Stop),
-      _ => None,
-    };
-    if let Some(new_status) = new_status {
-      ObjPsStatusDb::update_pk(
-        &cargo.spec.cargo_key,
-        ObjPsStatusUpdate {
-          wanted: Some(ObjPsStatusKind::Start.to_string()),
-          actual: Some(new_status.to_string()),
-          ..Default::default()
-        },
-        &state.inner.pool,
-      )
-      .await?;
-    }
-  }
-  Ok(())
-}
-
-/// Convert existing container instances with our labels to cargo.
-/// We use it to be sure that all existing containers are registered as cargo.
+/// Rebuild observed process rows from managed Docker containers.
+///
+/// Desired Cargo declarations remain database-authoritative: an effective
+/// Docker inspect configuration cannot be reversed into the authored
+/// multi-container declaration.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_processes: starting");
   let options = Some(ListContainersOptions::<&str> {
@@ -155,7 +255,6 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     .list_containers(options)
     .await
     .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
-  let mut cargo_inspected: HashMap<String, bool> = HashMap::new();
   let mut ids = Vec::new();
   for container_summary in containers {
     let labels = container_summary.labels.unwrap_or_default();
@@ -179,67 +278,15 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
       .await
       .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
     sync_process(key, kind, &container, state).await?;
-    ids.push(id);
     if kind == "cargo" {
-      let Ok(resource_key) =
-        key.parse::<nanocl_stubs::resource_key::ResourceKey>()
-      else {
-        log::warn!("system::sync_processes: invalid cargo key {key}");
-        continue;
-      };
-      let name = resource_key.name();
-      let namespace = resource_key.namespace();
-      // We inspect the container to have all the information we need
-      // If we already inspected this cargo we skip it
-      if cargo_inspected.contains_key(key) {
-        continue;
-      }
-      let config = container.config.clone().unwrap_or_default();
-      let mut config: bollard_next::container::Config = config.into();
-      config.host_config.clone_from(&container.host_config);
-      let new_cargo = CargoSpecPartial {
-        name: name.to_owned(),
-        container: config.to_owned(),
-        ..Default::default()
-      };
-      cargo_inspected.insert(key.to_owned(), true);
-      match CargoDb::transform_read_by_pk(key, &state.inner.pool).await {
-        // unless we create his config
-        Err(_err) => {
-          if let Err(err) = register_namespace(namespace, state).await {
-            log::warn!("system::sync_processes: namespace {err}");
-            continue;
-          }
-          log::trace!(
-            "system::sync_processes: create cargo {name} in namespace {namespace}",
-          );
-          let obj = &CargoObjCreateIn {
-            namespace: namespace.to_owned(),
-            spec: new_cargo.clone(),
-            version: format!("v{}", vars::VERSION),
-          };
-          let synced_cargo = CargoDb::create_obj(obj, state).await?;
-          sync_cargo_status(&synced_cargo, &container, state).await?;
-        }
-        // If the cargo is already in our store and the config is different we update it
-        Ok(cargo) => {
-          sync_cargo_status(&cargo, &container, state).await?;
-          if cargo.spec.container == config {
-            continue;
-          }
-          log::trace!(
-            "system::sync_processes: update cargo {name} in namespace {namespace}",
-          );
-          CargoDb::update_from_spec(
-            key,
-            &new_cargo,
-            &format!("v{}", vars::VERSION),
-            &state.inner.pool,
-          )
-          .await?;
-        }
-      }
+      let process_name = container
+        .name
+        .as_deref()
+        .unwrap_or_default()
+        .trim_start_matches('/');
+      reattach_cargo_process(key, &id, process_name, &labels, state).await?;
     }
+    ids.push(id);
   }
   // delete zombie instances (not in docker anymore) from our store if any
   let filter = GenericFilter::new()

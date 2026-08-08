@@ -2,11 +2,13 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 use tabled::Tabled;
 
-use bollard_next::exec::CreateExecOptions;
-
+use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::stubs::{
-  cargo::{CargoKillOptions, CargoSummary},
-  cargo_spec::{CargoSpecPartial, CargoSpecUpdate, Config, HostConfig},
+  cargo::CargoSummary,
+  cargo_spec::{
+    CargoSpec, CargoSpecPatch, CargoSpecRevision, Config, ContainerSpec,
+    HostConfig,
+  },
 };
 
 use super::{
@@ -32,24 +34,40 @@ pub struct CargoCreateOpts {
   pub(crate) env: Option<Vec<String>>,
 }
 
-/// Convert CargoCreateOpts to CargoSpecPartial
-impl From<CargoCreateOpts> for CargoSpecPartial {
-  fn from(val: CargoCreateOpts) -> Self {
-    Self {
-      name: val.name,
-      container: Config {
-        image: Some(val.image),
-        // network: val.network,
-        // volumes: val.volumes,
-        env: val.env,
+fn single_container_cargo_spec(
+  name: String,
+  image: String,
+  env: Option<Vec<String>>,
+  volumes: Option<Vec<String>>,
+  command: Option<Vec<String>>,
+) -> CargoSpec {
+  CargoSpec {
+    name: name.clone(),
+    containers: vec![ContainerSpec {
+      name,
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some(image),
+        env,
+        cmd: command,
         host_config: Some(HostConfig {
-          binds: val.volumes,
+          binds: volumes,
           ..Default::default()
         }),
         ..Default::default()
       },
-      ..Default::default()
-    }
+    }],
+    ..Default::default()
+  }
+}
+
+/// Convert CargoCreateOpts to CargoSpec
+impl From<CargoCreateOpts> for CargoSpec {
+  fn from(val: CargoCreateOpts) -> Self {
+    single_container_cargo_spec(val.name, val.image, val.env, val.volumes, None)
   }
 }
 
@@ -69,32 +87,20 @@ pub struct CargoRunOpts {
   /// Environment variables of the cargo
   #[clap(short, long = "env")]
   pub env: Option<Vec<String>>,
-  #[clap(long = "rm", default_value = "false")]
-  pub auto_remove: bool,
   /// Command to execute
   pub command: Vec<String>,
 }
 
-/// Convert CargoRunOpts to CargoSpecPartial
-impl From<CargoRunOpts> for CargoSpecPartial {
+/// Convert CargoRunOpts to CargoSpec
+impl From<CargoRunOpts> for CargoSpec {
   fn from(val: CargoRunOpts) -> Self {
-    Self {
-      name: val.name,
-      container: Config {
-        image: Some(val.image),
-        // network: val.network,
-        // volumes: val.volumes,
-        env: val.env,
-        cmd: Some(val.command),
-        host_config: Some(HostConfig {
-          binds: val.volumes,
-          auto_remove: Some(val.auto_remove),
-          ..Default::default()
-        }),
-        ..Default::default()
-      },
-      ..Default::default()
-    }
+    single_container_cargo_spec(
+      val.name,
+      val.image,
+      val.env,
+      val.volumes,
+      Some(val.command),
+    )
   }
 }
 
@@ -110,6 +116,9 @@ pub struct CargoRestartOpts {
 pub struct CargoPatchOpts {
   /// Canonical key of the cargo to update
   pub(crate) key: String,
+  /// Name of the application container to update
+  #[clap(long)]
+  pub(crate) container: Option<String>,
   /// New image of cargo
   #[clap(short, long = "image")]
   pub(crate) image: Option<String>,
@@ -121,64 +130,95 @@ pub struct CargoPatchOpts {
   pub(crate) volumes: Option<Vec<String>>,
 }
 
-/// Convert CargoPatchOpts to CargoSpecUpdate
-impl From<CargoPatchOpts> for CargoSpecUpdate {
-  fn from(val: CargoPatchOpts) -> Self {
-    CargoSpecUpdate {
-      name: None,
-      container: Some(Config {
-        image: val.image,
-        env: val.env,
-        ..Default::default()
-      }),
-      ..Default::default()
+/// Build a complete application-container replacement for a Cargo patch.
+// The build script includes CLI models without the command handlers that use
+// this helper.
+#[allow(dead_code)]
+pub(crate) fn build_cargo_patch(
+  opts: &CargoPatchOpts,
+  current: &[ContainerSpec],
+) -> IoResult<CargoSpecPatch> {
+  let target_name = match opts.container.as_ref() {
+    Some(name) => name.clone(),
+    None => match current {
+      [] => {
+        return Err(IoError::invalid_input(
+          "Cargo patch",
+          "the Cargo has no application container to update",
+        ));
+      }
+      [container] => container.name.clone(),
+      _ => {
+        return Err(IoError::invalid_input(
+          "Cargo patch",
+          "--container is required when the Cargo has multiple application containers",
+        ));
+      }
+    },
+  };
+
+  let mut containers = current.to_vec();
+  let mut matches = 0;
+  for container in &mut containers {
+    if container.name != target_name {
+      continue;
+    }
+    matches += 1;
+    if let Some(image) = &opts.image {
+      container.container_config.image = Some(image.clone());
+    }
+    if let Some(env) = &opts.env {
+      container.container_config.env = Some(env.clone());
+    }
+    if let Some(volumes) = &opts.volumes {
+      container
+        .container_config
+        .host_config
+        .get_or_insert_default()
+        .binds = Some(volumes.clone());
     }
   }
-}
 
-/// `nanocl cargo exec` available options
-#[derive(Clone, Parser)]
-pub struct CargoExecOpts {
-  /// Allocate a pseudo-TTY.
-  #[clap(short = 't', long = "tty")]
-  pub tty: bool,
-  /// Canonical key of the cargo in which to execute the command
-  pub key: String,
-  /// Command to execute
-  #[clap(last = true, raw = true)]
-  pub command: Vec<String>,
-  /// Override the key sequence for detaching a container.
-  #[clap(long)]
-  pub detach_keys: Option<String>,
-  /// Set environment variables
-  #[clap(short)]
-  pub env: Option<Vec<String>>,
-  /// Give extended privileges to the command
-  #[clap(long)]
-  pub privileged: bool,
-  /// Username or UID (format: "<name|uid>[:<group|gid>]")
-  #[clap(short)]
-  pub user: Option<String>,
-  /// Working directory inside the container
-  #[clap(short, long = "workdir")]
-  pub working_dir: Option<String>,
-}
-
-/// Convert CargoExecOpts to CreateExecOptions
-impl From<CargoExecOpts> for CreateExecOptions {
-  fn from(val: CargoExecOpts) -> Self {
-    CreateExecOptions {
-      cmd: Some(val.command),
-      tty: Some(val.tty),
-      detach_keys: val.detach_keys,
-      env: val.env,
-      privileged: Some(val.privileged),
-      user: val.user,
-      working_dir: val.working_dir,
-      attach_stderr: Some(true),
-      attach_stdout: Some(true),
-      ..Default::default()
+  match matches {
+    0 => {
+      return Err(IoError::invalid_input(
+        "Cargo patch".to_owned(),
+        format!("application container {target_name:?} does not exist"),
+      ));
     }
+    1 => {}
+    _ => {
+      return Err(IoError::invalid_data(
+        "Cargo patch".to_owned(),
+        format!("application container {target_name:?} is duplicated"),
+      ));
+    }
+  }
+
+  Ok(CargoSpecPatch {
+    containers: Some(containers),
+    ..Default::default()
+  })
+}
+
+/// Convert a stored Cargo revision back to its complete desired declaration.
+// The build script includes CLI models without the command handlers that use
+// this helper.
+#[allow(dead_code)]
+pub(crate) fn cargo_spec_from_revision(
+  revision: &CargoSpecRevision,
+) -> CargoSpec {
+  CargoSpec {
+    name: revision.name.clone(),
+    metadata: revision.metadata.clone(),
+    replicas: revision.replicas,
+    network_mode: revision.network_mode.clone(),
+    port_bindings: revision.port_bindings.clone(),
+    secrets: revision.secrets.clone(),
+    placement: revision.placement.clone(),
+    resource_requirement: revision.resource_requirement.clone(),
+    init_containers: revision.init_containers.clone(),
+    containers: revision.containers.clone(),
   }
 }
 
@@ -232,24 +272,6 @@ pub struct CargoStatsOpts {
   // pub all: bool,
 }
 
-/// `nanocl cargo kill` available options
-#[derive(Clone, Parser)]
-pub struct CargoKillOpts {
-  /// Canonical key of the cargo to signal
-  pub key: String,
-  /// Signal to send
-  #[clap(short, long, default_value = "SIGKILL")]
-  pub signal: String,
-}
-
-impl From<CargoKillOpts> for CargoKillOptions {
-  fn from(value: CargoKillOpts) -> Self {
-    Self {
-      signal: value.signal,
-    }
-  }
-}
-
 /// `nanocl cargo` available commands
 #[derive(Clone, Subcommand)]
 pub enum CargoCommand {
@@ -271,16 +293,12 @@ pub enum CargoCommand {
   Inspect(GenericInspectOpts),
   /// Update a cargo by its canonical key
   Patch(CargoPatchOpts),
-  /// Execute a command inside a cargo
-  Exec(CargoExecOpts),
   /// List cargo history
   History(CargoHistoryOpts),
   /// Revert cargo to a specific history
   Revert(CargoRevertOpts),
   /// Show logs
   Logs(CargoLogsOpts),
-  /// Send a signal to a cargo by its canonical key
-  Kill(CargoKillOpts),
   /// Run a cargo
   Run(CargoRunOpts),
   /// Show stats of cargo
@@ -300,8 +318,8 @@ pub struct CargoArg {
 pub struct CargoRow {
   /// Canonical key of the cargo
   pub(crate) key: String,
-  /// Image of the cargo
-  pub(crate) image: String,
+  /// Named application containers and their images
+  pub(crate) containers: String,
   /// Status of the cargo
   pub(crate) status: String,
   /// Number of running instances
@@ -332,7 +350,23 @@ impl From<CargoSummary> for CargoRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       key: cargo.spec.cargo_key,
-      image: cargo.spec.container.image.unwrap_or_default(),
+      containers: cargo
+        .spec
+        .containers
+        .iter()
+        .map(|container| {
+          format!(
+            "{}={}",
+            container.name,
+            container
+              .container_config
+              .image
+              .as_deref()
+              .unwrap_or_default()
+          )
+        })
+        .collect::<Vec<_>>()
+        .join(", "),
       version: cargo.spec.version,
       status: format!(
         "{}/{} ({})",
@@ -347,9 +381,295 @@ impl From<CargoSummary> for CargoRow {
 
 #[cfg(test)]
 mod tests {
+  use std::path::{Path, PathBuf};
+
   use clap::Parser;
+  use regex::Regex;
 
   use super::*;
+
+  fn container(name: &str, image: &str) -> ContainerSpec {
+    ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some(image.to_owned()),
+        ..Default::default()
+      },
+    }
+  }
+
+  fn collect_rust_sources(path: &Path, sources: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(path).unwrap() {
+      let path = entry.unwrap().path();
+      if path.is_dir() {
+        collect_rust_sources(&path, sources);
+      } else if path.extension().is_some_and(|extension| extension == "rs") {
+        sources.push(path);
+      }
+    }
+  }
+
+  #[test]
+  fn cargo_cli_sources_have_no_legacy_types_or_implicit_selector() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut sources = vec![manifest.join("build.rs")];
+    collect_rust_sources(&manifest.join("src"), &mut sources);
+
+    let legacy_types = [
+      ["CargoSpec", "Partial"].concat(),
+      ["CargoSpec", "Update"].concat(),
+    ];
+    let singular_spec = Regex::new(r"\bspec\s*\.\s*container\b").unwrap();
+    let implicit_selectors = [
+      Regex::new(r"\bcontainers\s*\.\s*first\s*\(").unwrap(),
+      Regex::new(r"\bcontainers\s*\.\s*get\s*\(\s*0\s*\)").unwrap(),
+      Regex::new(r"\bcontainers\s*\[\s*0\s*\]").unwrap(),
+    ];
+
+    for path in sources {
+      let source = std::fs::read_to_string(&path).unwrap();
+      for legacy_type in &legacy_types {
+        assert!(
+          !source.contains(legacy_type),
+          "legacy Cargo type remains in {}",
+          path.display()
+        );
+      }
+      assert!(
+        !singular_spec.is_match(&source),
+        "singular Cargo revision access remains in {}",
+        path.display()
+      );
+      for selector in &implicit_selectors {
+        assert!(
+          !selector.is_match(&source),
+          "implicit application-container selection remains in {}",
+          path.display()
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn create_builds_a_named_single_container_spec() {
+    let spec: CargoSpec = CargoCreateOpts {
+      namespace: Some("system".to_owned()),
+      name: "api".to_owned(),
+      image: "example/api:1".to_owned(),
+      volumes: Some(vec!["./data:/data".to_owned()]),
+      env: Some(vec!["MODE=prod".to_owned()]),
+    }
+    .into();
+
+    assert_eq!(spec.name, "api");
+    let [container] = spec.containers.as_slice() else {
+      panic!("create must produce exactly one application container");
+    };
+    assert_eq!(container.name, "api");
+    assert_eq!(
+      container.container_config.image.as_deref(),
+      Some("example/api:1")
+    );
+    assert_eq!(
+      container.container_config.env.as_deref(),
+      Some(["MODE=prod".to_owned()].as_slice())
+    );
+    assert_eq!(
+      container
+        .container_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.binds.as_deref()),
+      Some(["./data:/data".to_owned()].as_slice())
+    );
+  }
+
+  #[test]
+  fn run_builds_a_named_single_container_spec_with_command() {
+    let spec: CargoSpec = CargoRunOpts {
+      namespace: None,
+      name: "worker".to_owned(),
+      image: "example/worker:2".to_owned(),
+      volumes: Some(vec!["cache:/cache".to_owned()]),
+      env: Some(vec!["QUEUE=critical".to_owned()]),
+      command: vec!["sh".to_owned(), "-c".to_owned(), "work".to_owned()],
+    }
+    .into();
+
+    assert_eq!(spec.name, "worker");
+    let [container] = spec.containers.as_slice() else {
+      panic!("run must produce exactly one application container");
+    };
+    assert_eq!(container.name, "worker");
+    assert_eq!(
+      container.container_config.cmd.as_deref(),
+      Some(["sh".to_owned(), "-c".to_owned(), "work".to_owned()].as_slice())
+    );
+    assert_eq!(
+      container.container_config.env.as_deref(),
+      Some(["QUEUE=critical".to_owned()].as_slice())
+    );
+    assert_eq!(
+      container
+        .container_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.binds.as_deref()),
+      Some(["cache:/cache".to_owned()].as_slice())
+    );
+  }
+
+  #[test]
+  fn run_rejects_removed_rm_option() {
+    assert!(
+      CargoArg::try_parse_from(["cargo", "run", "worker", "alpine", "--rm"])
+        .is_err()
+    );
+  }
+
+  #[test]
+  fn patch_implicitly_updates_the_only_application_container() {
+    let current = vec![container("api", "example/api:1")];
+    let patch = build_cargo_patch(
+      &CargoPatchOpts {
+        key: "global.api".to_owned(),
+        container: None,
+        image: Some("example/api:2".to_owned()),
+        env: None,
+        volumes: None,
+      },
+      &current,
+    )
+    .unwrap();
+
+    let containers = patch.containers.unwrap();
+    let [updated] = containers.as_slice() else {
+      panic!("patch must replace the complete application list");
+    };
+    assert_eq!(updated.name, "api");
+    assert_eq!(
+      updated.container_config.image.as_deref(),
+      Some("example/api:2")
+    );
+  }
+
+  #[test]
+  fn patch_requires_a_selector_for_multiple_application_containers() {
+    let error = build_cargo_patch(
+      &CargoPatchOpts {
+        key: "global.stack".to_owned(),
+        container: None,
+        image: Some("example/api:2".to_owned()),
+        env: None,
+        volumes: None,
+      },
+      &[
+        container("api", "example/api:1"),
+        container("worker", "example/worker:1"),
+      ],
+    )
+    .unwrap_err();
+
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(error.inner.to_string().contains("--container is required"));
+  }
+
+  #[test]
+  fn patch_rejects_an_unknown_named_container() {
+    let error = build_cargo_patch(
+      &CargoPatchOpts {
+        key: "global.stack".to_owned(),
+        container: Some("missing".to_owned()),
+        image: Some("example/missing:2".to_owned()),
+        env: None,
+        volumes: None,
+      },
+      &[
+        container("api", "example/api:1"),
+        container("worker", "example/worker:1"),
+      ],
+    )
+    .unwrap_err();
+
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+      error
+        .inner
+        .to_string()
+        .contains("\"missing\" does not exist")
+    );
+  }
+
+  #[test]
+  fn patch_replaces_the_full_list_and_only_changes_the_named_container() {
+    let api = container("api", "example/api:1");
+    let mut worker = container("worker", "example/worker:1");
+    worker.container_config.env = Some(vec!["KEEP=yes".to_owned()]);
+    worker.container_config.host_config = Some(HostConfig {
+      privileged: Some(true),
+      binds: Some(vec!["old:/old".to_owned()]),
+      ..Default::default()
+    });
+    let patch = build_cargo_patch(
+      &CargoPatchOpts {
+        key: "global.stack".to_owned(),
+        container: Some("worker".to_owned()),
+        image: None,
+        env: Some(vec!["MODE=batch".to_owned()]),
+        volumes: Some(vec!["new:/new".to_owned()]),
+      },
+      &[api.clone(), worker],
+    )
+    .unwrap();
+
+    let containers = patch.containers.unwrap();
+    let [unchanged, updated] = containers.as_slice() else {
+      panic!("patch must preserve the complete application list");
+    };
+    assert_eq!(unchanged, &api);
+    assert_eq!(updated.name, "worker");
+    assert_eq!(
+      updated.container_config.image.as_deref(),
+      Some("example/worker:1")
+    );
+    assert_eq!(
+      updated.container_config.env.as_deref(),
+      Some(["MODE=batch".to_owned()].as_slice())
+    );
+    let host = updated.container_config.host_config.as_ref().unwrap();
+    assert_eq!(host.privileged, Some(true));
+    assert_eq!(
+      host.binds.as_deref(),
+      Some(["new:/new".to_owned()].as_slice())
+    );
+  }
+
+  #[test]
+  fn list_row_renders_every_application_container_in_declaration_order() {
+    let row = CargoRow::from(CargoSummary {
+      namespace_name: "global".to_owned(),
+      status: Default::default(),
+      created_at: Default::default(),
+      instance_total: 1,
+      instance_running: 1,
+      spec: CargoSpecRevision {
+        cargo_key: "global.stack".to_owned(),
+        version: "v1".to_owned(),
+        containers: vec![
+          container("api", "example/api:1"),
+          container("worker", "example/worker:2"),
+        ],
+        ..Default::default()
+      },
+    });
+
+    assert_eq!(row.containers, "api=example/api:1, worker=example/worker:2");
+    assert!(tabled::Table::new([row]).to_string().contains("CONTAINERS"));
+  }
 
   #[test]
   fn namespace_is_only_available_for_collection_and_creation_commands() {
@@ -388,7 +708,7 @@ mod tests {
     let table = tabled::Table::new([
       CargoRow {
         key: "global.same".to_owned(),
-        image: "alpine".to_owned(),
+        containers: "same=alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
         version: "v1".to_owned(),
@@ -397,7 +717,7 @@ mod tests {
       },
       CargoRow {
         key: "system.same".to_owned(),
-        image: "alpine".to_owned(),
+        containers: "same=alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
         version: "v1".to_owned(),

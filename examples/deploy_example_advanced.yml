@@ -73,13 +73,15 @@ Cargoes:
     Secrets:
       - env.deploy-example.com
       - env.deploy-secret
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
+    Containers:
+      - Name: deploy-example
+        Image: ghcr.io/next-hat/nanocl-get-started:latest
 
   - Name: deploy-example2
     Secrets:
       - env.trash
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
-      Env:
-        - APP=GET_STARTED2
+    Containers:
+      - Name: deploy-example2
+        Image: ghcr.io/next-hat/nanocl-get-started:latest
+        Env:
+          - APP=GET_STARTED2

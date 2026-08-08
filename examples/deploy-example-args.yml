@@ -21,5 +21,6 @@ Resources:
 
 Cargoes:
 - Name: deploy-example
-  Container:
+  Containers:
+  - Name: deploy-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest

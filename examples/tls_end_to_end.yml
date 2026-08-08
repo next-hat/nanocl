@@ -298,7 +298,8 @@ Cargoes:
   - Name: test-web-tls
     Secrets:
     - test-srv
-    Container:
+    Containers:
+    - Name: test-web-tls
       Image: docker.io/nginx:alpine
       Cmd:
       - /bin/sh

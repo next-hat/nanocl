@@ -16,7 +16,7 @@ use crate::{
     ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
-    (status = 200, description = "List of cargo histories", body = Vec<nanocl_stubs::cargo_spec::CargoSpec>),
+    (status = 200, description = "List of cargo histories", body = Vec<nanocl_stubs::cargo_spec::CargoSpecRevision>),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -29,7 +29,8 @@ pub async fn list_cargo_history(
   let histories = SpecDb::read_by_kind_key(key.as_str(), &state.inner.pool)
     .await?
     .into_iter()
-    .map(|e| e.try_to_cargo_spec())
+    .filter(|history| history.kind_name == "Cargo")
+    .map(|e| e.try_to_cargo_spec_revision())
     .collect::<IoResult<Vec<_>>>()?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }

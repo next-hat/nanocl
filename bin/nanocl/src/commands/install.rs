@@ -140,10 +140,16 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     let token = format!("cargo/{}", &cargo.name);
     let pg_style = utils::progress::create_spinner_style(&token, "green");
     let pg = utils::progress::create_progress("(submitting)", &pg_style);
-    let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "is not specified".into(),
-    ))?;
+    let container = utils::docker::single_application_container(cargo)?;
+    let image =
+      container
+        .container_config
+        .image
+        .clone()
+        .ok_or(IoError::invalid_data(
+          format!("Cargo {} image", cargo.name),
+          "is not specified".to_owned(),
+        ))?;
     let image_details = image.split(':').collect::<Vec<_>>();
     let [image_name, image_tag] = image_details[..] else {
       return Err(IoError::invalid_data(
