@@ -312,7 +312,7 @@ You may use either license at your discretion.
  </span>
 </blockquote>
 
-[![Star History Chart](https://api.star-history.com/svg?repos=next-hat/nanocl&type=Date)](https://star-history.com/#next-hat/nanocl&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=next-hat/nanocl&type=Date)](https://star-history.dera.page/#next-hat/nanocl&type=date)
 
 [contributing_guide]: ./CONTRIBUTING.md
 [next_hat]: https://next-hat.com
