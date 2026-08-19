@@ -306,6 +306,91 @@ Containers:
 }
 
 #[test]
+fn internal_sandbox_name_is_rejected_for_application_containers() {
+  let error = validation_error(
+    r#"
+Name: test
+Containers:
+  - Name: _sandbox
+    Image: nginx
+"#,
+  );
+  assert_eq!(
+    error,
+    CargoSpecValidationError::ReservedContainerName {
+      path: "Containers[_sandbox]".to_owned(),
+      name: "_sandbox".to_owned(),
+    }
+  );
+  assert_eq!(
+    error.to_string(),
+    "CargoSpec.Containers[_sandbox].Name is reserved by Nanocl"
+  );
+}
+
+#[test]
+fn internal_sandbox_name_is_rejected_for_init_containers() {
+  let error = validation_error(
+    r#"
+Name: test
+InitContainers:
+  - Name: _sandbox
+    Image: busybox
+Containers:
+  - Name: app
+    Image: nginx
+"#,
+  );
+  assert_eq!(
+    error,
+    CargoSpecValidationError::ReservedContainerName {
+      path: "InitContainers[_sandbox]".to_owned(),
+      name: "_sandbox".to_owned(),
+    }
+  );
+  assert_eq!(
+    error.to_string(),
+    "CargoSpec.InitContainers[_sandbox].Name is reserved by Nanocl"
+  );
+}
+
+#[test]
+fn names_resembling_the_internal_sandbox_name_remain_valid() {
+  for name in ["sandbox", "sandbox-app", "_sandbox-helper"] {
+    parse_validate_and_round_trip(&format!(
+      "Name: test\nContainers:\n  - Name: {name}\n    Image: nginx\n"
+    ));
+  }
+}
+
+#[test]
+fn revision_uses_the_shared_internal_sandbox_name_validation() {
+  let spec = parse_spec(
+    r#"
+Name: test
+Containers:
+  - Name: _sandbox
+    Image: nginx
+"#,
+  );
+  let revision = CargoSpecRevision {
+    name: spec.name,
+    replicas: spec.replicas,
+    init_containers: spec.init_containers,
+    containers: spec.containers,
+    ..Default::default()
+  };
+
+  assert_eq!(
+    revision.validate().unwrap_err(),
+    CargoSpecValidationError::ReservedContainerName {
+      path: "Containers[_sandbox]".to_owned(),
+      name: "_sandbox".to_owned(),
+    }
+  );
+}
+
+#[test]
 fn applications_require_an_essential_container_and_init_is_always_essential() {
   assert_eq!(
     validation_error(

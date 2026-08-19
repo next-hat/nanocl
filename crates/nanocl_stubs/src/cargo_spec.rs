@@ -651,6 +651,8 @@ fn default_cargo_replicas() -> usize {
   1
 }
 
+const CARGO_SANDBOX_CONTAINER_NAME: &str = "_sandbox";
+
 /// Desired declaration used to create or apply a Cargo.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -748,6 +750,8 @@ pub enum CargoSpecValidationError {
     path: String,
     source: ContainerSpecValidationError,
   },
+  /// A container used the logical name reserved for the Cargo sandbox.
+  ReservedContainerName { path: String, name: String },
   /// Container names are unique across both application and init containers.
   DuplicateContainerName {
     name: String,
@@ -772,6 +776,9 @@ impl std::fmt::Display for CargoSpecValidationError {
       }
       Self::InvalidContainer { path, source } => {
         write!(f, "CargoSpec.{path}: {source}")
+      }
+      Self::ReservedContainerName { path, .. } => {
+        write!(f, "CargoSpec.{path}.Name is reserved by Nanocl")
       }
       Self::DuplicateContainerName {
         name,
@@ -833,6 +840,12 @@ fn validate_cargo_declaration(
         source,
       }
     })?;
+    if container.name == CARGO_SANDBOX_CONTAINER_NAME {
+      return Err(CargoSpecValidationError::ReservedContainerName {
+        path,
+        name: container.name.clone(),
+      });
+    }
     if let Some(first_path) =
       names.insert(container.name.as_str(), path.clone())
     {
@@ -855,6 +868,12 @@ fn validate_cargo_declaration(
         source,
       }
     })?;
+    if container.name == CARGO_SANDBOX_CONTAINER_NAME {
+      return Err(CargoSpecValidationError::ReservedContainerName {
+        path,
+        name: container.name.clone(),
+      });
+    }
     if !container.essential {
       return Err(CargoSpecValidationError::NonEssentialInitContainer(
         container.name.clone(),

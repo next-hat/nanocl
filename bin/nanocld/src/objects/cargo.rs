@@ -417,6 +417,22 @@ mod tests {
     )
     .unwrap_err();
     assert_eq!(error, CargoSpecValidationError::InvalidReplicaCount);
+
+    let error = apply_cargo_spec_patch(
+      current_spec(),
+      &CargoSpecPatch {
+        containers: Some(vec![container("_sandbox", "nginx")]),
+        ..Default::default()
+      },
+    )
+    .unwrap_err();
+    assert_eq!(
+      error,
+      CargoSpecValidationError::ReservedContainerName {
+        path: "Containers[_sandbox]".to_owned(),
+        name: "_sandbox".to_owned(),
+      }
+    );
   }
 
   #[test]
