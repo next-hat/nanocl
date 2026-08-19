@@ -83,6 +83,30 @@ fn reconciliation_owns_cargo_health(actual: &str) -> bool {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VmRuntimeFailureEffect {
+  NoRuntimeFailure,
+  FailAndEmitRuntimeError,
+}
+
+fn vm_runtime_failure_effect(
+  action: &str,
+  process_name: &str,
+  wanted: &str,
+  prev_actual: &str,
+) -> VmRuntimeFailureEffect {
+  if action != "die"
+    || process_name.starts_with("tmp-")
+    || process_name.starts_with("init-")
+    || wanted == ObjPsStatusKind::Stop.to_string()
+    || wanted == ObjPsStatusKind::Destroy.to_string()
+    || prev_actual == ObjPsStatusKind::Updating.to_string()
+  {
+    return VmRuntimeFailureEffect::NoRuntimeFailure;
+  }
+  VmRuntimeFailureEffect::FailAndEmitRuntimeError
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NetworkEventOperation {
   Refresh,
   Remove,
@@ -434,10 +458,12 @@ async fn exec_docker(
             }
           }
           (EventActorKind::Vm, wanted, _)
-            if wanted != &ObjPsStatusKind::Stop.to_string()
-              && wanted != &ObjPsStatusKind::Destroy.to_string()
-              && actual_status.prev_actual
-                != ObjPsStatusKind::Updating.to_string() =>
+            if vm_runtime_failure_effect(
+              action,
+              &name,
+              wanted,
+              &actual_status.prev_actual,
+            ) == VmRuntimeFailureEffect::FailAndEmitRuntimeError =>
           {
             ObjPsStatusDb::update_actual_status(
               &kind_key,
@@ -658,6 +684,161 @@ mod tests {
     ));
     assert!(!reconciliation_owns_cargo_health(
       &ObjPsStatusKind::Fail.to_string()
+    ));
+  }
+
+  fn vm_failure_effect(
+    action: &str,
+    process_name: &str,
+    wanted: ObjPsStatusKind,
+    prev_actual: ObjPsStatusKind,
+  ) -> VmRuntimeFailureEffect {
+    vm_runtime_failure_effect(
+      action,
+      process_name,
+      &wanted.to_string(),
+      &prev_actual.to_string(),
+    )
+  }
+
+  #[test]
+  fn vm_docker_event_successful_init_die_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "init-global.ubuntu-a1b2c3.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::NoRuntimeFailure
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_init_die_does_not_request_runtime_failure_event() {
+    let effect = vm_failure_effect(
+      "die",
+      "init-global.ubuntu-a1b2c3.v",
+      ObjPsStatusKind::Start,
+      ObjPsStatusKind::Start,
+    );
+    assert_ne!(effect, VmRuntimeFailureEffect::FailAndEmitRuntimeError);
+  }
+
+  #[test]
+  fn vm_docker_event_temporary_die_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "tmp-global.ubuntu.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::NoRuntimeFailure
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_runtime_die_fails_and_emits_runtime_error() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::FailAndEmitRuntimeError
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_runtime_die_during_intentional_stop_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Stop,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::NoRuntimeFailure
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_destroy_and_remove_are_not_runtime_failures() {
+    for action in ["destroy", "remove"] {
+      assert_eq!(
+        vm_failure_effect(
+          action,
+          "global.ubuntu.v",
+          ObjPsStatusKind::Start,
+          ObjPsStatusKind::Start,
+        ),
+        VmRuntimeFailureEffect::NoRuntimeFailure
+      );
+    }
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Destroy,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::NoRuntimeFailure
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_update_replacement_die_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Updating,
+      ),
+      VmRuntimeFailureEffect::NoRuntimeFailure
+    );
+  }
+
+  #[test]
+  fn vm_docker_event_fix_does_not_change_cargo_runtime_filtering() {
+    let essential_app = HashMap::from([
+      (LABEL_CARGO_ROLE.to_owned(), "app".to_owned()),
+      (LABEL_CARGO_ESSENTIAL.to_owned(), "true".to_owned()),
+    ]);
+    let nonessential_app = HashMap::from([
+      (LABEL_CARGO_ROLE.to_owned(), "app".to_owned()),
+      (LABEL_CARGO_ESSENTIAL.to_owned(), "false".to_owned()),
+    ]);
+    let sandbox =
+      HashMap::from([(LABEL_CARGO_ROLE.to_owned(), "sandbox".to_owned())]);
+    let init =
+      HashMap::from([(LABEL_CARGO_ROLE.to_owned(), "init".to_owned())]);
+
+    assert!(labels_describe_active_cargo_runtime(
+      "demo-api.c",
+      Some(&essential_app)
+    ));
+    assert!(labels_describe_active_cargo_runtime(
+      "sandbox-demo.c",
+      Some(&sandbox)
+    ));
+    assert!(!labels_describe_active_cargo_runtime(
+      "demo-sidecar.c",
+      Some(&nonessential_app)
+    ));
+    assert!(!labels_describe_active_cargo_runtime(
+      "init-demo-db.c",
+      Some(&init)
+    ));
+    assert!(!labels_describe_active_cargo_runtime(
+      "tmp-demo-api.c",
+      Some(&essential_app)
+    ));
+    assert!(!labels_describe_active_cargo_runtime(
+      "candidate-demo-api.c",
+      Some(&essential_app)
     ));
   }
 }
