@@ -152,3 +152,110 @@ impl Modify for VersionModifier {
   modifiers(&VersionModifier),
 )]
 pub struct ApiDoc;
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
+    match schema {
+      serde_json::Value::Array(values) => {
+        values.iter().find_map(find_schema_reference)
+      }
+      serde_json::Value::Object(object) => object
+        .get("$ref")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| object.values().find_map(find_schema_reference)),
+      _ => None,
+    }
+  }
+
+  #[test]
+  fn generated_openapi_uses_closed_flattened_container_spec() {
+    let document =
+      serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
+    let schemas = document["components"]["schemas"]
+      .as_object()
+      .expect("OpenAPI must contain component schemas");
+    let container = &schemas["ContainerSpec"];
+
+    assert_eq!(container["type"], "object");
+    assert_eq!(container["additionalProperties"], false);
+    assert!(container.get("allOf").is_none());
+    assert_eq!(container["required"], serde_json::json!(["Name"]));
+    let properties = container["properties"]
+      .as_object()
+      .expect("ContainerSpec must expose flattened properties");
+    for property in [
+      "Name",
+      "Essential",
+      "Secrets",
+      "ImagePullSecret",
+      "ImagePullPolicy",
+      "Image",
+      "Cmd",
+      "Entrypoint",
+      "Env",
+      "HostConfig",
+      "Healthcheck",
+      "Labels",
+      "Volumes",
+    ] {
+      assert!(
+        properties.contains_key(property),
+        "missing flattened ContainerSpec property {property}"
+      );
+    }
+    for wrapper in ["Container", "container_config"] {
+      assert!(!properties.contains_key(wrapper));
+    }
+
+    let host_reference = find_schema_reference(&properties["HostConfig"])
+      .expect("HostConfig must reference its strict component");
+    let host_name = host_reference.rsplit('/').next().unwrap();
+    assert_eq!(host_name, "ContainerSpecHostConfig");
+    assert_eq!(schemas[host_name]["additionalProperties"], false);
+    assert!(
+      schemas[host_name]["properties"]
+        .get("NetworkMode")
+        .is_some()
+    );
+    let shared_host = schemas
+      .get("HostConfig")
+      .expect("shared HostConfig must remain registered");
+    assert!(shared_host.get("additionalProperties").is_none());
+
+    let cargo = &schemas["CargoSpec"];
+    assert_eq!(cargo["required"], serde_json::json!(["Name", "Containers"]));
+    let container_reference =
+      cargo["properties"]["Containers"]["items"]["$ref"]
+        .as_str()
+        .expect("CargoSpec.Containers must reference ContainerSpec");
+    assert_eq!(container_reference, "#/components/schemas/ContainerSpec");
+  }
+
+  #[test]
+  fn checked_in_swagger_matches_generated_openapi() {
+    let generated = ApiDoc::openapi()
+      .to_yaml()
+      .expect("OpenAPI must serialize as YAML");
+    assert_eq!(
+      generated,
+      include_str!("../../specs/swagger.yaml"),
+      "run the ignored regenerate_checked_in_swagger test"
+    );
+  }
+
+  /// Regenerate the checked-in daemon OpenAPI without starting Nanocld.
+  #[test]
+  #[ignore = "rewrites bin/nanocld/specs/swagger.yaml"]
+  fn regenerate_checked_in_swagger() {
+    let destination = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join("specs/swagger.yaml");
+    let yaml = ApiDoc::openapi()
+      .to_yaml()
+      .expect("OpenAPI must serialize as YAML");
+    std::fs::write(destination, yaml)
+      .expect("checked-in daemon OpenAPI must be writable");
+  }
+}

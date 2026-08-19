@@ -695,6 +695,14 @@ fn assert_final_cargo_schema(schema: &serde_json::Value) {
   );
   assert_eq!(schema["properties"]["Containers"]["type"], "array");
   assert_eq!(schema["properties"]["InitContainers"]["type"], "array");
+  for collection in ["Containers", "InitContainers"] {
+    let reference = schema["properties"][collection]["items"]["$ref"]
+      .as_str()
+      .unwrap_or_else(|| {
+        panic!("CargoSpec.{collection} must reference ContainerSpec")
+      });
+    assert_eq!(reference.rsplit('/').next(), Some("ContainerSpec"));
+  }
   for removed in [
     "Container",
     "InitContainer",

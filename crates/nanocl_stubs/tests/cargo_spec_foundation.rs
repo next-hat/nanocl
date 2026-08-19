@@ -588,74 +588,81 @@ fn every_raw_container_namespace_reference_is_rejected() {
   }
 }
 
-fn collect_schema_fields(
-  schema: &serde_json::Value,
-  references: &HashMap<String, serde_json::Value>,
-  properties: &mut BTreeSet<String>,
-  required: &mut BTreeSet<String>,
-  visited: &mut BTreeSet<String>,
-) {
-  if let Some(fields) =
-    schema.get("properties").and_then(|value| value.as_object())
-  {
-    properties.extend(fields.keys().cloned());
+fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
+  match schema {
+    serde_json::Value::Array(values) => {
+      values.iter().find_map(find_schema_reference)
+    }
+    serde_json::Value::Object(object) => object
+      .get("$ref")
+      .and_then(serde_json::Value::as_str)
+      .or_else(|| object.values().find_map(find_schema_reference)),
+    _ => None,
   }
-  if let Some(fields) =
-    schema.get("required").and_then(|value| value.as_array())
-  {
-    required.extend(
-      fields
-        .iter()
-        .filter_map(|field| field.as_str().map(str::to_owned)),
-    );
-  }
-  for composition in ["allOf", "anyOf", "oneOf"] {
-    if let Some(parts) =
-      schema.get(composition).and_then(|value| value.as_array())
-    {
-      for part in parts {
-        collect_schema_fields(part, references, properties, required, visited);
+}
+
+fn assert_struct_schemas_are_closed(schema: &serde_json::Value) {
+  match schema {
+    serde_json::Value::Array(values) => {
+      for value in values {
+        assert_struct_schemas_are_closed(value);
       }
     }
-  }
-  if let Some(reference) = schema.get("$ref").and_then(|value| value.as_str()) {
-    let name = reference.rsplit('/').next().unwrap();
-    if visited.insert(name.to_owned()) {
-      let referenced = references
-        .get(name)
-        .unwrap_or_else(|| panic!("missing schema reference {reference}"));
-      collect_schema_fields(
-        referenced, references, properties, required, visited,
-      );
+    serde_json::Value::Object(object) => {
+      if object
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .is_some()
+      {
+        assert_eq!(
+          object.get("additionalProperties"),
+          Some(&serde_json::Value::Bool(false)),
+          "generated struct schema remained open: {schema}"
+        );
+      }
+      for (key, value) in object {
+        if key != "definitions" {
+          assert_struct_schemas_are_closed(value);
+        }
+      }
     }
+    _ => {}
   }
+}
+
+fn resolve_property_reference<'a>(
+  schema: &serde_json::Value,
+  property: &str,
+  references: &'a HashMap<String, serde_json::Value>,
+) -> (String, &'a serde_json::Value) {
+  let reference = find_schema_reference(&schema["properties"][property])
+    .unwrap_or_else(|| panic!("{property} must reference a component schema"));
+  let name = reference.rsplit('/').next().unwrap();
+  let referenced = references
+    .get(name)
+    .unwrap_or_else(|| panic!("missing schema reference {reference}"));
+  (name.to_owned(), referenced)
 }
 
 fn assert_container_spec_schema(
   schema: &serde_json::Value,
   references: &HashMap<String, serde_json::Value>,
 ) {
-  if let Some(parts) = schema.get("allOf").and_then(|value| value.as_array()) {
-    for part in parts {
-      assert_ne!(
-        part.get("additionalProperties"),
-        Some(&serde_json::Value::Bool(false)),
-        "an allOf branch cannot reject fields supplied by the other flattened branch"
-      );
-    }
-  }
+  assert_eq!(schema["type"], "object");
+  assert_eq!(schema["additionalProperties"], false);
+  assert!(schema.get("allOf").is_none());
+  assert_struct_schemas_are_closed(schema);
+  let properties = schema["properties"]
+    .as_object()
+    .expect("ContainerSpec must expose one flattened property map");
+  let required = schema["required"]
+    .as_array()
+    .expect("ContainerSpec must identify required properties")
+    .iter()
+    .map(|field| field.as_str().unwrap())
+    .collect::<BTreeSet<_>>();
 
-  let mut properties = BTreeSet::new();
-  let mut required = BTreeSet::new();
-  collect_schema_fields(
-    schema,
-    references,
-    &mut properties,
-    &mut required,
-    &mut BTreeSet::new(),
-  );
-
-  assert_eq!(required, BTreeSet::from(["Name".to_owned()]));
+  assert_eq!(required, BTreeSet::from(["Name"]));
   for field in [
     "Name",
     "Essential",
@@ -664,10 +671,15 @@ fn assert_container_spec_schema(
     "ImagePullPolicy",
     "Image",
     "Cmd",
+    "Entrypoint",
+    "Env",
     "HostConfig",
+    "Healthcheck",
+    "Labels",
+    "Volumes",
   ] {
     assert!(
-      properties.contains(field),
+      properties.contains_key(field),
       "missing flattened field {field}"
     );
   }
@@ -679,9 +691,51 @@ fn assert_container_spec_schema(
     "Docker",
   ] {
     assert!(
-      !properties.contains(forbidden),
+      !properties.contains_key(forbidden),
       "schema exposed forbidden wrapper {forbidden}"
     );
+  }
+
+  assert_eq!(properties["Essential"]["default"], true);
+  assert_eq!(properties["Secrets"]["default"], serde_json::json!([]));
+  assert_eq!(properties["ImagePullPolicy"]["default"], "IfNotPresent");
+  assert!(!required.contains("Image"));
+
+  for property in ["HostConfig", "Healthcheck"] {
+    let (name, referenced) =
+      resolve_property_reference(schema, property, references);
+    assert!(
+      name.starts_with("ContainerSpec"),
+      "{property} must use a ContainerSpec-private strict component, got {name}"
+    );
+    assert_eq!(
+      referenced["additionalProperties"], false,
+      "{property} must reject unknown nested fields"
+    );
+  }
+  let (_, host_config) =
+    resolve_property_reference(schema, "HostConfig", references);
+  assert!(host_config["properties"].get("Binds").is_some());
+  assert!(host_config["properties"].get("NetworkMode").is_some());
+
+  for property in ["Labels", "Volumes"] {
+    assert!(
+      properties[property].get("additionalProperties").is_some(),
+      "{property} must retain its map value schema"
+    );
+    assert_ne!(properties[property]["additionalProperties"], false);
+  }
+
+  for shared in ["HostConfig", "HealthConfig"] {
+    assert!(
+      references[shared].get("additionalProperties").is_none(),
+      "shared Bollard component {shared} must remain unchanged for Job/VM schemas"
+    );
+  }
+  for (name, schema) in references {
+    if name.starts_with("ContainerSpec") {
+      assert_struct_schemas_are_closed(schema);
+    }
   }
 }
 
@@ -719,6 +773,34 @@ fn utoipa_schema_preserves_required_pascal_case_container_shape() {
 
   let cargo_mode = serde_json::to_value(CargoNetworkMode::schema()).unwrap();
   assert_eq!(cargo_mode["type"], "string");
+}
+
+#[cfg(feature = "utoipa")]
+#[test]
+fn utoipa_container_spec_remains_composable_in_collections() {
+  use utoipa::PartialSchema;
+
+  fn schema_for<T: PartialSchema>()
+  -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+    T::schema()
+  }
+
+  let array = serde_json::to_value(schema_for::<Vec<ContainerSpec>>()).unwrap();
+  assert_eq!(array["type"], "array");
+  assert_eq!(array["items"]["type"], "object");
+  assert_eq!(array["items"]["additionalProperties"], false);
+  assert!(array["items"].get("allOf").is_none());
+  assert_eq!(array["items"]["required"], serde_json::json!(["Name"]));
+
+  let optional =
+    serde_json::to_value(schema_for::<Option<ContainerSpec>>()).unwrap();
+  let variants = optional["oneOf"].as_array().unwrap();
+  assert!(variants.iter().any(|schema| schema["type"] == "null"));
+  assert!(
+    variants
+      .iter()
+      .any(|schema| schema["additionalProperties"] == false)
+  );
 }
 
 #[test]

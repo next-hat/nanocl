@@ -3158,37 +3158,1136 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/NetworkSettings'
     ContainerSpec:
-      allOf:
-      - $ref: '#/components/schemas/Config'
-        description: |-
-          Raw authored Docker container configuration.
-
-          This remains distinct in Rust but is flattened beside Nanocl-owned fields
-          in every public serialization format.
-      - type: object
-        required:
-        - Name
-        properties:
-          Name:
+      type: object
+      description: Declaration of one named container in a multi-container Cargo.
+      required:
+      - Name
+      properties:
+        Hostname:
+          type:
+          - string
+          - 'null'
+          description: The hostname to use for the container, as a valid RFC 1123 hostname.
+        Domainname:
+          type:
+          - string
+          - 'null'
+          description: The domain name to use for the container.
+        User:
+          type:
+          - string
+          - 'null'
+          description: The user that commands are run as inside the container.
+        AttachStdin:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stdin`.
+        AttachStdout:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stdout`.
+        AttachStderr:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stderr`.
+        ExposedPorts:
+          type:
+          - object
+          - 'null'
+          description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              default: null
+            propertyNames:
+              default: null
+          propertyNames:
             type: string
-            description: Name unique within the Cargo declaration.
-          Essential:
-            type: boolean
-            description: Whether failure of this container makes the Cargo replica unhealthy.
-          Secrets:
+        Tty:
+          type:
+          - boolean
+          - 'null'
+          description: Attach standard streams to a TTY, including `stdin` if it is not closed.
+        OpenStdin:
+          type:
+          - boolean
+          - 'null'
+          description: Open `stdin`
+        StdinOnce:
+          type:
+          - boolean
+          - 'null'
+          description: Close `stdin` after one attached client disconnects
+        Env:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
+        Cmd:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Command to run specified as a string or an array of strings.
+        Healthcheck:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHealthConfig'
+            description: A TEST to perform TO Check that the container is healthy.
+        ArgsEscaped:
+          type:
+          - boolean
+          - 'null'
+          description: Command is already escaped (Windows only)
+        Image:
+          type:
+          - string
+          - 'null'
+          description: The name of the image to use when creating the container
+        Volumes:
+          type:
+          - object
+          - 'null'
+          description: An object mapping mount point paths inside the container to empty objects.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              default: null
+            propertyNames:
+              default: null
+          propertyNames:
+            type: string
+        WorkingDir:
+          type:
+          - string
+          - 'null'
+          description: The working directory for commands to run in.
+        Entrypoint:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
+        NetworkDisabled:
+          type:
+          - boolean
+          - 'null'
+          description: Disable networking for the container.
+        MacAddress:
+          type:
+          - string
+          - 'null'
+          description: MAC address of the container.
+        OnBuild:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+        Labels:
+          type:
+          - object
+          - 'null'
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        StopSignal:
+          type:
+          - string
+          - 'null'
+          description: Signal to stop a container as a string or unsigned integer.
+        StopTimeout:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Timeout to stop a container in seconds.
+        Shell:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+        HostConfig:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHostConfig'
+            description: |-
+              Container configuration that depends on the host we are running on.
+              Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+        NetworkingConfig:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecNetworkingConfig_String'
+            description: This container's networking configuration.
+        Name:
+          type: string
+          description: Name unique within the Cargo declaration.
+        Essential:
+          type: boolean
+          description: Whether failure of this container makes the Cargo replica unhealthy.
+          default: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets injected into only this container.
+          default: []
+        ImagePullSecret:
+          oneOf:
+          - type: 'null'
+          - type: string
+          description: Secret used to pull this container's image.
+        ImagePullPolicy:
+          type: string
+          description: Policy used to pull this container's image.
+          default: IfNotPresent
+          enum:
+          - Never
+          - Always
+          - IfNotPresent
+      additionalProperties: false
+    ContainerSpecDeviceMapping:
+      type: object
+      description: A device mapping between the host and container
+      properties:
+        PathOnHost:
+          type:
+          - string
+          - 'null'
+        PathInContainer:
+          type:
+          - string
+          - 'null'
+        CgroupPermissions:
+          type:
+          - string
+          - 'null'
+      additionalProperties: false
+    ContainerSpecDeviceRequest:
+      type: object
+      description: A request for devices to be sent to device drivers
+      properties:
+        Driver:
+          type:
+          - string
+          - 'null'
+        Count:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        DeviceIDs:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        Capabilities:
+          type:
+          - array
+          - 'null'
+          items:
             type: array
             items:
               type: string
-            description: Secrets injected into only this container.
-          ImagePullSecret:
-            type:
-            - string
-            - 'null'
-            description: Secret used to pull this container's image.
-          ImagePullPolicy:
-            $ref: '#/components/schemas/ImagePullPolicy'
-            description: Policy used to pull this container's image.
-      description: Declaration of one named container in a multi-container Cargo.
+          description: A list of capabilities; an OR list of AND lists of capabilities.
+        Options:
+          type:
+          - object
+          - 'null'
+          description: Driver-specific options, specified as a key/value pairs. These options are passed directly to the driver.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+      additionalProperties: false
+    ContainerSpecEndpointIpamConfig:
+      type: object
+      description: EndpointIPAMConfig represents an endpoint's IPAM configuration.
+      properties:
+        IPv4Address:
+          type:
+          - string
+          - 'null'
+        IPv6Address:
+          type:
+          - string
+          - 'null'
+        LinkLocalIPs:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+      additionalProperties: false
+    ContainerSpecEndpointSettings:
+      type: object
+      description: Configuration for a network endpoint.
+      properties:
+        IPAMConfig:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecEndpointIpamConfig'
+        Links:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        MacAddress:
+          type:
+          - string
+          - 'null'
+          description: MAC address for the endpoint on this network. The network driver might ignore this parameter.
+        Aliases:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        NetworkID:
+          type:
+          - string
+          - 'null'
+          description: Unique ID of the network.
+        EndpointID:
+          type:
+          - string
+          - 'null'
+          description: Unique ID for the service endpoint in a Sandbox.
+        Gateway:
+          type:
+          - string
+          - 'null'
+          description: Gateway address for this network.
+        IPAddress:
+          type:
+          - string
+          - 'null'
+          description: IPv4 address.
+        IPPrefixLen:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Mask length of the IPv4 address.
+        IPv6Gateway:
+          type:
+          - string
+          - 'null'
+          description: IPv6 gateway address.
+        GlobalIPv6Address:
+          type:
+          - string
+          - 'null'
+          description: Global IPv6 address.
+        GlobalIPv6PrefixLen:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Mask length of the global IPv6 address.
+        DriverOpts:
+          type:
+          - object
+          - 'null'
+          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        DNSNames:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: List of all DNS names an endpoint has on a specific network. This list is based on the container name, network aliases, container short ID, and hostname.  These DNS names are non-fully qualified but can contain several dots. You can get fully qualified DNS names by appending `.<network-name>`. For instance, if container name is `my.ctr` and the network is named `testnet`, `DNSNames` will contain `my.ctr` and the FQDN will be `my.ctr.testnet`.
+      additionalProperties: false
+    ContainerSpecHashMap:
+      type: object
+      additionalProperties:
+        oneOf:
+        - type: 'null'
+        - type: array
+          items:
+            type: object
+            description: PortBinding represents a binding between a host IP address and a host port.
+            properties:
+              HostIp:
+                type:
+                - string
+                - 'null'
+                description: Host IP address that the container's port is mapped to.
+              HostPort:
+                type:
+                - string
+                - 'null'
+                description: Host port number that the container's port is mapped to.
+            additionalProperties: false
+      propertyNames:
+        type: string
+    ContainerSpecHealthConfig:
+      type: object
+      description: A test to perform to check that the container is healthy.
+      properties:
+        Test:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell'
+        Interval:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The time to wait between checks in nanoseconds. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+        Timeout:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+        Retries:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The number of consecutive failures needed to consider a container as unhealthy. 0 means inherit.
+        StartPeriod:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Start period for the container to initialize before starting health-retries countdown in nanoseconds. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+        StartInterval:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The time to wait between checks in nanoseconds during the start period. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+      additionalProperties: false
+    ContainerSpecHostConfig:
+      type: object
+      description: Container configuration that depends on the host we are running on
+      properties:
+        CpuShares:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: An integer value representing this container's relative CPU weight versus other containers.
+        Memory:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Memory limit in bytes.
+        CgroupParent:
+          type:
+          - string
+          - 'null'
+          description: Path to `cgroups` under which the container's `cgroup` is created. If the path is not absolute, the path is considered to be relative to the `cgroups` path of the init process. Cgroups are created if they do not already exist.
+        BlkioWeight:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Block IO weight (relative weight).
+          minimum: 0
+        BlkioWeightDevice:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecResourcesBlkioWeightDevice'
+          description: 'Block IO weight (relative device weight) in the form:  ``` [{\"Path\": \"device_path\", \"Weight\": weight}] ```'
+        BlkioDeviceReadBps:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecThrottleDevice'
+          description: 'Limit read rate (bytes per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+        BlkioDeviceWriteBps:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecThrottleDevice'
+          description: 'Limit write rate (bytes per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+        BlkioDeviceReadIOps:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecThrottleDevice'
+          description: 'Limit read rate (IO per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+        BlkioDeviceWriteIOps:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecThrottleDevice'
+          description: 'Limit write rate (IO per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+        CpuPeriod:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The length of a CPU period in microseconds.
+        CpuQuota:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Microseconds of CPU time that the container can get in a CPU period.
+        CpuRealtimePeriod:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The length of a CPU real-time period in microseconds. Set to 0 to allocate no time allocated to real-time tasks.
+        CpuRealtimeRuntime:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The length of a CPU real-time runtime in microseconds. Set to 0 to allocate no time allocated to real-time tasks.
+        CpusetCpus:
+          type:
+          - string
+          - 'null'
+          description: CPUs in which to allow execution (e.g., `0-3`, `0,1`).
+        CpusetMems:
+          type:
+          - string
+          - 'null'
+          description: Memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems.
+        Devices:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecDeviceMapping'
+          description: A list of devices to add to the container.
+        DeviceCgroupRules:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: a list of cgroup rules to apply to the container
+        DeviceRequests:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecDeviceRequest'
+          description: A list of requests for devices to be sent to device drivers.
+        KernelMemoryTCP:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Hard limit for kernel TCP buffer memory (in bytes). Depending on the OCI runtime in use, this option may be ignored. It is no longer supported by the default (runc) runtime.  This field is omitted when empty.
+        MemoryReservation:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Memory soft limit in bytes.
+        MemorySwap:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Total memory limit (memory + swap). Set as `-1` to enable unlimited swap.
+        MemorySwappiness:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Tune a container's memory swappiness behavior. Accepts an integer between 0 and 100.
+        NanoCpus:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: CPU quota in units of 10<sup>-9</sup> CPUs.
+        OomKillDisable:
+          type:
+          - boolean
+          - 'null'
+          description: Disable OOM Killer for the container.
+        Init:
+          type:
+          - boolean
+          - 'null'
+          description: Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used.
+        PidsLimit:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Tune a container's PIDs limit. Set `0` or `-1` for unlimited, or `null` to not change.
+        Ulimits:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecResourcesUlimits'
+          description: 'A list of resource limits to set in the container. For example:  ``` {\"Name\": \"nofile\", \"Soft\": 1024, \"Hard\": 2048} ```'
+        CpuCount:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The number of usable CPUs (Windows only).  On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is `CPUCount` first, then `CPUShares`, and `CPUPercent` last.
+        CpuPercent:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The usable percentage of the available CPUs (Windows only).  On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is `CPUCount` first, then `CPUShares`, and `CPUPercent` last.
+        IOMaximumIOps:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Maximum IOps for the container system drive (Windows only)
+        IOMaximumBandwidth:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Maximum IO in bytes per second for the container system drive (Windows only).
+        Binds:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: 'A list of volume bindings for this container. Each volume binding is a string in one of these forms:  - `host-src:container-dest[:options]` to bind-mount a host path   into the container. Both `host-src`, and `container-dest` must   be an _absolute_ path. - `volume-name:container-dest[:options]` to bind-mount a volume   managed by a volume driver into the container. `container-dest`   must be an _absolute_ path.  `options` is an optional, comma-delimited list of:  - `nocopy` disables automatic copying of data from the container   path to the volume. The `nocopy` flag only applies to named volumes. - `[ro|rw]` mounts a volume read-only or read-write, respectively.   If omitted or set to `rw`, volumes are mounted read-write. - `[z|Z]` applies SELinux labels to allow or deny multiple containers   to read and write to the same volume.     - `z`: a _shared_ content label is applied to the content. This       label indicates that multiple containers can share the volume       content, for both reading and writing.     - `Z`: a _private unshared_ label is applied to the content.       This label indicates that only the current container can use       a private volume. Labeling systems such as SELinux require       proper labels to be placed on volume content that is mounted       into a container. Without a label, the security system can       prevent a container''s processes from using the content. By       default, the labels set by the host operating system are not       modified. - `[[r]shared|[r]slave|[r]private]` specifies mount   [propagation behavior](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt).   This only applies to bind-mounted volumes, not internal volumes   or named volumes. Mount propagation requires the source mount   point (the location where the source directory is mounted in the   host operating system) to have the correct propagation properties.   For shared volumes, the source mount point must be set to `shared`.   For slave volumes, the mount must be set to either `shared` or   `slave`.'
+        ContainerIDFile:
+          type:
+          - string
+          - 'null'
+          description: Path to a file where the container ID is written
+        LogConfig:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHostConfigLogConfig'
+        NetworkMode:
+          type:
+          - string
+          - 'null'
+          description: 'Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network''s name to which this container should connect to.'
+        PortBindings:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHashMap'
+        RestartPolicy:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecRestartPolicy'
+        AutoRemove:
+          type:
+          - boolean
+          - 'null'
+          description: Automatically remove the container when the container's process exits. This has no effect if `RestartPolicy` is set.
+        VolumeDriver:
+          type:
+          - string
+          - 'null'
+          description: Driver that this container uses to mount volumes.
+        VolumesFrom:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of volumes to inherit from another container, specified in the form `<container name>[:<ro|rw>]`.
+        Mounts:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerSpecMount'
+          description: Specification for mounts to be added to the container.
+        ConsoleSize:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            format: int32
+          description: Initial console size, as an `[height, width]` array.
+        Annotations:
+          type:
+          - object
+          - 'null'
+          description: Arbitrary non-identifying metadata attached to container and provided to the runtime when the container is started.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        CapAdd:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of kernel capabilities to add to the container. Conflicts with option 'Capabilities'.
+        CapDrop:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'.
+        CgroupnsMode:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHostConfigCgroupnsModeEnum'
+            description: 'cgroup namespace mode for the container. Possible values are:  - `\"private\"`: the container runs in its own private cgroup namespace - `\"host\"`: use the host system''s cgroup namespace  If not specified, the daemon default is used, which can either be `\"private\"` or `\"host\"`, depending on daemon version, kernel support and configuration.'
+        Dns:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of DNS servers for the container to use.
+        DnsOptions:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of DNS options.
+        DnsSearch:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of DNS search domains.
+        ExtraHosts:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of hostnames/IP mappings to add to the container's `/etc/hosts` file. Specified in the form `[\"hostname:IP\"]`.
+        GroupAdd:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of additional groups that the container process will run as.
+        IpcMode:
+          type:
+          - string
+          - 'null'
+          description: 'IPC sharing mode for the container. Possible values are:  - `\"none\"`: own private IPC namespace, with /dev/shm not mounted - `\"private\"`: own private IPC namespace - `\"shareable\"`: own private IPC namespace, with a possibility to share it with other containers - `\"container:<name|id>\"`: join another (shareable) container''s IPC namespace - `\"host\"`: use the host system''s IPC namespace  If not specified, daemon default is used, which can either be `\"private\"` or `\"shareable\"`, depending on daemon version and configuration.'
+        Cgroup:
+          type:
+          - string
+          - 'null'
+          description: Cgroup to use for the container.
+        Links:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of links for the container in the form `container_name:alias`.
+        OomScoreAdj:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: An integer value containing the score given to the container in order to tune OOM killer preferences.
+        PidMode:
+          type:
+          - string
+          - 'null'
+          description: 'Set the PID (Process) Namespace mode for the container. It can be either:  - `\"container:<name|id>\"`: joins another container''s PID namespace - `\"host\"`: use the host''s PID namespace inside the container'
+        Privileged:
+          type:
+          - boolean
+          - 'null'
+          description: Gives the container full access to the host.
+        PublishAllPorts:
+          type:
+          - boolean
+          - 'null'
+          description: Allocates an ephemeral host port for all of a container's exposed ports.  Ports are de-allocated when the container stops and allocated when the container starts. The allocated port might be changed when restarting the container.  The port is selected from the ephemeral port range that depends on the kernel. For example, on Linux the range is defined by `/proc/sys/net/ipv4/ip_local_port_range`.
+        ReadonlyRootfs:
+          type:
+          - boolean
+          - 'null'
+          description: Mount the container's root filesystem as read only.
+        SecurityOpt:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of string values to customize labels for MLS systems, such as SELinux.
+        StorageOpt:
+          type:
+          - object
+          - 'null'
+          description: 'Storage driver options for this container, in the form `{\"size\": \"120G\"}`.'
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        Tmpfs:
+          type:
+          - object
+          - 'null'
+          description: 'A map of container directories which should be replaced by tmpfs mounts, and their corresponding mount options. For example:  ``` { \"/run\": \"rw,noexec,nosuid,size=65536k\" } ```'
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        UTSMode:
+          type:
+          - string
+          - 'null'
+          description: UTS namespace to use for the container.
+        UsernsMode:
+          type:
+          - string
+          - 'null'
+          description: Sets the usernamespace mode for the container when usernamespace remapping option is enabled.
+        ShmSize:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Size of `/dev/shm` in bytes. If omitted, the system uses 64MB.
+        Sysctls:
+          type:
+          - object
+          - 'null'
+          description: 'A list of kernel parameters (sysctls) to set in the container. For example:  ``` {\"net.ipv4.ip_forward\": \"1\"} ```'
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        Runtime:
+          type:
+          - string
+          - 'null'
+          description: Runtime to use with this container.
+        Isolation:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecHostConfigIsolationEnum'
+            description: Isolation technology of the container. (Windows only)
+        MaskedPaths:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: The list of paths to be masked inside the container (this overrides the default set of paths).
+        ReadonlyPaths:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: The list of paths to be set as read-only inside the container (this overrides the default set of paths).
+      additionalProperties: false
+    ContainerSpecHostConfigCgroupnsModeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - private
+      - host
+    ContainerSpecHostConfigIsolationEnum:
+      type: string
+      enum:
+      - EMPTY
+      - default
+      - process
+      - hyperv
+    ContainerSpecHostConfigLogConfig:
+      type: object
+      description: The logging configuration for this container
+      properties:
+        Type:
+          type:
+          - string
+          - 'null'
+        Config:
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+      additionalProperties: false
+    ContainerSpecMount:
+      type: object
+      properties:
+        Target:
+          type:
+          - string
+          - 'null'
+          description: Container path.
+        Source:
+          type:
+          - string
+          - 'null'
+          description: Mount source (e.g. a volume name, a host path).
+        Type:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountTypeEnum'
+            description: 'The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed. - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs. - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container. - `cluster` a Swarm cluster volume'
+        ReadOnly:
+          type:
+          - boolean
+          - 'null'
+          description: Whether the mount should be read-only.
+        Consistency:
+          type:
+          - string
+          - 'null'
+          description: 'The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`.'
+        BindOptions:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountBindOptions'
+        VolumeOptions:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountVolumeOptions'
+        TmpfsOptions:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountTmpfsOptions'
+      additionalProperties: false
+    ContainerSpecMountBindOptions:
+      type: object
+      description: Optional configuration for the `bind` type.
+      properties:
+        Propagation:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountBindOptionsPropagationEnum'
+            description: A propagation mode with the value `[r]private`, `[r]shared`, or `[r]slave`.
+        NonRecursive:
+          type:
+          - boolean
+          - 'null'
+          description: Disable recursive bind mount.
+        CreateMountpoint:
+          type:
+          - boolean
+          - 'null'
+          description: Create mount point on host if missing
+        ReadOnlyNonRecursive:
+          type:
+          - boolean
+          - 'null'
+          description: Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction).  Addded in v1.44, before that version all read-only mounts were non-recursive by default. To match the previous behaviour this will default to `true` for clients on versions prior to v1.44.
+        ReadOnlyForceRecursive:
+          type:
+          - boolean
+          - 'null'
+          description: Raise an error if the mount cannot be made recursively read-only.
+      additionalProperties: false
+    ContainerSpecMountBindOptionsPropagationEnum:
+      type: string
+      enum:
+      - EMPTY
+      - private
+      - rprivate
+      - shared
+      - rshared
+      - slave
+      - rslave
+    ContainerSpecMountTmpfsOptions:
+      type: object
+      description: Optional configuration for the `tmpfs` type.
+      properties:
+        SizeBytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The size for the tmpfs mount in bytes.
+        Mode:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The permission mode for the tmpfs mount in an integer.
+      additionalProperties: false
+    ContainerSpecMountTypeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - bind
+      - volume
+      - tmpfs
+      - npipe
+      - cluster
+    ContainerSpecMountVolumeOptions:
+      type: object
+      description: Optional configuration for the `volume` type.
+      properties:
+        NoCopy:
+          type:
+          - boolean
+          - 'null'
+          description: Populate volume with data from the target.
+        Labels:
+          type:
+          - object
+          - 'null'
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        DriverConfig:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecMountVolumeOptionsDriverConfig'
+        Subpath:
+          type:
+          - string
+          - 'null'
+          description: Source path inside the volume. Must be relative without any back traversals.
+      additionalProperties: false
+    ContainerSpecMountVolumeOptionsDriverConfig:
+      type: object
+      description: Map of driver specific options
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: Name of the driver to use to create the volume.
+        Options:
+          type:
+          - object
+          - 'null'
+          description: key/value map of driver specific options.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+      additionalProperties: false
+    ContainerSpecNetworkingConfig_String:
+      type: object
+      description: This container's networking configuration.
+      required:
+      - EndpointsConfig
+      properties:
+        EndpointsConfig:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ContainerSpecEndpointSettings'
+          propertyNames:
+            type: string
+      additionalProperties: false
+    ContainerSpecResourcesBlkioWeightDevice:
+      type: object
+      properties:
+        Path:
+          type:
+          - string
+          - 'null'
+        Weight:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      additionalProperties: false
+    ContainerSpecResourcesUlimits:
+      type: object
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: Name of ulimit
+        Soft:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Soft limit
+        Hard:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Hard limit
+      additionalProperties: false
+    ContainerSpecRestartPolicy:
+      type: object
+      description: The behavior to apply when the container exits. The default is not to restart.  An ever increasing delay (double the previous delay, starting at 100ms) is added before each restart to prevent flooding the server.
+      properties:
+        Name:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ContainerSpecRestartPolicyNameEnum'
+            description: '- Empty string means not to restart - `no` Do not automatically restart - `always` Always restart - `unless-stopped` Restart always except when the user has manually stopped the container - `on-failure` Restart only when the container exit code is non-zero'
+        MaximumRetryCount:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: If `on-failure` is used, the number of times to retry before giving up.
+      additionalProperties: false
+    ContainerSpecRestartPolicyNameEnum:
+      type: string
+      enum:
+      - EMPTY
+      - no
+      - always
+      - unless-stopped
+      - on-failure
+    ContainerSpecThrottleDevice:
+      type: object
+      properties:
+        Path:
+          type:
+          - string
+          - 'null'
+          description: Device path
+        Rate:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Rate
+      additionalProperties: false
     ContainerState:
       type: object
       description: ContainerState stores container's running state. It's part of ContainerJSONBase and will be returned by the \"inspect\" command.
