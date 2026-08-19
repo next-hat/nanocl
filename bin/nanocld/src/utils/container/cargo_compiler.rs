@@ -500,6 +500,10 @@ fn validate_shared_network_fields(
       "Container.MacAddress is incompatible with a shared sandbox network namespace",
     ),
     (
+      config.exposed_ports.is_some(),
+      "Container.ExposedPorts is incompatible with a shared sandbox network namespace",
+    ),
+    (
       host_config.is_some_and(|host| host.dns.is_some()),
       "Container.HostConfig.Dns is incompatible with a shared sandbox network namespace",
     ),
@@ -514,6 +518,10 @@ fn validate_shared_network_fields(
     (
       host_config.is_some_and(|host| host.extra_hosts.is_some()),
       "Container.HostConfig.ExtraHosts is incompatible with a shared sandbox network namespace",
+    ),
+    (
+      host_config.is_some_and(|host| host.links.is_some()),
+      "Container.HostConfig.Links is incompatible with a shared sandbox network namespace",
     ),
   ]
   .into_iter()
@@ -1053,8 +1061,11 @@ mod tests {
 
   #[test]
   fn explicit_container_host_and_none_bypass_the_cargo_sandbox() {
+    let exposed_ports =
+      HashMap::from([("8080/tcp".to_owned(), EmptyObject::default())]);
     for override_mode in ["host", "none"] {
       let mut declared = minimal_spec();
+      declared.container_config.exposed_ports = Some(exposed_ports.clone());
       declared.container_config.host_config = Some(HostConfig {
         network_mode: Some(override_mode.to_owned()),
         ..Default::default()
@@ -1062,6 +1073,7 @@ mod tests {
 
       let compiled = compile_application(&declared, None, None).unwrap();
       assert_eq!(network_mode(&compiled.config), Some(override_mode));
+      assert_eq!(compiled.config.exposed_ports, Some(exposed_ports.clone()));
     }
   }
 
@@ -1084,13 +1096,39 @@ mod tests {
 
   #[test]
   fn sandbox_join_rejects_container_owned_network_settings() {
-    for field in [
-      "Hostname",
-      "MacAddress",
-      "Dns",
-      "DnsOptions",
-      "DnsSearch",
-      "ExtraHosts",
+    for (field, reason) in [
+      (
+        "Hostname",
+        "Container.Hostname is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "MacAddress",
+        "Container.MacAddress is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "ExposedPorts",
+        "Container.ExposedPorts is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "Dns",
+        "Container.HostConfig.Dns is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "DnsOptions",
+        "Container.HostConfig.DnsOptions is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "DnsSearch",
+        "Container.HostConfig.DnsSearch is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "ExtraHosts",
+        "Container.HostConfig.ExtraHosts is incompatible with a shared sandbox network namespace",
+      ),
+      (
+        "Links",
+        "Container.HostConfig.Links is incompatible with a shared sandbox network namespace",
+      ),
     ] {
       let mut declared = minimal_spec();
       match field {
@@ -1100,6 +1138,12 @@ mod tests {
         "MacAddress" => {
           declared.container_config.mac_address =
             Some("02:42:ac:11:00:02".to_owned());
+        }
+        "ExposedPorts" => {
+          declared.container_config.exposed_ports = Some(HashMap::from([(
+            "8080/tcp".to_owned(),
+            EmptyObject::default(),
+          )]));
         }
         _ => {
           let host = declared
@@ -1115,20 +1159,54 @@ mod tests {
             "ExtraHosts" => {
               host.extra_hosts = Some(vec!["api:127.0.0.1".to_owned()])
             }
+            "Links" => host.links = Some(vec!["database:db".to_owned()]),
             _ => unreachable!(),
           }
         }
       }
 
-      assert!(matches!(
-        compile_application(&declared, None, Some(SANDBOX_ID)).unwrap_err(),
-        CargoCompilerError::InvalidNetworkCombination {
-          container,
-          cargo_network_mode,
-          ..
-        } if container == "app" && cargo_network_mode == "nanoclbr0"
-      ));
+      for role in [CargoContainerRole::Application, CargoContainerRole::Init] {
+        let error =
+          compile(&declared, None, Some(SANDBOX_ID), role, None).unwrap_err();
+        assert!(
+          error.to_string().contains(field),
+          "inherited-network diagnostic must identify {field}: {error}"
+        );
+        assert_eq!(
+          error,
+          CargoCompilerError::InvalidNetworkCombination {
+            container: "app".to_owned(),
+            cargo_network_mode: "nanoclbr0".to_owned(),
+            reason,
+          },
+          "unexpected inherited-network validation for {field} on {role:?}"
+        );
+      }
     }
+  }
+
+  #[test]
+  fn sandbox_join_preserves_unrelated_bollard_configuration() {
+    let mut declared = minimal_spec();
+    declared.container_config.cmd =
+      Some(vec!["serve".to_owned(), "--http".to_owned()]);
+    declared.container_config.working_dir = Some("/srv/app".to_owned());
+    declared.container_config.host_config = Some(HostConfig {
+      binds: Some(vec!["/srv/config:/config:ro".to_owned()]),
+      ..Default::default()
+    });
+
+    let compiled =
+      compile_application(&declared, None, Some(SANDBOX_ID)).unwrap();
+    assert_eq!(compiled.config.cmd, declared.container_config.cmd);
+    assert_eq!(
+      compiled.config.working_dir,
+      declared.container_config.working_dir
+    );
+    assert_eq!(
+      compiled.config.host_config.unwrap().binds,
+      declared.container_config.host_config.unwrap().binds
+    );
   }
 
   #[test]
