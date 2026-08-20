@@ -685,14 +685,12 @@ mod tests {
       app.container_config.cmd = Some(vec![
         "sh".to_owned(),
         "-c".to_owned(),
-        format!(
-          "rm -f /tmp/restart-ready; sleep {delay}; touch /tmp/restart-ready; while true; do sleep 3600; done"
-        ),
+        format!("sleep {delay}; exec sleep 3600"),
       ]);
       app.container_config.healthcheck = Some(HealthConfig {
         test: Some(vec![
           "CMD-SHELL".to_owned(),
-          "test -f /tmp/restart-ready".to_owned(),
+          "test \"$(cat /proc/1/comm)\" = sleep".to_owned(),
         ]),
         interval: Some(500_000_000),
         timeout: Some(1_000_000_000),
@@ -724,11 +722,13 @@ mod tests {
       name: NAME.to_owned(),
       init_containers: vec![prepare],
       containers: vec![
-        delayed_healthcheck("api", 1),
-        healthless("worker-a"),
-        delayed_healthcheck("queue", 3),
-        healthless("worker-b"),
+        // Restart the nonessential probe before the delayed essentials so its
+        // unhealthy observation cannot race the successful readiness point.
         metrics,
+        healthless("worker-a"),
+        delayed_healthcheck("api", 1),
+        healthless("worker-b"),
+        delayed_healthcheck("queue", 3),
       ],
       ..Default::default()
     };

@@ -15,7 +15,11 @@ Cargoes:
     Cmd:
     - sh
     - -c
-    - mkdir -p /www && echo multi-container-ok > /www/index.html && exec httpd -f -p 9000 -h /www
+    - |
+      while true; do
+        printf 'HTTP/1.1 200 OK\r\nContent-Length: 19\r\nConnection: close\r\n\r\nmulti-container-ok\n' |
+          nc -l -p 9000
+      done
   - Name: client
     Image: alpine:latest
     Cmd:
