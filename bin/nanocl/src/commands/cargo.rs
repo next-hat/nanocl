@@ -115,7 +115,12 @@ async fn exec_cargo_restart(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for key in &opts.keys {
+    let waiter =
+      wait_cargo_state(key, NativeEventAction::Restart, client).await?;
     client.restart_process("cargo", key).await?;
+    waiter.await.map_err(|err| {
+      IoError::interrupted("wait_cargo_state", &err.to_string())
+    })??;
   }
   Ok(())
 }

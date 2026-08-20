@@ -48,6 +48,7 @@ mod tests {
       GenericNspQuery, ImagePullPolicy,
     },
     namespace::NamespacePartial,
+    process::{ProcessKind, ProcessPartial},
     proxy::ProxySslConfig,
     secret::SecretPartial,
     system::{
@@ -56,9 +57,15 @@ mod tests {
     },
   };
 
-  use crate::utils::{
-    container::cargo_compiler::{LABEL_CONTAINER, LABEL_ROLE},
-    tests::*,
+  use crate::{
+    models::{
+      CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole, ProcessDb,
+    },
+    repositories::generic::*,
+    utils::{
+      container::cargo_compiler::{LABEL_CONTAINER, LABEL_ROLE},
+      tests::*,
+    },
   };
 
   const ENDPOINT: &str = "/cargoes";
@@ -149,6 +156,16 @@ mod tests {
       .unwrap_or_else(|| panic!("missing Cargo {role} process {name}"))
   }
 
+  fn process_started_at(
+    process: &nanocl_stubs::process::Process,
+  ) -> Option<&str> {
+    process
+      .data
+      .state
+      .as_ref()
+      .and_then(|state| state.started_at.as_deref())
+  }
+
   async fn start_cargo(system: &TestSystem, key: &str) {
     let events = system
       .state
@@ -176,6 +193,42 @@ mod tests {
     assert!(events.iter().any(|event| {
       event.kind == EventKind::Normal
         && event.action == NativeEventAction::Start.to_string()
+    }));
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+  }
+
+  async fn restart_cargo(system: &TestSystem, key: &str) {
+    let events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        key,
+        EventKind::Normal,
+        NativeEventAction::Restart,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "restart Cargo fixture"
+    );
+    let events = collect_events(events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Restart.to_string()
     }));
     system
       .state
@@ -362,7 +415,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     let system = gen_default_test_system().await;
-    let client = system.client;
+    let client = &system.client;
     let test_cargoes = [
       "1daemon-test-cargo",
       "2another-test-cargo",
@@ -408,18 +461,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
     let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
-    let res = client
-      .send_post(
-        &format!("/processes/cargo/{main_test_key}/start"),
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::ACCEPTED,
-      "basic cargo start"
-    );
+    start_cargo(&system, &main_test_key).await;
     let res = client
       .send_get(
         &format!("/processes/cargo/{main_test_key}/logs"),
@@ -435,17 +477,48 @@ mod tests {
       http::StatusCode::OK,
       "basic cargo logs by canonical key"
     );
-    let res = client
-      .send_post(
-        &format!("/processes/cargo/{main_test_key}/restart"),
-        None::<String>,
+    let before_restart = client
+      .send_get(
+        &format!("{ENDPOINT}/{main_test_key}/inspect"),
         None::<String>,
       )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::ACCEPTED,
-      "basic cargo restart"
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    let before_app = active_cargo_process(&before_restart, "app", "main");
+    let before_sandbox =
+      active_cargo_process(&before_restart, "sandbox", "_sandbox");
+    let before_app_id = before_app.key.clone();
+    let before_app_started = process_started_at(before_app).map(str::to_owned);
+    let before_sandbox_id = before_sandbox.key.clone();
+    let before_sandbox_started =
+      process_started_at(before_sandbox).map(str::to_owned);
+    restart_cargo(&system, &main_test_key).await;
+    let after_restart = client
+      .send_get(
+        &format!("{ENDPOINT}/{main_test_key}/inspect"),
+        None::<String>,
+      )
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    assert_eq!(after_restart.status.actual, ObjPsStatusKind::Start);
+    let after_app = active_cargo_process(&after_restart, "app", "main");
+    let after_sandbox =
+      active_cargo_process(&after_restart, "sandbox", "_sandbox");
+    assert_eq!(after_app.key, before_app_id);
+    assert_ne!(
+      process_started_at(after_app),
+      before_app_started.as_deref(),
+      "one healthless application must be Docker-restarted"
+    );
+    assert_eq!(after_sandbox.key, before_sandbox_id);
+    assert_eq!(
+      process_started_at(after_sandbox),
+      before_sandbox_started.as_deref(),
+      "Cargo restart must preserve the sandbox process"
     );
     let mut replacement_container =
       container("main", "ghcr.io/next-hat/nanocl-get-started:latest");
@@ -592,6 +665,460 @@ mod tests {
       res.status(),
       http::StatusCode::ACCEPTED,
       "init cargo delete"
+    );
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn multi_container_restart_preserves_sandbox_and_completed_init() {
+    const NAME: &str = "multi-container-restart-readiness";
+    const KEY: &str = "global.multi-container-restart-readiness";
+
+    let system = gen_default_test_system().await;
+    let mut prepare = container("prepare", "alpine:latest");
+    prepare.container_config.cmd =
+      Some(vec!["sh".to_owned(), "-c".to_owned(), "true".to_owned()]);
+
+    let delayed_healthcheck = |name: &str, delay: u64| {
+      let mut app = container(name, "alpine:latest");
+      app.container_config.cmd = Some(vec![
+        "sh".to_owned(),
+        "-c".to_owned(),
+        format!(
+          "rm -f /tmp/restart-ready; sleep {delay}; touch /tmp/restart-ready; while true; do sleep 3600; done"
+        ),
+      ]);
+      app.container_config.healthcheck = Some(HealthConfig {
+        test: Some(vec![
+          "CMD-SHELL".to_owned(),
+          "test -f /tmp/restart-ready".to_owned(),
+        ]),
+        interval: Some(500_000_000),
+        timeout: Some(1_000_000_000),
+        retries: Some(5),
+        start_period: Some(10_000_000_000),
+        ..Default::default()
+      });
+      app
+    };
+    let healthless = |name: &str| {
+      let mut app = container(name, "alpine:latest");
+      app.container_config.cmd = Some(vec![
+        "sh".to_owned(),
+        "-c".to_owned(),
+        "while true; do sleep 3600; done".to_owned(),
+      ]);
+      app
+    };
+    let mut metrics = healthless("metrics");
+    metrics.essential = false;
+    metrics.container_config.healthcheck = Some(HealthConfig {
+      test: Some(vec!["CMD-SHELL".to_owned(), "false".to_owned()]),
+      interval: Some(500_000_000),
+      timeout: Some(1_000_000_000),
+      retries: Some(1),
+      ..Default::default()
+    });
+    let spec = CargoSpec {
+      name: NAME.to_owned(),
+      init_containers: vec![prepare],
+      containers: vec![
+        delayed_healthcheck("api", 1),
+        healthless("worker-a"),
+        delayed_healthcheck("queue", 3),
+        healthless("worker-b"),
+        metrics,
+      ],
+      ..Default::default()
+    };
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::CREATED,
+      "create Cargo restart fixture"
+    );
+    start_cargo(&system, KEY).await;
+
+    let before = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    let sandbox = active_cargo_process(&before, "sandbox", "_sandbox");
+    let init = active_cargo_process(&before, "init", "prepare");
+    let sandbox_identity = (
+      sandbox.key.clone(),
+      process_started_at(sandbox).map(str::to_owned),
+    );
+    let init_identity = (
+      init.key.clone(),
+      process_started_at(init).map(str::to_owned),
+      init
+        .data
+        .state
+        .as_ref()
+        .and_then(|state| state.finished_at.clone()),
+    );
+    let before_apps = spec
+      .containers
+      .iter()
+      .map(|declared| {
+        let process = active_cargo_process(&before, "app", &declared.name);
+        (
+          declared.name.clone(),
+          (
+            process.key.clone(),
+            process_started_at(process).map(str::to_owned),
+          ),
+        )
+      })
+      .collect::<std::collections::HashMap<_, _>>();
+
+    let mut start_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Normal,
+        NativeEventAction::Start,
+      )]))
+      .await
+      .unwrap();
+    let restart_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Normal,
+        NativeEventAction::Restart,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{KEY}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "restart final multi-container Cargo"
+    );
+    let during_restart =
+      ntex::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+          let cargo = system
+            .client
+            .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+            .await
+            .json::<CargoInspect>()
+            .await
+            .unwrap();
+          if cargo.status.actual == ObjPsStatusKind::Starting {
+            break cargo;
+          }
+          assert_ne!(cargo.status.actual, ObjPsStatusKind::Fail);
+          ntex::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+      })
+      .await
+      .expect("Cargo restart never entered its readiness transition");
+    assert_eq!(during_restart.status.health, ObjPsHealthStatusKind::Unknown);
+    let premature_start =
+      ntex::time::timeout(std::time::Duration::from_millis(500), async {
+        while let Some(chunk) = start_events.next().await {
+          let chunk = chunk.unwrap();
+          if chunk.is_empty() {
+            continue;
+          }
+          let event = serde_json::from_slice::<Event>(&chunk).unwrap();
+          if event.kind == EventKind::Normal
+            && event.action == NativeEventAction::Start.to_string()
+            && event.actor.as_ref().and_then(|actor| actor.key.as_deref())
+              == Some(KEY)
+          {
+            return true;
+          }
+        }
+        false
+      })
+      .await;
+    assert!(
+      premature_start.is_err(),
+      "restart published Start before every essential app was ready"
+    );
+    let start_events = collect_events(start_events).await;
+    let restart_events = collect_events(restart_events).await;
+    assert!(start_events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Start.to_string()
+    }));
+    assert!(restart_events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Restart.to_string()
+    }));
+
+    let after = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    assert_eq!(after.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(after.status.health, ObjPsHealthStatusKind::Healthy);
+    let sandbox = active_cargo_process(&after, "sandbox", "_sandbox");
+    assert_eq!(
+      (
+        sandbox.key.clone(),
+        process_started_at(sandbox).map(str::to_owned)
+      ),
+      sandbox_identity,
+      "sandbox ID and start time must not change"
+    );
+    let init = active_cargo_process(&after, "init", "prepare");
+    assert_eq!(
+      (
+        init.key.clone(),
+        process_started_at(init).map(str::to_owned),
+        init
+          .data
+          .state
+          .as_ref()
+          .and_then(|state| state.finished_at.clone())
+      ),
+      init_identity,
+      "completed init ID and timestamps must not change"
+    );
+    for declared in &spec.containers {
+      let process = active_cargo_process(&after, "app", &declared.name);
+      let (before_key, before_started) = &before_apps[&declared.name];
+      assert_eq!(&process.key, before_key);
+      assert_ne!(process_started_at(process), before_started.as_deref());
+    }
+    for name in ["api", "queue"] {
+      let process = active_cargo_process(&after, "app", name);
+      assert_eq!(
+        process
+          .data
+          .state
+          .as_ref()
+          .and_then(|state| state.health.as_ref())
+          .and_then(|health| health.status.as_ref())
+          .map(ToString::to_string)
+          .as_deref(),
+        Some("healthy"),
+        "both essential healthchecked apps must be healthy at success"
+      );
+    }
+    let metrics = active_cargo_process(&after, "app", "metrics");
+    assert_eq!(
+      metrics
+        .data
+        .state
+        .as_ref()
+        .and_then(|state| state.health.as_ref())
+        .and_then(|health| health.status.as_ref())
+        .map(ToString::to_string)
+        .as_deref(),
+      Some("unhealthy"),
+      "an unhealthy nonessential app must not block restart completion"
+    );
+
+    let response = system
+      .client
+      .send_delete(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(CargoDeleteQuery { force: Some(true) }),
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "delete Cargo restart fixture"
+    );
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn cargo_restart_rejects_missing_sandbox_and_ambiguous_app() {
+    const NAME: &str = "invalid-restart-topology";
+    const KEY: &str = "global.invalid-restart-topology";
+
+    let system = gen_default_test_system().await;
+    let mut app = container("api", "alpine:latest");
+    app.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "while true; do sleep 3600; done".to_owned(),
+    ]);
+    let response = system
+      .client
+      .send_post(
+        ENDPOINT,
+        Some(CargoSpec {
+          name: NAME.to_owned(),
+          containers: vec![app],
+          ..Default::default()
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::CREATED,
+      "create invalid restart topology fixture"
+    );
+    start_cargo(&system, KEY).await;
+    let before = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    let app = active_cargo_process(&before, "app", "api");
+    let sandbox = active_cargo_process(&before, "sandbox", "_sandbox");
+    let app_started = process_started_at(app).map(str::to_owned);
+    let sandbox_id = sandbox.key.clone();
+    let replicas = CargoReplicaDb::list_by_cargo(KEY, &system.state.inner.pool)
+      .await
+      .unwrap();
+    assert_eq!(replicas.len(), 1);
+    let sandbox_mapping = CargoReplicaProcessDb::find(
+      replicas[0].key,
+      CargoReplicaProcessRole::Sandbox,
+      "_sandbox",
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    CargoReplicaProcessDb::set_processes(
+      vec![(sandbox_mapping.key, None, true)],
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    let error_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Error,
+        NativeEventAction::Restart,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{KEY}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    let events = collect_events(error_events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Error
+        && event.action == NativeEventAction::Restart.to_string()
+    }));
+    assert!(
+      system
+        .state
+        .inner
+        .docker_api
+        .inspect_container(
+          &sandbox_id,
+          None::<bollard_next::container::InspectContainerOptions>,
+        )
+        .await
+        .is_ok(),
+      "missing sandbox mapping must not recreate or replace Docker sandbox"
+    );
+    CargoReplicaProcessDb::set_processes(
+      vec![(
+        sandbox_mapping.key,
+        Some(sandbox_id.clone()),
+        sandbox_mapping.essential,
+      )],
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+
+    let duplicate_key = uuid::Uuid::new_v4().to_string();
+    ProcessDb::create_from(
+      &ProcessPartial {
+        key: duplicate_key.clone(),
+        name: format!("{KEY}-duplicate-api.c"),
+        kind: ProcessKind::Cargo,
+        data: serde_json::to_value(&app.data).unwrap(),
+        node_name: system.state.inner.config.hostname.clone(),
+        kind_key: KEY.to_owned(),
+        created_at: Some(chrono::Utc::now().naive_utc()),
+      },
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    let error_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Error,
+        NativeEventAction::Restart,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{KEY}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    let events = collect_events(error_events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Error
+        && event.action == NativeEventAction::Restart.to_string()
+    }));
+    let after = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await
+      .json::<CargoInspect>()
+      .await
+      .unwrap();
+    assert_eq!(
+      process_started_at(active_cargo_process(&after, "app", "api")),
+      app_started.as_deref(),
+      "topology failure must occur before any Docker app restart"
+    );
+    ProcessDb::del_by_pk(&duplicate_key, &system.state.inner.pool)
+      .await
+      .unwrap();
+
+    let response = system
+      .client
+      .send_delete(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(CargoDeleteQuery { force: Some(true) }),
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "delete invalid restart topology fixture"
     );
     ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     system.state.wait_event_loop().await;
