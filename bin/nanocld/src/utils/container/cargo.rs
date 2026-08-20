@@ -366,6 +366,35 @@ async fn compile_declared(
   inject_secrets(cargo, task, declared, role, attempt_id, config, state).await
 }
 
+fn declared_container_position(
+  cargo: &Cargo,
+  declared: &ContainerSpec,
+  role: CargoReplicaProcessRole,
+) -> IoResult<usize> {
+  let declarations = match role {
+    CargoReplicaProcessRole::App => &cargo.spec.containers,
+    CargoReplicaProcessRole::Init => &cargo.spec.init_containers,
+    CargoReplicaProcessRole::Sandbox => {
+      return Err(IoError::other(
+        "CargoRuntime",
+        "The internal sandbox has no user declaration position",
+      ));
+    }
+  };
+  declarations
+    .iter()
+    .position(|candidate| candidate.name == declared.name)
+    .ok_or_else(|| {
+      IoError::other(
+        "CargoRuntime",
+        &format!(
+          "Cargo {} container {:?} is not present in its declared {role} collection",
+          cargo.spec.cargo_key, declared.name
+        ),
+      )
+    })
+}
+
 fn compile_declared_base(
   cargo: &Cargo,
   task: &CargoReplicaTask,
@@ -387,8 +416,11 @@ fn compile_declared_base(
       ));
     }
   };
+  let declaration_position =
+    declared_container_position(cargo, declared, role)?;
   let compiled = compile_container(ContainerCompileInput {
     declared,
+    declaration_position,
     cargo_network_mode: cargo.spec.network_mode.as_ref(),
     sandbox_id,
     role: compiler_role,
@@ -2556,6 +2588,47 @@ mod tests {
     let error = process_identity(&process).unwrap_err();
     assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
     assert!(error.to_string().contains(LABEL_REPLICA));
+  }
+
+  #[test]
+  fn declaration_positions_are_zero_based_within_each_container_role() {
+    let mut cargo = Cargo::default();
+    cargo.spec.cargo_key = "global.api".to_owned();
+    cargo.spec.init_containers = vec![
+      declared_container("prepare", true),
+      declared_container("migrate", true),
+    ];
+    cargo.spec.containers = vec![
+      declared_container("api", true),
+      declared_container("worker", true),
+    ];
+
+    assert_eq!(
+      declared_container_position(
+        &cargo,
+        &cargo.spec.init_containers[1],
+        CargoReplicaProcessRole::Init,
+      )
+      .unwrap(),
+      1
+    );
+    assert_eq!(
+      declared_container_position(
+        &cargo,
+        &cargo.spec.containers[1],
+        CargoReplicaProcessRole::App,
+      )
+      .unwrap(),
+      1
+    );
+    assert!(
+      declared_container_position(
+        &cargo,
+        &cargo.spec.containers[0],
+        CargoReplicaProcessRole::Sandbox,
+      )
+      .is_err()
+    );
   }
 
   #[test]

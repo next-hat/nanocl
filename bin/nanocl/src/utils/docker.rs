@@ -14,7 +14,9 @@ use bollard_next::{API_DEFAULT_VERSION, Docker};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
-use nanocld_client::stubs::cargo_spec::{CargoSpec, Config, ContainerSpec};
+use nanocld_client::stubs::cargo_spec::{
+  CARGO_CONTAINER_POSITION_LABEL, CargoSpec, Config, ContainerSpec,
+};
 
 use crate::models::DockerContextMeta;
 use crate::utils::hash;
@@ -163,6 +165,8 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
 pub fn hook_labels(
   key: &str,
   namespace: &str,
+  replica_id: &str,
+  container: &ContainerSpec,
   labels: &HashMap<String, String>,
 ) -> HashMap<String, String> {
   let mut hooked_labels = labels.clone();
@@ -171,6 +175,21 @@ pub fn hook_labels(
   hooked_labels.insert("io.nanocl.c".to_owned(), key.to_owned());
   hooked_labels.insert("io.nanocl.n".to_owned(), namespace.to_owned());
   hooked_labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
+  hooked_labels
+    .insert("io.nanocl.cargo.replica".to_owned(), replica_id.to_owned());
+  hooked_labels
+    .insert("io.nanocl.cargo.replica-ordinal".to_owned(), "0".to_owned());
+  hooked_labels.insert(
+    "io.nanocl.cargo.container".to_owned(),
+    container.name.clone(),
+  );
+  hooked_labels.insert("io.nanocl.cargo.role".to_owned(), "app".to_owned());
+  hooked_labels.insert(
+    "io.nanocl.cargo.essential".to_owned(),
+    container.essential.to_string(),
+  );
+  hooked_labels
+    .insert(CARGO_CONTAINER_POSITION_LABEL.to_owned(), "0".to_owned());
   hooked_labels.insert(
     "com.docker.compose.project".to_owned(),
     format!("nanocl_{namespace}"),
@@ -293,19 +312,20 @@ pub async fn create_cargo_container(
 ) -> IoResult<ContainerCreateResponse> {
   let hooked_cargo = hook_binds(cargo)?;
   let name = &hooked_cargo.name;
-  let config = installer_container_config(
-    &hooked_cargo,
-    single_application_container(&hooked_cargo)?,
-  );
+  let declared = single_application_container(&hooked_cargo)?;
+  let config = installer_container_config(&hooked_cargo, declared);
   let key =
     nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
       .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?
       .to_string();
   let host_config = config.host_config.clone().unwrap_or_default();
+  let replica_id = uuid::Uuid::new_v4().to_string();
   let hooked_container = Config {
     labels: Some(hook_labels(
       &key,
       namespace,
+      &replica_id,
+      declared,
       &config.labels.clone().unwrap_or_default(),
     )),
     host_config: Some(HostConfig {
@@ -469,5 +489,35 @@ mod tests {
         Some(mode)
       );
     }
+  }
+
+  #[test]
+  fn installer_labels_describe_one_ordered_application_replica() {
+    let declared = container(Config {
+      image: Some("alpine:latest".to_owned()),
+      ..Default::default()
+    });
+    let labels = hook_labels(
+      "system.api",
+      "system",
+      "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+      &declared,
+      &HashMap::from([("example.owner".to_owned(), "platform".to_owned())]),
+    );
+
+    assert_eq!(labels["io.nanocl"], "enabled");
+    assert_eq!(labels["io.nanocl.kind"], "cargo");
+    assert_eq!(labels["io.nanocl.c"], "system.api");
+    assert_eq!(
+      labels["io.nanocl.cargo.replica"],
+      "7a9778c5-6e52-49a0-99f8-b63bb15a4337"
+    );
+    assert_eq!(labels["io.nanocl.cargo.replica-ordinal"], "0");
+    assert_eq!(labels["io.nanocl.cargo.container"], "api");
+    assert_eq!(labels["io.nanocl.cargo.role"], "app");
+    assert_eq!(labels["io.nanocl.cargo.essential"], "true");
+    assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
+    assert_eq!(labels["io.nanocl.not-init-c"], "true");
+    assert_eq!(labels["example.owner"], "platform");
   }
 }

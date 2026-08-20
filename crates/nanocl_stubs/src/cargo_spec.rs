@@ -17,6 +17,12 @@ use super::generic::Any;
 
 use crate::generic::ImagePullPolicy;
 
+/// Runtime label carrying a declared Cargo container's zero-based position.
+///
+/// Application and init-container positions are scoped to their respective
+/// declaration lists. The internal Cargo sandbox never carries this label.
+pub const CARGO_CONTAINER_POSITION_LABEL: &str = "io.nanocl.cargo.position";
+
 /// Docker network mode used by a Cargo.
 ///
 /// Docker accepts any non-blank network name in addition to its built-in

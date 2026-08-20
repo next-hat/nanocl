@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use bollard_next::models::{EmptyObject, RestartPolicy, RestartPolicyNameEnum};
 use nanocl_error::io::IoError;
 use nanocl_stubs::cargo_spec::{
-  CargoNetworkMode, Config as DockerConfig, ContainerSpec,
-  ContainerSpecValidationError, HostConfig, PortMap,
+  CARGO_CONTAINER_POSITION_LABEL, CargoNetworkMode, Config as DockerConfig,
+  ContainerSpec, ContainerSpecValidationError, HostConfig, PortMap,
 };
 
 use super::network::DEFAULT_NETWORK;
@@ -13,8 +13,8 @@ const INTERNAL_GATEWAY_TOKEN: &str = "$$INTERNAL_GATEWAY";
 const SANDBOX_LOGICAL_NAME: &str = "_sandbox";
 
 const LABEL_MANAGED: &str = "io.nanocl";
-const LABEL_KIND: &str = "io.nanocl.kind";
-const LABEL_CARGO_KEY: &str = "io.nanocl.c";
+pub(crate) const LABEL_KIND: &str = "io.nanocl.kind";
+pub(crate) const LABEL_CARGO_KEY: &str = "io.nanocl.c";
 const LABEL_NAMESPACE: &str = "io.nanocl.n";
 const LABEL_INIT_CONTAINER: &str = "io.nanocl.init-c";
 const LABEL_APPLICATION_CONTAINER: &str = "io.nanocl.not-init-c";
@@ -60,6 +60,7 @@ pub(super) struct CargoRuntimeMetadata<'a> {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct ContainerCompileInput<'a> {
   pub(super) declared: &'a ContainerSpec,
+  pub(super) declaration_position: usize,
   pub(super) cargo_network_mode: Option<&'a CargoNetworkMode>,
   pub(super) sandbox_id: Option<&'a str>,
   pub(super) role: CargoContainerRole,
@@ -367,6 +368,10 @@ pub(super) fn compile_container(
     &input.declared.name,
     input.declared.essential,
   ));
+  labels.insert(
+    CARGO_CONTAINER_POSITION_LABEL.to_owned(),
+    input.declaration_position.to_string(),
+  );
   labels.insert(
     LABEL_COMPOSE_PROJECT.to_owned(),
     format!("nanocl_{}", input.runtime.namespace),
@@ -776,6 +781,7 @@ mod tests {
   ) -> Result<CompiledContainer, CargoCompilerError> {
     compile_container(ContainerCompileInput {
       declared,
+      declaration_position: 0,
       cargo_network_mode,
       sandbox_id,
       role,
@@ -1412,6 +1418,7 @@ mod tests {
     assert_eq!(labels[LABEL_ROLE], "sandbox");
     assert_eq!(labels[LABEL_CONTAINER], SANDBOX_LOGICAL_NAME);
     assert_eq!(labels[LABEL_REPLICA], runtime().replica_id);
+    assert!(!labels.contains_key(CARGO_CONTAINER_POSITION_LABEL));
     assert!(!labels.contains_key(LABEL_COMPOSE_PROJECT));
     assert!(!labels.contains_key(LABEL_APPLICATION_CONTAINER));
     assert!(!labels.contains_key(LABEL_INIT_CONTAINER));
@@ -1589,6 +1596,7 @@ mod tests {
     assert_eq!(labels[LABEL_REPLICA_ORDINAL], "2");
     assert_eq!(labels[LABEL_CONTAINER], "app");
     assert_eq!(labels[LABEL_ROLE], "app");
+    assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
     assert_eq!(labels[LABEL_APPLICATION_CONTAINER], "true");
     assert!(!labels.contains_key(LABEL_INIT_CONTAINER));
     assert_eq!(
@@ -1615,6 +1623,7 @@ mod tests {
     .unwrap();
     let labels = compiled.config.labels.unwrap();
     assert_eq!(labels[LABEL_ROLE], "init");
+    assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
     assert_eq!(labels[LABEL_INIT_CONTAINER], "true");
     assert!(!labels.contains_key(LABEL_APPLICATION_CONTAINER));
     assert!(
