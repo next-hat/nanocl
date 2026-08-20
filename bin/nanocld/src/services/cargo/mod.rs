@@ -34,6 +34,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use bollard_next::models::HealthConfig;
   use futures::{StreamExt, TryStreamExt};
   use ntex::http;
 
@@ -49,10 +50,16 @@ mod tests {
     namespace::NamespacePartial,
     proxy::ProxySslConfig,
     secret::SecretPartial,
-    system::{EventActorKind, EventCondition, EventKind, NativeEventAction},
+    system::{
+      Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
+      ObjPsHealthStatusKind, ObjPsStatusKind,
+    },
   };
 
-  use crate::utils::tests::*;
+  use crate::utils::{
+    container::cargo_compiler::{LABEL_CONTAINER, LABEL_ROLE},
+    tests::*,
+  };
 
   const ENDPOINT: &str = "/cargoes";
 
@@ -76,6 +83,106 @@ mod tests {
       containers: vec![container("main", image)],
       ..Default::default()
     }
+  }
+
+  fn cargo_event_condition(
+    key: &str,
+    kind: EventKind,
+    action: NativeEventAction,
+  ) -> EventCondition {
+    EventCondition {
+      actor_key: Some(key.to_owned()),
+      actor_kind: Some(EventActorKind::Cargo),
+      related_key: None,
+      related_kind: None,
+      kind: vec![kind],
+      action: vec![action],
+    }
+  }
+
+  async fn collect_events(
+    stream: crate::models::RawEventReceiver,
+  ) -> Vec<Event> {
+    ntex::time::timeout(std::time::Duration::from_secs(360), async move {
+      let mut stream = stream;
+      let mut events = Vec::new();
+      while let Some(chunk) = stream.next().await {
+        let chunk = chunk.unwrap();
+        if !chunk.is_empty() {
+          events.push(serde_json::from_slice(&chunk).unwrap());
+        }
+      }
+      events
+    })
+    .await
+    .expect("timed out waiting for Cargo event")
+  }
+
+  fn active_cargo_process<'a>(
+    cargo: &'a CargoInspect,
+    role: &str,
+    name: &str,
+  ) -> &'a nanocl_stubs::process::Process {
+    cargo
+      .instances
+      .iter()
+      .find(|process| {
+        if process.name.starts_with("tmp-")
+          || process.name.starts_with("candidate-")
+        {
+          return false;
+        }
+        let labels = process
+          .data
+          .config
+          .as_ref()
+          .and_then(|config| config.labels.as_ref());
+        labels
+          .and_then(|labels| labels.get(LABEL_ROLE))
+          .map(String::as_str)
+          == Some(role)
+          && labels
+            .and_then(|labels| labels.get(LABEL_CONTAINER))
+            .map(String::as_str)
+            == Some(name)
+      })
+      .unwrap_or_else(|| panic!("missing Cargo {role} process {name}"))
+  }
+
+  async fn start_cargo(system: &TestSystem, key: &str) {
+    let events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        key,
+        EventKind::Normal,
+        NativeEventAction::Start,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "start Cargo update fixture"
+    );
+    let events = collect_events(events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Start.to_string()
+    }));
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
   }
 
   #[ntex::test]
@@ -266,7 +373,7 @@ mod tests {
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_owned();
       let expected =
-        cargo_spec(&test_cargo, "ghcr.io/next-hat/nanocl-get-started:latest");
+        cargo_spec(test_cargo, "ghcr.io/next-hat/nanocl-get-started:latest");
       let res = client
         .send_post(ENDPOINT, Some(&expected), None::<String>)
         .await;
@@ -485,6 +592,379 @@ mod tests {
       res.status(),
       http::StatusCode::ACCEPTED,
       "init cargo delete"
+    );
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn multi_container_update_waits_for_complete_candidate_readiness() {
+    const NAME: &str = "multi-container-update-readiness";
+    const KEY: &str = "global.multi-container-update-readiness";
+
+    let system = gen_default_test_system().await;
+    let response = system
+      .client
+      .send_post(
+        ENDPOINT,
+        Some(cargo_spec(
+          NAME,
+          "ghcr.io/next-hat/nanocl-get-started:latest",
+        )),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::CREATED,
+      "create multi-container update fixture"
+    );
+    start_cargo(&system, KEY).await;
+
+    let mut prepare_schema = container("prepare-schema", "alpine:latest");
+    prepare_schema.container_config.cmd =
+      Some(vec!["sh".to_owned(), "-c".to_owned(), "true".to_owned()]);
+    let mut prepare_data = container("prepare-data", "alpine:latest");
+    prepare_data.container_config.cmd =
+      Some(vec!["sh".to_owned(), "-c".to_owned(), "true".to_owned()]);
+
+    let mut api = container("api", "alpine:latest");
+    api.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "sleep 3; touch /tmp/ready; while true; do sleep 3600; done".to_owned(),
+    ]);
+    api.container_config.healthcheck = Some(HealthConfig {
+      test: Some(vec![
+        "CMD-SHELL".to_owned(),
+        "test -f /tmp/ready".to_owned(),
+      ]),
+      interval: Some(500_000_000),
+      timeout: Some(1_000_000_000),
+      retries: Some(3),
+      start_period: Some(10_000_000_000),
+      ..Default::default()
+    });
+
+    let mut worker = container("worker", "alpine:latest");
+    worker.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "while true; do sleep 3600; done".to_owned(),
+    ]);
+
+    let mut metrics = container("metrics", "alpine:latest");
+    metrics.essential = false;
+    metrics.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "while true; do sleep 3600; done".to_owned(),
+    ]);
+    metrics.container_config.healthcheck = Some(HealthConfig {
+      test: Some(vec!["CMD-SHELL".to_owned(), "false".to_owned()]),
+      interval: Some(500_000_000),
+      timeout: Some(1_000_000_000),
+      retries: Some(1),
+      ..Default::default()
+    });
+
+    let replacement = CargoSpec {
+      name: NAME.to_owned(),
+      init_containers: vec![prepare_schema, prepare_data],
+      containers: vec![api, worker, metrics],
+      ..Default::default()
+    };
+    let start_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Normal,
+        NativeEventAction::Start,
+      )]))
+      .await
+      .unwrap();
+    let completion_events = system
+      .state
+      .subscribe_raw(Some(vec![EventCondition {
+        actor_key: Some(KEY.to_owned()),
+        actor_kind: Some(EventActorKind::Cargo),
+        related_key: None,
+        related_kind: None,
+        kind: vec![EventKind::Normal, EventKind::Error],
+        action: vec![NativeEventAction::Update],
+      }]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "put final multi-container Cargo declaration"
+    );
+    let updating = response.json::<Cargo>().await.unwrap();
+    assert_eq!(updating.status.actual, ObjPsStatusKind::Updating);
+    assert_eq!(updating.spec.init_containers, replacement.init_containers);
+    assert_eq!(updating.spec.containers, replacement.containers);
+
+    let events = collect_events(start_events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Start.to_string()
+    }));
+
+    // Assert the complete readiness boundary at the promotion event, before
+    // waiting for the four-second retained-generation cleanup.
+    let response = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await;
+    let at_promotion = response.json::<CargoInspect>().await.unwrap();
+    assert_eq!(at_promotion.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(at_promotion.status.health, ObjPsHealthStatusKind::Healthy);
+    assert!(at_promotion.instances.iter().any(|process| {
+      process.name.starts_with("tmp-")
+        && process.data.state.as_ref().and_then(|state| state.running)
+          == Some(true)
+    }));
+    let sandbox = active_cargo_process(&at_promotion, "sandbox", "_sandbox");
+    assert_eq!(
+      sandbox.data.state.as_ref().and_then(|state| state.running),
+      Some(true)
+    );
+    let api = active_cargo_process(&at_promotion, "app", "api");
+    assert_eq!(
+      api.data.state.as_ref().and_then(|state| state.running),
+      Some(true)
+    );
+    assert_eq!(
+      api
+        .data
+        .state
+        .as_ref()
+        .and_then(|state| state.health.as_ref())
+        .and_then(|health| health.status.as_ref())
+        .map(ToString::to_string)
+        .as_deref(),
+      Some("healthy")
+    );
+    let worker = active_cargo_process(&at_promotion, "app", "worker");
+    assert_eq!(
+      worker.data.state.as_ref().and_then(|state| state.running),
+      Some(true)
+    );
+    let metrics = active_cargo_process(&at_promotion, "app", "metrics");
+    assert_eq!(
+      metrics
+        .data
+        .state
+        .as_ref()
+        .and_then(|state| state.health.as_ref())
+        .and_then(|health| health.status.as_ref())
+        .map(ToString::to_string)
+        .as_deref(),
+      Some("unhealthy")
+    );
+    let events = collect_events(completion_events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Update.to_string()
+    }));
+    assert!(!events.iter().any(|event| {
+      event.kind == EventKind::Error
+        && event.action == NativeEventAction::Update.to_string()
+    }));
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{KEY}", EventActorKind::Cargo))
+      .await;
+
+    let response = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "inspect promoted multi-container Cargo"
+    );
+    let cargo = response.json::<CargoInspect>().await.unwrap();
+    assert_eq!(cargo.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(cargo.status.health, ObjPsHealthStatusKind::Healthy);
+    assert_eq!(cargo.spec.init_containers, replacement.init_containers);
+    assert_eq!(cargo.spec.containers, replacement.containers);
+    assert_eq!(cargo.instance_total, 6);
+    assert!(cargo.instances.iter().all(|process| {
+      !process.name.starts_with("tmp-")
+        && !process.name.starts_with("candidate-")
+    }));
+    let init_states = cargo
+      .instances
+      .iter()
+      .filter_map(|process| {
+        let labels = process.data.config.as_ref()?.labels.as_ref()?;
+        (labels.get(LABEL_ROLE).map(String::as_str) == Some("init")).then(
+          || {
+            (
+              labels.get(LABEL_CONTAINER).unwrap().as_str(),
+              process.data.state.as_ref().unwrap(),
+            )
+          },
+        )
+      })
+      .collect::<std::collections::HashMap<_, _>>();
+    for name in ["prepare-schema", "prepare-data"] {
+      let state = init_states
+        .get(name)
+        .unwrap_or_else(|| panic!("missing completed init container {name}"));
+      assert_eq!(
+        state.status.as_ref().map(ToString::to_string).as_deref(),
+        Some("exited")
+      );
+      assert_eq!(state.exit_code, Some(0));
+    }
+    let first_finished = init_states["prepare-schema"]
+      .finished_at
+      .as_deref()
+      .expect("first init must have a finish time");
+    let second_started = init_states["prepare-data"]
+      .started_at
+      .as_deref()
+      .expect("second init must have a start time");
+    assert!(
+      first_finished <= second_started,
+      "init containers must execute in declaration order"
+    );
+
+    let response = system
+      .client
+      .send_delete(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(CargoDeleteQuery { force: Some(true) }),
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "delete multi-container update fixture"
+    );
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn failed_essential_candidate_does_not_emit_successful_promotion() {
+    const NAME: &str = "failed-essential-update-readiness";
+    const KEY: &str = "global.failed-essential-update-readiness";
+
+    let system = gen_default_test_system().await;
+    let response = system
+      .client
+      .send_post(
+        ENDPOINT,
+        Some(cargo_spec(
+          NAME,
+          "ghcr.io/next-hat/nanocl-get-started:latest",
+        )),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::CREATED,
+      "create failed essential update fixture"
+    );
+    start_cargo(&system, KEY).await;
+
+    let mut failing = container("api", "alpine:latest");
+    failing.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "while true; do sleep 3600; done".to_owned(),
+    ]);
+    failing.container_config.healthcheck = Some(HealthConfig {
+      test: Some(vec!["CMD-SHELL".to_owned(), "false".to_owned()]),
+      interval: Some(500_000_000),
+      timeout: Some(1_000_000_000),
+      retries: Some(1),
+      ..Default::default()
+    });
+    let replacement = CargoSpec {
+      name: NAME.to_owned(),
+      containers: vec![failing],
+      ..Default::default()
+    };
+    let failure_events = system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        KEY,
+        EventKind::Error,
+        NativeEventAction::Update,
+      )]))
+      .await
+      .unwrap();
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "put failing essential Cargo declaration"
+    );
+    assert_eq!(
+      response.json::<Cargo>().await.unwrap().status.actual,
+      ObjPsStatusKind::Updating
+    );
+
+    let events = collect_events(failure_events).await;
+    assert!(events.iter().any(|event| {
+      event.kind == EventKind::Error
+        && event.action == NativeEventAction::Update.to_string()
+    }));
+    assert!(!events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Update.to_string()
+    }));
+    assert!(!events.iter().any(|event| {
+      event.kind == EventKind::Normal
+        && event.action == NativeEventAction::Start.to_string()
+        && event.actor.as_ref().is_some_and(|actor| {
+          actor.kind == EventActorKind::Cargo
+            && actor.key.as_deref() == Some(KEY)
+        })
+    }));
+
+    let response = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{KEY}/inspect"), None::<String>)
+      .await;
+    let cargo = response.json::<CargoInspect>().await.unwrap();
+    assert_eq!(cargo.status.actual, ObjPsStatusKind::Fail);
+
+    let response = system
+      .client
+      .send_delete(
+        &format!("{ENDPOINT}/{KEY}"),
+        Some(CargoDeleteQuery { force: Some(true) }),
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::ACCEPTED,
+      "delete failed essential update fixture"
     );
     ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     system.state.wait_event_loop().await;

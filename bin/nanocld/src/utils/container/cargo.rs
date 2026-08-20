@@ -24,8 +24,8 @@ use nanocl_stubs::{
 use crate::{
   models::{
     CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
-    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ProcessDb,
-    ProcessUpdateDb, SystemState,
+    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    ProcessDb, ProcessUpdateDb, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -45,6 +45,11 @@ const DEFAULT_SANDBOX_IMAGE: &str = "registry.k8s.io/pause:3.10";
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 const READY_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const ROUTE_HANDOFF_GRACE: Duration = Duration::from_secs(4);
+const RUNTIME_DELETION_ORDER: [CargoReplicaProcessRole; 3] = [
+  CargoReplicaProcessRole::App,
+  CargoReplicaProcessRole::Init,
+  CargoReplicaProcessRole::Sandbox,
+];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CargoProcessIdentity {
@@ -650,18 +655,17 @@ async fn stop_process(process: &Process, state: &SystemState) -> IoResult<()> {
 async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
   let inspected = inspect_process(&process.key, state).await?;
   let container_state = inspected.state.as_ref();
-  if !container_state
+  let running = container_state
     .and_then(|state| state.running)
-    .unwrap_or_default()
-    && container_state.and_then(|state| state.exit_code) == Some(0)
-  {
-    return Ok(());
-  }
-  if !container_state
-    .and_then(|state| state.running)
-    .unwrap_or_default()
-  {
-    start_process(process, state).await?;
+    .unwrap_or_default();
+  let status = container_state
+    .and_then(|state| state.status.as_ref())
+    .map(ToString::to_string);
+  let exit_code = container_state.and_then(|state| state.exit_code);
+  match init_container_disposition(running, status.as_deref(), exit_code) {
+    InitContainerDisposition::Complete => return Ok(()),
+    InitContainerDisposition::Start => start_process(process, state).await?,
+    InitContainerDisposition::Wait => {}
   }
   let mut stream = state.inner.docker_api.wait_container(
     &process.key,
@@ -687,6 +691,29 @@ async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InitContainerDisposition {
+  Complete,
+  Start,
+  Wait,
+}
+
+fn init_container_disposition(
+  running: bool,
+  status: Option<&str>,
+  exit_code: Option<i64>,
+) -> InitContainerDisposition {
+  if running {
+    return InitContainerDisposition::Wait;
+  }
+  match status {
+    Some("exited") if exit_code == Some(0) => {
+      InitContainerDisposition::Complete
+    }
+    _ => InitContainerDisposition::Start,
+  }
+}
+
 fn healthcheck_enabled(
   healthcheck: Option<&bollard_next::models::HealthConfig>,
 ) -> bool {
@@ -698,6 +725,24 @@ fn healthcheck_enabled(
   })
 }
 
+fn requires_steady_state_readiness(
+  role: CargoReplicaProcessRole,
+  essential: bool,
+) -> bool {
+  role == CargoReplicaProcessRole::Sandbox
+    || (role == CargoReplicaProcessRole::App && essential)
+}
+
+pub(crate) fn promotion_actions(
+  has_healthcheck: bool,
+) -> Vec<NativeEventAction> {
+  let mut actions = vec![NativeEventAction::Start];
+  if has_healthcheck {
+    actions.push(NativeEventAction::Healthy);
+  }
+  actions
+}
+
 async fn wait_until_ready(
   slots: &[RuntimeSlot],
   state: &SystemState,
@@ -706,10 +751,10 @@ async fn wait_until_ready(
   let mut any_healthcheck = false;
   loop {
     let mut pending = Vec::new();
-    for slot in slots.iter().filter(|slot| {
-      slot.role == CargoReplicaProcessRole::Sandbox
-        || (slot.role == CargoReplicaProcessRole::App && slot.essential)
-    }) {
+    for slot in slots
+      .iter()
+      .filter(|slot| requires_steady_state_readiness(slot.role, slot.essential))
+    {
       let inspected = inspect_process(&slot.process.key, state).await?;
       let container_state = inspected.state.as_ref();
       let running = container_state
@@ -998,14 +1043,6 @@ pub async fn start(
   Ok(())
 }
 
-fn has_port_bindings(cargo: &Cargo) -> bool {
-  cargo
-    .spec
-    .port_bindings
-    .as_ref()
-    .is_some_and(|bindings| !bindings.is_empty())
-}
-
 fn has_fixed_port_bindings(cargo: &Cargo) -> bool {
   cargo.spec.port_bindings.as_ref().is_some_and(|bindings| {
     bindings.values().any(|bindings| {
@@ -1019,6 +1056,10 @@ fn has_fixed_port_bindings(cargo: &Cargo) -> bool {
       })
     })
   })
+}
+
+fn requires_removal_before_replacement(cargo: &Cargo) -> bool {
+  has_fixed_port_bindings(cargo)
 }
 
 fn validate_local_fixed_port_ownership(
@@ -1055,7 +1096,7 @@ fn uses_host_network(cargo: &Cargo) -> bool {
 }
 
 fn requires_stop_before_replacement(cargo: &Cargo) -> bool {
-  has_port_bindings(cargo) || uses_host_network(cargo)
+  requires_removal_before_replacement(cargo) || uses_host_network(cargo)
 }
 
 async fn active_slots(
@@ -1249,11 +1290,7 @@ async fn delete_slots(
   slots: &[RuntimeSlot],
   state: &SystemState,
 ) -> IoResult<()> {
-  for role in [
-    CargoReplicaProcessRole::App,
-    CargoReplicaProcessRole::Init,
-    CargoReplicaProcessRole::Sandbox,
-  ] {
+  for role in RUNTIME_DELETION_ORDER {
     for slot in slots.iter().filter(|slot| slot.role == role) {
       super::process::delete_instance(
         &slot.process.key,
@@ -1447,6 +1484,7 @@ async fn prepare_replica_update(
   cargo: &Cargo,
   task: &CargoReplicaTask,
   stop_first: bool,
+  remove_first: bool,
   state: &SystemState,
 ) -> IoResult<PreparedReplicaUpdate> {
   preflight_replica(cargo, task, state).await?;
@@ -1458,6 +1496,22 @@ async fn prepare_replica_update(
   if stop_first && let Err(error) = stop_slots(&old, state).await {
     let _ = retain_old_slots(&mut old, true, state).await;
     return Err(error);
+  }
+  if remove_first {
+    if let Err(error) = delete_slots(&old, state).await {
+      if let Err(restore_error) = retain_old_slots(&mut old, true, state).await
+      {
+        log::error!(
+          "Unable to restore Cargo {} replica {} after fixed-port cleanup failure: {restore_error}",
+          cargo.spec.cargo_key,
+          task.key
+        );
+      }
+      return Err(error);
+    }
+    // A fixed host-port rollout deliberately trades rollback for releasing the
+    // old sandbox listener before the replacement sandbox is created.
+    old.clear();
   }
   let mut candidate = match create_candidate(cargo, task, state).await {
     Ok(candidate) => candidate,
@@ -1630,19 +1684,71 @@ async fn restore_retained_updates(
   all_ready
 }
 
+fn required_candidate_topology_complete<'a>(
+  cargo: &Cargo,
+  slots: impl IntoIterator<Item = (CargoReplicaProcessRole, &'a str, bool)>,
+) -> bool {
+  let desired_apps = cargo
+    .spec
+    .containers
+    .iter()
+    .filter(|container| container.essential)
+    .map(|container| container.name.as_str())
+    .collect::<HashSet<_>>();
+  let mut observed_apps = HashSet::new();
+  let mut duplicate_app = false;
+  let mut sandboxes = 0usize;
+  for (role, name, essential) in slots {
+    match role {
+      CargoReplicaProcessRole::Sandbox => sandboxes += 1,
+      CargoReplicaProcessRole::App if essential => {
+        if !observed_apps.insert(name) {
+          duplicate_app = true;
+        }
+      }
+      _ => {}
+    }
+  }
+  let sandbox_complete = if cargo_network_mode(cargo) == "host" {
+    sandboxes == 0
+  } else {
+    sandboxes == 1
+  };
+  sandbox_complete && !duplicate_app && observed_apps == desired_apps
+}
+
 async fn snapshot_prepared_candidate_readiness(
+  cargo: &Cargo,
   prepared: &mut [PreparedReplicaUpdate],
   state: &SystemState,
 ) -> IoResult<bool> {
+  if prepared.iter().any(|replica| {
+    !required_candidate_topology_complete(
+      cargo,
+      replica
+        .candidate
+        .slots
+        .iter()
+        .map(|slot| (slot.role, slot.container_name.as_str(), slot.essential)),
+    )
+  }) {
+    return Ok(false);
+  }
   let targets = prepared
     .iter()
     .enumerate()
     .flat_map(|(replica_index, replica)| {
-      replica.candidate.slots.iter().enumerate().map(
-        move |(slot_index, slot)| {
+      replica
+        .candidate
+        .slots
+        .iter()
+        .enumerate()
+        .filter(|(_, slot)| {
+          requires_steady_state_readiness(slot.role, slot.essential)
+        })
+        .map(move |(slot_index, slot)| {
           (replica_index, slot_index, slot.process.key.clone())
-        },
-      )
+        })
     })
     .collect::<Vec<_>>();
   let observations = try_join_all(
@@ -1656,10 +1762,12 @@ async fn snapshot_prepared_candidate_readiness(
     targets.into_iter().zip(observations)
   {
     let slot = &mut prepared[replica_index].candidate.slots[slot_index];
-    if (slot.role == CargoReplicaProcessRole::Sandbox
-      || (slot.role == CargoReplicaProcessRole::App && slot.essential))
-      && !observed_container_ready(&inspected)
-    {
+    let slot_ready = if slot.role == CargoReplicaProcessRole::Sandbox {
+      observed_container_running(&inspected)
+    } else {
+      observed_container_ready(&inspected)
+    };
+    if !slot_ready {
       ready = false;
     }
     let data = serde_json::to_value(&inspected)
@@ -1750,9 +1858,16 @@ async fn rollback_committed_update(
       cargo.spec.cargo_key
     );
   }
-  if let Err(error) = ObjPsStatusDb::update_actual_status(
+  if let Err(error) = ObjPsStatusDb::update_pk(
     &cargo.spec.cargo_key,
-    &ObjPsStatusKind::Fail,
+    ObjPsStatusUpdate {
+      actual: Some(ObjPsStatusKind::Fail.to_string()),
+      // Preserve an explicit failed-update marker even when readiness changed
+      // after the provisional Start commit. Delayed reconciliation events must
+      // not reinterpret the restored old topology as a successful candidate.
+      prev_actual: Some(ObjPsStatusKind::Updating.to_string()),
+      ..Default::default()
+    },
     &state.inner.pool,
   )
   .await
@@ -1835,9 +1950,12 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     preflight_replica(&cargo, task, state).await?;
   }
   let stop_first = requires_stop_before_replacement(&cargo);
+  let remove_first = requires_removal_before_replacement(&cargo);
   let mut prepared = Vec::with_capacity(tasks.len());
   for task in &tasks {
-    match prepare_replica_update(&cargo, task, stop_first, state).await {
+    match prepare_replica_update(&cargo, task, stop_first, remove_first, state)
+      .await
+    {
       Ok(replica) => prepared.push(replica),
       Err(error) => {
         rollback_prepared_updates(&mut prepared, state).await;
@@ -1853,7 +1971,9 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
         return Err(error);
       }
     };
-  match snapshot_prepared_candidate_readiness(&mut prepared, state).await {
+  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
+    .await
+  {
     Ok(true) => {}
     Ok(false) => {
       rollback_prepared_updates(&mut prepared, state).await;
@@ -1902,7 +2022,9 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     .await;
     return Err(error);
   }
-  match snapshot_prepared_candidate_readiness(&mut prepared, state).await {
+  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
+    .await
+  {
     Ok(true) => {}
     Ok(false) => {
       rollback_committed_update(
@@ -1952,7 +2074,9 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     .await;
     return Err(error);
   }
-  match snapshot_prepared_candidate_readiness(&mut prepared, state).await {
+  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
+    .await
+  {
     Ok(true) => {}
     Ok(false) => {
       rollback_committed_update(
@@ -1975,17 +2099,12 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
       return Err(error);
     }
   }
-  if any_healthcheck {
-    state
-      .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
-      .await;
+  for action in promotion_actions(any_healthcheck) {
+    state.emit_normal_native_action_sync(&cargo, action).await;
   }
-  state
-    .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
-    .await;
   ntex::time::sleep(ROUTE_HANDOFF_GRACE).await;
   let handoff_ready =
-    snapshot_prepared_candidate_readiness(&mut prepared, state).await;
+    snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state).await;
   let status = ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await;
   match (handoff_ready, status) {
     (Ok(true), Ok(status))
@@ -2077,10 +2196,16 @@ pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
   })
 }
 
+fn observed_container_running(
+  observed: &bollard_next::models::ContainerInspectResponse,
+) -> bool {
+  observed.state.as_ref().and_then(|state| state.running) == Some(true)
+}
+
 fn observed_container_ready(
   observed: &bollard_next::models::ContainerInspectResponse,
 ) -> bool {
-  if observed.state.as_ref().and_then(|state| state.running) != Some(true) {
+  if !observed_container_running(observed) {
     return false;
   }
   let healthcheck = observed
@@ -2105,9 +2230,8 @@ fn observed_process_ready(process: &Process) -> bool {
 #[derive(Default)]
 struct ReplicaReadinessObservation {
   sandboxes: Vec<bool>,
-  app_names: HashSet<String>,
   essential_apps: HashMap<String, bool>,
-  duplicate_app: bool,
+  invalid_required_app: bool,
 }
 
 /// Reduce fresh persisted observations without selecting a first container.
@@ -2151,25 +2275,32 @@ pub(crate) fn all_desired_replicas_ready(
     let observation = replicas.entry(replica_key).or_default();
     match labels.get(LABEL_ROLE).map(String::as_str) {
       Some("sandbox") => {
-        observation.sandboxes.push(observed_process_ready(process));
+        observation
+          .sandboxes
+          .push(observed_container_running(&process.data));
       }
       Some("app") => {
+        let essential = match labels.get(LABEL_ESSENTIAL).map(String::as_str) {
+          Some("true") => true,
+          Some("false") => false,
+          _ => {
+            observation.invalid_required_app = true;
+            continue;
+          }
+        };
+        if !essential {
+          continue;
+        }
         let Some(name) = labels.get(LABEL_CONTAINER) else {
-          observation.duplicate_app = true;
+          observation.invalid_required_app = true;
           continue;
         };
-        if !observation.app_names.insert(name.clone()) {
-          observation.duplicate_app = true;
-        }
-        if labels
-          .get(LABEL_ESSENTIAL)
-          .is_some_and(|value| value == "true")
-          && observation
-            .essential_apps
-            .insert(name.clone(), observed_process_ready(process))
-            .is_some()
+        if observation
+          .essential_apps
+          .insert(name.clone(), observed_process_ready(process))
+          .is_some()
         {
-          observation.duplicate_app = true;
+          observation.invalid_required_app = true;
         }
       }
       _ => {}
@@ -2182,7 +2313,7 @@ pub(crate) fn all_desired_replicas_ready(
   }
   let sandbox_required = cargo_network_mode(cargo) != "host";
   replicas.values().all(|observation| {
-    !observation.duplicate_app
+    !observation.invalid_required_app
       && observation.essential_apps.len() == desired_apps.len()
       && desired_apps
         .iter()
@@ -2438,6 +2569,21 @@ mod tests {
       }]),
     )]));
     assert!(requires_stop_before_replacement(&cargo));
+    assert!(requires_removal_before_replacement(&cargo));
+
+    cargo
+      .spec
+      .port_bindings
+      .as_mut()
+      .unwrap()
+      .values_mut()
+      .next()
+      .unwrap()
+      .as_mut()
+      .unwrap()[0]
+      .host_port = Some("0".to_owned());
+    assert!(!requires_stop_before_replacement(&cargo));
+    assert!(!requires_removal_before_replacement(&cargo));
   }
 
   #[test]
@@ -2473,8 +2619,21 @@ mod tests {
     let mut cargo = Cargo::default();
     cargo.spec.network_mode = Some(CargoNetworkMode::new("host").unwrap());
     assert!(requires_stop_before_replacement(&cargo));
+    assert!(!requires_removal_before_replacement(&cargo));
     cargo.spec.network_mode = Some(CargoNetworkMode::new("private").unwrap());
     assert!(!requires_stop_before_replacement(&cargo));
+  }
+
+  #[test]
+  fn runtime_cleanup_orders_applications_before_sandbox() {
+    assert_eq!(
+      RUNTIME_DELETION_ORDER,
+      [
+        CargoReplicaProcessRole::App,
+        CargoReplicaProcessRole::Init,
+        CargoReplicaProcessRole::Sandbox,
+      ]
+    );
   }
 
   #[test]
@@ -2508,6 +2667,92 @@ mod tests {
   }
 
   #[test]
+  fn init_container_must_run_before_exit_zero_counts_as_complete() {
+    assert_eq!(
+      init_container_disposition(false, Some("created"), Some(0)),
+      InitContainerDisposition::Start
+    );
+    assert_eq!(
+      init_container_disposition(true, Some("running"), Some(0)),
+      InitContainerDisposition::Wait
+    );
+    assert_eq!(
+      init_container_disposition(false, Some("exited"), Some(0)),
+      InitContainerDisposition::Complete
+    );
+    assert_eq!(
+      init_container_disposition(false, Some("exited"), Some(1)),
+      InitContainerDisposition::Start
+    );
+  }
+
+  #[test]
+  fn steady_state_readiness_excludes_completed_init_and_nonessential_apps() {
+    assert!(requires_steady_state_readiness(
+      CargoReplicaProcessRole::Sandbox,
+      true
+    ));
+    assert!(requires_steady_state_readiness(
+      CargoReplicaProcessRole::App,
+      true
+    ));
+    assert!(!requires_steady_state_readiness(
+      CargoReplicaProcessRole::App,
+      false
+    ));
+    assert!(!requires_steady_state_readiness(
+      CargoReplicaProcessRole::Init,
+      true
+    ));
+  }
+
+  #[test]
+  fn successful_promotion_keeps_the_nightly_event_order() {
+    assert_eq!(promotion_actions(false), vec![NativeEventAction::Start]);
+    assert_eq!(
+      promotion_actions(true),
+      vec![NativeEventAction::Start, NativeEventAction::Healthy]
+    );
+  }
+
+  #[test]
+  fn candidate_topology_requires_sandbox_and_every_essential_application() {
+    let mut cargo = readiness_cargo(1);
+    cargo
+      .spec
+      .containers
+      .insert(1, declared_container("worker", true));
+    let complete = [
+      (CargoReplicaProcessRole::Sandbox, SANDBOX_LOGICAL_NAME, true),
+      (CargoReplicaProcessRole::Init, "migrate", true),
+      (CargoReplicaProcessRole::App, "api", true),
+      (CargoReplicaProcessRole::App, "worker", true),
+      (CargoReplicaProcessRole::App, "metrics", false),
+    ];
+    assert!(required_candidate_topology_complete(&cargo, complete));
+    assert!(!required_candidate_topology_complete(
+      &cargo,
+      complete
+        .into_iter()
+        .filter(|(_, name, _)| *name != "worker")
+    ));
+    assert!(!required_candidate_topology_complete(
+      &cargo,
+      complete
+        .into_iter()
+        .filter(|(role, _, _)| { *role != CargoReplicaProcessRole::Sandbox })
+    ));
+
+    cargo.spec.network_mode = Some(CargoNetworkMode::new("host").unwrap());
+    assert!(required_candidate_topology_complete(
+      &cargo,
+      complete
+        .into_iter()
+        .filter(|(role, _, _)| { *role != CargoReplicaProcessRole::Sandbox })
+    ));
+  }
+
+  #[test]
   fn complete_desired_replica_is_ready_with_healthless_or_disabled_app() {
     let replica = uuid::Uuid::new_v4();
     let cargo = readiness_cargo(1);
@@ -2532,6 +2777,87 @@ mod tests {
       ..Default::default()
     });
     assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+  }
+
+  #[test]
+  fn complete_replica_readiness_uses_only_required_steady_state_processes() {
+    let replica = uuid::Uuid::new_v4();
+    let mut cargo = readiness_cargo(1);
+    cargo
+      .spec
+      .containers
+      .insert(1, declared_container("worker", true));
+    let desired = HashSet::from([replica]);
+    let mut processes = vec![
+      readiness_process(
+        replica,
+        "global.api-sandbox.c",
+        "sandbox",
+        SANDBOX_LOGICAL_NAME,
+        true,
+        true,
+        None,
+      ),
+      readiness_process(
+        replica,
+        "global.api-api.c",
+        "app",
+        "api",
+        true,
+        true,
+        Some(HealthStatusEnum::HEALTHY),
+      ),
+      readiness_process(
+        replica,
+        "global.api-worker.c",
+        "app",
+        "worker",
+        true,
+        true,
+        Some(HealthStatusEnum::STARTING),
+      ),
+      readiness_process(
+        replica,
+        "global.api-metrics.c",
+        "app",
+        "metrics",
+        false,
+        true,
+        Some(HealthStatusEnum::UNHEALTHY),
+      ),
+      readiness_process(
+        replica,
+        "init-global.api-migrate.c",
+        "init",
+        "migrate",
+        true,
+        false,
+        None,
+      ),
+    ];
+
+    // One healthy application cannot promote a two-application candidate.
+    assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+    processes[2].data.state.as_mut().unwrap().health = Some(Health {
+      status: Some(HealthStatusEnum::HEALTHY),
+      ..Default::default()
+    });
+    assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+
+    // A running healthless essential application is ready alongside a
+    // healthchecked essential application. Completed init and an unhealthy
+    // nonessential application do not participate in steady-state readiness.
+    processes[2].data.config.as_mut().unwrap().healthcheck = None;
+    processes[2].data.state.as_mut().unwrap().health = None;
+    assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+
+    let worker = processes.remove(2);
+    assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+    processes.insert(2, worker);
+    processes[0].data.state.as_mut().unwrap().running = Some(false);
+    assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+    processes.remove(0);
+    assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
   }
 
   #[test]
@@ -2617,7 +2943,7 @@ mod tests {
     );
     processes.push(sidecar.clone());
     processes.push(sidecar);
-    assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+    assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
   }
 
   #[test]

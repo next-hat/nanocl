@@ -582,7 +582,7 @@ fn close_and_retarget_utoipa_schema(
             strict_components,
           );
           if let utoipa::openapi::RefOr::T(property_names) = property_names {
-            *schema.property_names.as_mut().unwrap() = Box::new(property_names);
+            **schema.property_names.as_mut().unwrap() = property_names;
           }
         }
         if !schema.properties.is_empty()

@@ -77,9 +77,25 @@ fn labels_describe_active_cargo_runtime(
   }
 }
 
-fn reconciliation_owns_cargo_health(actual: &str) -> bool {
+fn reconciliation_owns_cargo_health(actual: &str, prev_actual: &str) -> bool {
   actual == ObjPsStatusKind::Updating.to_string()
     || actual == ObjPsStatusKind::Starting.to_string()
+    || (actual == ObjPsStatusKind::Fail.to_string()
+      && prev_actual == ObjPsStatusKind::Updating.to_string())
+}
+
+fn successful_cargo_readiness_actions(
+  actual_changed: bool,
+  health_changed: bool,
+) -> Vec<NativeEventAction> {
+  let mut actions = Vec::new();
+  if actual_changed {
+    actions.push(NativeEventAction::Start);
+  }
+  if health_changed {
+    actions.push(NativeEventAction::Healthy);
+  }
+  actions
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,14 +207,24 @@ async fn exec_network_event(
 async fn refresh_process_observation(
   id: &str,
   name: &str,
+  kind: &EventActorKind,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<String> {
   let instance = state
     .inner
     .docker_api
     .inspect_container(id, None::<InspectContainerOptions>)
     .await
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  // Docker events retain the name that existed when they were emitted. A
+  // delayed Cargo candidate event can therefore arrive after promotion
+  // renamed the same container. Persist the inspected current Cargo name
+  // instead of reviving a stale candidate/tmp marker from the event payload.
+  let observed_name = if kind == &EventActorKind::Cargo {
+    current_process_name(instance.name.as_deref(), name)
+  } else {
+    name.to_owned()
+  };
   let data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
   ProcessDb::update_pk(
@@ -206,13 +232,24 @@ async fn refresh_process_observation(
     ProcessUpdateDb {
       updated_at: Some(chrono::Utc::now().naive_utc()),
       data: Some(data),
-      name: Some(name.to_owned()),
+      name: Some(observed_name.clone()),
       ..Default::default()
     },
     &state.inner.pool,
   )
   .await?;
-  Ok(())
+  Ok(observed_name)
+}
+
+fn current_process_name(
+  inspected_name: Option<&str>,
+  event_name: &str,
+) -> String {
+  inspected_name
+    .map(|name| name.trim_start_matches('/'))
+    .filter(|name| !name.is_empty())
+    .unwrap_or(event_name)
+    .to_owned()
 }
 
 async fn reduce_cargo_runtime_readiness(
@@ -228,7 +265,7 @@ async fn reduce_cargo_runtime_readiness(
     );
     return Ok(false);
   }
-  if reconciliation_owns_cargo_health(&status.actual) {
+  if reconciliation_owns_cargo_health(&status.actual, &status.prev_actual) {
     // Cargo reconciliation performs a synchronous, per-replica readiness
     // gate and owns promotion or rollback. Docker events can be delivered out
     // of order, so they must not mutate aggregate state or delete/restore a
@@ -291,14 +328,11 @@ async fn reduce_cargo_runtime_readiness(
       &state.inner.pool,
     )
     .await?;
-    state
-      .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
-      .await;
   }
-  if health_changed {
-    state
-      .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
-      .await;
+  for action in
+    successful_cargo_readiness_actions(actual_changed, health_changed)
+  {
+    state.emit_normal_native_action_sync(&cargo, action).await;
   }
   Ok(true)
 }
@@ -350,10 +384,6 @@ async fn exec_docker(
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   let name = attributes.get("name").cloned().unwrap_or_default();
-  let is_active_cargo_application_event =
-    labels_describe_active_cargo_application(&name, Some(&attributes));
-  let is_active_cargo_runtime_event =
-    labels_describe_active_cargo_runtime(&name, Some(&attributes));
   let action = action.as_str();
   let mut observation_refreshed = false;
   let mut event = EventPartial {
@@ -380,9 +410,17 @@ async fn exec_docker(
   };
   match action {
     "start" => {
+      let mut is_active_cargo_runtime_event = false;
       if kind == EventActorKind::Cargo {
-        refresh_process_observation(&id, &name, state).await?;
+        let current_name =
+          refresh_process_observation(&id, &name, &kind, state).await?;
         observation_refreshed = true;
+        is_active_cargo_runtime_event =
+          labels_describe_active_cargo_runtime(&name, Some(&attributes))
+            && labels_describe_active_cargo_runtime(
+              &current_name,
+              Some(&attributes),
+            );
       }
       let actual_status =
         ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
@@ -391,7 +429,11 @@ async fn exec_docker(
         // Cargo reconciler. A sandbox, init container, or the first app start
         // event must never promote the whole Cargo.
         (EventActorKind::Cargo, actual)
-          if !reconciliation_owns_cargo_health(actual)
+          if is_active_cargo_runtime_event
+            && !reconciliation_owns_cargo_health(
+              actual,
+              &actual_status.prev_actual,
+            )
             && actual_status.wanted == ObjPsStatusKind::Start.to_string() =>
         {
           let _ =
@@ -412,11 +454,16 @@ async fn exec_docker(
       }
     }
     action if action.starts_with("health_status:") => {
-      refresh_process_observation(&id, &name, state).await?;
+      let current_name =
+        refresh_process_observation(&id, &name, &kind, state).await?;
       observation_refreshed = true;
       event.action = NativeEventAction::Update.to_string();
       if kind == EventActorKind::Cargo
-        && is_active_cargo_application_event
+        && labels_describe_active_cargo_application(&name, Some(&attributes))
+        && labels_describe_active_cargo_application(
+          &current_name,
+          Some(&attributes),
+        )
         && let Err(err) =
           handle_cargo_health_event(&kind_key, action, state).await
       {
@@ -424,9 +471,16 @@ async fn exec_docker(
       }
     }
     "die" => {
-      refresh_process_observation(&id, &name, state).await?;
+      let current_name =
+        refresh_process_observation(&id, &name, &kind, state).await?;
       observation_refreshed = true;
-      if kind != EventActorKind::Cargo || is_active_cargo_runtime_event {
+      if kind != EventActorKind::Cargo
+        || (labels_describe_active_cargo_runtime(&name, Some(&attributes))
+          && labels_describe_active_cargo_runtime(
+            &current_name,
+            Some(&attributes),
+          ))
+      {
         let actual_status =
           ObjPsStatusDb::read_by_pk(&kind_key, &state.inner.pool).await?;
         log::debug!(
@@ -438,7 +492,10 @@ async fn exec_docker(
           (EventActorKind::Cargo, wanted, actual)
             if wanted != &ObjPsStatusKind::Stop.to_string()
               && wanted != &ObjPsStatusKind::Destroy.to_string()
-              && !reconciliation_owns_cargo_health(actual) =>
+              && !reconciliation_owns_cargo_health(
+                actual,
+                &actual_status.prev_actual,
+              ) =>
           {
             let cargo =
               CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
@@ -500,7 +557,7 @@ async fn exec_docker(
   }
   state.spawn_emit_event(event);
   if !observation_refreshed {
-    refresh_process_observation(&id, &name, state).await?;
+    let _ = refresh_process_observation(&id, &name, &kind, state).await?;
   }
   Ok(())
 }
@@ -672,19 +729,69 @@ mod tests {
   }
 
   #[test]
-  fn reconciliation_owns_starting_and_updating_health_events() {
+  fn reconciliation_owns_in_progress_and_failed_update_events() {
     assert!(reconciliation_owns_cargo_health(
-      &ObjPsStatusKind::Starting.to_string()
+      &ObjPsStatusKind::Starting.to_string(),
+      &ObjPsStatusKind::Create.to_string()
     ));
     assert!(reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Updating.to_string(),
+      &ObjPsStatusKind::Start.to_string()
+    ));
+    assert!(reconciliation_owns_cargo_health(
+      &ObjPsStatusKind::Fail.to_string(),
       &ObjPsStatusKind::Updating.to_string()
     ));
     assert!(!reconciliation_owns_cargo_health(
-      &ObjPsStatusKind::Start.to_string()
+      &ObjPsStatusKind::Start.to_string(),
+      &ObjPsStatusKind::Updating.to_string()
     ));
     assert!(!reconciliation_owns_cargo_health(
-      &ObjPsStatusKind::Fail.to_string()
+      &ObjPsStatusKind::Fail.to_string(),
+      &ObjPsStatusKind::Start.to_string()
     ));
+  }
+
+  #[test]
+  fn repeated_successful_status_does_not_emit_duplicate_actions() {
+    assert_eq!(
+      successful_cargo_readiness_actions(true, true),
+      vec![NativeEventAction::Start, NativeEventAction::Healthy]
+    );
+    assert!(successful_cargo_readiness_actions(false, false).is_empty());
+  }
+
+  #[test]
+  fn delayed_docker_event_keeps_the_current_inspected_process_name() {
+    let app = HashMap::from([
+      (LABEL_CARGO_ROLE.to_owned(), "app".to_owned()),
+      (LABEL_CARGO_ESSENTIAL.to_owned(), "true".to_owned()),
+    ]);
+    let promoted = current_process_name(
+      Some("/global.api-api-1.c"),
+      "candidate-global.api-api-1.c",
+    );
+    assert_eq!(promoted, "global.api-api-1.c");
+    assert!(labels_describe_active_cargo_runtime(&promoted, Some(&app)));
+    assert!(
+      !(labels_describe_active_cargo_runtime(
+        "candidate-global.api-api-1.c",
+        Some(&app)
+      ) && labels_describe_active_cargo_runtime(&promoted, Some(&app)))
+    );
+
+    let rolled_back = current_process_name(
+      Some("/candidate-global.api-api-1.c"),
+      "global.api-api-1.c",
+    );
+    assert!(!labels_describe_active_cargo_runtime(
+      &rolled_back,
+      Some(&app)
+    ));
+    assert_eq!(
+      current_process_name(None, "candidate-global.api-api-1.c"),
+      "candidate-global.api-api-1.c"
+    );
   }
 
   fn vm_failure_effect(

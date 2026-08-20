@@ -164,17 +164,15 @@ impl ObjTaskStart for CargoDb {
       let instances =
         ProcessDb::read_by_kind_key(&cargo_key, None, &state.inner.pool)
           .await?;
-      if utils::container::cargo::has_container_healthcheck(&cargo, &instances)
-      {
+      let has_healthcheck =
+        utils::container::cargo::has_container_healthcheck(&cargo, &instances);
+      if has_healthcheck {
         ObjPsStatusDb::update_health_status(
           &cargo_key,
           &ObjPsHealthStatusKind::Healthy,
           &state.inner.pool,
         )
         .await?;
-        state
-          .emit_normal_native_action_sync(&cargo, NativeEventAction::Healthy)
-          .await;
       }
       ObjPsStatusDb::update_actual_status(
         &cargo_key,
@@ -182,9 +180,10 @@ impl ObjTaskStart for CargoDb {
         &state.inner.pool,
       )
       .await?;
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Start)
-        .await;
+      for action in utils::container::cargo::promotion_actions(has_healthcheck)
+      {
+        state.emit_normal_native_action_sync(&cargo, action).await;
+      }
       CargoDb::delete_mutex(&mutex.key, &state).await?;
       Ok::<_, IoError>(())
     })
@@ -211,7 +210,12 @@ impl ObjTaskUpdate for CargoDb {
     Box::pin(async move {
       let mutex = CargoDb::create_mutex(&key, "update", &state).await?;
       utils::container::cargo::update(&key, &state).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
       CargoDb::delete_mutex(&mutex.key, &state).await?;
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Update)
+        .await;
       Ok::<_, IoError>(())
     })
   }

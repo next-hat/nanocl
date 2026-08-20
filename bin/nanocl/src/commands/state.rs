@@ -887,7 +887,7 @@ async fn state_apply(
             let waiter = utils::process::wait_process_state(
               &key,
               EventActorKind::Cargo,
-              vec![NativeEventAction::Start],
+              vec![NativeEventAction::Update],
               client,
             )
             .await?;

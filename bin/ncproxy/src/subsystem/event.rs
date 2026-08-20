@@ -61,16 +61,36 @@ fn cargo_has_committed_start(
   cargo.status.actual == nanocld_client::stubs::system::ObjPsStatusKind::Start
 }
 
-async fn cargo_is_committed_started(
+fn cargo_event_refreshes_route(
+  cargo: &nanocld_client::stubs::cargo::CargoInspect,
+  action: &NativeEventAction,
+) -> bool {
+  if !cargo_has_committed_start(cargo) {
+    return false;
+  }
+  // Preserve nightly's single handoff: healthless/NONE Cargoes refresh on
+  // Start, while a health-gated Cargo refreshes on the following Healthy.
+  // Nanocld commits aggregate health and actual state before either event.
+  let healthchecked = cargo.status.health
+    == nanocld_client::stubs::system::ObjPsHealthStatusKind::Healthy;
+  match action {
+    NativeEventAction::Start => !healthchecked,
+    NativeEventAction::Healthy => healthchecked,
+    _ => false,
+  }
+}
+
+async fn cargo_event_should_refresh_route(
   name: &str,
   namespace: &str,
+  action: &NativeEventAction,
   state: &SystemStateRef,
 ) -> IoResult<bool> {
   let key =
     nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
       .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?;
   let cargo = state.client.inspect_cargo(key.as_str()).await?;
-  Ok(cargo_has_committed_start(&cargo))
+  Ok(cargo_event_refreshes_route(&cargo, action))
 }
 
 /// Get workload name and namespace attributes from a nanocld event.
@@ -197,10 +217,12 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
-    (EventActorKind::Cargo, NativeEventAction::Start)
-    | (EventActorKind::Cargo, NativeEventAction::Healthy) => {
+    (EventActorKind::Cargo, action @ NativeEventAction::Start)
+    | (EventActorKind::Cargo, action @ NativeEventAction::Healthy) => {
       let (name, namespace) = get_workload_attributes(&actor.attributes)?;
-      if cargo_is_committed_started(&name, &namespace, state).await? {
+      if cargo_event_should_refresh_route(&name, &namespace, &action, state)
+        .await?
+      {
         update_cargo_rule(&name, &namespace, state).await?;
         let _ = state.event_emitter.emit_reload().await;
       }
@@ -216,8 +238,9 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Update) => {
-      // Updating is not a committed serving state. Keep the existing nginx
-      // routes until Start/Healthy or recompute them after Unhealthy rollback.
+      // Start/Healthy already performed the route handoff. Update is the
+      // terminal rollout-completion signal for command and API waiters, so it
+      // must not trigger a second reload.
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)
@@ -366,7 +389,10 @@ pub(crate) fn spawn(state: &SystemStateRef) {
 
 #[cfg(test)]
 mod tests {
-  use nanocld_client::stubs::{cargo::CargoInspect, system::ObjPsStatusKind};
+  use nanocld_client::stubs::{
+    cargo::CargoInspect,
+    system::{ObjPsHealthStatusKind, ObjPsStatusKind},
+  };
 
   use super::*;
 
@@ -400,6 +426,46 @@ mod tests {
     ] {
       assert!(!cargo_has_committed_start(&cargo(status)));
     }
+  }
+
+  #[test]
+  fn cargo_promotion_refreshes_proxy_once_for_its_readiness_kind() {
+    // Healthless and explicitly disabled healthchecks both retain aggregate
+    // health Unknown and hand off on Start.
+    let healthless = cargo(ObjPsStatusKind::Start);
+    assert!(cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Start
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Healthy
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Update
+    ));
+
+    let mut healthchecked = cargo(ObjPsStatusKind::Start);
+    healthchecked.status.health = ObjPsHealthStatusKind::Healthy;
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Start
+    ));
+    assert!(cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Healthy
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Update
+    ));
+
+    healthchecked.status.actual = ObjPsStatusKind::Updating;
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Healthy
+    ));
   }
 
   #[test]

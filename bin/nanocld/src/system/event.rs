@@ -240,6 +240,33 @@ fn stopping(
   }
 }
 
+fn event_waits_for_object_task(
+  actor_kind: &EventActorKind,
+  action: &NativeEventAction,
+  active_task_kind: Option<&NativeEventAction>,
+) -> bool {
+  match actor_kind {
+    // Cargo update tasks emit their route-handoff actions before completing.
+    // Waiting for that same task here would delay raw subscribers (including
+    // ncproxy) until after retained-generation cleanup. Other tasks retain the
+    // existing completion barrier.
+    EventActorKind::Cargo
+      if active_task_kind == Some(&NativeEventAction::Updating)
+        && matches!(
+          action,
+          NativeEventAction::Start
+            | NativeEventAction::Healthy
+            | NativeEventAction::Unhealthy
+        ) =>
+    {
+      false
+    }
+    EventActorKind::Cargo => true,
+    EventActorKind::Vm => true,
+    _ => false,
+  }
+}
+
 /// Take action when event is received
 /// and push the action into the task manager
 /// The task manager will execute the action in background
@@ -264,16 +291,35 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
   let action = NativeEventAction::from_str(e.action.as_str())?;
+  let active_task_kind = if actor.kind == EventActorKind::Cargo
+    && matches!(
+      &action,
+      NativeEventAction::Start
+        | NativeEventAction::Healthy
+        | NativeEventAction::Unhealthy
+    ) {
+    state
+      .inner
+      .task_manager
+      .get_task(&task_key)
+      .await
+      .map(|task| task.kind)
+  } else {
+    None
+  };
   // Check if the task already exists
-  match (&actor.kind, &action) {
-    (EventActorKind::Cargo | EventActorKind::Vm, _) => {
-      state.inner.task_manager.wait_task(&task_key).await;
-    }
-    (EventActorKind::Job, NativeEventAction::Destroying) => {
-      log::debug!("Removing task for job {key}");
-      state.inner.task_manager.remove_task(&task_key).await;
-    }
-    _ => {}
+  if event_waits_for_object_task(
+    &actor.kind,
+    &action,
+    active_task_kind.as_ref(),
+  ) {
+    state.inner.task_manager.wait_task(&task_key).await;
+  } else if matches!(
+    (&actor.kind, &action),
+    (EventActorKind::Job, NativeEventAction::Destroying)
+  ) {
+    log::debug!("Removing task for job {key}");
+    state.inner.task_manager.remove_task(&task_key).await;
   }
   let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => starting(&key, actor, state),
@@ -368,5 +414,48 @@ mod tests {
       assert!(cargo_references_secret(&cargo, key));
     }
     assert!(!cargo_references_secret(&cargo, "unrelated"));
+  }
+
+  #[test]
+  fn cargo_handoff_events_bypass_the_update_task_but_completion_waits() {
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Updating),
+    ));
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Healthy,
+      Some(&NativeEventAction::Updating),
+    ));
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Unhealthy,
+      Some(&NativeEventAction::Updating),
+    ));
+
+    for action in [
+      NativeEventAction::Starting,
+      NativeEventAction::Stopping,
+      NativeEventAction::Updating,
+      NativeEventAction::Update,
+      NativeEventAction::Destroying,
+    ] {
+      assert!(event_waits_for_object_task(
+        &EventActorKind::Cargo,
+        &action,
+        Some(&NativeEventAction::Updating),
+      ));
+    }
+    assert!(event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Starting),
+    ));
+    assert!(event_waits_for_object_task(
+      &EventActorKind::Vm,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Updating),
+    ));
   }
 }

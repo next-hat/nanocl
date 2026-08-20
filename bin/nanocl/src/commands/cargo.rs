@@ -130,7 +130,7 @@ async fn exec_cargo_patch(
   let cargo = client.inspect_cargo(&opts.key).await?;
   let patch = build_cargo_patch(opts, &cargo.spec.containers)?;
   let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Start, client).await?;
+    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
   client.patch_cargo(&opts.key, &patch).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
@@ -241,7 +241,7 @@ async fn exec_cargo_revert(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Start, client).await?;
+    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
   let cargo = client.revert_cargo(&opts.key, &opts.history_id).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_cargo_state", &err.to_string())
