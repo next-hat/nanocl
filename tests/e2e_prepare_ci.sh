@@ -126,6 +126,21 @@ while [ "$p" -lt 240 ]; do
   sleep 1
 done
 
+proxy_id="$(system_app_id ncproxy)"
+
+sudo ls -la /run/nanocl || true
+sudo stat /run/nanocl/proxy.sock || true
+
+docker exec "$proxy_id" sh -c \
+  'id; ls -la /run/nanocl; grep proxy.sock /proc/net/unix || true'
+
+docker inspect "$proxy_id" \
+  --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
+
+sudo curl --show-error --verbose \
+  --unix-socket /run/nanocl/proxy.sock \
+  http://localhost/health || true
+
 if [ "$proxy_ready" -ne 1 ]; then
   echo "ncproxy did not become ready in time" >&2
   docker ps -a
