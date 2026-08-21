@@ -95,32 +95,32 @@ teardown_file() {
   cleanup_nanocl_artifacts
 }
 
-@test "nanocl --version" {
+@test "nanocl prints its CLI version" {
   run nanocl --version
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl version" {
+@test "nanocl prints CLI and daemon versions" {
   run nanocl version
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl help" {
+@test "nanocl displays help" {
   run nanocl help
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl info" {
+@test "nanocl displays host information" {
   run nanocl info
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl cargo ls" {
+@test "nanocl lists Cargo resources" {
   run nanocl cargo ls
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl cargo run/remove" {
+@test "nanocl runs and removes a Cargo" {
   run nanocl cargo run test nginx:latest
   [ "$status" -eq 0 ]
 
@@ -128,7 +128,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl deploy Statefile apply/render/serve/remove" {
+@test "nanocl applies, renders, serves, and removes a deployment Statefile" {
   run nanocl state apply -ys ./examples/deploy_example.yml
   [ "$status" -eq 0 ]
 
@@ -143,7 +143,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl Job Statefile apply/remove" {
+@test "nanocl applies and removes a Job Statefile" {
   run nanocl state apply -ys ./examples/job_example.yml
   [ "$status" -eq 0 ]
 
@@ -151,7 +151,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "one Cargo replica shares one default-network sandbox and Cargo ports" {
+@test "nanocl runs one Cargo replica with shared default networking and published ports" {
   local cargo_key="global.e2e-multi-container"
 
   run nanocl state apply -ys ./tests/multi_container_networking.yml
@@ -223,7 +223,7 @@ teardown_file() {
   assert_no_cargo_containers "$cargo_key"
 }
 
-@test "Cargo none shares localhost without an external network" {
+@test "nanocl runs a Cargo in none mode with shared localhost and no external network" {
   local cargo_key="global.e2e-none"
 
   run nanocl state apply -ys ./tests/cargo_none.yml
@@ -263,7 +263,7 @@ teardown_file() {
   assert_no_cargo_containers "$cargo_key"
 }
 
-@test "nanocl state apply -ys ./tests/network_partitioning.yml" {
+@test "nanocl isolates and routes workloads on a custom network" {
   run docker network inspect e2e-private
   [ "$status" -ne 0 ]
 
@@ -377,7 +377,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "nanocl state apply fails with invalid statefile" {
+@test "nanocl rejects an invalid Statefile" {
   run nanocl state apply -ys ./tests/invalid_statefile.yaml
   [ "$status" -ne 0 ]
 }
