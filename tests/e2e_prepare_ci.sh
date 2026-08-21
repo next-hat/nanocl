@@ -220,12 +220,12 @@ fi
 # whose supplementary groups are not refreshed by usermod. Preserve the
 # intended nanocl-group check above, then grant only the runner user access for
 # the following Bats step instead of making the socket directory world-writable.
-# if ! command -v setfacl >/dev/null 2>&1; then
-#   echo "setfacl is required to grant the E2E runner socket access" >&2
-#   exit 1
-# fi
-# sudo setfacl -R -m "u:${E2E_RUNNER_USER}:rwx" /run/nanocl
-# sudo setfacl -m "d:u:${E2E_RUNNER_USER}:rwx" /run/nanocl
+if ! command -v setfacl >/dev/null 2>&1; then
+  echo "setfacl is required to grant the E2E runner socket access" >&2
+  exit 1
+fi
+sudo setfacl -R -m "u:${E2E_RUNNER_USER}:rwx" /run/nanocl
+sudo setfacl -m "d:u:${E2E_RUNNER_USER}:rwx" /run/nanocl
 
 nanocl version
 docker ps -a
