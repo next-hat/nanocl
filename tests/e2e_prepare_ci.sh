@@ -6,6 +6,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 NANOCL_CHANNEL="${NANOCL_CHANNEL:-nightly}"
+E2E_RUNNER_USER="${E2E_RUNNER_USER:-${USER:-$(id -un)}}"
+export E2E_RUNNER_USER
 
 system_app_id() {
   local name="$1"
@@ -32,6 +34,56 @@ log_system_app() {
   fi
 }
 
+unix_health_status() {
+  local socket_path="$1"
+  local url="$2"
+  local status
+
+  status="$(curl --silent --output /dev/null --write-out "%{http_code}" \
+    --unix-socket "$socket_path" "$url" 2>/dev/null || true)"
+  printf '%s\n' "${status:-000}"
+}
+
+diagnose_unix_service() {
+  local name="$1"
+  local socket_path="$2"
+  local id
+
+  ls -la /run/nanocl || true
+  stat "$socket_path" || true
+  id="$(system_app_id "$name" || true)"
+  if [ -n "$id" ]; then
+    docker exec "$id" sh -c \
+      'id; ls -la /run/nanocl; grep "$1" /proc/net/unix || true' \
+      sh "$socket_path" || true
+    docker inspect "$id" \
+      --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}' \
+      || true
+  fi
+  curl --show-error --verbose --unix-socket "$socket_path" \
+    http://localhost/health || true
+}
+
+if ! getent group nanocl >/dev/null 2>&1; then
+  sudo groupadd nanocl
+fi
+sudo usermod -aG nanocl "$E2E_RUNNER_USER"
+
+e2e_nanocl_gid="$(getent group nanocl | awk -F: '{ print $3 }')"
+if [[ " $(id -G) " != *" ${e2e_nanocl_gid} "* ]]; then
+  if [ "${E2E_NANOCL_GROUP_REEXEC:-0}" = "1" ]; then
+    echo "Unable to activate the nanocl group for $E2E_RUNNER_USER" >&2
+    exit 1
+  fi
+  export E2E_NANOCL_PREPARE_SCRIPT="$ROOT_DIR/tests/e2e_prepare_ci.sh"
+  if ! command -v sg >/dev/null 2>&1; then
+    echo "sg is required to activate the nanocl group" >&2
+    exit 1
+  fi
+  exec sg nanocl -c \
+    'E2E_NANOCL_GROUP_REEXEC=1 exec "$E2E_NANOCL_PREPARE_SCRIPT"'
+fi
+
 # Set E2E_SKIP_IMAGE_BUILD=1 and/or E2E_SKIP_NANOCL_BUILD=1 for faster local reruns.
 if [ "${E2E_SKIP_IMAGE_BUILD:-0}" != "1" ]; then
   NANOCL_CHANNEL="$NANOCL_CHANNEL" sh ./scripts/build_images.sh
@@ -42,12 +94,6 @@ if [ "${E2E_SKIP_NANOCL_BUILD:-0}" != "1" ]; then
   sudo cp target/release/nanocl /usr/bin/nanocl
   sudo chmod +x /usr/bin/nanocl
 fi
-
-if ! getent group nanocl >/dev/null 2>&1; then
-  sudo groupadd nanocl
-fi
-sudo usermod -aG nanocl "$USER" || true
-sudo gpasswd -r nanocl || true
 
 nanocl install -t installer.yml
 
@@ -63,7 +109,8 @@ fi
 daemon_ready=0
 i=0
 while [ "$i" -lt 240 ]; do
-  daemon_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/nanocl.sock http://localhost/v0.0/version || true)
+  daemon_status="$(unix_health_status \
+    /run/nanocl/nanocl.sock http://localhost/v0.0/version)"
 
   if [ "$daemon_status" = "200" ]; then
     echo "readiness: daemon=200 (ready)"
@@ -103,17 +150,16 @@ fi
 proxy_ready=0
 p=0
 while [ "$p" -lt 240 ]; do
-  if [ -S /run/nanocl/proxy.sock ]; then
-    proxy_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/proxy.sock 'http://localhost/health' 2>/dev/null || true)
-    if [ "$proxy_status" != "000" ]; then
-      echo "readiness: proxy=${proxy_status} (ready)"
-      proxy_ready=1
-      break
-    fi
+  proxy_status="$(unix_health_status \
+    /run/nanocl/proxy.sock http://localhost/health)"
+  if [ "$proxy_status" = "200" ]; then
+    echo "readiness: proxy=200 (ready)"
+    proxy_ready=1
+    break
   fi
 
   if [ $((p % 10)) -eq 0 ]; then
-    echo "readiness: proxy=waiting (${p}s)"
+    echo "readiness: proxy=${proxy_status} (${p}s)"
   fi
 
   if ! system_app_id ncproxy >/dev/null; then
@@ -126,23 +172,9 @@ while [ "$p" -lt 240 ]; do
   sleep 1
 done
 
-proxy_id="$(system_app_id ncproxy)"
-
-sudo ls -la /run/nanocl || true
-sudo stat /run/nanocl/proxy.sock || true
-
-docker exec "$proxy_id" sh -c \
-  'id; ls -la /run/nanocl; grep proxy.sock /proc/net/unix || true'
-
-docker inspect "$proxy_id" \
-  --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
-
-sudo curl --show-error --verbose \
-  --unix-socket /run/nanocl/proxy.sock \
-  http://localhost/health || true
-
 if [ "$proxy_ready" -ne 1 ]; then
   echo "ncproxy did not become ready in time" >&2
+  diagnose_unix_service ncproxy /run/nanocl/proxy.sock
   docker ps -a
   log_system_app ndaemon
   log_system_app ncproxy
@@ -153,17 +185,16 @@ fi
 dns_ready=0
 p=0
 while [ "$p" -lt 240 ]; do
-  if [ -S /run/nanocl/dns.sock ]; then
-    dns_status=$(sudo curl --silent --output /dev/null --write-out "%{http_code}" --unix-socket /run/nanocl/dns.sock 'http://localhost/health' 2>/dev/null || true)
-    if [ "$dns_status" != "000" ]; then
-      echo "readiness: dns=${dns_status} (ready)"
-      dns_ready=1
-      break
-    fi
+  dns_status="$(unix_health_status \
+    /run/nanocl/dns.sock http://localhost/health)"
+  if [ "$dns_status" = "200" ]; then
+    echo "readiness: dns=200 (ready)"
+    dns_ready=1
+    break
   fi
 
   if [ $((p % 10)) -eq 0 ]; then
-    echo "readiness: dns=waiting (${p}s)"
+    echo "readiness: dns=${dns_status} (${p}s)"
   fi
 
   if ! system_app_id ncdns >/dev/null; then
@@ -178,13 +209,23 @@ done
 
 if [ "$dns_ready" -ne 1 ]; then
   echo "ncdns did not become ready in time" >&2
+  diagnose_unix_service ncdns /run/nanocl/dns.sock
   docker ps -a
   log_system_app ndaemon
   log_system_app ncdns
   exit 1
 fi
 
-sudo chmod 777 -R /run/nanocl
+# GitHub Actions starts each `run` block from its long-lived runner process,
+# whose supplementary groups are not refreshed by usermod. Preserve the
+# intended nanocl-group check above, then grant only the runner user access for
+# the following Bats step instead of making the socket directory world-writable.
+# if ! command -v setfacl >/dev/null 2>&1; then
+#   echo "setfacl is required to grant the E2E runner socket access" >&2
+#   exit 1
+# fi
+# sudo setfacl -R -m "u:${E2E_RUNNER_USER}:rwx" /run/nanocl
+# sudo setfacl -m "d:u:${E2E_RUNNER_USER}:rwx" /run/nanocl
 
 nanocl version
 docker ps -a
