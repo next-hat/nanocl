@@ -289,7 +289,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // Specific key of the task for this object
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
-  let task_key = format!("{}@{key}", &actor.kind);
+  let task_key = format!("{}@{key}", actor.kind);
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let active_task_kind = if actor.kind == EventActorKind::Cargo
     && matches!(

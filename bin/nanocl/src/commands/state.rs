@@ -197,13 +197,13 @@ pub async fn log_cargoes(
       let key = match utils::process::resource_key(&cargo.name, namespace) {
         Ok(key) => key,
         Err(err) => {
-          eprintln!("Cannot resolve cargo {} key: {err}", &cargo.name);
+          eprintln!("Cannot resolve cargo {} key: {err}", cargo.name);
           return;
         }
       };
       match client.logs_processes("cargo", &key, Some(query)).await {
         Err(err) => {
-          eprintln!("Cannot attach to cargo {}: {err}", &cargo.name);
+          eprintln!("Cannot attach to cargo {}: {err}", cargo.name);
         }
         Ok(stream) => {
           if let Err(err) = utils::print::logs_process_stream(stream).await {
