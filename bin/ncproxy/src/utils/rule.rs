@@ -795,6 +795,8 @@ mod tests {
     stubs::process::{Process, ProcessKind},
   };
 
+  use crate::models::{CargoProcessOpts, CargoProcessProbe as Probe};
+
   use super::*;
 
   fn process(
@@ -842,27 +844,21 @@ mod tests {
     }
   }
 
-  #[derive(Clone, Copy)]
-  enum Probe {
-    None,
-    Disabled,
-    Starting,
-    Healthy,
-    Unhealthy,
-  }
-
   fn cargo_process(
     name: &str,
     replica: &str,
-    logical_name: &str,
-    role: &str,
-    essential: bool,
     node: &str,
     mode: &str,
-    status: ContainerStateStatusEnum,
     networks: &[(&str, &str)],
-    probe: Probe,
+    opts: CargoProcessOpts<'_>,
   ) -> Process {
+    let CargoProcessOpts {
+      logical_name,
+      role,
+      essential,
+      status,
+      probe,
+    } = opts;
     let mut process = process(name, node, mode, status, networks);
     let (healthcheck, health) = match probe {
       Probe::None => (None, None),
@@ -917,27 +913,31 @@ mod tests {
     let mut sandbox = cargo_process(
       &format!("sandbox-{replica}-{attempt}"),
       replica,
-      "_sandbox",
-      "sandbox",
-      true,
       "node-a",
       "private",
-      ContainerStateStatusEnum::RUNNING,
       &[("private", address)],
-      Probe::None,
+      CargoProcessOpts {
+        logical_name: "_sandbox",
+        role: "sandbox",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
     );
     let sandbox_mode = format!("container:{}", sandbox.key);
     let mut app = cargo_process(
       &format!("api-{replica}-{attempt}"),
       replica,
-      "api",
-      "app",
-      true,
       "node-a",
       &sandbox_mode,
-      app_status,
       &[],
-      probe,
+      CargoProcessOpts {
+        logical_name: "api",
+        role: "app",
+        essential: true,
+        status: app_status,
+        probe,
+      },
     );
     if retained {
       sandbox.name = format!("tmp-{}", sandbox.name);
@@ -1065,26 +1065,30 @@ mod tests {
     processes.push(cargo_process(
       "metrics-replica-a",
       "replica-a",
-      "metrics",
-      "app",
-      false,
       "node-a",
       "host",
-      ContainerStateStatusEnum::RUNNING,
       &[],
-      Probe::Unhealthy,
+      CargoProcessOpts {
+        logical_name: "metrics",
+        role: "app",
+        essential: false,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::Unhealthy,
+      },
     ));
     processes.push(cargo_process(
       "debug-replica-a",
       "replica-a",
-      "debug",
-      "app",
-      false,
       "node-a",
       "none",
-      ContainerStateStatusEnum::RUNNING,
       &[],
-      Probe::None,
+      CargoProcessOpts {
+        logical_name: "debug",
+        role: "app",
+        essential: false,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
     ));
 
     assert_eq!(
@@ -1129,38 +1133,44 @@ mod tests {
       cargo_process(
         "api-host-a",
         "host-a",
-        "api",
-        "app",
-        true,
         "node-a",
         "host",
-        ContainerStateStatusEnum::RUNNING,
         &[],
-        Probe::None,
+        CargoProcessOpts {
+          logical_name: "api",
+          role: "app",
+          essential: true,
+          status: ContainerStateStatusEnum::RUNNING,
+          probe: Probe::None,
+        },
       ),
       cargo_process(
         "worker-host-a",
         "host-a",
-        "worker",
-        "app",
-        false,
         "node-a",
         "host",
-        ContainerStateStatusEnum::RUNNING,
         &[],
-        Probe::Healthy,
+        CargoProcessOpts {
+          logical_name: "worker",
+          role: "app",
+          essential: false,
+          status: ContainerStateStatusEnum::RUNNING,
+          probe: Probe::Healthy,
+        },
       ),
       cargo_process(
         "api-host-b",
         "host-b",
-        "api",
-        "app",
-        true,
         "node-a",
         "host",
-        ContainerStateStatusEnum::RUNNING,
         &[],
-        Probe::Disabled,
+        CargoProcessOpts {
+          logical_name: "api",
+          role: "app",
+          essential: true,
+          status: ContainerStateStatusEnum::RUNNING,
+          probe: Probe::Disabled,
+        },
       ),
     ];
 
@@ -1181,14 +1191,16 @@ mod tests {
     processes.push(cargo_process(
       "init-valid",
       "valid",
-      "migrate",
-      "init",
-      true,
       "node-a",
       "container:sandbox",
-      ContainerStateStatusEnum::EXITED,
       &[],
-      Probe::None,
+      CargoProcessOpts {
+        logical_name: "migrate",
+        role: "init",
+        essential: true,
+        status: ContainerStateStatusEnum::EXITED,
+        probe: Probe::None,
+      },
     ));
 
     let mut duplicate_app = sandbox_replica(
@@ -1295,14 +1307,16 @@ mod tests {
     processes.push(cargo_process(
       "worker-rollout-candidate",
       "rollout",
-      "worker",
-      "app",
-      true,
       "node-a",
       &candidate_mode,
-      ContainerStateStatusEnum::RUNNING,
       &[],
-      Probe::None,
+      CargoProcessOpts {
+        logical_name: "worker",
+        role: "app",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
     ));
     assert_eq!(
       get_cargo_addresses(
@@ -1490,14 +1504,16 @@ mod tests {
     processes.push(cargo_process(
       "tmp-worker-rollout-old",
       "rollout",
-      "worker",
-      "app",
-      true,
       "node-a",
       "host",
-      ContainerStateStatusEnum::RUNNING,
       &[],
-      Probe::Healthy,
+      CargoProcessOpts {
+        logical_name: "worker",
+        role: "app",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::Healthy,
+      },
     ));
     processes.extend(sandbox_attempt(
       "rollout",
@@ -1510,14 +1526,16 @@ mod tests {
     processes.push(cargo_process(
       "worker-rollout-candidate",
       "rollout",
-      "worker",
-      "app",
-      true,
       "node-a",
       "host",
-      ContainerStateStatusEnum::RUNNING,
       &[],
-      Probe::Unhealthy,
+      CargoProcessOpts {
+        logical_name: "worker",
+        role: "app",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::Unhealthy,
+      },
     ));
 
     assert_eq!(
@@ -1538,26 +1556,30 @@ mod tests {
       cargo_process(
         "tmp-api-host",
         "host",
-        "api",
-        "app",
-        true,
         "node-a",
         "host",
-        ContainerStateStatusEnum::RUNNING,
         &[],
-        Probe::Healthy,
+        CargoProcessOpts {
+          logical_name: "api",
+          role: "app",
+          essential: true,
+          status: ContainerStateStatusEnum::RUNNING,
+          probe: Probe::Healthy,
+        },
       ),
       cargo_process(
         "api-host-candidate",
         "host",
-        "api",
-        "app",
-        true,
         "node-a",
         "host",
-        ContainerStateStatusEnum::RUNNING,
         &[],
-        Probe::Starting,
+        CargoProcessOpts {
+          logical_name: "api",
+          role: "app",
+          essential: true,
+          status: ContainerStateStatusEnum::RUNNING,
+          probe: Probe::Starting,
+        },
       ),
     ];
 

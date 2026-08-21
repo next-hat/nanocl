@@ -103,88 +103,81 @@ impl NanocldClient {
   }
 
   async fn gen_client(&self) -> IoResult<ntex::client::Client> {
-    #[allow(unused_mut)]
-    let mut client = ntex::client::Client::builder()
+    let client = ntex::client::Client::builder()
       .response_payload_timeout(Millis::from_secs(20))
       .response_timeout(Millis::from_secs(20));
     #[cfg(not(target_os = "windows"))]
-    {
-      if let Some(unix_socket) = &self.unix_socket {
-        use ntex::ServiceFactory;
-        let unix_socket = unix_socket.clone();
-        client = client.connector::<&str>(
-          ntex::client::Connector::default().connector(
-            ntex::service::fn_service(move |_| {
-              let unix_socket = unix_socket.clone();
-              async {
-                Ok(
-                  rt::unix_connect(unix_socket, ntex::SharedCfg::default())
-                    .await?,
-                )
-              }
-            })
-            .map_init_err(|_| unreachable!()),
-          ),
-        );
-      }
-    }
+    let client = if let Some(unix_socket) = &self.unix_socket {
+      use ntex::ServiceFactory;
+      let unix_socket = unix_socket.clone();
+      client.connector::<&str>(
+        ntex::client::Connector::default().connector(
+          ntex::service::fn_service(move |_| {
+            let unix_socket = unix_socket.clone();
+            async {
+              Ok(
+                rt::unix_connect(unix_socket, ntex::SharedCfg::default())
+                  .await?,
+              )
+            }
+          })
+          .map_init_err(|_| unreachable!()),
+        ),
+      )
+    } else {
+      client
+    };
     #[cfg(feature = "openssl")]
-    {
+    let client = if let Some(ssl) = &self.ssl {
       use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-      if let Some(ssl) = &self.ssl {
-        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-        if ssl.verify {
-          builder.set_verify(
-            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
-          );
-          let cert_ca = openssl::x509::X509::from_pem(
-            ssl.cert_ca.clone().expect("Ssl.ca to be fill").as_bytes(),
-          )
-          .expect("Invalid ssl cert ca");
-          // Create an X509Store and add the certificate
-          let mut store_builder = openssl::x509::store::X509StoreBuilder::new()
-            .expect("Failed to create X509 store builder");
-          store_builder
-            .add_cert(cert_ca)
-            .expect("Failed to add CA certificate to store");
-          let store = store_builder.build();
-          builder.set_cert_store(store);
-        } else {
-          builder.set_verify(SslVerifyMode::NONE);
-        }
-        let cert = openssl::x509::X509::from_pem(
-          ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
+      let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+      if ssl.verify {
+        builder.set_verify(
+          SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+        );
+        let cert_ca = openssl::x509::X509::from_pem(
+          ssl.cert_ca.clone().expect("Ssl.ca to be fill").as_bytes(),
         )
-        .map_err(|err| {
-          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
-        })?;
-        let cert_key = openssl::pkey::PKey::private_key_from_pem(
-          ssl
-            .cert_key
-            .clone()
-            .expect("Ssl.cert_key to be fill")
-            .as_bytes(),
-        )
-        .map_err(|err| {
-          IoError::invalid_data(
-            "Invalid ssl cert key",
-            err.to_string().as_str(),
-          )
-        })?;
-        builder.set_certificate(&cert).map_err(|err| {
-          IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
-        })?;
-        builder.set_private_key(&cert_key).map_err(|err| {
-          IoError::invalid_data(
-            "Invalid ssl cert key",
-            err.to_string().as_str(),
-          )
-        })?;
-        client = ntex::client::Client::builder().connector::<&str>(
-          ntex::client::Connector::default().openssl(builder.build()),
-        )
+        .expect("Invalid ssl cert ca");
+        // Create an X509Store and add the certificate
+        let mut store_builder = openssl::x509::store::X509StoreBuilder::new()
+          .expect("Failed to create X509 store builder");
+        store_builder
+          .add_cert(cert_ca)
+          .expect("Failed to add CA certificate to store");
+        let store = store_builder.build();
+        builder.set_cert_store(store);
+      } else {
+        builder.set_verify(SslVerifyMode::NONE);
       }
-    }
+      let cert = openssl::x509::X509::from_pem(
+        ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
+      )
+      .map_err(|err| {
+        IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+      })?;
+      let cert_key = openssl::pkey::PKey::private_key_from_pem(
+        ssl
+          .cert_key
+          .clone()
+          .expect("Ssl.cert_key to be fill")
+          .as_bytes(),
+      )
+      .map_err(|err| {
+        IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
+      })?;
+      builder.set_certificate(&cert).map_err(|err| {
+        IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+      })?;
+      builder.set_private_key(&cert_key).map_err(|err| {
+        IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
+      })?;
+      ntex::client::Client::builder().connector::<&str>(
+        ntex::client::Connector::default().openssl(builder.build()),
+      )
+    } else {
+      client
+    };
 
     client
       .build(ntex::SharedCfg::default())

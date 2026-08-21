@@ -324,6 +324,7 @@ impl CargoReplicaDb {
   }
 
   /// Assign a replica to a node.
+  #[cfg(test)]
   pub(crate) async fn assign_node(
     key: uuid::Uuid,
     node_name: &str,
@@ -333,6 +334,7 @@ impl CargoReplicaDb {
   }
 
   /// Clear the current node assignment while preserving replica identity.
+  #[cfg(test)]
   pub(crate) async fn clear_node(
     key: uuid::Uuid,
     pool: &Pool,
@@ -340,6 +342,7 @@ impl CargoReplicaDb {
     Self::set_node(key, None, pool).await
   }
 
+  #[cfg(test)]
   async fn set_node(
     key: uuid::Uuid,
     node_name: Option<&str>,
@@ -361,6 +364,7 @@ impl CargoReplicaDb {
   }
 
   /// Delete one Cargo replica and its logical process mappings.
+  #[cfg(test)]
   pub(crate) async fn delete(key: uuid::Uuid, pool: &Pool) -> IoResult<()> {
     run_query(
       pool,
@@ -376,6 +380,7 @@ impl CargoReplicaDb {
   }
 
   /// Delete every replica belonging to one Cargo.
+  #[cfg(test)]
   pub(crate) async fn delete_all_by_cargo(
     cargo_key: &str,
     pool: &Pool,
@@ -418,6 +423,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Get one logical process mapping by UUID.
+  #[cfg(test)]
   pub(crate) async fn get(key: uuid::Uuid, pool: &Pool) -> IoResult<Self> {
     run_query(
       pool,
@@ -481,6 +487,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Find a logical mapping by its currently attached concrete process.
+  #[cfg(test)]
   pub(crate) async fn find_by_process(
     process_key: &str,
     pool: &Pool,

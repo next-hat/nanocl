@@ -8,15 +8,10 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::{
-  GenericClause, GenericFilter, NetworkKind,
-};
+use nanocld_client::stubs::generic::NetworkKind;
 use nanocld_client::stubs::network::{Network, gen_network_key};
 
-use crate::{
-  dnsmasq::{Dnsmasq, DnsmasqScope, PendingDnsRule},
-  vars,
-};
+use crate::dnsmasq::{Dnsmasq, DnsmasqScope, PendingDnsRule};
 
 const OVERRIDE_TTL: Duration = Duration::from_secs(10);
 
@@ -245,48 +240,12 @@ pub(crate) async fn reconcile_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  reconcile_entries_inner(current_key, replacement, None, None, dnsmasq, client)
-    .await
-}
-
-/// Rebuild from the committed nanocld snapshot. A resource event acknowledges
-/// the matching pre-commit override; periodic calls expire any event that was
-/// missed so stale desired state cannot survive indefinitely.
-#[allow(dead_code)]
-pub(crate) async fn reconcile_persisted_entries(
-  acknowledged_key: Option<&str>,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
-) -> IoResult<()> {
-  let filter = GenericFilter::new()
-    .limit(10_000)
-    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
-  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list DNS resources from nanocld")
-  })?;
-  let mut persisted = BTreeMap::new();
-  for resource in resources {
-    let key = resource.spec.resource_key;
-    let rule = serde_json::from_value::<ResourceDnsRule>(resource.spec.data)
-      .map_err(|err| err.map_err_context(|| "Unable to deserialize DnsRule"))?;
-    persisted.insert(key, rule);
-  }
-  reconcile_entries_inner(
-    None,
-    None,
-    acknowledged_key,
-    Some(&persisted),
-    dnsmasq,
-    client,
-  )
-  .await
+  reconcile_entries_inner(current_key, replacement, dnsmasq, client).await
 }
 
 async fn reconcile_entries_inner(
   current_key: Option<&str>,
   replacement: Option<&ResourceDnsRule>,
-  acknowledged_key: Option<&str>,
-  persisted_snapshot: Option<&BTreeMap<String, ResourceDnsRule>>,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
@@ -304,14 +263,9 @@ async fn reconcile_entries_inner(
     log::debug!("dns::reconcile: waiting for update lock");
     let mut update = dnsmasq.lock_updates().await;
     log::debug!("dns::reconcile: acquired update lock");
-    let rules = persisted_snapshot.unwrap_or(&update.persisted).clone();
+    let rules = update.persisted.clone();
     let mut overrides = update.overrides.clone();
-    retain_uncommitted_overrides(
-      &rules,
-      &mut overrides,
-      acknowledged_key,
-      Instant::now(),
-    );
+    retain_uncommitted_overrides(&rules, &mut overrides, None, Instant::now());
     if let Some(key) = current_key {
       overrides.insert(
         key.to_owned(),
@@ -339,9 +293,6 @@ async fn reconcile_entries_inner(
     log::debug!("dns::reconcile: applying {} scopes", scopes.len());
     dnsmasq.apply_scopes(scopes).await?;
     log::debug!("dns::reconcile: applied scopes");
-    if persisted_snapshot.is_some() {
-      update.persisted = rules;
-    }
     update.overrides = overrides;
     return Ok(());
   }

@@ -48,9 +48,9 @@ use crate::{
     CargoArg, Context, DisplayFormat, GenericDefaultOpts,
     GenericRemoveForceOpts, GenericRemoveOpts, JobArg, ResourceArg, SecretArg,
     StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
-    StateRemoveOpts, StateRoot, VmArg, cargo_spec_from_revision,
+    StateRemoveOpts, StateRoot, VmArg,
   },
-  utils,
+  utils::{self, cargo::cargo_spec_from_revision},
 };
 
 use super::GenericCommandRm;

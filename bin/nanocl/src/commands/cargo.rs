@@ -20,9 +20,8 @@ use crate::{
     CargoArg, CargoCommand, CargoCreateOpts, CargoHistoryOpts, CargoLogsOpts,
     CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow, CargoRunOpts,
     CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
-    build_cargo_patch,
   },
-  utils,
+  utils::{self, cargo::build_cargo_patch},
 };
 
 use super::{

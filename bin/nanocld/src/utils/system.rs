@@ -689,7 +689,7 @@ mod tests {
       id: Some(process.process_key.clone()),
       name: Some(format!("/{}", process.process_name)),
       state: Some(ContainerState {
-        status: process.status.clone(),
+        status: process.status,
         running: Some(
           process.status == Some(ContainerStateStatusEnum::RUNNING),
         ),

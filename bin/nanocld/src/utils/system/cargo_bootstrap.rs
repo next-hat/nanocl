@@ -76,10 +76,7 @@ impl CargoBootstrapProcess {
     let labels = inspected.labels.clone().unwrap_or_default();
     let mut config: DockerConfig = inspected.into();
     config.host_config.clone_from(&instance.host_config);
-    let status = instance
-      .state
-      .as_ref()
-      .and_then(|state| state.status.clone());
+    let status = instance.state.as_ref().and_then(|state| state.status);
     Ok(Self {
       process_key,
       process_name,
@@ -234,7 +231,7 @@ fn parse_process(
     declaration_position,
     essential,
     config: process.config.clone(),
-    status: process.status.clone(),
+    status: process.status,
   })
 }
 
@@ -471,15 +468,15 @@ fn normalize_declared_config(
       process.container_name
     )));
   }
-  if ownership.direct_installer_generation {
-    if let (Some(exposed), Some(port_bindings)) = (
+  if ownership.direct_installer_generation
+    && let (Some(exposed), Some(port_bindings)) = (
       config.exposed_ports.as_mut(),
       ownership.port_bindings.as_ref(),
-    ) {
-      exposed.retain(|port, _| !port_bindings.contains_key(port));
-      if exposed.is_empty() {
-        config.exposed_ports = None;
-      }
+    )
+  {
+    exposed.retain(|port, _| !port_bindings.contains_key(port));
+    if exposed.is_empty() {
+      config.exposed_ports = None;
     }
   }
   host.publish_all_ports = None;

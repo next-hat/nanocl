@@ -1,15 +1,18 @@
 #![cfg(feature = "serde")]
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 use std::collections::BTreeSet;
 
 use nanocl_stubs::{
   cargo_spec::{
-    CargoPlacementSpec, CargoPlacementStrategy, CargoSpec, CargoSpecPatch,
-    CargoSpecRevision, CargoSpecValidationError, ContainerSpecValidationError,
-    PortMap,
+    CargoPlacementStrategy, CargoSpec, CargoSpecPatch, CargoSpecRevision,
+    CargoSpecValidationError, ContainerSpecValidationError, PortMap,
   },
   statefile::Statefile,
 };
+
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
+use nanocl_stubs::cargo_spec::CargoPlacementSpec;
 
 fn parse_spec(yaml: &str) -> CargoSpec {
   serde_yaml::from_str(yaml).expect("CargoSpec fixture must deserialize")
@@ -648,6 +651,7 @@ Container:
   assert!(legacy.to_string().contains("unknown field `Container`"));
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn required_fields(schema: &serde_json::Value) -> BTreeSet<&str> {
   schema
     .get("required")
@@ -658,6 +662,7 @@ fn required_fields(schema: &serde_json::Value) -> BTreeSet<&str> {
     .collect()
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn property_names(schema: &serde_json::Value) -> BTreeSet<&str> {
   schema["properties"]
     .as_object()
@@ -667,6 +672,7 @@ fn property_names(schema: &serde_json::Value) -> BTreeSet<&str> {
     .collect()
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn assert_final_cargo_schema(schema: &serde_json::Value) {
   assert_eq!(
     required_fields(schema),
@@ -732,6 +738,7 @@ fn assert_final_cargo_schema(schema: &serde_json::Value) {
   assert!(!serialized.contains("<port/tcp|udp>"));
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn assert_related_cargo_schemas(
   revision: &serde_json::Value,
   patch: &serde_json::Value,

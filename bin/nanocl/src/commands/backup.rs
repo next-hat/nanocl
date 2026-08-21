@@ -12,8 +12,8 @@ use nanocld_client::stubs::{
 
 use crate::{
   config::CliConfig,
-  models::{BackupOpts, cargo_spec_from_revision},
-  utils,
+  models::BackupOpts,
+  utils::{self, cargo::cargo_spec_from_revision},
 };
 
 /// Path inside containers where nanocld automatically mounts TLS secrets.

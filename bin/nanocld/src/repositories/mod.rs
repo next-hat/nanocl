@@ -1,5 +1,4 @@
 mod cargo;
-#[cfg_attr(not(test), allow(dead_code))]
 mod cargo_replica;
 mod distributed_mutex;
 mod event;

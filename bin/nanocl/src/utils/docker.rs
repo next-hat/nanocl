@@ -5,6 +5,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use bollard_next::container::CreateContainerOptions;
 use bollard_next::image::CreateImageOptions;
+#[cfg(test)]
 use bollard_next::models::EmptyObject;
 use bollard_next::service::{
   ContainerCreateResponse, HostConfig, ProgressDetail, RestartPolicy,
@@ -295,9 +296,7 @@ fn installer_container_config(
     host_config.port_bindings = Some(port_bindings.clone());
     let exposed_ports = config.exposed_ports.get_or_insert_default();
     for port in port_bindings.keys() {
-      exposed_ports
-        .entry(port.clone())
-        .or_insert_with(EmptyObject::default);
+      exposed_ports.entry(port.clone()).or_default();
     }
   }
   config.host_config = Some(host_config);
@@ -372,7 +371,7 @@ pub fn detect_docker_host() -> IoResult<(String, bool)> {
   if context == "default" {
     return Ok(("unix:///var/run/docker.sock".into(), false));
   }
-  let hash = hash::calculate_SHA256(context);
+  let hash = hash::calculate_sha256(context);
   let path = format!("{home}/.docker/contexts/meta/{hash}/meta.json",);
   let str = std::fs::read_to_string(path)?;
   let config =

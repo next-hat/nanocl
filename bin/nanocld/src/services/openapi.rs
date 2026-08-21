@@ -1,25 +1,16 @@
-use utoipa::{Modify, OpenApi, ToSchema};
+use utoipa::{Modify, OpenApi};
 
 use nanocl_stubs::{
   dns::ResourceDnsRule, proxy::ResourceProxyRule, statefile::Statefile,
 };
 
+pub(crate) use crate::models::ApiError;
 use crate::vars;
 
 use super::{
   cargo, event, job, metric, namespace, network, node, process, resource,
   resource_kind, secret, system, vm,
 };
-
-/// When returning a [HttpError](nanocl_error::http::HttpError)
-/// the status code is stripped and the error
-/// is returned as a json object with the message
-/// field set to the error message.
-#[allow(dead_code)]
-#[derive(ToSchema)]
-pub struct ApiError {
-  msg: String,
-}
 
 /// Helper to generate the versioned OpenAPI documentation
 struct VersionModifier;

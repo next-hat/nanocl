@@ -13,11 +13,9 @@ use nanocld_client::stubs::resource_kind::{
 
 use nanocld_client::NanocldClient;
 
-use crate::{dnsmasq::Dnsmasq, utils, vars};
+use crate::{dnsmasq::Dnsmasq, vars};
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
-#[allow(dead_code)]
-const RECONCILE_INTERVAL: Duration = Duration::from_secs(15);
 
 pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
@@ -70,19 +68,6 @@ fn dns_rule_actor_key(
   actor.key.clone()
 }
 
-#[allow(dead_code)]
-async fn reconcile(
-  acknowledged_key: Option<&str>,
-  client: &NanocldClient,
-  dnsmasq: &Dnsmasq,
-) {
-  if let Err(err) =
-    utils::reconcile_persisted_entries(acknowledged_key, dnsmasq, client).await
-  {
-    log::warn!("event::reconcile: unable to reconcile DNS rules: {err}");
-  }
-}
-
 async fn watch_loop(client: &NanocldClient, _dnsmasq: &Dnsmasq) {
   loop {
     if let Err(err) = ensure_self_config(client).await {
@@ -104,14 +89,6 @@ async fn watch_loop(client: &NanocldClient, _dnsmasq: &Dnsmasq) {
     }
     log::warn!("event::loop: retrying in 2 seconds");
     ntex::time::sleep(RETRY_DELAY).await;
-  }
-}
-
-#[allow(dead_code)]
-async fn periodic_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
-  loop {
-    ntex::time::sleep(RECONCILE_INTERVAL).await;
-    reconcile(None, client, dnsmasq).await;
   }
 }
 

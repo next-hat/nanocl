@@ -1,6 +1,8 @@
 #![cfg(feature = "serde")]
 
-use std::collections::{BTreeSet, HashMap};
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 
 use nanocl_stubs::{
   cargo_spec::{
@@ -588,6 +590,7 @@ fn every_raw_container_namespace_reference_is_rejected() {
   }
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
   match schema {
     serde_json::Value::Array(values) => {
@@ -601,6 +604,7 @@ fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
   }
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn assert_struct_schemas_are_closed(schema: &serde_json::Value) {
   match schema {
     serde_json::Value::Array(values) => {
@@ -630,6 +634,7 @@ fn assert_struct_schemas_are_closed(schema: &serde_json::Value) {
   }
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn resolve_property_reference<'a>(
   schema: &serde_json::Value,
   property: &str,
@@ -644,6 +649,7 @@ fn resolve_property_reference<'a>(
   (name.to_owned(), referenced)
 }
 
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
 fn assert_container_spec_schema(
   schema: &serde_json::Value,
   references: &HashMap<String, serde_json::Value>,

@@ -22,9 +22,6 @@ use crate::{models::SystemStateRef, utils, vars};
 use nanocld_client::stubs::{proxy::ResourceProxyRule, system::EventActor};
 
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
-#[allow(dead_code)]
-const RECONCILE_INTERVAL: std::time::Duration =
-  std::time::Duration::from_secs(30);
 
 #[cfg(test)]
 fn is_proxy_resource(actor: &EventActor) -> bool {
@@ -300,17 +297,6 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   }
 }
 
-#[allow(dead_code)]
-async fn reconcile_loop(state: &SystemStateRef) {
-  loop {
-    log::info!("event::reconcile: rebuilding committed proxy resources");
-    if let Err(err) = utils::resource::rebuild_all_rules(state).await {
-      log::warn!("event::reconcile: {err}");
-    }
-    ntex::time::sleep(RECONCILE_INTERVAL).await;
-  }
-}
-
 pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
@@ -378,13 +364,6 @@ pub(crate) fn spawn(state: &SystemStateRef) {
       rt::Arbiter::current().stop();
     });
   });
-  // let reconcile_state = Arc::clone(state);
-  // rt::Arbiter::new().handle().spawn(async move {
-  //   rt::spawn(async move {
-  //     reconcile_loop(&reconcile_state).await;
-  //     rt::Arbiter::current().stop();
-  //   });
-  // });
 }
 
 #[cfg(test)]

@@ -24,8 +24,9 @@ use nanocl_stubs::{
 use crate::{
   models::{
     CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
-    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
-    ProcessDb, ProcessUpdateDb, SystemState,
+    CompileDeclaredOpts, EnsureExistingSlotOpts, NewCargoReplicaProcessDb,
+    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, ProcessUpdateDb,
+    SystemState, ValidateRestartSlotOpts,
   },
   repositories::generic::*,
   utils,
@@ -356,15 +357,18 @@ async fn internal_gateway(
 }
 
 async fn compile_declared(
-  cargo: &Cargo,
-  task: &CargoReplicaTask,
-  declared: &ContainerSpec,
-  role: CargoReplicaProcessRole,
-  sandbox_id: Option<&str>,
-  attempt_id: &str,
-  gateway: &str,
-  state: &SystemState,
+  opts: CompileDeclaredOpts<'_>,
 ) -> IoResult<DockerConfig> {
+  let CompileDeclaredOpts {
+    cargo,
+    task,
+    declared,
+    role,
+    sandbox_id,
+    attempt_id,
+    gateway,
+    state,
+  } = opts;
   let config = compile_declared_base(
     cargo, task, declared, role, sandbox_id, gateway, state,
   )?;
@@ -899,15 +903,18 @@ async fn refresh_slot_observations(
 }
 
 async fn ensure_existing_slot(
-  cargo: &Cargo,
-  task: &CargoReplicaTask,
-  mapping: CargoReplicaProcessDb,
-  role: CargoReplicaProcessRole,
-  container_name: &str,
-  essential: bool,
-  config: &DockerConfig,
-  state: &SystemState,
+  opts: EnsureExistingSlotOpts<'_>,
 ) -> IoResult<RuntimeSlot> {
+  let EnsureExistingSlotOpts {
+    cargo,
+    task,
+    mapping,
+    role,
+    container_name,
+    essential,
+    config,
+    state,
+  } = opts;
   let process = match mapped_process(&mapping, state).await? {
     Some(process) => {
       let identity = process_identity(&process)?;
@@ -963,16 +970,16 @@ async fn reconcile_replica(
       state,
     )
     .await?;
-    let slot = ensure_existing_slot(
+    let slot = ensure_existing_slot(EnsureExistingSlotOpts {
       cargo,
       task,
       mapping,
-      CargoReplicaProcessRole::Sandbox,
-      SANDBOX_LOGICAL_NAME,
-      true,
-      &config,
+      role: CargoReplicaProcessRole::Sandbox,
+      container_name: SANDBOX_LOGICAL_NAME,
+      essential: true,
+      config: &config,
       state,
-    )
+    })
     .await?;
     start_process(&slot.process, state).await?;
     let id = slot.process.key.clone();
@@ -983,16 +990,16 @@ async fn reconcile_replica(
   };
 
   for declared in &cargo.spec.init_containers {
-    let config = compile_declared(
+    let config = compile_declared(CompileDeclaredOpts {
       cargo,
       task,
       declared,
-      CargoReplicaProcessRole::Init,
-      sandbox.as_deref(),
-      &attempt_id,
-      &gateway,
+      role: CargoReplicaProcessRole::Init,
+      sandbox_id: sandbox.as_deref(),
+      attempt_id: &attempt_id,
+      gateway: &gateway,
       state,
-    )
+    })
     .await?;
     let mapping = ensure_mapping(
       task,
@@ -1002,32 +1009,32 @@ async fn reconcile_replica(
       state,
     )
     .await?;
-    let slot = ensure_existing_slot(
+    let slot = ensure_existing_slot(EnsureExistingSlotOpts {
       cargo,
       task,
       mapping,
-      CargoReplicaProcessRole::Init,
-      &declared.name,
-      true,
-      &config,
+      role: CargoReplicaProcessRole::Init,
+      container_name: &declared.name,
+      essential: true,
+      config: &config,
       state,
-    )
+    })
     .await?;
     wait_init(&slot.process, state).await?;
     slots.push(slot);
   }
 
   for declared in &cargo.spec.containers {
-    let config = compile_declared(
+    let config = compile_declared(CompileDeclaredOpts {
       cargo,
       task,
       declared,
-      CargoReplicaProcessRole::App,
-      sandbox.as_deref(),
-      &attempt_id,
-      &gateway,
+      role: CargoReplicaProcessRole::App,
+      sandbox_id: sandbox.as_deref(),
+      attempt_id: &attempt_id,
+      gateway: &gateway,
       state,
-    )
+    })
     .await?;
     let mapping = ensure_mapping(
       task,
@@ -1037,16 +1044,16 @@ async fn reconcile_replica(
       state,
     )
     .await?;
-    let slot = ensure_existing_slot(
+    let slot = ensure_existing_slot(EnsureExistingSlotOpts {
       cargo,
       task,
       mapping,
-      CargoReplicaProcessRole::App,
-      &declared.name,
-      declared.essential,
-      &config,
+      role: CargoReplicaProcessRole::App,
+      container_name: &declared.name,
+      essential: declared.essential,
+      config: &config,
       state,
-    )
+    })
     .await?;
     start_process(&slot.process, state).await?;
     slots.push(slot);
@@ -1068,18 +1075,18 @@ fn restart_topology_error(cargo_key: &str, reason: &str) -> IoError {
 }
 
 fn validate_restart_slot(
-  cargo_key: &str,
-  replica: &CargoReplicaDb,
-  mapping: &CargoReplicaProcessDb,
-  expected_role: CargoReplicaProcessRole,
-  expected_name: &str,
-  expected_essential: bool,
-  processes_by_key: &HashMap<&str, &Process>,
-  stable_identities: &HashMap<
-    (uuid::Uuid, CargoReplicaProcessRole, String),
-    Vec<&Process>,
-  >,
+  opts: ValidateRestartSlotOpts<'_, '_>,
 ) -> IoResult<RuntimeSlot> {
+  let ValidateRestartSlotOpts {
+    cargo_key,
+    replica,
+    mapping,
+    expected_role,
+    expected_name,
+    expected_essential,
+    processes_by_key,
+    stable_identities,
+  } = opts;
   if mapping.role != expected_role
     || mapping.container_name != expected_name
     || mapping.essential != expected_essential
@@ -1318,16 +1325,16 @@ fn plan_cargo_restart(
           ),
         ));
       };
-      slots.push(validate_restart_slot(
+      slots.push(validate_restart_slot(ValidateRestartSlotOpts {
         cargo_key,
         replica,
-        sandbox_mapping,
-        CargoReplicaProcessRole::Sandbox,
-        SANDBOX_LOGICAL_NAME,
-        true,
-        &processes_by_key,
-        &stable_identities,
-      )?);
+        mapping: sandbox_mapping,
+        expected_role: CargoReplicaProcessRole::Sandbox,
+        expected_name: SANDBOX_LOGICAL_NAME,
+        expected_essential: true,
+        processes_by_key: &processes_by_key,
+        stable_identities: &stable_identities,
+      })?);
     } else if !sandbox_mappings.is_empty() {
       return Err(restart_topology_error(
         cargo_key,
@@ -1338,7 +1345,7 @@ fn plan_cargo_restart(
       ));
     }
 
-    for mapping in replica_mappings.iter().copied().filter(|mapping| {
+    if let Some(mapping) = replica_mappings.iter().copied().find(|mapping| {
       mapping.role == CargoReplicaProcessRole::App
         && !desired_app_names.contains(mapping.container_name.as_str())
     }) {
@@ -1370,16 +1377,16 @@ fn plan_cargo_restart(
           ),
         ));
       };
-      slots.push(validate_restart_slot(
+      slots.push(validate_restart_slot(ValidateRestartSlotOpts {
         cargo_key,
         replica,
         mapping,
-        CargoReplicaProcessRole::App,
-        &declared.name,
-        declared.essential,
-        &processes_by_key,
-        &stable_identities,
-      )?);
+        expected_role: CargoReplicaProcessRole::App,
+        expected_name: &declared.name,
+        expected_essential: declared.essential,
+        processes_by_key: &processes_by_key,
+        stable_identities: &stable_identities,
+      })?);
     }
   }
   Ok(CargoRestartPlan { slots })
@@ -1884,16 +1891,16 @@ async fn create_candidate(
       None
     };
     for declared in &cargo.spec.init_containers {
-      let config = compile_declared(
+      let config = compile_declared(CompileDeclaredOpts {
         cargo,
         task,
         declared,
-        CargoReplicaProcessRole::Init,
-        sandbox.as_deref(),
-        &attempt_id,
-        &gateway,
+        role: CargoReplicaProcessRole::Init,
+        sandbox_id: sandbox.as_deref(),
+        attempt_id: &attempt_id,
+        gateway: &gateway,
         state,
-      )
+      })
       .await?;
       let mapping = ensure_mapping(
         task,
@@ -1931,16 +1938,16 @@ async fn create_candidate(
       .await?;
     }
     for declared in &cargo.spec.containers {
-      let config = compile_declared(
+      let config = compile_declared(CompileDeclaredOpts {
         cargo,
         task,
         declared,
-        CargoReplicaProcessRole::App,
-        sandbox.as_deref(),
-        &attempt_id,
-        &gateway,
+        role: CargoReplicaProcessRole::App,
+        sandbox_id: sandbox.as_deref(),
+        attempt_id: &attempt_id,
+        gateway: &gateway,
         state,
-      )
+      })
       .await?;
       let mapping = ensure_mapping(
         task,
@@ -2229,10 +2236,10 @@ fn required_candidate_topology_complete<'a>(
   for (role, name, essential) in slots {
     match role {
       CargoReplicaProcessRole::Sandbox => sandboxes += 1,
-      CargoReplicaProcessRole::App if essential => {
-        if !observed_apps.insert(name) {
-          duplicate_app = true;
-        }
+      CargoReplicaProcessRole::App
+        if essential && !observed_apps.insert(name) =>
+      {
+        duplicate_app = true;
       }
       _ => {}
     }
