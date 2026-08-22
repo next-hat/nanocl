@@ -10,28 +10,6 @@ use crate::utils;
 
 use super::Store;
 
-#[cfg(test)]
-use nanocld_client::bollard_next::service::ContainerStateStatusEnum;
-
-#[cfg(test)]
-#[derive(Clone, Copy)]
-pub(crate) enum CargoProcessProbe {
-  None,
-  Disabled,
-  Starting,
-  Healthy,
-  Unhealthy,
-}
-
-#[cfg(test)]
-pub(crate) struct CargoProcessOpts<'a> {
-  pub(crate) logical_name: &'a str,
-  pub(crate) role: &'a str,
-  pub(crate) essential: bool,
-  pub(crate) status: ContainerStateStatusEnum,
-  pub(crate) probe: CargoProcessProbe,
-}
-
 /// Shared state of the program
 #[derive(Clone)]
 pub struct SystemState {

@@ -18,39 +18,7 @@ use nanocld_client::{
 
 use crate::{models::SystemStateRef, utils, vars};
 
-#[cfg(test)]
-use nanocld_client::stubs::{proxy::ResourceProxyRule, system::EventActor};
-
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
-
-#[cfg(test)]
-fn is_proxy_resource(actor: &EventActor) -> bool {
-  actor
-    .attributes
-    .as_ref()
-    .and_then(|attributes| attributes.get("Kind"))
-    .and_then(serde_json::Value::as_str)
-    == Some(vars::RULE_KEY)
-}
-
-#[cfg(test)]
-fn proxy_resource_name(actor: &EventActor) -> IoResult<&str> {
-  actor
-    .key
-    .as_deref()
-    .filter(|name| !name.is_empty())
-    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing key"))
-}
-
-#[cfg(test)]
-fn proxy_resource_rule(actor: &EventActor) -> IoResult<ResourceProxyRule> {
-  let data = actor
-    .attributes
-    .as_ref()
-    .and_then(|attributes| attributes.get("Spec"))
-    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing Spec"))?;
-  utils::resource::serialize(data)
-}
 
 fn cargo_has_committed_start(
   cargo: &nanocld_client::stubs::cargo::CargoInspect,
@@ -261,27 +229,6 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    // This shouldn't be required as nanocld call the endpoint.
-    // (EventActorKind::Resource, NativeEventAction::Create)
-    // | (EventActorKind::Resource, NativeEventAction::Update) => {
-    //   if !is_proxy_resource(&actor) {
-    //     return Ok(());
-    //   }
-    //   let name = proxy_resource_name(&actor)?;
-    //   let rule = proxy_resource_rule(&actor)?;
-    //   utils::nginx::add_rule(name, &rule, state).await?;
-    //   state.event_emitter.emit_reload().await;
-    //   Ok(())
-    // }
-    // (EventActorKind::Resource, NativeEventAction::Destroy) => {
-    //   if !is_proxy_resource(&actor) {
-    //     return Ok(());
-    //   }
-    //   let name = proxy_resource_name(&actor)?;
-    //   utils::nginx::del_rule(name, state).await?;
-    //   state.event_emitter.emit_reload().await;
-    //   Ok(())
-    // }
     (EventActorKind::Secret, NativeEventAction::Create)
     | (EventActorKind::Secret, NativeEventAction::Update) => {
       let resources = utils::resource::list_by_secret(
@@ -457,36 +404,5 @@ mod tests {
       get_workload_attributes(&attributes).unwrap(),
       ("database".to_owned(), "private".to_owned())
     );
-  }
-
-  #[test]
-  fn committed_proxy_resource_events_expose_name_and_rule() {
-    let actor = EventActor {
-      key: Some("public-api".to_owned()),
-      kind: EventActorKind::Resource,
-      attributes: Some(serde_json::json!({
-        "Kind": vars::RULE_KEY,
-        "Version": "v0.15.0",
-        "Spec": { "Rules": [] },
-      })),
-    };
-
-    assert!(is_proxy_resource(&actor));
-    assert_eq!(proxy_resource_name(&actor).unwrap(), "public-api");
-    assert!(proxy_resource_rule(&actor).unwrap().rules.is_empty());
-  }
-
-  #[test]
-  fn resource_events_for_other_controllers_are_ignored() {
-    let actor = EventActor {
-      key: Some("dns-rule".to_owned()),
-      kind: EventActorKind::Resource,
-      attributes: Some(serde_json::json!({
-        "Kind": "ncdns.io/rule",
-        "Spec": { "Rules": [] },
-      })),
-    };
-
-    assert!(!is_proxy_resource(&actor));
   }
 }

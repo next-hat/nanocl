@@ -795,9 +795,26 @@ mod tests {
     stubs::process::{Process, ProcessKind},
   };
 
-  use crate::models::{CargoProcessOpts, CargoProcessProbe as Probe};
-
   use super::*;
+
+  #[derive(Clone, Copy)]
+  enum CargoProcessProbe {
+    None,
+    Disabled,
+    Starting,
+    Healthy,
+    Unhealthy,
+  }
+
+  use CargoProcessProbe as Probe;
+
+  struct CargoProcessOpts<'a> {
+    logical_name: &'a str,
+    role: &'a str,
+    essential: bool,
+    status: ContainerStateStatusEnum,
+    probe: CargoProcessProbe,
+  }
 
   fn process(
     name: &str,

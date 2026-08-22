@@ -818,12 +818,9 @@ mod tests {
     assert!(mappings.iter().all(|mapping| mapping.process_key.is_some()));
     for pending_key in [&candidate_key, &retained_key] {
       assert!(
-        CargoReplicaProcessDb::find_by_process(
-          pending_key,
-          &system.state.inner.pool,
-        )
-        .await
-        .is_err()
+        mappings
+          .iter()
+          .all(|mapping| mapping.process_key.as_deref() != Some(pending_key))
       );
     }
 

@@ -322,84 +322,6 @@ impl CargoReplicaDb {
     )
     .await
   }
-
-  /// Assign a replica to a node.
-  #[cfg(test)]
-  pub(crate) async fn assign_node(
-    key: uuid::Uuid,
-    node_name: &str,
-    pool: &Pool,
-  ) -> IoResult<Self> {
-    Self::set_node(key, Some(node_name), pool).await
-  }
-
-  /// Clear the current node assignment while preserving replica identity.
-  #[cfg(test)]
-  pub(crate) async fn clear_node(
-    key: uuid::Uuid,
-    pool: &Pool,
-  ) -> IoResult<Self> {
-    Self::set_node(key, None, pool).await
-  }
-
-  #[cfg(test)]
-  async fn set_node(
-    key: uuid::Uuid,
-    node_name: Option<&str>,
-    pool: &Pool,
-  ) -> IoResult<Self> {
-    let update = CargoReplicaUpdateDb::node(node_name);
-    run_query(
-      pool,
-      "Interrupted while assigning Cargo replica",
-      move |conn| {
-        diesel::update(cargo_replicas::table.find(key))
-          .set(update)
-          .returning(Self::as_returning())
-          .get_result(conn)
-          .map_err(map_replica_error)
-      },
-    )
-    .await
-  }
-
-  /// Delete one Cargo replica and its logical process mappings.
-  #[cfg(test)]
-  pub(crate) async fn delete(key: uuid::Uuid, pool: &Pool) -> IoResult<()> {
-    run_query(
-      pool,
-      "Interrupted while deleting Cargo replica",
-      move |conn| {
-        diesel::delete(cargo_replicas::table.find(key))
-          .execute(conn)
-          .map(|_| ())
-          .map_err(map_replica_error)
-      },
-    )
-    .await
-  }
-
-  /// Delete every replica belonging to one Cargo.
-  #[cfg(test)]
-  pub(crate) async fn delete_all_by_cargo(
-    cargo_key: &str,
-    pool: &Pool,
-  ) -> IoResult<()> {
-    let cargo_key = cargo_key.to_owned();
-    run_query(
-      pool,
-      "Interrupted while deleting Cargo replicas",
-      move |conn| {
-        diesel::delete(
-          cargo_replicas::table.filter(cargo_replicas::cargo_key.eq(cargo_key)),
-        )
-        .execute(conn)
-        .map(|_| ())
-        .map_err(map_replica_error)
-      },
-    )
-    .await
-  }
 }
 
 impl CargoReplicaProcessDb {
@@ -416,23 +338,6 @@ impl CargoReplicaProcessDb {
           .values(process)
           .returning(Self::as_returning())
           .get_result(conn)
-          .map_err(map_process_error)
-      },
-    )
-    .await
-  }
-
-  /// Get one logical process mapping by UUID.
-  #[cfg(test)]
-  pub(crate) async fn get(key: uuid::Uuid, pool: &Pool) -> IoResult<Self> {
-    run_query(
-      pool,
-      "Interrupted while reading Cargo replica process",
-      move |conn| {
-        cargo_replica_processes::table
-          .find(key)
-          .select(Self::as_select())
-          .first(conn)
           .map_err(map_process_error)
       },
     )
@@ -478,27 +383,6 @@ impl CargoReplicaProcessDb {
           .filter(cargo_replica_processes::replica_key.eq(replica_key))
           .filter(cargo_replica_processes::role.eq(role))
           .filter(cargo_replica_processes::container_name.eq(container_name))
-          .select(Self::as_select())
-          .first(conn)
-          .map_err(map_process_error)
-      },
-    )
-    .await
-  }
-
-  /// Find a logical mapping by its currently attached concrete process.
-  #[cfg(test)]
-  pub(crate) async fn find_by_process(
-    process_key: &str,
-    pool: &Pool,
-  ) -> IoResult<Self> {
-    let process_key = process_key.to_owned();
-    run_query(
-      pool,
-      "Interrupted while finding Cargo replica process",
-      move |conn| {
-        cargo_replica_processes::table
-          .filter(cargo_replica_processes::process_key.eq(process_key))
           .select(Self::as_select())
           .first(conn)
           .map_err(map_process_error)
@@ -642,6 +526,112 @@ mod tests {
 
   use super::*;
 
+  async fn assign_replica_node(
+    key: uuid::Uuid,
+    node_name: &str,
+    pool: &Pool,
+  ) -> IoResult<CargoReplicaDb> {
+    set_replica_node(key, Some(node_name), pool).await
+  }
+
+  async fn clear_replica_node(
+    key: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<CargoReplicaDb> {
+    set_replica_node(key, None, pool).await
+  }
+
+  async fn set_replica_node(
+    key: uuid::Uuid,
+    node_name: Option<&str>,
+    pool: &Pool,
+  ) -> IoResult<CargoReplicaDb> {
+    let update = CargoReplicaUpdateDb::node(node_name);
+    run_query(
+      pool,
+      "Interrupted while assigning Cargo replica",
+      move |conn| {
+        diesel::update(cargo_replicas::table.find(key))
+          .set(update)
+          .returning(CargoReplicaDb::as_returning())
+          .get_result(conn)
+          .map_err(map_replica_error)
+      },
+    )
+    .await
+  }
+
+  async fn delete_replica(key: uuid::Uuid, pool: &Pool) -> IoResult<()> {
+    run_query(
+      pool,
+      "Interrupted while deleting Cargo replica",
+      move |conn| {
+        diesel::delete(cargo_replicas::table.find(key))
+          .execute(conn)
+          .map(|_| ())
+          .map_err(map_replica_error)
+      },
+    )
+    .await
+  }
+
+  async fn delete_replicas_by_cargo(
+    cargo_key: &str,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let cargo_key = cargo_key.to_owned();
+    run_query(
+      pool,
+      "Interrupted while deleting Cargo replicas",
+      move |conn| {
+        diesel::delete(
+          cargo_replicas::table.filter(cargo_replicas::cargo_key.eq(cargo_key)),
+        )
+        .execute(conn)
+        .map(|_| ())
+        .map_err(map_replica_error)
+      },
+    )
+    .await
+  }
+
+  async fn get_replica_process_mapping(
+    key: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<CargoReplicaProcessDb> {
+    run_query(
+      pool,
+      "Interrupted while reading Cargo replica process",
+      move |conn| {
+        cargo_replica_processes::table
+          .find(key)
+          .select(CargoReplicaProcessDb::as_select())
+          .first(conn)
+          .map_err(map_process_error)
+      },
+    )
+    .await
+  }
+
+  async fn find_replica_process_mapping_by_process(
+    process_key: &str,
+    pool: &Pool,
+  ) -> IoResult<CargoReplicaProcessDb> {
+    let process_key = process_key.to_owned();
+    run_query(
+      pool,
+      "Interrupted while finding Cargo replica process",
+      move |conn| {
+        cargo_replica_processes::table
+          .filter(cargo_replica_processes::process_key.eq(process_key))
+          .select(CargoReplicaProcessDb::as_select())
+          .first(conn)
+          .map_err(map_process_error)
+      },
+    )
+    .await
+  }
+
   fn no_routes(_: &mut ntex::web::ServiceConfig) {}
 
   struct Fixture {
@@ -720,7 +710,7 @@ mod tests {
     async fn cleanup(self) {
       let pool = &self.system.state.inner.pool;
       for cargo_key in &self.cargo_keys {
-        let _ = CargoReplicaDb::delete_all_by_cargo(cargo_key, pool).await;
+        let _ = delete_replicas_by_cargo(cargo_key, pool).await;
       }
       for process_key in &self.process_keys {
         let _ = ProcessDb::del_by_pk(process_key, pool).await;
@@ -874,7 +864,7 @@ mod tests {
       std::io::ErrorKind::InvalidData,
     );
 
-    CargoReplicaDb::delete(replica_two.key, pool).await.unwrap();
+    delete_replica(replica_two.key, pool).await.unwrap();
     assert_error_kind(
       CargoReplicaDb::get(replica_two.key, pool).await,
       std::io::ErrorKind::NotFound,
@@ -892,28 +882,21 @@ mod tests {
     .await
     .unwrap();
 
-    let assigned = CargoReplicaDb::assign_node(
-      replica.key,
-      &fixture.node_name,
-      fixture.pool(),
-    )
-    .await
-    .unwrap();
+    let assigned =
+      assign_replica_node(replica.key, &fixture.node_name, fixture.pool())
+        .await
+        .unwrap();
     assert_eq!(
       assigned.node_name.as_deref(),
       Some(fixture.node_name.as_str())
     );
-    let cleared = CargoReplicaDb::clear_node(replica.key, fixture.pool())
+    let cleared = clear_replica_node(replica.key, fixture.pool())
       .await
       .unwrap();
     assert!(cleared.node_name.is_none());
-    CargoReplicaDb::assign_node(
-      replica.key,
-      &fixture.node_name,
-      fixture.pool(),
-    )
-    .await
-    .unwrap();
+    assign_replica_node(replica.key, &fixture.node_name, fixture.pool())
+      .await
+      .unwrap();
     NodeDb::del_by_pk(&fixture.node_name, fixture.pool())
       .await
       .unwrap();
@@ -944,7 +927,7 @@ mod tests {
       std::io::ErrorKind::NotFound,
     );
     assert_error_kind(
-      CargoReplicaProcessDb::get(mapping.key, fixture.pool()).await,
+      get_replica_process_mapping(mapping.key, fixture.pool()).await,
       std::io::ErrorKind::NotFound,
     );
 
@@ -962,7 +945,7 @@ mod tests {
     )
     .await
     .unwrap();
-    CargoReplicaDb::delete_all_by_cargo(&cargo_a, fixture.pool())
+    delete_replicas_by_cargo(&cargo_a, fixture.pool())
       .await
       .unwrap();
     assert_error_kind(
@@ -1035,7 +1018,9 @@ mod tests {
     .unwrap();
 
     assert_eq!(
-      CargoReplicaProcessDb::get(sandbox.key, pool).await.unwrap(),
+      get_replica_process_mapping(sandbox.key, pool)
+        .await
+        .unwrap(),
       sandbox
     );
     assert_eq!(
@@ -1142,7 +1127,7 @@ mod tests {
 
     CargoReplicaProcessDb::delete(web.key, pool).await.unwrap();
     assert_error_kind(
-      CargoReplicaProcessDb::get(web.key, pool).await,
+      get_replica_process_mapping(web.key, pool).await,
       std::io::ErrorKind::NotFound,
     );
     assert_eq!(api.container_name, "api");
@@ -1192,7 +1177,7 @@ mod tests {
     .unwrap();
     assert_eq!(attached.process_key.as_deref(), Some(process.key.as_str()));
     assert_eq!(
-      CargoReplicaProcessDb::find_by_process(&process.key, fixture.pool())
+      find_replica_process_mapping_by_process(&process.key, fixture.pool())
         .await
         .unwrap()
         .key,
@@ -1225,22 +1210,20 @@ mod tests {
       .await
       .unwrap();
     assert!(
-      CargoReplicaProcessDb::get(web.key, fixture.pool())
+      get_replica_process_mapping(web.key, fixture.pool())
         .await
         .unwrap()
         .process_key
         .is_none()
     );
 
-    CargoReplicaDb::delete(replica.key, fixture.pool())
-      .await
-      .unwrap();
+    delete_replica(replica.key, fixture.pool()).await.unwrap();
     assert_error_kind(
-      CargoReplicaProcessDb::get(web.key, fixture.pool()).await,
+      get_replica_process_mapping(web.key, fixture.pool()).await,
       std::io::ErrorKind::NotFound,
     );
     assert_error_kind(
-      CargoReplicaProcessDb::get(worker.key, fixture.pool()).await,
+      get_replica_process_mapping(worker.key, fixture.pool()).await,
       std::io::ErrorKind::NotFound,
     );
 
@@ -1255,7 +1238,7 @@ mod tests {
       assert_eq!(stored.kind_key, kind_key);
       assert_eq!(stored.node_name, fixture.node_name);
       assert!(
-        CargoReplicaProcessDb::find_by_process(&process.key, fixture.pool())
+        find_replica_process_mapping_by_process(&process.key, fixture.pool())
           .await
           .is_err()
       );
@@ -1517,7 +1500,7 @@ mod tests {
         .await
         .unwrap();
     let mapping_before =
-      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+      get_replica_process_mapping(mapping.key, fixture.pool())
         .await
         .unwrap();
 
@@ -1539,7 +1522,7 @@ mod tests {
       before
     );
     assert_eq!(
-      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+      get_replica_process_mapping(mapping.key, fixture.pool())
         .await
         .unwrap(),
       mapping_before
@@ -1553,7 +1536,7 @@ mod tests {
     .await
     .unwrap();
     assert_eq!(
-      CargoReplicaProcessDb::get(mapping.key, fixture.pool())
+      get_replica_process_mapping(mapping.key, fixture.pool())
         .await
         .unwrap(),
       mapping_before,
