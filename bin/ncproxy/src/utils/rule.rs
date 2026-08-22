@@ -271,6 +271,12 @@ enum CargoEndpointOwner {
   Sandbox,
 }
 
+enum CargoServingEndpoint {
+  ValidWithAddress(String),
+  ValidAddressless,
+  MissingOrInvalid,
+}
+
 fn cargo_endpoint_owner(
   application_count: usize,
   cargo_network_mode: Option<&str>,
@@ -354,12 +360,13 @@ impl<'a> CargoRuntimeGroup<'a> {
     }
   }
 
-  fn serving_address(
+  fn serving_endpoint(
     &self,
     desired_essential_apps: &BTreeSet<String>,
     enforce_desired_apps: bool,
     expected_owner: Option<CargoEndpointOwner>,
-  ) -> Option<String> {
+    cargo_network_mode: Option<&str>,
+  ) -> CargoServingEndpoint {
     let essential_apps = self
       .apps
       .values()
@@ -383,34 +390,66 @@ impl<'a> CargoRuntimeGroup<'a> {
         .iter()
         .any(|process| !essential_app_is_ready(process))
     {
-      return None;
+      return CargoServingEndpoint::MissingOrInvalid;
     }
 
     match self.owner {
-      CargoEndpointOwner::Sandbox => self
-        .sandbox
-        .filter(|sandbox| process_is_running(sandbox))
-        .and_then(|sandbox| process_network_address(sandbox)),
+      CargoEndpointOwner::Sandbox => {
+        let Some(sandbox) =
+          self.sandbox.filter(|sandbox| process_is_running(sandbox))
+        else {
+          return CargoServingEndpoint::MissingOrInvalid;
+        };
+        if process_network_mode(sandbox) == Some("none")
+          && (!enforce_desired_apps || cargo_network_mode == Some("none"))
+        {
+          CargoServingEndpoint::ValidAddressless
+        } else if let Some(address) = process_network_address(sandbox) {
+          CargoServingEndpoint::ValidWithAddress(address)
+        } else {
+          CargoServingEndpoint::MissingOrInvalid
+        }
+      }
       CargoEndpointOwner::DirectApp => {
         if self.apps.len() != 1 {
-          return None;
+          return CargoServingEndpoint::MissingOrInvalid;
         }
-        let (process, _) = self.apps.values().next()?;
-        (process_network_mode(process) != Some("host")
-          && process_is_running(process))
-        .then(|| process_network_address(process))
-        .flatten()
+        let Some((process, _)) = self.apps.values().next() else {
+          return CargoServingEndpoint::MissingOrInvalid;
+        };
+        if !process_is_running(process) {
+          CargoServingEndpoint::MissingOrInvalid
+        } else if matches!(process_network_mode(process), Some("host" | "none"))
+        {
+          CargoServingEndpoint::ValidAddressless
+        } else {
+          process_network_address(process).map_or(
+            CargoServingEndpoint::MissingOrInvalid,
+            CargoServingEndpoint::ValidWithAddress,
+          )
+        }
       }
       CargoEndpointOwner::Host => {
         // Cargo-level host mode has no sandbox. Container-level `none` escapes
         // do not provide an endpoint, while every host app shares the node
         // address.
-        self.apps.values().find_map(|(process, _)| {
+        let address = self.apps.values().find_map(|(process, _)| {
           (process_is_running(process)
             && process_network_mode(process) == Some("host"))
           .then(|| process_network_address(process))
           .flatten()
-        })
+        });
+        if let Some(address) = address {
+          CargoServingEndpoint::ValidWithAddress(address)
+        } else if self
+          .apps
+          .values()
+          .all(|(process, _)| process_network_mode(process) == Some("none"))
+        {
+          CargoServingEndpoint::ValidAddressless
+        } else {
+          CargoServingEndpoint::MissingOrInvalid
+        }
       }
     }
   }
@@ -589,17 +628,21 @@ fn get_cargo_addresses(
     for group in groups.into_values() {
       let enforce_desired_apps = !group.retained && enforce_active_desired_apps;
       let expected_group_owner = enforce_desired_apps.then_some(expected_owner);
-      let Some(address) = group.serving_address(
+      let endpoint = group.serving_endpoint(
         desired_essential_apps,
         enforce_desired_apps,
         expected_group_owner,
-      ) else {
+        cargo_network_mode,
+      );
+      // Keep a valid addressless generation in its lifecycle class so a
+      // committed active attempt cannot be mistaken for a missing attempt.
+      if matches!(endpoint, CargoServingEndpoint::MissingOrInvalid) {
         continue;
-      };
+      }
       if group.retained {
-        retained.push(address);
+        retained.push(endpoint);
       } else {
-        active.push(address);
+        active.push(endpoint);
       }
     }
 
@@ -634,7 +677,7 @@ fn get_cargo_addresses(
         _ => None,
       }
     };
-    if let Some(address) = selected {
+    if let Some(CargoServingEndpoint::ValidWithAddress(address)) = selected {
       addresses.insert(address.clone());
     }
   }
@@ -1650,6 +1693,150 @@ mod tests {
       )
       .unwrap(),
       vec!["10.0.0.5"]
+    );
+  }
+
+  #[test]
+  fn cargo_none_rollout_keeps_retained_endpoint_only_while_updating() {
+    let mut processes = sandbox_attempt(
+      "rollout",
+      "old",
+      "10.0.0.2",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    let mut active = sandbox_attempt(
+      "rollout",
+      "active",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    );
+    active[0].data.host_config.as_mut().unwrap().network_mode =
+      Some("none".to_owned());
+    processes.extend(active);
+
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        2,
+        Some("none"),
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+
+    let error = cargo_addresses_with_topology(
+      &processes,
+      "node-a",
+      2,
+      Some("none"),
+      ObjPsStatusKind::Start,
+    )
+    .unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(
+      error
+        .to_string()
+        .contains("No serving Cargo replica endpoint")
+    );
+  }
+
+  #[test]
+  fn cargo_direct_none_rollout_keeps_retained_endpoint_only_while_updating() {
+    let mut processes = direct_attempt(
+      "rollout",
+      "old",
+      "private",
+      &[("private", "10.0.0.2")],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(direct_attempt(
+      "rollout",
+      "active",
+      "none",
+      &[],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+
+    let error = cargo_addresses_with_topology(
+      &processes,
+      "node-a",
+      1,
+      Some("private"),
+      ObjPsStatusKind::Start,
+    )
+    .unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(
+      error
+        .to_string()
+        .contains("No serving Cargo replica endpoint")
+    );
+  }
+
+  #[test]
+  fn cargo_routable_direct_rollout_hands_off_after_commit() {
+    let mut processes = direct_attempt(
+      "rollout",
+      "old",
+      "private",
+      &[("private", "10.0.0.2")],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    processes.extend(direct_attempt(
+      "rollout",
+      "active",
+      "private",
+      &[("private", "10.0.0.3")],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.3"]
     );
   }
 
