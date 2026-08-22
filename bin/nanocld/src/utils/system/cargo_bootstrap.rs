@@ -258,6 +258,7 @@ struct CargoNetworkOwnership {
   network_mode: Option<CargoNetworkMode>,
   port_bindings: Option<PortMap>,
   has_sandbox: bool,
+  application_owns_network: bool,
   direct_installer_generation: bool,
 }
 
@@ -281,6 +282,24 @@ fn infer_network_ownership(
   processes: &[ParsedCargoProcess],
   replica_count: usize,
 ) -> IoResult<CargoNetworkOwnership> {
+  let mut application_counts = HashMap::<uuid::Uuid, usize>::new();
+  for process in processes {
+    let count = application_counts.entry(process.replica_key).or_default();
+    if process.role == CargoReplicaProcessRole::App {
+      *count += 1;
+    }
+  }
+  let application_count =
+    application_counts.values().next().copied().unwrap_or(0);
+  if application_counts
+    .values()
+    .any(|count| *count != application_count)
+  {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} replicas expose contradictory application cardinality"
+    )));
+  }
+
   let sandboxes = processes
     .iter()
     .filter(|process| process.role == CargoReplicaProcessRole::Sandbox)
@@ -298,6 +317,11 @@ fn infer_network_ownership(
         "Cargo {cargo_key:?} sandbox cannot join another container namespace"
       )));
     }
+    if application_count <= 1 || effective_mode == "host" {
+      return Err(bootstrap_error(format!(
+        "Cargo {cargo_key:?} has a sandbox for {application_count} applications on network {effective_mode:?}, which contradicts the canonical Cargo topology"
+      )));
+    }
     let port_bindings = observed_port_bindings(&sandboxes[0].config);
     for sandbox in sandboxes.iter().skip(1) {
       if observed_network_mode(&sandbox.config) != effective_mode
@@ -313,6 +337,7 @@ fn infer_network_ownership(
       effective_mode,
       port_bindings,
       has_sandbox: true,
+      application_owns_network: false,
       direct_installer_generation: false,
     });
   }
@@ -320,15 +345,40 @@ fn infer_network_ownership(
   let direct_installer_generation = processes.len() == 1
     && processes[0].role == CargoReplicaProcessRole::App
     && processes[0].process_name == format!("{cargo_key}.c");
-  if direct_installer_generation {
-    let effective_mode = observed_network_mode(&processes[0].config);
-    let port_bindings = observed_port_bindings(&processes[0].config);
+  if application_count == 1 {
+    let applications = processes
+      .iter()
+      .filter(|process| process.role == CargoReplicaProcessRole::App)
+      .collect::<Vec<_>>();
+    if applications.len() != replica_count {
+      return Err(bootstrap_error(format!(
+        "Cargo {cargo_key:?} has {} direct application network owners for {replica_count} replicas",
+        applications.len()
+      )));
+    }
+    let effective_mode = observed_network_mode(&applications[0].config);
+    if effective_mode.starts_with("container:") {
+      return Err(bootstrap_error(format!(
+        "Cargo {cargo_key:?} direct application cannot join another container namespace"
+      )));
+    }
+    let port_bindings = observed_port_bindings(&applications[0].config);
+    for application in applications.iter().skip(1) {
+      if observed_network_mode(&application.config) != effective_mode
+        || observed_port_bindings(&application.config) != port_bindings
+      {
+        return Err(bootstrap_error(format!(
+          "Cargo {cargo_key:?} replicas expose contradictory direct application network ownership"
+        )));
+      }
+    }
     return Ok(CargoNetworkOwnership {
       network_mode: cargo_network_mode(&effective_mode)?,
       effective_mode,
       port_bindings,
       has_sandbox: false,
-      direct_installer_generation: true,
+      application_owns_network: true,
+      direct_installer_generation,
     });
   }
 
@@ -341,6 +391,14 @@ fn infer_network_ownership(
   }) {
     return Err(bootstrap_error(format!(
       "Cargo {cargo_key:?} has no sandbox but its stable application processes do not describe a host-network Cargo"
+    )));
+  }
+  if !processes.iter().any(|process| {
+    process.role == CargoReplicaProcessRole::App
+      && observed_network_mode(&process.config) == "host"
+  }) {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} has no sandbox but its multiple applications do not expose Cargo-level host ownership"
     )));
   }
   if processes
@@ -359,6 +417,7 @@ fn infer_network_ownership(
     ),
     port_bindings: None,
     has_sandbox: false,
+    application_owns_network: false,
     direct_installer_generation: false,
   })
 }
@@ -423,7 +482,16 @@ fn normalize_declared_config(
     .clone()
     .filter(|mode| !mode.is_empty())
     .unwrap_or_else(|| DEFAULT_NETWORK.to_owned());
-  if ownership.has_sandbox {
+  if ownership.has_sandbox && process.role == CargoReplicaProcessRole::Init {
+    if observed_mode == ownership.effective_mode {
+      host.network_mode = None;
+    } else if !matches!(observed_mode.as_str(), "host" | "none") {
+      return Err(bootstrap_error(format!(
+        "Cargo {cargo_key:?} init container {:?} has network mode {observed_mode:?} instead of the Cargo network",
+        process.container_name
+      )));
+    }
+  } else if ownership.has_sandbox {
     match observed_mode.as_str() {
       mode if mode.starts_with("container:") => host.network_mode = None,
       "host" | "none" => {}
@@ -434,9 +502,14 @@ fn normalize_declared_config(
         )));
       }
     }
-  } else if ownership.direct_installer_generation {
+  } else if ownership.application_owns_network {
     if observed_mode == ownership.effective_mode {
       host.network_mode = None;
+    } else if !matches!(observed_mode.as_str(), "host" | "none") {
+      return Err(bootstrap_error(format!(
+        "Cargo {cargo_key:?} container {:?} has network mode {observed_mode:?} instead of the Cargo network",
+        process.container_name
+      )));
     }
   } else {
     match observed_mode.as_str() {
@@ -455,6 +528,21 @@ fn normalize_declared_config(
     .port_bindings
     .take()
     .filter(|bindings| !bindings.is_empty());
+  if ownership.has_sandbox && application_ports.is_some() {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} container {:?} duplicates sandbox-owned port bindings",
+      process.container_name
+    )));
+  }
+  if application_ports.is_some()
+    && (!ownership.application_owns_network
+      || process.role != CargoReplicaProcessRole::App)
+  {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} container {:?} exposes unexpected container-owned port bindings",
+      process.container_name
+    )));
+  }
   if application_ports.is_some() && application_ports != ownership.port_bindings
   {
     return Err(bootstrap_error(format!(
@@ -462,13 +550,8 @@ fn normalize_declared_config(
       process.container_name
     )));
   }
-  if ownership.has_sandbox && application_ports.is_some() {
-    return Err(bootstrap_error(format!(
-      "Cargo {cargo_key:?} container {:?} duplicates sandbox-owned port bindings",
-      process.container_name
-    )));
-  }
-  if ownership.direct_installer_generation
+  if ownership.application_owns_network
+    && process.role == CargoReplicaProcessRole::App
     && let (Some(exposed), Some(port_bindings)) = (
       config.exposed_ports.as_mut(),
       ownership.port_bindings.as_ref(),
@@ -891,20 +974,36 @@ mod tests {
     )
   }
 
+  fn direct_app(
+    replica_key: uuid::Uuid,
+    ordinal: i32,
+    name: &str,
+    position: &str,
+    network_mode: &str,
+  ) -> CargoBootstrapProcess {
+    let mut app = app(replica_key, ordinal, name, position);
+    app.config.host_config.as_mut().unwrap().network_mode =
+      Some(network_mode.to_owned());
+    app
+  }
+
   fn init(
     replica_key: uuid::Uuid,
     ordinal: i32,
     name: &str,
     position: &str,
   ) -> CargoBootstrapProcess {
-    process(
+    let mut init = process(
       replica_key,
       ordinal,
       CargoReplicaProcessRole::Init,
       name,
       Some(position),
       &format!("init-system.bootstrap-r{ordinal}-{name}.c"),
-    )
+    );
+    init.config.host_config.as_mut().unwrap().network_mode =
+      Some(DEFAULT_NETWORK.to_owned());
+    init
   }
 
   #[test]
@@ -912,12 +1011,13 @@ mod tests {
     let replica = replica(1);
     let reconstructed = reconstruct_cargo(
       KEY,
-      &[sandbox(replica, 0), app(replica, 0, "api", "0")],
+      &[direct_app(replica, 0, "api", "0", DEFAULT_NETWORK)],
     )
     .unwrap()
     .unwrap();
 
     assert_eq!(reconstructed.spec.replicas, 1);
+    assert!(reconstructed.spec.network_mode.is_none());
     assert_eq!(reconstructed.spec.containers.len(), 1);
     assert_eq!(reconstructed.spec.containers[0].name, "api");
     assert!(reconstructed.spec.secrets.is_empty());
@@ -928,12 +1028,18 @@ mod tests {
       ImagePullPolicy::IfNotPresent
     );
     assert_eq!(reconstructed.actual, ObjPsStatusKind::Start);
+    assert!(
+      reconstructed
+        .processes
+        .iter()
+        .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
+    );
   }
 
   #[test]
   fn reconciler_runtime_metadata_is_removed_but_user_config_is_preserved() {
     let replica = replica(1);
-    let mut app = app(replica, 0, "api", "0");
+    let mut app = direct_app(replica, 0, "api", "0", DEFAULT_NETWORK);
     app
       .config
       .labels
@@ -948,9 +1054,7 @@ mod tests {
       "/tmp/generated:/opt/nanocl.io/secrets:ro".to_owned(),
       "/data:/data".to_owned(),
     ]);
-    let reconstructed = reconstruct_cargo(KEY, &[sandbox(replica, 0), app])
-      .unwrap()
-      .unwrap();
+    let reconstructed = reconstruct_cargo(KEY, &[app]).unwrap().unwrap();
     let config = &reconstructed.spec.containers[0].container_config;
 
     assert_eq!(
@@ -1054,10 +1158,16 @@ mod tests {
     let host = sandbox.config.host_config.as_mut().unwrap();
     host.network_mode = Some("private-api".to_owned());
     host.port_bindings = Some(bindings.clone());
-    let reconstructed =
-      reconstruct_cargo(KEY, &[sandbox, app(replica, 0, "api", "0")])
-        .unwrap()
-        .unwrap();
+    let reconstructed = reconstruct_cargo(
+      KEY,
+      &[
+        sandbox,
+        app(replica, 0, "api", "0"),
+        app(replica, 0, "worker", "1"),
+      ],
+    )
+    .unwrap()
+    .unwrap();
 
     assert_eq!(
       reconstructed
@@ -1069,7 +1179,7 @@ mod tests {
     );
     assert_eq!(reconstructed.spec.port_bindings, Some(bindings));
     assert!(reconstructed.spec.init_containers.is_empty());
-    assert_eq!(reconstructed.spec.containers.len(), 1);
+    assert_eq!(reconstructed.spec.containers.len(), 2);
     assert_eq!(
       reconstructed.spec.containers[0]
         .container_config
@@ -1140,8 +1250,7 @@ mod tests {
       &[
         candidate,
         retained,
-        sandbox(replica, 0),
-        app(replica, 0, "api", "0"),
+        direct_app(replica, 0, "api", "0", DEFAULT_NETWORK),
       ],
     )
     .unwrap()
@@ -1177,6 +1286,12 @@ mod tests {
     let reconstructed = reconstruct_cargo(KEY, &[app]).unwrap().unwrap();
 
     assert!(reconstructed.direct_installer_generation);
+    assert!(
+      reconstructed
+        .processes
+        .iter()
+        .all(|process| process.role != CargoReplicaProcessRole::Sandbox)
+    );
     assert_eq!(reconstructed.spec.network_mode, None);
     assert_eq!(reconstructed.spec.port_bindings, Some(bindings));
     assert_eq!(
@@ -1207,6 +1322,230 @@ mod tests {
         .as_ref()
         .and_then(|host| host.port_bindings.as_ref()),
       None
+    );
+  }
+
+  #[test]
+  fn direct_application_ownership_lifts_custom_none_init_and_ports() {
+    let replica = replica(1);
+    let bindings = HashMap::from([(
+      "8080/tcp".to_owned(),
+      Some(vec![PortBinding {
+        host_ip: Some("127.0.0.1".to_owned()),
+        host_port: Some("8080".to_owned()),
+      }]),
+    )]);
+    let mut custom = direct_app(replica, 0, "api", "0", "private-api");
+    custom.config.exposed_ports = Some(HashMap::from([(
+      "8080/tcp".to_owned(),
+      EmptyObject::default(),
+    )]));
+    custom.config.host_config.as_mut().unwrap().port_bindings =
+      Some(bindings.clone());
+    let mut prepare = init(replica, 0, "prepare", "0");
+    prepare.status = Some(ContainerStateStatusEnum::EXITED);
+    prepare.config.host_config.as_mut().unwrap().network_mode =
+      Some("private-api".to_owned());
+    let mut migrate = init(replica, 0, "migrate", "1");
+    migrate.status = Some(ContainerStateStatusEnum::EXITED);
+    migrate.config.host_config.as_mut().unwrap().network_mode =
+      Some("private-api".to_owned());
+
+    let reconstructed = reconstruct_cargo(KEY, &[prepare, migrate, custom])
+      .unwrap()
+      .unwrap();
+    assert_eq!(
+      reconstructed
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("private-api")
+    );
+    assert_eq!(reconstructed.spec.port_bindings, Some(bindings));
+    assert_eq!(reconstructed.spec.init_containers.len(), 2);
+    assert!(
+      reconstructed
+        .processes
+        .iter()
+        .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
+    );
+    assert!(
+      reconstructed
+        .spec
+        .init_containers
+        .iter()
+        .chain(&reconstructed.spec.containers)
+        .all(|container| {
+          let config = &container.container_config;
+          config
+            .host_config
+            .as_ref()
+            .and_then(|host| host.network_mode.as_ref())
+            .is_none()
+            && config
+              .host_config
+              .as_ref()
+              .and_then(|host| host.port_bindings.as_ref())
+              .is_none()
+        })
+    );
+    assert_eq!(
+      reconstructed.spec.containers[0]
+        .container_config
+        .exposed_ports,
+      None
+    );
+
+    let none =
+      reconstruct_cargo(KEY, &[direct_app(replica, 0, "api", "0", "none")])
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+      none
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("none")
+    );
+    assert_eq!(
+      none.spec.containers[0]
+        .container_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.network_mode.as_ref()),
+      None
+    );
+  }
+
+  #[test]
+  fn application_cardinality_selects_sandbox_or_host_topology() {
+    let replica = replica(1);
+    let mut isolated_sandbox = sandbox(replica, 0);
+    isolated_sandbox
+      .config
+      .host_config
+      .as_mut()
+      .unwrap()
+      .network_mode = Some("none".to_owned());
+    let isolated = reconstruct_cargo(
+      KEY,
+      &[
+        isolated_sandbox,
+        app(replica, 0, "api", "0"),
+        app(replica, 0, "worker", "1"),
+      ],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+      isolated
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("none")
+    );
+    assert!(
+      isolated
+        .processes
+        .iter()
+        .any(|process| { process.role == CargoReplicaProcessRole::Sandbox })
+    );
+
+    for mode in [DEFAULT_NETWORK, "none"] {
+      let error = reconstruct_cargo(
+        KEY,
+        &[
+          direct_app(replica, 0, "api", "0", mode),
+          direct_app(replica, 0, "worker", "1", mode),
+        ],
+      )
+      .unwrap_err();
+      assert!(error.to_string().contains("has no sandbox"));
+    }
+
+    let host = reconstruct_cargo(
+      KEY,
+      &[
+        direct_app(replica, 0, "api", "0", "host"),
+        direct_app(replica, 0, "worker", "1", "host"),
+      ],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+      host
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("host")
+    );
+    assert!(
+      host
+        .processes
+        .iter()
+        .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
+    );
+
+    let error = reconstruct_cargo(
+      KEY,
+      &[sandbox(replica, 0), app(replica, 0, "api", "0")],
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("canonical Cargo topology"));
+  }
+
+  #[test]
+  fn replicas_must_agree_on_direct_network_ownership() {
+    let first = replica(1);
+    let second = replica(2);
+    let consistent = reconstruct_cargo(
+      KEY,
+      &[
+        direct_app(first, 0, "api", "0", DEFAULT_NETWORK),
+        direct_app(second, 1, "api", "0", DEFAULT_NETWORK),
+      ],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(consistent.spec.replicas, 2);
+    assert!(
+      consistent
+        .processes
+        .iter()
+        .all(|process| process.role != CargoReplicaProcessRole::Sandbox)
+    );
+
+    let error = reconstruct_cargo(
+      KEY,
+      &[
+        direct_app(first, 0, "api", "0", DEFAULT_NETWORK),
+        direct_app(second, 1, "api", "0", "private-api"),
+      ],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("contradictory direct application network ownership")
+    );
+
+    let error = reconstruct_cargo(
+      KEY,
+      &[
+        sandbox(first, 0),
+        app(first, 0, "api", "0"),
+        direct_app(second, 1, "api", "0", DEFAULT_NETWORK),
+      ],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("stable sandboxes for 2 replicas")
     );
   }
 }

@@ -859,4 +859,73 @@ mod tests {
         .unwrap();
     }
   }
+
+  /// DB-backed startup coverage. Run manually with the Nanocld test store.
+  #[ntex::test]
+  async fn bootstrap_persistence_adopts_direct_single_application_mapping() {
+    let system = gen_default_test_system().await;
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let cargo_name = format!("bootstrap-direct-{}", &suffix[..8]);
+    let cargo_key = format!("system.{cargo_name}");
+    let replica_key = uuid::Uuid::new_v4();
+    let mut api = bootstrap_process(
+      &cargo_key,
+      replica_key,
+      CargoReplicaProcessRole::App,
+      "api",
+      Some(0),
+      format!("{cargo_key}-r0-api.c"),
+    );
+    api.config.host_config.as_mut().unwrap().network_mode =
+      Some("nanoclbr0".to_owned());
+    insert_observed_process(&cargo_key, &api, &system.state).await;
+
+    let reconstructed = reconstruct_cargo(&cargo_key, &[api.clone()])
+      .unwrap()
+      .unwrap();
+    persist_reconstructed_cargo(&cargo_key, &reconstructed, &system.state)
+      .await
+      .unwrap();
+
+    let cargo =
+      CargoDb::transform_read_by_pk(&cargo_key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    assert_eq!(cargo.spec.name, cargo_name);
+    assert_eq!(cargo.spec.replicas, 1);
+    assert_eq!(cargo.spec.containers.len(), 1);
+    assert_eq!(cargo.spec.containers[0].name, "api");
+    assert!(cargo.spec.init_containers.is_empty());
+
+    let replicas =
+      CargoReplicaDb::list_by_cargo(&cargo_key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    assert_eq!(replicas.len(), 1);
+    assert_eq!(replicas[0].key, replica_key);
+    let mappings = CargoReplicaProcessDb::list_by_replica(
+      replica_key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    assert_eq!(mappings.len(), 1);
+    assert_eq!(mappings[0].role, CargoReplicaProcessRole::App);
+    assert_eq!(mappings[0].container_name, "api");
+    assert_eq!(
+      mappings[0].process_key.as_deref(),
+      Some(api.process_key.as_str())
+    );
+    assert!(mappings.iter().all(|mapping| {
+      mapping.role != CargoReplicaProcessRole::Sandbox
+        && mapping.container_name != "_sandbox"
+    }));
+
+    CargoDb::del_by_pk(&cargo_key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    ProcessDb::del_by_pk(&api.process_key, &system.state.inner.pool)
+      .await
+      .unwrap();
+  }
 }
