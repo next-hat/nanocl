@@ -5,7 +5,7 @@ use nanocl_stubs::{cargo::Cargo, process::Process, system::NativeEventAction};
 
 use crate::models::CargoReplicaProcessRole;
 
-use super::{RuntimeSlot, cargo_network_mode};
+use super::{RuntimeSlot, needs_sandbox};
 use crate::utils::container::cargo_compiler::{
   LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_ROLE,
 };
@@ -75,10 +75,10 @@ pub(super) fn required_candidate_topology_complete<'a>(
       _ => {}
     }
   }
-  let sandbox_complete = if cargo_network_mode(cargo) == "host" {
-    sandboxes == 0
-  } else {
+  let sandbox_complete = if needs_sandbox(cargo) {
     sandboxes == 1
+  } else {
+    sandboxes == 0
   };
   sandbox_complete && !duplicate_app && observed_apps == desired_apps
 }
@@ -167,8 +167,8 @@ struct ReplicaReadinessObservation {
 
 /// Reduce fresh persisted observations without selecting a first container.
 /// This legacy aggregate bridge is deliberately strict: every desired replica
-/// must have its complete essential application set and, outside Cargo host
-/// mode, exactly one running sandbox.
+/// must have its complete essential application set and exactly the sandbox
+/// cardinality selected by the desired Cargo topology.
 pub(crate) fn all_desired_replicas_ready(
   cargo: &Cargo,
   desired_replica_keys: &HashSet<uuid::Uuid>,
@@ -242,7 +242,7 @@ pub(crate) fn all_desired_replicas_ready(
   {
     return false;
   }
-  let sandbox_required = cargo_network_mode(cargo) != "host";
+  let sandbox_required = needs_sandbox(cargo);
   replicas.values().all(|observation| {
     !observation.invalid_required_app
       && observation.essential_apps.len() == desired_apps.len()
@@ -268,7 +268,7 @@ mod tests {
     SANDBOX_LOGICAL_NAME,
     tests::{
       declared_container, readiness_cargo, readiness_process,
-      ready_replica_processes,
+      ready_replica_processes, topology_cargo,
     },
   };
   use super::*;
@@ -351,6 +351,110 @@ mod tests {
         .into_iter()
         .filter(|(role, _, _)| { *role != CargoReplicaProcessRole::Sandbox })
     ));
+  }
+
+  #[test]
+  fn candidate_topology_enforces_direct_and_sandbox_cardinality() {
+    let direct = topology_cargo(1, 1, None);
+    let direct_app = [
+      (CargoReplicaProcessRole::Init, "init-0", true),
+      (CargoReplicaProcessRole::App, "app-0", true),
+    ];
+    assert!(required_candidate_topology_complete(&direct, direct_app));
+    assert!(!required_candidate_topology_complete(
+      &direct,
+      direct_app.into_iter().chain([(
+        CargoReplicaProcessRole::Sandbox,
+        SANDBOX_LOGICAL_NAME,
+        true,
+      )])
+    ));
+
+    let shared = topology_cargo(2, 1, None);
+    let shared_apps = [
+      (CargoReplicaProcessRole::Init, "init-0", true),
+      (CargoReplicaProcessRole::App, "app-0", true),
+      (CargoReplicaProcessRole::App, "app-1", true),
+    ];
+    assert!(!required_candidate_topology_complete(&shared, shared_apps));
+    let complete = [
+      (CargoReplicaProcessRole::Init, "init-0", true),
+      (CargoReplicaProcessRole::App, "app-0", true),
+      (CargoReplicaProcessRole::App, "app-1", true),
+      (CargoReplicaProcessRole::Sandbox, SANDBOX_LOGICAL_NAME, true),
+    ];
+    assert!(required_candidate_topology_complete(&shared, complete));
+    assert!(!required_candidate_topology_complete(
+      &shared,
+      complete.into_iter().chain([(
+        CargoReplicaProcessRole::Sandbox,
+        SANDBOX_LOGICAL_NAME,
+        true,
+      )])
+    ));
+  }
+
+  #[test]
+  fn aggregate_readiness_enforces_direct_and_sandbox_cardinality() {
+    let replica = uuid::Uuid::new_v4();
+    let desired = HashSet::from([replica]);
+    let direct = topology_cargo(1, 0, None);
+    let direct_app = readiness_process(
+      replica,
+      "global.api-app.c",
+      "app",
+      "app-0",
+      true,
+      true,
+      None,
+    );
+    assert!(all_desired_replicas_ready(
+      &direct,
+      &desired,
+      std::slice::from_ref(&direct_app)
+    ));
+    let unexpected_sandbox = readiness_process(
+      replica,
+      "global.api-sandbox.c",
+      "sandbox",
+      SANDBOX_LOGICAL_NAME,
+      true,
+      true,
+      None,
+    );
+    assert!(!all_desired_replicas_ready(
+      &direct,
+      &desired,
+      &[direct_app, unexpected_sandbox.clone()]
+    ));
+
+    let shared = topology_cargo(2, 0, None);
+    let apps = [
+      readiness_process(
+        replica,
+        "global.api-app-0.c",
+        "app",
+        "app-0",
+        true,
+        true,
+        None,
+      ),
+      readiness_process(
+        replica,
+        "global.api-app-1.c",
+        "app",
+        "app-1",
+        true,
+        true,
+        None,
+      ),
+    ];
+    assert!(!all_desired_replicas_ready(&shared, &desired, &apps));
+    let mut complete = apps.to_vec();
+    complete.push(unexpected_sandbox.clone());
+    assert!(all_desired_replicas_ready(&shared, &desired, &complete));
+    complete.push(unexpected_sandbox);
+    assert!(!all_desired_replicas_ready(&shared, &desired, &complete));
   }
 
   #[test]

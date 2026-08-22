@@ -16,7 +16,6 @@ use super::{
 pub(super) async fn reconcile_containers(
   cargo: &Cargo,
   task: &CargoReplicaTask,
-  sandbox_id: Option<&str>,
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
@@ -28,7 +27,7 @@ pub(super) async fn reconcile_containers(
       task,
       declared,
       role: CargoReplicaProcessRole::Init,
-      sandbox_id,
+      sandbox_id: None,
       attempt_id,
       gateway,
       state,
@@ -62,7 +61,6 @@ pub(super) async fn reconcile_containers(
 pub(super) async fn create_candidate_containers(
   cargo: &Cargo,
   task: &CargoReplicaTask,
-  sandbox_id: Option<&str>,
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
@@ -74,7 +72,7 @@ pub(super) async fn create_candidate_containers(
       task,
       declared,
       role: CargoReplicaProcessRole::Init,
-      sandbox_id,
+      sandbox_id: None,
       attempt_id,
       gateway,
       state,

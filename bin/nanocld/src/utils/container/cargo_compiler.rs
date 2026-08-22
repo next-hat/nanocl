@@ -63,6 +63,8 @@ pub(super) struct ContainerCompileInput<'a> {
   pub(super) declaration_position: usize,
   pub(super) cargo_network_mode: Option<&'a CargoNetworkMode>,
   pub(super) sandbox_id: Option<&'a str>,
+  /// Cargo-level ports projected only when this direct application owns them.
+  pub(super) cargo_port_bindings: Option<&'a PortMap>,
   pub(super) role: CargoContainerRole,
   pub(super) runtime: CargoRuntimeMetadata<'a>,
   pub(super) internal_gateway: Option<&'a str>,
@@ -98,10 +100,6 @@ pub(super) enum CargoCompilerError {
   InvalidContainerSpec {
     container: String,
     source: ContainerSpecValidationError,
-  },
-  MissingSandboxId {
-    container: String,
-    cargo_network_mode: String,
   },
   UnexpectedSandboxId {
     container: String,
@@ -157,13 +155,6 @@ impl std::fmt::Display for CargoCompilerError {
       Self::InvalidContainerSpec { container, source } => {
         write!(f, "invalid ContainerSpec {container:?}: {source}")
       }
-      Self::MissingSandboxId {
-        container,
-        cargo_network_mode,
-      } => write!(
-        f,
-        "container {container:?} requires a sandbox Docker ID for Cargo network mode {cargo_network_mode:?}"
-      ),
       Self::UnexpectedSandboxId {
         container,
         cargo_network_mode,
@@ -260,8 +251,7 @@ impl From<CargoCompilerError> for IoError {
       | CargoCompilerError::ReservedEnvironmentCollision { .. } => {
         IoError::invalid_input("CargoCompiler", message.as_str())
       }
-      CargoCompilerError::MissingSandboxId { .. }
-      | CargoCompilerError::UnexpectedSandboxId { .. }
+      CargoCompilerError::UnexpectedSandboxId { .. }
       | CargoCompilerError::InvalidSandboxId { .. }
       | CargoCompilerError::InvalidContainerRole { .. }
       | CargoCompilerError::UnresolvedInternalGateway { .. }
@@ -295,6 +285,23 @@ pub(super) fn compile_container(
   reject_reserved_values(input.declared)?;
 
   let cargo_mode = effective_cargo_mode(input.cargo_network_mode);
+  validate_cargo_port_bindings(cargo_mode, input.cargo_port_bindings)?;
+  if input.cargo_port_bindings.is_some() {
+    if input.role == CargoContainerRole::Init {
+      return Err(CargoCompilerError::InvalidContainerRole {
+        container: name,
+        role: input.role.label_value(),
+        reason: "init containers cannot own Cargo port bindings",
+      });
+    }
+    if input.sandbox_id.is_some() {
+      return Err(CargoCompilerError::InvalidNetworkCombination {
+        container: name,
+        cargo_network_mode: cargo_mode.to_owned(),
+        reason: "applications sharing a sandbox cannot own Cargo port bindings",
+      });
+    }
+  }
   if cargo_mode == "host" && input.sandbox_id.is_some() {
     return Err(CargoCompilerError::UnexpectedSandboxId {
       container: name,
@@ -317,22 +324,18 @@ pub(super) fn compile_container(
         reason: "declared container network mode must be omitted, host, or none",
       });
     }
-    None if cargo_mode == "host" => "host".to_owned(),
-    None => {
-      let sandbox_id = input.sandbox_id.ok_or_else(|| {
-        CargoCompilerError::MissingSandboxId {
-          container: name.clone(),
-          cargo_network_mode: cargo_mode.to_owned(),
+    None => match input.sandbox_id {
+      None => cargo_mode.to_owned(),
+      Some(sandbox_id) => {
+        if sandbox_id.is_empty() {
+          return Err(CargoCompilerError::InvalidSandboxId {
+            container: name,
+            reason: "sandbox Docker ID cannot be empty",
+          });
         }
-      })?;
-      if sandbox_id.is_empty() {
-        return Err(CargoCompilerError::InvalidSandboxId {
-          container: name,
-          reason: "sandbox Docker ID cannot be empty",
-        });
+        format!("container:{sandbox_id}")
       }
-      format!("container:{sandbox_id}")
-    }
+    },
   };
   if effective_container_mode.starts_with("container:") {
     validate_shared_network_fields(
@@ -351,6 +354,13 @@ pub(super) fn compile_container(
 
   let mut host_config = config.host_config.take().unwrap_or_default();
   host_config.network_mode = Some(effective_container_mode);
+  if let Some(port_bindings) = input.cargo_port_bindings {
+    host_config.port_bindings = Some(port_bindings.clone());
+    let exposed_ports = config.exposed_ports.get_or_insert_default();
+    for port in port_bindings.keys() {
+      exposed_ports.entry(port.clone()).or_default();
+    }
+  }
   if input.role == CargoContainerRole::Application
     && host_config.restart_policy.is_none()
   {
@@ -404,22 +414,13 @@ pub(super) fn compile_sandbox(
   input: SandboxCompileInput<'_>,
 ) -> Result<Option<CompiledSandbox>, CargoCompilerError> {
   let cargo_mode = effective_cargo_mode(input.cargo_network_mode);
-  let has_ports = input.port_bindings.is_some_and(|ports| !ports.is_empty());
-  if matches!(cargo_mode, "host" | "none") && has_ports {
-    return Err(CargoCompilerError::InvalidCargoPortBindingCombination {
-      cargo_network_mode: cargo_mode.to_owned(),
-    });
-  }
+  validate_cargo_port_bindings(cargo_mode, input.port_bindings)?;
   if cargo_mode == "host" {
     return Ok(None);
   }
   if input.sandbox_image.trim().is_empty() {
     return Err(CargoCompilerError::InvalidSandboxImage);
   }
-  if let Some(port_bindings) = input.port_bindings {
-    validate_port_bindings(port_bindings)?;
-  }
-
   let port_bindings = input.port_bindings.cloned();
   let exposed_ports = input.port_bindings.map(|ports| {
     ports
@@ -454,6 +455,22 @@ pub(super) fn compile_sandbox(
 
 fn effective_cargo_mode(mode: Option<&CargoNetworkMode>) -> &str {
   mode.map_or(DEFAULT_NETWORK, CargoNetworkMode::as_str)
+}
+
+fn validate_cargo_port_bindings(
+  cargo_network_mode: &str,
+  port_bindings: Option<&PortMap>,
+) -> Result<(), CargoCompilerError> {
+  let has_ports = port_bindings.is_some_and(|ports| !ports.is_empty());
+  if matches!(cargo_network_mode, "host" | "none") && has_ports {
+    return Err(CargoCompilerError::InvalidCargoPortBindingCombination {
+      cargo_network_mode: cargo_network_mode.to_owned(),
+    });
+  }
+  if let Some(port_bindings) = port_bindings {
+    validate_port_bindings(port_bindings)?;
+  }
+  Ok(())
 }
 
 fn identity_labels(
@@ -772,6 +789,26 @@ mod tests {
     }
   }
 
+  fn compile_with_cargo_ports(
+    declared: &ContainerSpec,
+    cargo_network_mode: Option<&CargoNetworkMode>,
+    sandbox_id: Option<&str>,
+    role: CargoContainerRole,
+    internal_gateway: Option<&str>,
+    cargo_port_bindings: Option<&PortMap>,
+  ) -> Result<CompiledContainer, CargoCompilerError> {
+    compile_container(ContainerCompileInput {
+      declared,
+      declaration_position: 0,
+      cargo_network_mode,
+      sandbox_id,
+      cargo_port_bindings,
+      role,
+      runtime: runtime(),
+      internal_gateway,
+    })
+  }
+
   fn compile(
     declared: &ContainerSpec,
     cargo_network_mode: Option<&CargoNetworkMode>,
@@ -779,15 +816,14 @@ mod tests {
     role: CargoContainerRole,
     internal_gateway: Option<&str>,
   ) -> Result<CompiledContainer, CargoCompilerError> {
-    compile_container(ContainerCompileInput {
+    compile_with_cargo_ports(
       declared,
-      declaration_position: 0,
       cargo_network_mode,
       sandbox_id,
       role,
-      runtime: runtime(),
       internal_gateway,
-    })
+      None,
+    )
   }
 
   fn compile_application(
@@ -801,6 +837,22 @@ mod tests {
       sandbox_id,
       CargoContainerRole::Application,
       None,
+    )
+  }
+
+  fn compile_application_with_cargo_ports(
+    declared: &ContainerSpec,
+    cargo_network_mode: Option<&CargoNetworkMode>,
+    sandbox_id: Option<&str>,
+    cargo_port_bindings: Option<&PortMap>,
+  ) -> Result<CompiledContainer, CargoCompilerError> {
+    compile_with_cargo_ports(
+      declared,
+      cargo_network_mode,
+      sandbox_id,
+      CargoContainerRole::Application,
+      None,
+      cargo_port_bindings,
     )
   }
 
@@ -1002,14 +1054,31 @@ mod tests {
   }
 
   #[test]
-  fn missing_sandbox_id_fails_for_a_normal_sandbox_backed_container() {
-    assert_eq!(
-      compile_application(&minimal_spec(), None, None).unwrap_err(),
-      CargoCompilerError::MissingSandboxId {
-        container: "app".to_owned(),
-        cargo_network_mode: "nanoclbr0".to_owned(),
-      }
-    );
+  fn direct_application_inherits_cargo_network_and_preserves_overrides() {
+    for (cargo_mode, expected) in [
+      (None, "nanoclbr0"),
+      (Some("custom-network"), "custom-network"),
+      (Some("none"), "none"),
+    ] {
+      let cargo_mode =
+        cargo_mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
+      let compiled =
+        compile_application(&minimal_spec(), cargo_mode.as_ref(), None)
+          .unwrap();
+      assert_eq!(network_mode(&compiled.config), Some(expected));
+    }
+
+    let cargo_mode = CargoNetworkMode::new("custom-network").unwrap();
+    for override_mode in ["host", "none"] {
+      let mut declared = minimal_spec();
+      declared.container_config.host_config = Some(HostConfig {
+        network_mode: Some(override_mode.to_owned()),
+        ..Default::default()
+      });
+      let compiled =
+        compile_application(&declared, Some(&cargo_mode), None).unwrap();
+      assert_eq!(network_mode(&compiled.config), Some(override_mode));
+    }
   }
 
   #[test]
@@ -1077,7 +1146,8 @@ mod tests {
         ..Default::default()
       });
 
-      let compiled = compile_application(&declared, None, None).unwrap();
+      let compiled =
+        compile_application(&declared, None, Some(SANDBOX_ID)).unwrap();
       assert_eq!(network_mode(&compiled.config), Some(override_mode));
       assert_eq!(compiled.config.exposed_ports, Some(exposed_ports.clone()));
     }
@@ -1264,6 +1334,71 @@ mod tests {
     );
   }
 
+  #[test]
+  fn direct_init_inherits_cargo_network_without_owning_cargo_ports() {
+    for (cargo_mode, expected) in [
+      (None, "nanoclbr0"),
+      (Some("custom-network"), "custom-network"),
+      (Some("none"), "none"),
+    ] {
+      let cargo_mode =
+        cargo_mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
+      let compiled = compile(
+        &minimal_spec(),
+        cargo_mode.as_ref(),
+        None,
+        CargoContainerRole::Init,
+        None,
+      )
+      .unwrap();
+      assert_eq!(network_mode(&compiled.config), Some(expected));
+      assert!(compiled.config.host_config.unwrap().port_bindings.is_none());
+      assert!(compiled.config.exposed_ports.is_none());
+    }
+
+    let cargo_mode = CargoNetworkMode::new("custom-network").unwrap();
+    for override_mode in ["host", "none"] {
+      let authored_exposed_ports =
+        HashMap::from([("9000/tcp".to_owned(), EmptyObject::default())]);
+      let mut declared = minimal_spec();
+      declared.container_config.exposed_ports =
+        Some(authored_exposed_ports.clone());
+      declared.container_config.host_config = Some(HostConfig {
+        network_mode: Some(override_mode.to_owned()),
+        ..Default::default()
+      });
+      let compiled = compile(
+        &declared,
+        Some(&cargo_mode),
+        None,
+        CargoContainerRole::Init,
+        None,
+      )
+      .unwrap();
+      assert_eq!(network_mode(&compiled.config), Some(override_mode));
+      assert!(compiled.config.host_config.unwrap().port_bindings.is_none());
+      assert_eq!(compiled.config.exposed_ports, Some(authored_exposed_ports));
+    }
+
+    let ports = real_port_map();
+    assert_eq!(
+      compile_with_cargo_ports(
+        &minimal_spec(),
+        None,
+        None,
+        CargoContainerRole::Init,
+        None,
+        Some(&ports),
+      )
+      .unwrap_err(),
+      CargoCompilerError::InvalidContainerRole {
+        container: "app".to_owned(),
+        role: "init",
+        reason: "init containers cannot own Cargo port bindings",
+      }
+    );
+  }
+
   fn real_port_map() -> PortMap {
     PortMap::from([
       (
@@ -1281,6 +1416,40 @@ mod tests {
       ),
       ("8443/tcp".to_owned(), None),
     ])
+  }
+
+  #[test]
+  fn direct_application_owns_cargo_ports_and_unions_exposed_ports() {
+    let ports = real_port_map();
+    let authored_exposed_ports =
+      HashMap::from([("9000/tcp".to_owned(), EmptyObject::default())]);
+    let mut declared = minimal_spec();
+    declared.container_config.exposed_ports =
+      Some(authored_exposed_ports.clone());
+
+    let compiled =
+      compile_application_with_cargo_ports(&declared, None, None, Some(&ports))
+        .unwrap()
+        .config;
+
+    assert_eq!(network_mode(&compiled), Some("nanoclbr0"));
+    assert_eq!(
+      compiled
+        .host_config
+        .as_ref()
+        .unwrap()
+        .port_bindings
+        .as_ref(),
+      Some(&ports)
+    );
+    let exposed_ports = compiled.exposed_ports.unwrap();
+    assert_eq!(exposed_ports.len(), 3);
+    assert!(exposed_ports.contains_key("8080/tcp"));
+    assert!(exposed_ports.contains_key("8443/tcp"));
+    assert_eq!(
+      exposed_ports.get("9000/tcp"),
+      authored_exposed_ports.get("9000/tcp")
+    );
   }
 
   #[test]
@@ -1316,14 +1485,37 @@ mod tests {
   }
 
   #[test]
-  fn application_and_init_configs_never_receive_port_publication() {
+  fn existing_sandbox_backed_compilation_keeps_ports_off_declared_containers() {
+    let ports = real_port_map();
+    let compiled_sandbox = sandbox(None, Some(&ports)).unwrap().unwrap().config;
+    assert_eq!(
+      compiled_sandbox.host_config.unwrap().port_bindings.as_ref(),
+      Some(&ports)
+    );
+
     for role in [CargoContainerRole::Application, CargoContainerRole::Init] {
       let compiled =
         compile(&minimal_spec(), None, Some(SANDBOX_ID), role, None).unwrap();
       let host = compiled.config.host_config.unwrap();
       assert!(host.port_bindings.is_none());
       assert!(host.publish_all_ports.is_none());
+      assert!(compiled.config.exposed_ports.is_none());
     }
+
+    assert_eq!(
+      compile_application_with_cargo_ports(
+        &minimal_spec(),
+        None,
+        Some(SANDBOX_ID),
+        Some(&ports),
+      )
+      .unwrap_err(),
+      CargoCompilerError::InvalidNetworkCombination {
+        container: "app".to_owned(),
+        cargo_network_mode: "nanoclbr0".to_owned(),
+        reason: "applications sharing a sandbox cannot own Cargo port bindings",
+      }
+    );
   }
 
   #[test]
@@ -1333,6 +1525,18 @@ mod tests {
       let cargo_mode = CargoNetworkMode::new(mode).unwrap();
       assert_eq!(
         sandbox(Some(&cargo_mode), Some(&ports)).unwrap_err(),
+        CargoCompilerError::InvalidCargoPortBindingCombination {
+          cargo_network_mode: mode.to_owned(),
+        }
+      );
+      assert_eq!(
+        compile_application_with_cargo_ports(
+          &minimal_spec(),
+          Some(&cargo_mode),
+          None,
+          Some(&ports),
+        )
+        .unwrap_err(),
         CargoCompilerError::InvalidCargoPortBindingCombination {
           cargo_network_mode: mode.to_owned(),
         }
@@ -1750,16 +1954,6 @@ mod tests {
   }
 
   #[test]
-  fn missing_sandbox_context_converts_to_other() {
-    let error = compile_application(&minimal_spec(), None, None).unwrap_err();
-    assert!(matches!(
-      &error,
-      CargoCompilerError::MissingSandboxId { .. }
-    ));
-    assert_io_conversion(error, std::io::ErrorKind::Other);
-  }
-
-  #[test]
   fn unresolved_internal_gateway_converts_to_other() {
     let mut declared = minimal_spec();
     declared.container_config.env =
@@ -1810,13 +2004,6 @@ mod tests {
           source: ContainerSpecValidationError::MissingImage,
         },
         std::io::ErrorKind::InvalidInput,
-      ),
-      (
-        CargoCompilerError::MissingSandboxId {
-          container: "app".to_owned(),
-          cargo_network_mode: "nanoclbr0".to_owned(),
-        },
-        std::io::ErrorKind::Other,
       ),
       (
         CargoCompilerError::UnexpectedSandboxId {
@@ -1913,7 +2100,7 @@ mod tests {
       assert_io_conversion(error, expected_kind);
     }
 
-    assert_eq!(covered_variants.len(), 14);
+    assert_eq!(covered_variants.len(), 13);
   }
 
   #[test]

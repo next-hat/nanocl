@@ -111,6 +111,10 @@ fn cargo_network_mode(cargo: &Cargo) -> &str {
     .map_or(DEFAULT_NETWORK, CargoNetworkMode::as_str)
 }
 
+pub(super) fn needs_sandbox(cargo: &Cargo) -> bool {
+  cargo.spec.containers.len() > 1 && cargo_network_mode(cargo) != "host"
+}
+
 fn runtime_metadata<'a>(
   cargo: &'a Cargo,
   replica_id: &'a str,
@@ -295,6 +299,24 @@ fn compile_declared_base(
 ) -> IoResult<DockerConfig> {
   let replica_id = task.key.to_string();
   let ordinal = replica_ordinal(task)?;
+  compile_declared_config(
+    cargo,
+    declared,
+    role,
+    sandbox_id,
+    runtime_metadata(cargo, &replica_id, ordinal, state),
+    gateway,
+  )
+}
+
+fn compile_declared_config(
+  cargo: &Cargo,
+  declared: &ContainerSpec,
+  role: CargoReplicaProcessRole,
+  sandbox_id: Option<&str>,
+  runtime: CargoRuntimeMetadata<'_>,
+  gateway: &str,
+) -> IoResult<DockerConfig> {
   let compiler_role = match role {
     CargoReplicaProcessRole::App => CargoContainerRole::Application,
     CargoReplicaProcessRole::Init => CargoContainerRole::Init,
@@ -312,8 +334,12 @@ fn compile_declared_base(
     declaration_position,
     cargo_network_mode: cargo.spec.network_mode.as_ref(),
     sandbox_id,
+    cargo_port_bindings: (role == CargoReplicaProcessRole::App
+      && sandbox_id.is_none())
+    .then_some(cargo.spec.port_bindings.as_ref())
+    .flatten(),
     role: compiler_role,
-    runtime: runtime_metadata(cargo, &replica_id, ordinal, state),
+    runtime,
     internal_gateway: Some(gateway),
   })?;
   Ok(compiled.config)
@@ -327,12 +353,27 @@ async fn compile_sandbox_config(
   let replica_id = task.key.to_string();
   let ordinal = replica_ordinal(task)?;
   let image = sandbox_image();
+  compile_sandbox_config_base(
+    cargo,
+    &image,
+    runtime_metadata(cargo, &replica_id, ordinal, state),
+  )
+}
+
+fn compile_sandbox_config_base(
+  cargo: &Cargo,
+  image: &str,
+  runtime: CargoRuntimeMetadata<'_>,
+) -> IoResult<Option<DockerConfig>> {
+  if !needs_sandbox(cargo) {
+    return Ok(None);
+  }
   Ok(
     compile_sandbox(SandboxCompileInput {
       cargo_network_mode: cargo.spec.network_mode.as_ref(),
       port_bindings: cargo.spec.port_bindings.as_ref(),
-      sandbox_image: &image,
-      runtime: runtime_metadata(cargo, &replica_id, ordinal, state),
+      sandbox_image: image,
+      runtime,
     })?
     .map(|compiled| compiled.config),
   )
@@ -392,7 +433,7 @@ async fn preflight_replica(
       task,
       declared,
       CargoReplicaProcessRole::Init,
-      placeholder,
+      None,
       &gateway,
       state,
     )?;
@@ -765,16 +806,8 @@ async fn reconcile_replica(
     None
   };
 
-  reconcile_containers(
-    cargo,
-    task,
-    sandbox.as_deref(),
-    &attempt_id,
-    &gateway,
-    &mut slots,
-    state,
-  )
-  .await?;
+  reconcile_containers(cargo, task, &attempt_id, &gateway, &mut slots, state)
+    .await?;
 
   for declared in &cargo.spec.containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -1267,7 +1300,6 @@ async fn create_candidate(
     create_candidate_containers(
       cargo,
       task,
-      sandbox.as_deref(),
       &attempt_id,
       &gateway,
       &mut slots,
@@ -2100,6 +2132,58 @@ mod tests {
     cargo
   }
 
+  pub(super) fn topology_cargo(
+    app_count: usize,
+    init_count: usize,
+    network_mode: Option<&str>,
+  ) -> Cargo {
+    let mut cargo = Cargo::default();
+    cargo.spec.network_mode =
+      network_mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
+    cargo.spec.containers = (0..app_count)
+      .map(|index| declared_container(&format!("app-{index}"), true))
+      .collect();
+    cargo.spec.init_containers = (0..init_count)
+      .map(|index| declared_container(&format!("init-{index}"), true))
+      .collect();
+    cargo
+  }
+
+  fn compilable_topology_cargo(
+    app_count: usize,
+    init_count: usize,
+    network_mode: Option<&str>,
+  ) -> Cargo {
+    let mut cargo = topology_cargo(app_count, init_count, network_mode);
+    for container in cargo
+      .spec
+      .containers
+      .iter_mut()
+      .chain(&mut cargo.spec.init_containers)
+    {
+      container.container_config.image = Some("example/app:1".to_owned());
+    }
+    cargo
+  }
+
+  fn compiler_runtime() -> CargoRuntimeMetadata<'static> {
+    CargoRuntimeMetadata {
+      cargo_key: "global.demo",
+      namespace: "global",
+      replica_id: "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+      replica_ordinal: 0,
+      node_name: "node-a",
+      node_address: "10.0.0.12",
+    }
+  }
+
+  fn config_network_mode(config: &DockerConfig) -> Option<&str> {
+    config
+      .host_config
+      .as_ref()
+      .and_then(|host| host.network_mode.as_deref())
+  }
+
   pub(super) fn readiness_process(
     replica: uuid::Uuid,
     process_name: &str,
@@ -2225,6 +2309,208 @@ mod tests {
       ),
     ] {
       assert_process_name(&cargo, &task, role, logical_name, prefix, false);
+    }
+  }
+
+  #[test]
+  fn needs_sandbox_matches_application_count_and_cargo_network_mode() {
+    for (app_count, network_mode, expected) in [
+      (1, None, false),
+      (1, Some("private"), false),
+      (1, Some("none"), false),
+      (1, Some("host"), false),
+      (2, None, true),
+      (2, Some("private"), true),
+      (2, Some("none"), true),
+      (2, Some("host"), false),
+    ] {
+      let cargo = topology_cargo(app_count, 0, network_mode);
+      assert_eq!(
+        needs_sandbox(&cargo),
+        expected,
+        "unexpected sandbox decision for {app_count} applications and Cargo network mode {network_mode:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn needs_sandbox_ignores_init_container_count() {
+    for init_count in [0, 3] {
+      assert!(!needs_sandbox(&topology_cargo(1, init_count, None)));
+      assert!(needs_sandbox(&topology_cargo(2, init_count, None)));
+    }
+  }
+
+  #[test]
+  fn needs_sandbox_counts_applications_with_container_network_escapes() {
+    for network_mode in ["host", "none"] {
+      let mut cargo = topology_cargo(2, 0, None);
+      cargo.spec.containers[1]
+        .container_config
+        .host_config
+        .get_or_insert_default()
+        .network_mode = Some(network_mode.to_owned());
+
+      assert!(
+        needs_sandbox(&cargo),
+        "an application using {network_mode:?} must still count toward Cargo topology"
+      );
+    }
+  }
+
+  #[test]
+  fn runtime_sandbox_compilation_uses_the_desired_topology() {
+    for (app_count, init_count, network_mode, expected) in [
+      (1, 0, None, false),
+      (1, 2, None, false),
+      (2, 0, None, true),
+      (2, 2, None, true),
+      (2, 0, Some("host"), false),
+      (1, 0, Some("none"), false),
+      (2, 0, Some("none"), true),
+    ] {
+      let cargo =
+        compilable_topology_cargo(app_count, init_count, network_mode);
+      assert_eq!(
+        compile_sandbox_config_base(
+          &cargo,
+          DEFAULT_SANDBOX_IMAGE,
+          compiler_runtime(),
+        )
+        .unwrap()
+        .is_some(),
+        expected,
+        "unexpected sandbox config selection for {app_count} apps, {init_count} init containers, and Cargo network mode {network_mode:?}"
+      );
+    }
+
+    let mut cargo = compilable_topology_cargo(2, 0, None);
+    for override_mode in ["host", "none"] {
+      cargo.spec.containers[1]
+        .container_config
+        .host_config
+        .get_or_insert_default()
+        .network_mode = Some(override_mode.to_owned());
+      assert!(
+        compile_sandbox_config_base(
+          &cargo,
+          DEFAULT_SANDBOX_IMAGE,
+          compiler_runtime(),
+        )
+        .unwrap()
+        .is_some()
+      );
+    }
+  }
+
+  #[test]
+  fn runtime_application_compilation_selects_direct_or_shared_ownership() {
+    let ports = HashMap::from([(
+      "8080/tcp".to_owned(),
+      Some(vec![bollard_next::models::PortBinding {
+        host_ip: Some("0.0.0.0".to_owned()),
+        host_port: Some("8080".to_owned()),
+      }]),
+    )]);
+    let mut direct = compilable_topology_cargo(1, 0, Some("private"));
+    direct.spec.port_bindings = Some(ports.clone());
+    let direct_config = compile_declared_config(
+      &direct,
+      &direct.spec.containers[0],
+      CargoReplicaProcessRole::App,
+      None,
+      compiler_runtime(),
+      "172.18.0.1",
+    )
+    .unwrap();
+    assert_eq!(config_network_mode(&direct_config), Some("private"));
+    assert_eq!(
+      direct_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.port_bindings.as_ref()),
+      Some(&ports)
+    );
+    assert!(
+      direct_config
+        .exposed_ports
+        .as_ref()
+        .is_some_and(|ports| ports.contains_key("8080/tcp"))
+    );
+
+    let mut shared = compilable_topology_cargo(2, 0, Some("private"));
+    shared.spec.port_bindings = Some(ports);
+    let shared_config = compile_declared_config(
+      &shared,
+      &shared.spec.containers[0],
+      CargoReplicaProcessRole::App,
+      Some("sandbox-docker-id"),
+      compiler_runtime(),
+      "172.18.0.1",
+    )
+    .unwrap();
+    assert_eq!(
+      config_network_mode(&shared_config),
+      Some("container:sandbox-docker-id")
+    );
+    assert!(
+      shared_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.port_bindings.as_ref())
+        .is_none()
+    );
+    assert!(shared_config.exposed_ports.is_none());
+  }
+
+  #[test]
+  fn runtime_init_compilation_is_direct_and_never_projects_cargo_ports() {
+    for app_count in [1, 2] {
+      let mut cargo = compilable_topology_cargo(app_count, 1, Some("private"));
+      cargo.spec.port_bindings = Some(HashMap::from([(
+        "8080/tcp".to_owned(),
+        Some(vec![bollard_next::models::PortBinding {
+          host_ip: Some("0.0.0.0".to_owned()),
+          host_port: Some("8080".to_owned()),
+        }]),
+      )]));
+      let config = compile_declared_config(
+        &cargo,
+        &cargo.spec.init_containers[0],
+        CargoReplicaProcessRole::Init,
+        None,
+        compiler_runtime(),
+        "172.18.0.1",
+      )
+      .unwrap();
+      assert_eq!(config_network_mode(&config), Some("private"));
+      assert!(
+        config
+          .host_config
+          .as_ref()
+          .and_then(|host| host.port_bindings.as_ref())
+          .is_none()
+      );
+      assert!(config.exposed_ports.is_none());
+    }
+
+    let mut cargo = compilable_topology_cargo(2, 1, Some("private"));
+    for override_mode in ["host", "none"] {
+      cargo.spec.init_containers[0]
+        .container_config
+        .host_config
+        .get_or_insert_default()
+        .network_mode = Some(override_mode.to_owned());
+      let config = compile_declared_config(
+        &cargo,
+        &cargo.spec.init_containers[0],
+        CargoReplicaProcessRole::Init,
+        None,
+        compiler_runtime(),
+        "172.18.0.1",
+      )
+      .unwrap();
+      assert_eq!(config_network_mode(&config), Some(override_mode));
     }
   }
 
