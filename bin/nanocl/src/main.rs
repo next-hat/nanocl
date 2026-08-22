@@ -326,29 +326,24 @@ mod tests {
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.yml");
   }
 
-  /// Test cargo exec command
-  #[ntex::test]
-  async fn cargo_exec() {
-    assert_cli_ok!("cargo", "exec", "system.nstore", "--", "echo", "hello",);
-    assert_cli_ok!(
-      "cargo",
-      "exec",
-      "system.nstore",
-      "-e",
-      "A=test",
-      "--",
-      "env",
+  #[test]
+  fn cargo_exec_and_kill_are_not_cli_subcommands() {
+    assert!(
+      Cli::try_parse_from([
+        "nanocl",
+        "cargo",
+        "exec",
+        "system.nstore",
+        "--",
+        "echo",
+        "hello",
+      ])
+      .is_err()
     );
-    assert_cli_ok!(
-      "cargo",
-      "exec",
-      "system.nstore",
-      "--privileged",
-      "--",
-      "whoami",
+    assert!(
+      Cli::try_parse_from(["nanocl", "cargo", "kill", "system.nstore"])
+        .is_err()
     );
-    assert_cli_ok!("cargo", "exec", "system.nstore", "-t", "--", "ls",);
-    assert_cli_ok!("cargo", "exec", "system.nstore", "-u", "0", "--", "whoami",);
   }
 
   #[ntex::test]

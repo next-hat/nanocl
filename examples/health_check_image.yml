@@ -2,7 +2,8 @@ ApiVersion: v0.17
 
 Cargoes:
 - Name: health-check
-  Container:
+  Containers:
+  - Name: health-check
     Image: leone-website:0.5.7
 
 Resources:

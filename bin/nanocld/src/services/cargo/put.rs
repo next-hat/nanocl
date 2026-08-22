@@ -1,7 +1,10 @@
 use ntex::web;
 
-use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::cargo_spec::CargoSpecPartial;
+use nanocl_error::{
+  http::{HttpError, HttpResult},
+  io::IoError,
+};
+use nanocl_stubs::cargo_spec::CargoSpec;
 
 use crate::{
   models::{CargoDb, CargoObjPutIn, SystemState},
@@ -13,7 +16,7 @@ use crate::{
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   tag = "Cargoes",
-  request_body = CargoSpecPartial,
+  request_body = CargoSpec,
   path = "/cargoes/{key}",
   params(
     ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
@@ -27,16 +30,20 @@ use crate::{
 pub async fn put_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
-  payload: web::types::Json<CargoSpecPartial>,
+  payload: web::types::Json<CargoSpec>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
-  if payload.name != key.name() {
+  let spec = payload.into_inner();
+  spec.validate().map_err(|error| {
+    IoError::invalid_input("CargoSpec".to_owned(), error.to_string())
+  })?;
+  if spec.name != key.name() {
     return Err(HttpError::bad_request(
       "Cargo names are immutable; create a new cargo to use another name",
     ));
   }
   let obj = &CargoObjPutIn {
-    spec: payload.into_inner(),
+    spec,
     version: path.0.clone(),
   };
   let cargo = CargoDb::put_obj_by_pk(key.as_str(), obj, &state).await?;

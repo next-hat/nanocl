@@ -11,7 +11,7 @@ run - Run a cargo
 
 ## SYNOPSIS
 
-**run** \[**-n**\|**--namespace**\] \[**-v**\|**--volume**\] \[**-e**\|**--env**\] \[**--rm**\]
+**run** \[**-n**\|**--namespace**\] \[**-v**\|**--volume**\] \[**-e**\|**--env**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\> \[*COMMAND*\]
 
 ## DESCRIPTION
@@ -28,8 +28,6 @@ Volumes of the cargo
 
 **-e**, **--env** *\<ENV\>*  
 Environment variables of the cargo
-
-**--rm**  
 
 **-h**, **--help**  
 Print help

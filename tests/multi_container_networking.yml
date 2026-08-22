@@ -1,0 +1,27 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-multi-container
+  Replicas: 1
+  PortBindings:
+    "9000/tcp":
+    - HostIp: 127.0.0.1
+      HostPort: "0"
+  Containers:
+  - Name: server
+    Image: alpine:latest
+    Cmd:
+    - sh
+    - -c
+    - |
+      while true; do
+        printf 'HTTP/1.1 200 OK\r\nContent-Length: 19\r\nConnection: close\r\n\r\nmulti-container-ok\n' |
+          nc -l -p 9000
+      done
+  - Name: client
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"

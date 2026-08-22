@@ -102,8 +102,9 @@ Create a minimal Statefile and apply it:
 ApiVersion: v0.16
 Cargoes:
   - Name: hello
-    Container:
-      Image: ghcr.io/next-hat/documentation:0.16.0
+    Containers:
+      - Name: hello
+        Image: ghcr.io/next-hat/documentation:0.16.0
 ```
 
 Apply & inspect:
@@ -155,8 +156,9 @@ Statefiles drive everything. Here's the Statefile we use to deploy our own [docu
 ApiVersion: v0.16
 Cargoes:
   - Name: doc
-    Container:
-      Image: ghcr.io/next-hat/documentation:0.16.0
+    Containers:
+      - Name: doc
+        Image: ghcr.io/next-hat/documentation:0.16.0
 Resources:
   - Name: docs.next-hat.com
     Kind: ncproxy.io/rule

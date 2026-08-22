@@ -81,7 +81,8 @@ Resources:
 
 Cargoes:
 - Name: ${{ Args.name }}
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
       - APP=SECRET_TLS

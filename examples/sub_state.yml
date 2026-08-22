@@ -20,5 +20,6 @@ SubStates:
 
 Cargoes:
 - Name: ${{ Args.name }}-sub-example
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}-sub-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest

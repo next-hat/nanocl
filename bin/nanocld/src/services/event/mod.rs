@@ -19,10 +19,10 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::Config;
   use futures::{StreamExt, TryStreamExt};
   use nanocl_stubs::{
-    cargo_spec::CargoSpecPartial,
+    cargo_spec::{CargoSpec, Config, ContainerSpec},
+    generic::ImagePullPolicy,
     system::{
       Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
     },
@@ -86,12 +86,19 @@ mod tests {
         log::info!("Received event: {string}");
       }
     });
-    let cargo = CargoSpecPartial {
+    let cargo = CargoSpec {
       name: CARGO_NAME.to_owned(),
-      container: Config {
-        image: Some("alpine:latest".to_owned()),
-        ..Default::default()
-      },
+      containers: vec![ContainerSpec {
+        name: "main".to_owned(),
+        essential: true,
+        secrets: Vec::new(),
+        image_pull_secret: None,
+        image_pull_policy: ImagePullPolicy::IfNotPresent,
+        container_config: Config {
+          image: Some("alpine:latest".to_owned()),
+          ..Default::default()
+        },
+      }],
       ..Default::default()
     };
     let _ = client

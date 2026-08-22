@@ -34,7 +34,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(restart_processes);
   config.service(start_processes);
   config.service(stop_processes);
-  config.service(kill_processes);
   config.service(wait_processes);
   config.service(stats_processes);
   config.service(count_processes);

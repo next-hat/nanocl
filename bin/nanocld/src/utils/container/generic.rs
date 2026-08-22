@@ -152,17 +152,12 @@ pub async fn emit_stopping(
   Ok(())
 }
 
-/// Inject internal data into the payload
-/// eg: $$INTERNAL_GATEWAY
-///
-pub async fn inject_data(
-  payload: &str,
+/// Resolve the gateway used by the Cargo compiler for
+/// `$$INTERNAL_GATEWAY` without mutating an authored declaration.
+pub async fn resolve_internal_gateway(
   network_mode: &str,
   state: &SystemState,
 ) -> IoResult<String> {
-  if !payload.contains("$$INTERNAL_GATEWAY") {
-    return Ok(payload.to_owned());
-  }
   let network_name =
     match super::network::ensure_network_exists(network_mode, state).await? {
       Some(network_name) => network_name,
@@ -192,9 +187,7 @@ pub async fn inject_data(
       &format!("No network found for {network_name}"),
     ));
   };
-  let gateway_addr = network.gateway.clone().unwrap_or_default();
-  let new_data = payload.replace("$$INTERNAL_GATEWAY", &gateway_addr);
-  Ok(new_data)
+  Ok(network.gateway.clone().unwrap_or_default())
 }
 
 /// Plan node selection for a cargo based on placement and resource requirements.
@@ -212,10 +205,14 @@ pub struct SelectionAssignment {
 ///
 #[derive(Debug, Clone)]
 pub struct SelectionPlan {
-  /// Total replicas is currently not in use but may be useful for logging or future features
-  #[allow(dead_code)]
+  /// Desired replica count used to validate and persist the placement result.
   pub total_replicas: usize,
   pub assignments: Vec<SelectionAssignment>,
+}
+
+/// Read the desired Cargo replica count from its canonical top-level field.
+pub(crate) fn desired_replica_count(cargo: &Cargo) -> usize {
+  cargo.spec.replicas
 }
 
 /// Select nodes for the given cargo based on its placement and resource requirements.
@@ -227,14 +224,7 @@ pub async fn plan_selection(
 ) -> IoResult<SelectionPlan> {
   // Default metrics recency window (in seconds) to consider a node's metrics as fresh
   const METRIC_RECENCY_DEFAULT_SECS: i64 = 300;
-  // Determine desired replicas (default: 1)
-  let replicas = cargo
-    .spec
-    .placement
-    .as_ref()
-    .and_then(|p| p.replicas)
-    .unwrap_or(1)
-    .max(1);
+  let replicas = desired_replica_count(cargo);
   // Extract and normalize minimal resource requirements and caps
   let (cpu_req, mem_req, storage_req, cpu_cap, mem_cap) = cargo
     .spec
@@ -484,4 +474,18 @@ pub async fn plan_selection(
     total_replicas: replicas,
     assignments,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn desired_replica_count_uses_the_top_level_cargo_field() {
+    let mut cargo = Cargo::default();
+    assert_eq!(desired_replica_count(&cargo), 1);
+
+    cargo.spec.replicas = 7;
+    assert_eq!(desired_replica_count(&cargo), 7);
+  }
 }

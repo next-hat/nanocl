@@ -48,7 +48,8 @@ Namespace: global
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: ${{ Args.name }}
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}
     Image: ${{ Args.image }}
 
 # See all options:

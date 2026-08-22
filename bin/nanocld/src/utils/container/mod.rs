@@ -1,4 +1,6 @@
 pub mod cargo;
+pub(crate) mod cargo_compiler;
+pub(crate) mod cargo_replica;
 pub mod generic;
 pub mod image;
 pub mod job;

@@ -48,9 +48,6 @@ Inspect a cargo by its canonical key
 cargo-patch(1)  
 Update a cargo by its canonical key
 
-cargo-exec(1)  
-Execute a command inside a cargo
-
 cargo-history(1)  
 List cargo history
 
@@ -59,9 +56,6 @@ Revert cargo to a specific history
 
 cargo-logs(1)  
 Show logs
-
-cargo-kill(1)
-Send a signal to a cargo by its canonical key
 
 cargo-run(1)  
 Run a cargo

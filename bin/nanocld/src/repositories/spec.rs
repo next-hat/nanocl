@@ -5,7 +5,7 @@ use diesel::prelude::*;
 use nanocl_error::io::IoResult;
 
 use nanocl_stubs::{
-  cargo_spec::{CargoSpec, CargoSpecPartial},
+  cargo_spec::{CargoSpec, CargoSpecRevision},
   generic::{GenericClause, GenericFilter},
   vm_spec::{VmSpec, VmSpecPartial},
 };
@@ -108,10 +108,10 @@ impl SpecDb {
     SpecDb::read_by(&filter, pool).await
   }
 
-  pub fn try_from_cargo_partial(
+  pub fn try_from_cargo_spec(
     key: &str,
     version: &str,
-    item: &CargoSpecPartial,
+    item: &CargoSpec,
   ) -> IoResult<Self> {
     Ok(Self {
       key: uuid::Uuid::new_v4(),
@@ -141,23 +141,28 @@ impl SpecDb {
   }
 
   pub fn try_to_cargo_spec(&self) -> IoResult<CargoSpec> {
-    let p = serde_json::from_value::<CargoSpecPartial>(self.data.clone())?;
-    let spec = CargoSpec {
+    Ok(serde_json::from_value::<CargoSpec>(self.data.clone())?)
+  }
+
+  pub fn try_to_cargo_spec_revision(&self) -> IoResult<CargoSpecRevision> {
+    let spec = self.try_to_cargo_spec()?;
+    let revision = CargoSpecRevision {
       key: self.key,
       cargo_key: self.kind_key.clone(),
       version: self.version.clone(),
       created_at: self.created_at,
-      name: p.name,
-      metadata: self.metadata.clone(),
-      init_container: p.init_container,
-      secrets: p.secrets,
-      container: p.container,
-      placement: p.placement,
-      resource_requirement: p.resource_requirement,
-      image_pull_secret: p.image_pull_secret,
-      image_pull_policy: p.image_pull_policy,
+      name: spec.name,
+      metadata: spec.metadata,
+      replicas: spec.replicas,
+      network_mode: spec.network_mode,
+      port_bindings: spec.port_bindings,
+      secrets: spec.secrets,
+      placement: spec.placement,
+      resource_requirement: spec.resource_requirement,
+      init_containers: spec.init_containers,
+      containers: spec.containers,
     };
-    Ok(spec)
+    Ok(revision)
   }
 
   pub fn try_to_vm_spec(&self) -> IoResult<VmSpec> {
@@ -181,5 +186,121 @@ impl SpecDb {
       labels: vm_spec_partial.labels,
     };
     Ok(spec)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocl_stubs::{
+    cargo_spec::{
+      CargoNetworkMode, CargoPlacementSpec, CargoPlacementStrategy,
+      CargoResourceRequirementSpec, Config, ContainerSpec, PortBinding,
+      PortMap,
+    },
+    generic::ImagePullPolicy,
+  };
+
+  use super::*;
+
+  fn container(name: &str, image: &str) -> ContainerSpec {
+    ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: vec![format!("{name}-secret")],
+      image_pull_secret: Some("registry-secret".to_owned()),
+      image_pull_policy: ImagePullPolicy::Always,
+      container_config: Config {
+        image: Some(image.to_owned()),
+        env: Some(vec![format!("ROLE={name}")]),
+        ..Default::default()
+      },
+    }
+  }
+
+  fn complete_spec() -> CargoSpec {
+    CargoSpec {
+      name: "persisted-cargo".to_owned(),
+      metadata: Some(serde_json::json!({"owner": "platform"})),
+      replicas: 3,
+      network_mode: Some(CargoNetworkMode::new("private").unwrap()),
+      port_bindings: Some(PortMap::from([(
+        "8080/tcp".to_owned(),
+        Some(vec![PortBinding {
+          host_ip: Some("127.0.0.1".to_owned()),
+          host_port: Some("18080".to_owned()),
+        }]),
+      )])),
+      secrets: vec!["shared-secret".to_owned()],
+      placement: Some(CargoPlacementSpec {
+        strategy: Some(CargoPlacementStrategy::Distinct),
+        ..Default::default()
+      }),
+      resource_requirement: Some(CargoResourceRequirementSpec {
+        cpu_cores: Some(2),
+        cpu_utilization_cap: Some(0.75),
+        memory_bytes: Some(512 * 1024 * 1024),
+        memory_utilization_cap: Some(0.8),
+        cpu_weight: Some(0.6),
+        memory_weight: Some(0.4),
+        storage_bytes: Some(1024 * 1024 * 1024),
+      }),
+      init_containers: vec![container("migrate", "example/migrate:1")],
+      containers: vec![
+        container("api", "example/api:1"),
+        container("worker", "example/worker:1"),
+      ],
+    }
+  }
+
+  #[test]
+  fn cargo_desired_spec_json_round_trips_every_final_field() {
+    let desired = complete_spec();
+    let stored =
+      SpecDb::try_from_cargo_spec("team.persisted-cargo", "v0.18.0", &desired)
+        .unwrap();
+
+    assert_eq!(stored.data, serde_json::to_value(&desired).unwrap());
+    assert_eq!(stored.metadata, desired.metadata);
+    assert_eq!(stored.try_to_cargo_spec().unwrap(), desired);
+  }
+
+  #[test]
+  fn cargo_revision_reconstruction_preserves_declaration_and_metadata() {
+    let desired = complete_spec();
+    let stored =
+      SpecDb::try_from_cargo_spec("team.persisted-cargo", "v0.18.0", &desired)
+        .unwrap();
+
+    let revision = stored.try_to_cargo_spec_revision().unwrap();
+
+    assert_eq!(revision.key, stored.key);
+    assert_eq!(revision.cargo_key, stored.kind_key);
+    assert_eq!(revision.version, stored.version);
+    assert_eq!(revision.created_at, stored.created_at);
+    assert_eq!(revision.name, desired.name);
+    assert_eq!(revision.metadata, desired.metadata);
+    assert_eq!(revision.replicas, desired.replicas);
+    assert_eq!(revision.network_mode, desired.network_mode);
+    assert_eq!(revision.port_bindings, desired.port_bindings);
+    assert_eq!(revision.secrets, desired.secrets);
+    assert_eq!(revision.placement, desired.placement);
+    assert_eq!(revision.resource_requirement, desired.resource_requirement);
+    assert_eq!(revision.init_containers, desired.init_containers);
+    assert_eq!(revision.containers, desired.containers);
+  }
+
+  #[test]
+  fn revert_extraction_restores_the_complete_desired_declaration() {
+    let desired = complete_spec();
+    let mut history =
+      SpecDb::try_from_cargo_spec("team.persisted-cargo", "v0.18.0", &desired)
+        .unwrap();
+    // The generic metadata column is only a query mirror. Revert restores the
+    // authoritative complete declaration from specs.data.
+    history.metadata = Some(serde_json::json!({"stale-mirror": true}));
+
+    let restored = history.try_to_cargo_spec().unwrap();
+
+    assert_eq!(restored, desired);
   }
 }

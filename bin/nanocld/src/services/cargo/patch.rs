@@ -1,7 +1,7 @@
 use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::cargo_spec::CargoSpecUpdate;
+use nanocl_stubs::cargo_spec::CargoSpecPatch;
 
 use crate::{
   models::{CargoDb, CargoObjPatchIn, SystemState},
@@ -13,7 +13,7 @@ use crate::{
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Cargoes",
-  request_body = CargoSpecUpdate,
+  request_body = CargoSpecPatch,
   path = "/cargoes/{key}",
   params(
     ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
@@ -27,7 +27,7 @@ use crate::{
 pub async fn patch_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
-  payload: web::types::Json<CargoSpecUpdate>,
+  payload: web::types::Json<CargoSpecPatch>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
   if payload

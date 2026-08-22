@@ -4,21 +4,27 @@
   "Cargoes": [
     {
       "Name": "deploy-example",
-      "Container": {
-        "Env": [
-          "APP=GET_STARTED1"
-        ],
-        "Image": "ghcr.io/next-hat/nanocl-get-started:latest"
-      }
+      "Containers": [
+        {
+          "Name": "deploy-example",
+          "Env": [
+            "APP=GET_STARTED1"
+          ],
+          "Image": "ghcr.io/next-hat/nanocl-get-started:latest"
+        }
+      ]
     },
     {
       "Name": "deploy-example2",
-      "Container": {
-        "Env": [
-          "APP=GET_STARTED2"
-        ],
-        "Image": "ghcr.io/next-hat/nanocl-get-started:latest"
-      }
+      "Containers": [
+        {
+          "Name": "deploy-example2",
+          "Env": [
+            "APP=GET_STARTED2"
+          ],
+          "Image": "ghcr.io/next-hat/nanocl-get-started:latest"
+        }
+      ]
     }
   ],
   "Resources": [

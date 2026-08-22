@@ -4,20 +4,14 @@ use serde::{Deserialize, Serialize};
 use bollard_next::container::KillContainerOptions;
 
 use crate::{
-  cargo_spec::CargoSpecPartial,
+  cargo_spec::CargoSpecRevision,
   process::Process,
   system::{EventActor, EventActorKind, ObjPsStatus},
 };
 
-use super::cargo_spec::CargoSpec;
-
-// Reexport some stuff from simplicity
-pub use bollard_next::exec::CreateExecOptions;
-
-/// A Cargo is a replicable container
-/// It is used to run one or multiple instances of the same container
+/// A Cargo is a replicable group of application containers.
+/// It is used to run one or multiple instances of the same container group.
 /// You can define the number of replicas you want to run
-/// You can also define the minimum and maximum number of replicas
 /// The cluster will automatically scale the number of replicas to match the number of replicas you want
 /// Cargo contain a specification which is used to create the container
 /// The specification can be updated and the old specification will be kept in the history
@@ -36,13 +30,7 @@ pub struct Cargo {
   /// Status of the cargo
   pub status: ObjPsStatus,
   /// Specification of the cargo
-  pub spec: CargoSpec,
-}
-
-impl From<Cargo> for CargoSpecPartial {
-  fn from(cargo: Cargo) -> Self {
-    cargo.spec.into()
-  }
+  pub spec: CargoSpecRevision,
 }
 
 /// Convert a Cargo into an EventActor
@@ -80,7 +68,7 @@ pub struct CargoSummary {
   /// Number of running instances
   pub instance_running: usize,
   /// Specification of the cargo
-  pub spec: CargoSpec,
+  pub spec: CargoSpecRevision,
 }
 
 /// Cargo Inspect is a detailed view of a cargo
@@ -103,7 +91,7 @@ pub struct CargoInspect {
   /// Status of the cargo
   pub status: ObjPsStatus,
   /// Specification of the cargo
-  pub spec: CargoSpec,
+  pub spec: CargoSpecRevision,
   /// List of instances
   pub instances: Vec<Process>,
 }

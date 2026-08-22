@@ -31,7 +31,7 @@ use nanocld_client::{
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    cargo_spec::CargoSpecPartial,
+    cargo_spec::CargoSpec,
     job::JobPartial,
     process::ProcessLogQuery,
     resource::{ResourcePartial, ResourceUpdate},
@@ -50,7 +50,7 @@ use crate::{
     StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
     StateRemoveOpts, StateRoot, VmArg,
   },
-  utils,
+  utils::{self, cargo::cargo_spec_from_revision},
 };
 
 use super::GenericCommandRm;
@@ -187,7 +187,7 @@ async fn log_jobs(
 /// Attach to a list of cargoes and print their logs
 pub async fn log_cargoes(
   client: &NanocldClient,
-  cargoes: Vec<CargoSpecPartial>,
+  cargoes: Vec<CargoSpec>,
   namespace: &str,
   query: &ProcessLogQuery,
 ) {
@@ -197,13 +197,13 @@ pub async fn log_cargoes(
       let key = match utils::process::resource_key(&cargo.name, namespace) {
         Ok(key) => key,
         Err(err) => {
-          eprintln!("Cannot resolve cargo {} key: {err}", &cargo.name);
+          eprintln!("Cannot resolve cargo {} key: {err}", cargo.name);
           return;
         }
       };
       match client.logs_processes("cargo", &key, Some(query)).await {
         Err(err) => {
-          eprintln!("Cannot attach to cargo {}: {err}", &cargo.name);
+          eprintln!("Cannot attach to cargo {}: {err}", cargo.name);
         }
         Ok(stream) => {
           if let Err(err) = utils::print::logs_process_stream(stream).await {
@@ -218,9 +218,7 @@ pub async fn log_cargoes(
 }
 
 /// Hook cargoes binds to replace relative path with absolute path
-fn hook_cargoes(
-  cargoes: Vec<CargoSpecPartial>,
-) -> IoResult<Vec<CargoSpecPartial>> {
+fn hook_cargoes(cargoes: Vec<CargoSpec>) -> IoResult<Vec<CargoSpec>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
     let new_cargo = utils::docker::hook_binds(&cargo)?;
@@ -883,13 +881,13 @@ async fn state_apply(
           })??;
         }
         Ok(inspect) => {
-          let cmp: CargoSpecPartial = inspect.spec.into();
+          let cmp = cargo_spec_from_revision(&inspect.spec);
           if (cmp != cargo) || opts.reload {
             pg.set_message("(updating)");
             let waiter = utils::process::wait_process_state(
               &key,
               EventActorKind::Cargo,
-              vec![NativeEventAction::Start],
+              vec![NativeEventAction::Update],
               client,
             )
             .await?;
@@ -1016,7 +1014,7 @@ async fn remove_orphans(
     .iter()
     .map(|secret| secret.clone().into())
     .collect();
-  let old_cargoes: Vec<CargoSpecPartial> = cli_conf
+  let old_cargoes: Vec<CargoSpec> = cli_conf
     .client
     .list_cargo(Some(&GenericFilterNsp {
       filter: Some(filter.clone()),
@@ -1030,7 +1028,7 @@ async fn remove_orphans(
     }))
     .await?
     .iter()
-    .map(|cargo| cargo.spec.clone().into())
+    .map(|cargo| cargo_spec_from_revision(&cargo.spec))
     .collect();
   let old_vms: Vec<VmSpecPartial> = cli_conf
     .client

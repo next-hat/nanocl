@@ -21,16 +21,16 @@ async fn run(cli: &Cli) -> IoResult<()> {
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
     .with_dns(cli.dns.clone())
     .ensure()?;
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
-  {
+  let client = {
     use nanocld_client::ConnectOpts;
-    client = NanocldClient::connect_to(&ConnectOpts {
+    NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    })?;
-  }
+    })?
+  };
+  #[cfg(not(any(feature = "dev", feature = "test")))]
+  let client = NanocldClient::connect_with_unix_default();
   // Do not block socket binding on nanocld availability.
   event::spawn(&client, &dnsmasq);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
