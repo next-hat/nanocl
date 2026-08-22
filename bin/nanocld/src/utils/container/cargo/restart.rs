@@ -12,9 +12,9 @@ use crate::{
 };
 
 use super::{
-  RuntimeSlot, SANDBOX_LOGICAL_NAME, cargo_network_mode,
+  RuntimeSlot, SANDBOX_LOGICAL_NAME,
   identity::{is_rollout_process_name, process_identity},
-  restart_topology_error,
+  needs_sandbox, restart_topology_error,
 };
 
 #[derive(Debug)]
@@ -250,7 +250,7 @@ pub(super) fn plan_cargo_restart(
     }
   }
 
-  let sandbox_required = cargo_network_mode(cargo) != "host";
+  let sandbox_required = needs_sandbox(cargo);
   let mut slots = Vec::new();
   for replica in &replicas {
     let replica_mappings = mappings
@@ -283,14 +283,29 @@ pub(super) fn plan_cargo_restart(
         processes_by_key: &processes_by_key,
         stable_identities: &stable_identities,
       })?);
-    } else if !sandbox_mappings.is_empty() {
-      return Err(restart_topology_error(
-        cargo_key,
-        &format!(
-          "host-network replica {} unexpectedly has a sandbox mapping",
-          replica.key
-        ),
-      ));
+    } else {
+      if !sandbox_mappings.is_empty() {
+        return Err(restart_topology_error(
+          cargo_key,
+          &format!(
+            "replica {} unexpectedly has a sandbox mapping",
+            replica.key
+          ),
+        ));
+      }
+      if stable_identities.contains_key(&(
+        replica.key,
+        CargoReplicaProcessRole::Sandbox,
+        SANDBOX_LOGICAL_NAME.to_owned(),
+      )) {
+        return Err(restart_topology_error(
+          cargo_key,
+          &format!(
+            "replica {} unexpectedly has an active sandbox process",
+            replica.key
+          ),
+        ));
+      }
     }
 
     if let Some(mapping) = replica_mappings.iter().copied().find(|mapping| {
@@ -437,28 +452,46 @@ mod tests {
     Vec<CargoReplicaProcessDb>,
     Vec<Process>,
   ) {
+    restart_fixture_with_apps(
+      replicas,
+      &[("worker", true), ("api", true), ("metrics", false)],
+    )
+  }
+
+  fn restart_fixture_with_apps(
+    replicas: usize,
+    applications: &[(&str, bool)],
+  ) -> (
+    Cargo,
+    Vec<CargoReplicaDb>,
+    Vec<CargoReplicaProcessDb>,
+    Vec<Process>,
+  ) {
     let mut cargo = Cargo::default();
     cargo.spec.cargo_key = "global.api".to_owned();
     cargo.spec.replicas = replicas;
     cargo.spec.init_containers = vec![declared_container("prepare", true)];
-    cargo.spec.containers = vec![
-      declared_container("worker", true),
-      declared_container("api", true),
-      declared_container("metrics", false),
-    ];
+    cargo.spec.containers = applications
+      .iter()
+      .map(|(name, essential)| declared_container(name, *essential))
+      .collect();
     let mut replica_rows = Vec::new();
     let mut mappings = Vec::new();
     let mut processes = Vec::new();
     for ordinal in 0..replicas as i32 {
       let replica_key = uuid::Uuid::new_v4();
       replica_rows.push(restart_replica(replica_key, ordinal));
-      for (role, name, essential) in [
-        (CargoReplicaProcessRole::Sandbox, SANDBOX_LOGICAL_NAME, true),
-        (CargoReplicaProcessRole::Init, "prepare", true),
-        (CargoReplicaProcessRole::App, "api", true),
-        (CargoReplicaProcessRole::App, "metrics", false),
-        (CargoReplicaProcessRole::App, "worker", true),
-      ] {
+      let mut expected = vec![(CargoReplicaProcessRole::Init, "prepare", true)];
+      if needs_sandbox(&cargo) {
+        expected.insert(
+          0,
+          (CargoReplicaProcessRole::Sandbox, SANDBOX_LOGICAL_NAME, true),
+        );
+      }
+      expected.extend(applications.iter().map(|(name, essential)| {
+        (CargoReplicaProcessRole::App, *name, *essential)
+      }));
+      for (role, name, essential) in expected {
         let process_key = format!("r{ordinal}-{role}-{name}");
         let process = restart_process(
           replica_key,
@@ -482,6 +515,66 @@ mod tests {
     mappings.reverse();
     processes.reverse();
     (cargo, replica_rows, mappings, processes)
+  }
+
+  #[test]
+  fn single_application_restart_accepts_direct_non_host_topologies() {
+    for network_mode in [None, Some("private"), Some("none")] {
+      let (mut cargo, replicas, mappings, processes) =
+        restart_fixture_with_apps(1, &[("api", true)]);
+      cargo.spec.network_mode =
+        network_mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
+
+      let plan =
+        plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
+          .unwrap();
+      assert_eq!(plan.slots.len(), 1);
+      assert_eq!(plan.slots[0].role, CargoReplicaProcessRole::App);
+      assert_eq!(plan.slots[0].container_name, "api");
+      assert_eq!(plan.slots[0].process.key, "r0-app-api");
+    }
+  }
+
+  #[test]
+  fn single_application_restart_rejects_legacy_sandbox_topology() {
+    let (cargo, replicas, mut mappings, mut processes) =
+      restart_fixture_with_apps(1, &[("api", true)]);
+    let replica = &replicas[0];
+    let sandbox = restart_process(
+      replica.key,
+      replica.ordinal,
+      "legacy-sandbox",
+      CargoReplicaProcessRole::Sandbox,
+      SANDBOX_LOGICAL_NAME,
+      true,
+    );
+    mappings.push(restart_mapping(
+      replica.key,
+      &sandbox,
+      CargoReplicaProcessRole::Sandbox,
+      SANDBOX_LOGICAL_NAME,
+      true,
+    ));
+    processes.push(sandbox);
+
+    let error =
+      plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
+        .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("unexpectedly has a sandbox mapping")
+    );
+
+    mappings.retain(|mapping| mapping.role != CargoReplicaProcessRole::Sandbox);
+    let error =
+      plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
+        .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("unexpectedly has an active sandbox process")
+    );
   }
 
   #[test]
@@ -617,6 +710,67 @@ mod tests {
         .slots
         .iter()
         .all(|slot| slot.role == CargoReplicaProcessRole::App)
+    );
+  }
+
+  #[test]
+  fn multi_application_none_restart_preserves_the_required_sandbox() {
+    let (mut cargo, replicas, mappings, processes) = restart_fixture(1);
+    cargo.spec.network_mode = Some(CargoNetworkMode::new("none").unwrap());
+
+    let plan =
+      plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
+        .unwrap();
+    assert_eq!(
+      plan
+        .slots
+        .iter()
+        .filter(|slot| slot.role == CargoReplicaProcessRole::Sandbox)
+        .count(),
+      1
+    );
+    assert_eq!(
+      plan
+        .slots
+        .iter()
+        .filter(|slot| slot.role == CargoReplicaProcessRole::App)
+        .count(),
+      cargo.spec.containers.len()
+    );
+  }
+
+  #[test]
+  fn application_network_escapes_do_not_change_restart_topology() {
+    let (mut cargo, replicas, mappings, processes) = restart_fixture(1);
+    for (container, network_mode) in
+      cargo.spec.containers.iter_mut().zip(["host", "none"])
+    {
+      container
+        .container_config
+        .host_config
+        .get_or_insert_default()
+        .network_mode = Some(network_mode.to_owned());
+    }
+
+    let plan =
+      plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
+        .unwrap();
+    assert_eq!(
+      plan
+        .slots
+        .iter()
+        .filter(|slot| slot.role == CargoReplicaProcessRole::Sandbox)
+        .count(),
+      1
+    );
+    assert_eq!(
+      plan
+        .slots
+        .iter()
+        .filter(|slot| slot.role == CargoReplicaProcessRole::App)
+        .map(|slot| slot.process.key.as_str())
+        .collect::<Vec<_>>(),
+      ["r0-app-worker", "r0-app-api", "r0-app-metrics"]
     );
   }
 
