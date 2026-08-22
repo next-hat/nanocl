@@ -126,7 +126,7 @@ mod tests {
   }
 
   #[test]
-  fn host_network_requires_stop_but_sandbox_network_does_not() {
+  fn host_network_requires_stop_but_non_host_network_does_not() {
     let mut cargo = Cargo::default();
     cargo.spec.network_mode = Some(CargoNetworkMode::new("host").unwrap());
     assert!(requires_stop_before_replacement(&cargo));

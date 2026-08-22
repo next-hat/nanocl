@@ -487,13 +487,35 @@ mod tests {
       .await
       .unwrap();
     let before_app = active_cargo_process(&before_restart, "app", "main");
-    let before_sandbox =
-      active_cargo_process(&before_restart, "sandbox", "_sandbox");
+    assert_eq!(
+      before_restart.instances.len(),
+      1,
+      "single-application Cargo must have only its direct application process"
+    );
     let before_app_id = before_app.key.clone();
     let before_app_started = process_started_at(before_app).map(str::to_owned);
-    let before_sandbox_id = before_sandbox.key.clone();
-    let before_sandbox_started =
-      process_started_at(before_sandbox).map(str::to_owned);
+    let replicas =
+      CargoReplicaDb::list_by_cargo(&main_test_key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    assert_eq!(replicas.len(), 1);
+    let before_mappings = CargoReplicaProcessDb::list_by_replica(
+      replicas[0].key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      before_mappings.len(),
+      1,
+      "single-application Cargo must not persist a sandbox mapping"
+    );
+    assert_eq!(before_mappings[0].role, CargoReplicaProcessRole::App);
+    assert_eq!(before_mappings[0].container_name, "main");
+    assert_eq!(
+      before_mappings[0].process_key.as_deref(),
+      Some(before_app_id.as_str())
+    );
     restart_cargo(&system, &main_test_key).await;
     let after_restart = client
       .send_get(
@@ -506,19 +528,34 @@ mod tests {
       .unwrap();
     assert_eq!(after_restart.status.actual, ObjPsStatusKind::Start);
     let after_app = active_cargo_process(&after_restart, "app", "main");
-    let after_sandbox =
-      active_cargo_process(&after_restart, "sandbox", "_sandbox");
+    assert_eq!(
+      after_restart.instances.len(),
+      1,
+      "single-application Cargo must remain direct after restart"
+    );
     assert_eq!(after_app.key, before_app_id);
     assert_ne!(
       process_started_at(after_app),
       before_app_started.as_deref(),
       "one healthless application must be Docker-restarted"
     );
-    assert_eq!(after_sandbox.key, before_sandbox_id);
+    let after_mappings = CargoReplicaProcessDb::list_by_replica(
+      replicas[0].key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
     assert_eq!(
-      process_started_at(after_sandbox),
-      before_sandbox_started.as_deref(),
-      "Cargo restart must preserve the sandbox process"
+      after_mappings.len(),
+      1,
+      "restart must not add a sandbox mapping to a single-application Cargo"
+    );
+    assert_eq!(after_mappings[0].key, before_mappings[0].key);
+    assert_eq!(after_mappings[0].role, CargoReplicaProcessRole::App);
+    assert_eq!(after_mappings[0].container_name, "main");
+    assert_eq!(
+      after_mappings[0].process_key.as_deref(),
+      Some(after_app.key.as_str())
     );
     let mut replacement_container =
       container("main", "ghcr.io/next-hat/nanocl-get-started:latest");
@@ -960,13 +997,19 @@ mod tests {
       "-c".to_owned(),
       "while true; do sleep 3600; done".to_owned(),
     ]);
+    let mut worker = container("worker", "alpine:latest");
+    worker.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      "while true; do sleep 3600; done".to_owned(),
+    ]);
     let response = system
       .client
       .send_post(
         ENDPOINT,
         Some(CargoSpec {
           name: NAME.to_owned(),
-          containers: vec![app],
+          containers: vec![app, worker],
           ..Default::default()
         }),
         None::<String>,

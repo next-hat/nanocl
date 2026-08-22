@@ -83,6 +83,22 @@ assert_no_cargo_containers() {
   return 1
 }
 
+assert_no_cargo_role_containers() {
+  local cargo_key="$1"
+  local role="$2"
+  local ids
+  ids="$(docker ps --all --quiet \
+    --filter "label=io.nanocl.c=${cargo_key}" \
+    --filter "label=io.nanocl.cargo.role=${role}")" || return 1
+  if [ -z "$ids" ]; then
+    return 0
+  fi
+  docker ps --all --no-trunc \
+    --filter "label=io.nanocl.c=${cargo_key}" \
+    --filter "label=io.nanocl.cargo.role=${role}" >&2
+  return 1
+}
+
 setup_file() {
   cleanup_nanocl_artifacts
 }
@@ -273,30 +289,26 @@ teardown_file() {
   run docker network inspect e2e-private
   [ "$status" -eq 0 ]
 
-  api_sandbox="$(running_cargo_container global.e2e-private-api sandbox _sandbox)"
   api_container="$(running_cargo_container global.e2e-private-api app api)"
-  peer_sandbox="$(running_cargo_container global.e2e-private-peer sandbox _sandbox)"
   peer_container="$(running_cargo_container global.e2e-private-peer app peer)"
-  default_sandbox="$(running_cargo_container global.e2e-default-client sandbox _sandbox)"
   default_container="$(running_cargo_container global.e2e-default-client app client)"
+  assert_no_cargo_role_containers global.e2e-private-api sandbox
+  assert_no_cargo_role_containers global.e2e-private-peer sandbox
+  assert_no_cargo_role_containers global.e2e-default-client sandbox
   job_container="$(docker ps -aq --filter label=io.nanocl.j=e2e-private-job | head -n 1)"
   [ -n "$job_container" ]
 
-  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$api_sandbox"
+  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$api_container"
   [ "$status" -eq 0 ]
   [ "$output" = "e2e-private" ]
 
-  run docker inspect --format '{{.HostConfig.NetworkMode}}' "$api_container"
-  [ "$status" -eq 0 ]
-  [ "$output" = "container:${api_sandbox}" ]
-
   run docker inspect --format '{{.HostConfig.NetworkMode}}' "$peer_container"
   [ "$status" -eq 0 ]
-  [ "$output" = "container:${peer_sandbox}" ]
+  [ "$output" = "e2e-private" ]
 
   run docker inspect --format '{{.HostConfig.NetworkMode}}' "$default_container"
   [ "$status" -eq 0 ]
-  [ "$output" = "container:${default_sandbox}" ]
+  [ "$output" = "nanoclbr0" ]
 
   run docker inspect --format '{{.HostConfig.NetworkMode}}' "$job_container"
   [ "$status" -eq 0 ]
@@ -304,21 +316,21 @@ teardown_file() {
 
   run docker inspect --format \
     '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' \
-    "$api_sandbox"
+    "$api_container"
   [ "$status" -eq 0 ]
   [[ "$output" == *"e2e-private"* ]]
   [[ "$output" != *"nanoclbr0"* ]]
 
   run docker inspect --format \
     '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' \
-    "$default_sandbox"
+    "$default_container"
   [ "$status" -eq 0 ]
   [[ "$output" == *"nanoclbr0"* ]]
   [[ "$output" != *"e2e-private"* ]]
 
   api_address="$(docker inspect --format \
     '{{(index .NetworkSettings.Networks "e2e-private").IPAddress}}' \
-    "$api_sandbox")"
+    "$api_container")"
   [ -n "$api_address" ]
 
   run docker exec "$peer_container" sh -c \

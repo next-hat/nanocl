@@ -1534,7 +1534,7 @@ mod tests {
       "init-valid",
       "valid",
       "node-a",
-      "container:sandbox",
+      "private",
       &[],
       CargoProcessOpts {
         logical_name: "migrate",
