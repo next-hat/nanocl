@@ -440,6 +440,7 @@ fn normalize_declared_config(
   cargo_key: &str,
   process: &ParsedCargoProcess,
   ownership: &CargoNetworkOwnership,
+  expected_sandbox_mode: Option<&str>,
 ) -> IoResult<DockerConfig> {
   let mut config = process.config.clone();
   config.networking_config = None;
@@ -498,12 +499,18 @@ fn normalize_declared_config(
     }
   } else if ownership.has_sandbox {
     match observed_mode.as_str() {
-      mode if mode.starts_with("container:") => host.network_mode = None,
       "host" | "none" => {}
+      mode if Some(mode) == expected_sandbox_mode => host.network_mode = None,
       _ => {
+        let expected_sandbox_mode = expected_sandbox_mode.ok_or_else(|| {
+          bootstrap_error(format!(
+            "Cargo {cargo_key:?} replica {} has no selected sandbox process",
+            process.replica_key
+          ))
+        })?;
         return Err(bootstrap_error(format!(
-          "Cargo {cargo_key:?} container {:?} has network mode {observed_mode:?} instead of its sandbox namespace",
-          process.container_name
+          "Cargo {cargo_key:?} replica {} container {:?} has network mode {observed_mode:?} instead of its own replica sandbox mode {expected_sandbox_mode:?}",
+          process.replica_key, process.container_name
         )));
       }
     }
@@ -741,6 +748,16 @@ pub(super) fn reconstruct_cargo(
 
   let ownership =
     infer_network_ownership(cargo_key, &stable, replicas_by_ordinal.len())?;
+  let sandbox_network_modes = stable
+    .iter()
+    .filter(|process| process.role == CargoReplicaProcessRole::Sandbox)
+    .map(|process| {
+      (
+        process.replica_key,
+        format!("container:{}", process.process_key),
+      )
+    })
+    .collect::<HashMap<_, _>>();
   let mut init_containers = BTreeMap::<usize, ContainerSpec>::new();
   let mut containers = BTreeMap::<usize, ContainerSpec>::new();
   let mut logical_positions = HashMap::<(u8, String), usize>::new();
@@ -772,7 +789,12 @@ pub(super) fn reconstruct_cargo(
       image_pull_secret: None,
       image_pull_policy: ImagePullPolicy::default(),
       container_config: normalize_declared_config(
-        cargo_key, process, &ownership,
+        cargo_key,
+        process,
+        &ownership,
+        sandbox_network_modes
+          .get(&process.replica_key)
+          .map(String::as_str),
       )?,
     };
     let declarations = if process.role == CargoReplicaProcessRole::Init {
@@ -862,6 +884,10 @@ mod tests {
     uuid::Uuid::from_u128(value)
   }
 
+  fn sandbox_process_key(ordinal: i32) -> String {
+    format!("{ordinal:064x}")
+  }
+
   fn process(
     replica_key: uuid::Uuid,
     ordinal: i32,
@@ -891,10 +917,14 @@ mod tests {
     let network_mode = if role == CargoReplicaProcessRole::Sandbox {
       DEFAULT_NETWORK.to_owned()
     } else {
-      format!("container:sandbox-{ordinal}")
+      format!("container:{}", sandbox_process_key(ordinal))
     };
     CargoBootstrapProcess {
-      process_key: format!("{ordinal}-{role}-{logical_name}"),
+      process_key: if role == CargoReplicaProcessRole::Sandbox {
+        sandbox_process_key(ordinal)
+      } else {
+        format!("{ordinal}-{role}-{logical_name}")
+      },
       process_name: process_name.to_owned(),
       labels: labels.clone(),
       config: DockerConfig {
@@ -930,6 +960,14 @@ mod tests {
       .as_mut()
       .unwrap()
       .insert(LABEL_CARGO_NETWORK_MODE.to_owned(), network_mode.to_owned());
+  }
+
+  fn set_observed_network_mode(
+    process: &mut CargoBootstrapProcess,
+    network_mode: &str,
+  ) {
+    process.config.host_config.as_mut().unwrap().network_mode =
+      Some(network_mode.to_owned());
   }
 
   fn sandbox(replica_key: uuid::Uuid, ordinal: i32) -> CargoBootstrapProcess {
@@ -1201,7 +1239,7 @@ mod tests {
   }
 
   #[test]
-  fn sandbox_owns_network_and_ports_but_is_not_a_user_container() {
+  fn sandbox_owns_network_and_ports_with_exact_application_linkage() {
     let replica = replica(1);
     let bindings = HashMap::from([(
       "8080/tcp".to_owned(),
@@ -1217,8 +1255,6 @@ mod tests {
     set_cargo_network_mode(&mut network_sandbox, "private-api");
     let mut api = app(replica, 0, "api", "0");
     set_cargo_network_mode(&mut api, "private-api");
-    api.config.host_config.as_mut().unwrap().network_mode =
-      Some("container:not-the-sandbox-process-key".to_owned());
     let mut worker = app(replica, 0, "worker", "1");
     set_cargo_network_mode(&mut worker, "private-api");
     let reconstructed = reconstruct_cargo(KEY, &[network_sandbox, api, worker])
@@ -1265,6 +1301,137 @@ mod tests {
         .to_string()
         .contains("contradictory sandbox network ownership")
     );
+  }
+
+  #[test]
+  fn shared_applications_require_their_own_selected_sandbox_id() {
+    let first = replica(1);
+    let second = replica(2);
+    let mut cross_linked = app(first, 0, "api", "0");
+    set_observed_network_mode(
+      &mut cross_linked,
+      &format!("container:{}", sandbox_process_key(1)),
+    );
+    let error = reconstruct_cargo(
+      KEY,
+      &[
+        sandbox(first, 0),
+        cross_linked,
+        app(first, 0, "worker", "1"),
+        sandbox(second, 1),
+        app(second, 1, "api", "0"),
+        app(second, 1, "worker", "1"),
+      ],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("instead of its own replica sandbox mode")
+    );
+
+    for invalid_mode in [
+      format!("container:{}", "f".repeat(64)),
+      format!("container:{}", &sandbox_process_key(0)[..12]),
+      "container:sandbox-system.bootstrap-r0.c".to_owned(),
+      "container:".to_owned(),
+    ] {
+      let mut invalid = app(first, 0, "api", "0");
+      set_observed_network_mode(&mut invalid, &invalid_mode);
+      let error = reconstruct_cargo(
+        KEY,
+        &[sandbox(first, 0), invalid, app(first, 0, "worker", "1")],
+      )
+      .unwrap_err();
+      assert!(
+        error
+          .to_string()
+          .contains("instead of its own replica sandbox mode"),
+        "invalid shared application mode {invalid_mode:?}"
+      );
+    }
+
+    for (artifact_name, artifact_key) in [
+      ("tmp-system.bootstrap-r0-sandbox.c", "a".repeat(64)),
+      ("candidate-system.bootstrap-r0-sandbox.c", "b".repeat(64)),
+    ] {
+      let mut artifact = sandbox(first, 0);
+      artifact.process_name = artifact_name.to_owned();
+      artifact.process_key = artifact_key.clone();
+      let mut stale_linked = app(first, 0, "api", "0");
+      set_observed_network_mode(
+        &mut stale_linked,
+        &format!("container:{artifact_key}"),
+      );
+      let error = reconstruct_cargo(
+        KEY,
+        &[
+          sandbox(first, 0),
+          artifact,
+          stale_linked,
+          app(first, 0, "worker", "1"),
+        ],
+      )
+      .unwrap_err();
+      assert!(
+        error
+          .to_string()
+          .contains("instead of its own replica sandbox mode"),
+        "rollout artifact {artifact_name:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn shared_application_escapes_bypass_sandbox_id_linkage() {
+    let replica = replica(1);
+    for escape in ["host", "none"] {
+      let mut escaped = app(replica, 0, "api", "0");
+      set_observed_network_mode(&mut escaped, escape);
+      let reconstructed = reconstruct_cargo(
+        KEY,
+        &[sandbox(replica, 0), escaped, app(replica, 0, "worker", "1")],
+      )
+      .unwrap()
+      .unwrap();
+      assert_eq!(
+        reconstructed.spec.containers[0]
+          .container_config
+          .host_config
+          .as_ref()
+          .and_then(|host| host.network_mode.as_deref()),
+        Some(escape)
+      );
+      assert_eq!(
+        reconstructed.spec.containers[1]
+          .container_config
+          .host_config
+          .as_ref()
+          .and_then(|host| host.network_mode.as_deref()),
+        None
+      );
+    }
+  }
+
+  #[test]
+  fn shared_init_container_cannot_join_the_sandbox_namespace() {
+    let replica = replica(1);
+    let mut sandbox_linked_init = init(replica, 0, "prepare", "0");
+    set_observed_network_mode(
+      &mut sandbox_linked_init,
+      &format!("container:{}", sandbox_process_key(0)),
+    );
+    let error = reconstruct_cargo(
+      KEY,
+      &[
+        sandbox(replica, 0),
+        sandbox_linked_init,
+        app(replica, 0, "api", "0"),
+        app(replica, 0, "worker", "1"),
+      ],
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("instead of the Cargo network"));
   }
 
   #[test]
@@ -1639,6 +1806,28 @@ mod tests {
         .processes
         .iter()
         .any(|process| { process.role == CargoReplicaProcessRole::Sandbox })
+    );
+
+    let mut isolated_sandbox = sandbox(replica, 0);
+    set_observed_network_mode(&mut isolated_sandbox, "none");
+    set_cargo_network_mode(&mut isolated_sandbox, "none");
+    let mut wrong_isolated_api = app(replica, 0, "api", "0");
+    set_cargo_network_mode(&mut wrong_isolated_api, "none");
+    set_observed_network_mode(
+      &mut wrong_isolated_api,
+      &format!("container:{}", "f".repeat(64)),
+    );
+    let mut isolated_worker = app(replica, 0, "worker", "1");
+    set_cargo_network_mode(&mut isolated_worker, "none");
+    let error = reconstruct_cargo(
+      KEY,
+      &[isolated_sandbox, wrong_isolated_api, isolated_worker],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("instead of its own replica sandbox mode")
     );
 
     for mode in [DEFAULT_NETWORK, "private-api", "none"] {
