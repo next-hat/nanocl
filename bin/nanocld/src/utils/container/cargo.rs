@@ -422,14 +422,14 @@ fn process_name(
 ) -> String {
   let short_id = utils::key::generate_short_id(6);
   let pending_prefix = if pending { "candidate-" } else { "" };
-  let prefix = match role {
-    CargoReplicaProcessRole::Sandbox => "sandbox-",
-    CargoReplicaProcessRole::Init => "init-",
-    CargoReplicaProcessRole::App => "",
+  let (prefix, role_marker) = match role {
+    CargoReplicaProcessRole::Sandbox => ("", "sandbox-"),
+    CargoReplicaProcessRole::Init => ("init-", ""),
+    CargoReplicaProcessRole::App => ("", ""),
   };
   let logical_name = runtime_path_component(logical_name);
   format!(
-    "{pending_prefix}{prefix}{}.{}-r{}-{logical_name}-{short_id}.c",
+    "{pending_prefix}{prefix}{}.{}-r{}-{role_marker}{logical_name}-{short_id}.c",
     cargo.namespace_name, cargo.spec.name, task.ordinal
   )
 }
@@ -2167,6 +2167,95 @@ mod tests {
         None,
       ),
     ]
+  }
+
+  fn naming_fixture() -> (Cargo, CargoReplicaTask) {
+    let mut cargo = Cargo::default();
+    cargo.namespace_name = "global".to_owned();
+    cargo.spec.name = "deploy-example".to_owned();
+    let task = CargoReplicaTask {
+      key: uuid::Uuid::nil(),
+      ordinal: 0,
+    };
+    (cargo, task)
+  }
+
+  fn assert_process_name(
+    cargo: &Cargo,
+    task: &CargoReplicaTask,
+    role: CargoReplicaProcessRole,
+    logical_name: &str,
+    prefix: &str,
+    pending: bool,
+  ) -> String {
+    let name = process_name(cargo, task, role, logical_name, pending);
+    let logical_hash = runtime_path_component(logical_name);
+    assert_eq!(logical_hash.len(), 16);
+    assert!(logical_hash.chars().all(|value| value.is_ascii_hexdigit()));
+    let identity_prefix = format!("{prefix}{logical_hash}-");
+    let short_id = name
+      .strip_prefix(&identity_prefix)
+      .and_then(|value| value.strip_suffix(".c"))
+      .unwrap_or_else(|| {
+        panic!("runtime name {name:?} does not match {identity_prefix:?}")
+      });
+    assert_eq!(short_id.len(), 6);
+    assert!(short_id.chars().all(|value| value.is_ascii_alphanumeric()));
+    name
+  }
+
+  #[test]
+  fn process_name_keeps_stable_role_layout_and_identity_suffix() {
+    let (cargo, task) = naming_fixture();
+    for (role, logical_name, prefix) in [
+      (
+        CargoReplicaProcessRole::Sandbox,
+        SANDBOX_LOGICAL_NAME,
+        "global.deploy-example-r0-sandbox-",
+      ),
+      (
+        CargoReplicaProcessRole::App,
+        "api",
+        "global.deploy-example-r0-",
+      ),
+      (
+        CargoReplicaProcessRole::Init,
+        "migrate",
+        "init-global.deploy-example-r0-",
+      ),
+    ] {
+      assert_process_name(&cargo, &task, role, logical_name, prefix, false);
+    }
+  }
+
+  #[test]
+  fn process_name_keeps_rollout_prefixes_outermost() {
+    let (cargo, task) = naming_fixture();
+    let stable = assert_process_name(
+      &cargo,
+      &task,
+      CargoReplicaProcessRole::Sandbox,
+      SANDBOX_LOGICAL_NAME,
+      "global.deploy-example-r0-sandbox-",
+      false,
+    );
+    let retained = format!("tmp-{stable}");
+    assert_eq!(
+      retained.strip_prefix("tmp-"),
+      Some(stable.as_str()),
+      "tmp- must remain the outer retained-process prefix"
+    );
+    assert!(is_rollout_process_name(&retained));
+
+    let candidate = assert_process_name(
+      &cargo,
+      &task,
+      CargoReplicaProcessRole::Sandbox,
+      SANDBOX_LOGICAL_NAME,
+      "candidate-global.deploy-example-r0-sandbox-",
+      true,
+    );
+    assert!(is_rollout_process_name(&candidate));
   }
 
   #[test]
