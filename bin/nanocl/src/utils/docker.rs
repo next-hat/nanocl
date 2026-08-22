@@ -23,6 +23,16 @@ use crate::models::DockerContextMeta;
 use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
 
+const LABEL_CARGO_NETWORK_MODE: &str = "io.nanocl.cargo.network-mode";
+const DEFAULT_CARGO_NETWORK_MODE: &str = "nanoclbr0";
+
+fn cargo_network_mode(cargo: &CargoSpec) -> &str {
+  cargo
+    .network_mode
+    .as_ref()
+    .map_or(DEFAULT_CARGO_NETWORK_MODE, |mode| mode.as_str())
+}
+
 /// Update progress bar for install image
 fn update_image_progress(
   multi_progress: &MultiProgress,
@@ -167,6 +177,7 @@ pub fn hook_labels(
   key: &str,
   namespace: &str,
   replica_id: &str,
+  cargo: &CargoSpec,
   container: &ContainerSpec,
   labels: &HashMap<String, String>,
 ) -> HashMap<String, String> {
@@ -188,6 +199,10 @@ pub fn hook_labels(
   hooked_labels.insert(
     "io.nanocl.cargo.essential".to_owned(),
     container.essential.to_string(),
+  );
+  hooked_labels.insert(
+    LABEL_CARGO_NETWORK_MODE.to_owned(),
+    cargo_network_mode(cargo).to_owned(),
   );
   hooked_labels
     .insert(CARGO_CONTAINER_POSITION_LABEL.to_owned(), "0".to_owned());
@@ -284,13 +299,7 @@ fn installer_container_config(
   let mut config = container.container_config.clone();
   let mut host_config = config.host_config.clone().unwrap_or_default();
   if !matches!(host_config.network_mode.as_deref(), Some("host" | "none")) {
-    host_config.network_mode = Some(
-      cargo
-        .network_mode
-        .as_ref()
-        .map(ToString::to_string)
-        .unwrap_or_else(|| "nanoclbr0".to_owned()),
-    );
+    host_config.network_mode = Some(cargo_network_mode(cargo).to_owned());
   }
   if let Some(port_bindings) = &cargo.port_bindings {
     host_config.port_bindings = Some(port_bindings.clone());
@@ -324,6 +333,7 @@ pub async fn create_cargo_container(
       &key,
       namespace,
       &replica_id,
+      &hooked_cargo,
       declared,
       &config.labels.clone().unwrap_or_default(),
     )),
@@ -487,6 +497,18 @@ mod tests {
           .as_deref(),
         Some(mode)
       );
+      let labels = hook_labels(
+        "system.api",
+        "system",
+        "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+        &cargo,
+        &declared,
+        &HashMap::new(),
+      );
+      assert_eq!(
+        labels[LABEL_CARGO_NETWORK_MODE], "private",
+        "application {mode} escape must retain the Cargo base mode"
+      );
     }
   }
 
@@ -500,6 +522,10 @@ mod tests {
       "system.api",
       "system",
       "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+      &CargoSpec {
+        name: "api".to_owned(),
+        ..Default::default()
+      },
       &declared,
       &HashMap::from([("example.owner".to_owned(), "platform".to_owned())]),
     );
@@ -515,8 +541,26 @@ mod tests {
     assert_eq!(labels["io.nanocl.cargo.container"], "api");
     assert_eq!(labels["io.nanocl.cargo.role"], "app");
     assert_eq!(labels["io.nanocl.cargo.essential"], "true");
+    assert_eq!(labels[LABEL_CARGO_NETWORK_MODE], "nanoclbr0");
     assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
     assert_eq!(labels["io.nanocl.not-init-c"], "true");
     assert_eq!(labels["example.owner"], "platform");
+
+    for mode in ["default", "host", "none"] {
+      let cargo = CargoSpec {
+        name: "api".to_owned(),
+        network_mode: Some(CargoNetworkMode::new(mode).unwrap()),
+        ..Default::default()
+      };
+      let labels = hook_labels(
+        "system.api",
+        "system",
+        "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+        &cargo,
+        &declared,
+        &HashMap::new(),
+      );
+      assert_eq!(labels[LABEL_CARGO_NETWORK_MODE], mode);
+    }
   }
 }

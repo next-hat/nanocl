@@ -621,8 +621,8 @@ mod tests {
 
   use crate::utils::{
     container::cargo_compiler::{
-      LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_REPLICA,
-      LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+      LABEL_CARGO_KEY, LABEL_CARGO_NETWORK_MODE, LABEL_CONTAINER,
+      LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
     },
     tests::gen_default_test_system,
   };
@@ -644,6 +644,7 @@ mod tests {
       (LABEL_ROLE.to_owned(), role.to_string()),
       (LABEL_CONTAINER.to_owned(), logical_name.to_owned()),
       (LABEL_ESSENTIAL.to_owned(), "true".to_owned()),
+      (LABEL_CARGO_NETWORK_MODE.to_owned(), "nanoclbr0".to_owned()),
     ]);
     if let Some(position) = position {
       labels.insert(

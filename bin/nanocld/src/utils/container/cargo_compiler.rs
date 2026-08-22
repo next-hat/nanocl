@@ -25,6 +25,8 @@ pub(crate) const LABEL_REPLICA_ORDINAL: &str =
 pub(crate) const LABEL_CONTAINER: &str = "io.nanocl.cargo.container";
 pub(crate) const LABEL_ROLE: &str = "io.nanocl.cargo.role";
 pub(crate) const LABEL_ESSENTIAL: &str = "io.nanocl.cargo.essential";
+pub(crate) const LABEL_CARGO_NETWORK_MODE: &str =
+  "io.nanocl.cargo.network-mode";
 
 /// Role of a declared container in a Cargo replica.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -374,6 +376,7 @@ pub(super) fn compile_container(
   let mut labels = config.labels.take().unwrap_or_default();
   labels.extend(identity_labels(
     input.runtime,
+    cargo_mode,
     input.role.label_value(),
     &input.declared.name,
     input.declared.essential,
@@ -429,8 +432,13 @@ pub(super) fn compile_sandbox(
       .map(|port| (port, EmptyObject::default()))
       .collect::<HashMap<_, _>>()
   });
-  let labels =
-    identity_labels(input.runtime, "sandbox", SANDBOX_LOGICAL_NAME, true);
+  let labels = identity_labels(
+    input.runtime,
+    cargo_mode,
+    "sandbox",
+    SANDBOX_LOGICAL_NAME,
+    true,
+  );
   let config = DockerConfig {
     image: Some(input.sandbox_image.to_owned()),
     exposed_ports,
@@ -475,6 +483,7 @@ fn validate_cargo_port_bindings(
 
 fn identity_labels(
   runtime: CargoRuntimeMetadata<'_>,
+  cargo_network_mode: &str,
   role: &str,
   logical_name: &str,
   essential: bool,
@@ -492,6 +501,10 @@ fn identity_labels(
     (LABEL_CONTAINER.to_owned(), logical_name.to_owned()),
     (LABEL_ROLE.to_owned(), role.to_owned()),
     (LABEL_ESSENTIAL.to_owned(), essential.to_string()),
+    (
+      LABEL_CARGO_NETWORK_MODE.to_owned(),
+      cargo_network_mode.to_owned(),
+    ),
   ])
 }
 
@@ -875,6 +888,14 @@ mod tests {
       .and_then(|host| host.network_mode.as_deref())
   }
 
+  fn cargo_network_mode_label(config: &DockerConfig) -> Option<&str> {
+    config
+      .labels
+      .as_ref()
+      .and_then(|labels| labels.get(LABEL_CARGO_NETWORK_MODE))
+      .map(String::as_str)
+  }
+
   fn assert_io_conversion(
     compiler_error: CargoCompilerError,
     expected_kind: std::io::ErrorKind,
@@ -1038,6 +1059,7 @@ mod tests {
       Some("default"),
       Some("none"),
     ] {
+      let expected_cargo_mode = cargo_mode.unwrap_or(DEFAULT_NETWORK);
       let cargo_mode =
         cargo_mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
       let compiled = compile_application(
@@ -1049,6 +1071,10 @@ mod tests {
       assert_eq!(
         network_mode(&compiled.config),
         Some("container:sandbox-docker-id")
+      );
+      assert_eq!(
+        cargo_network_mode_label(&compiled.config),
+        Some(expected_cargo_mode)
       );
     }
   }
@@ -1066,6 +1092,7 @@ mod tests {
         compile_application(&minimal_spec(), cargo_mode.as_ref(), None)
           .unwrap();
       assert_eq!(network_mode(&compiled.config), Some(expected));
+      assert_eq!(cargo_network_mode_label(&compiled.config), Some(expected));
     }
 
     let cargo_mode = CargoNetworkMode::new("custom-network").unwrap();
@@ -1078,6 +1105,10 @@ mod tests {
       let compiled =
         compile_application(&declared, Some(&cargo_mode), None).unwrap();
       assert_eq!(network_mode(&compiled.config), Some(override_mode));
+      assert_eq!(
+        cargo_network_mode_label(&compiled.config),
+        Some("custom-network")
+      );
     }
   }
 
@@ -1101,6 +1132,7 @@ mod tests {
     let compiled =
       compile_application(&minimal_spec(), Some(&cargo_mode), None).unwrap();
     assert_eq!(network_mode(&compiled.config), Some("host"));
+    assert_eq!(cargo_network_mode_label(&compiled.config), Some("host"));
   }
 
   #[test]
@@ -1115,6 +1147,7 @@ mod tests {
     let compiled =
       compile_application(&declared, Some(&cargo_mode), None).unwrap();
     assert_eq!(network_mode(&compiled.config), Some("none"));
+    assert_eq!(cargo_network_mode_label(&compiled.config), Some("host"));
   }
 
   #[test]
@@ -1149,6 +1182,10 @@ mod tests {
       let compiled =
         compile_application(&declared, None, Some(SANDBOX_ID)).unwrap();
       assert_eq!(network_mode(&compiled.config), Some(override_mode));
+      assert_eq!(
+        cargo_network_mode_label(&compiled.config),
+        Some(DEFAULT_NETWORK)
+      );
       assert_eq!(compiled.config.exposed_ports, Some(exposed_ports.clone()));
     }
   }
@@ -1352,6 +1389,7 @@ mod tests {
       )
       .unwrap();
       assert_eq!(network_mode(&compiled.config), Some(expected));
+      assert_eq!(cargo_network_mode_label(&compiled.config), Some(expected));
       assert!(compiled.config.host_config.unwrap().port_bindings.is_none());
       assert!(compiled.config.exposed_ports.is_none());
     }
@@ -1376,6 +1414,10 @@ mod tests {
       )
       .unwrap();
       assert_eq!(network_mode(&compiled.config), Some(override_mode));
+      assert_eq!(
+        cargo_network_mode_label(&compiled.config),
+        Some("custom-network")
+      );
       assert!(compiled.config.host_config.unwrap().port_bindings.is_none());
       assert_eq!(compiled.config.exposed_ports, Some(authored_exposed_ports));
     }
@@ -1622,6 +1664,7 @@ mod tests {
     assert_eq!(labels[LABEL_ROLE], "sandbox");
     assert_eq!(labels[LABEL_CONTAINER], SANDBOX_LOGICAL_NAME);
     assert_eq!(labels[LABEL_REPLICA], runtime().replica_id);
+    assert_eq!(labels[LABEL_CARGO_NETWORK_MODE], DEFAULT_NETWORK);
     assert!(!labels.contains_key(CARGO_CONTAINER_POSITION_LABEL));
     assert!(!labels.contains_key(LABEL_COMPOSE_PROJECT));
     assert!(!labels.contains_key(LABEL_APPLICATION_CONTAINER));
@@ -1652,6 +1695,7 @@ mod tests {
     let cargo_mode = CargoNetworkMode::new("none").unwrap();
     let compiled = sandbox(Some(&cargo_mode), None).unwrap().unwrap();
     assert_eq!(network_mode(&compiled.config), Some("none"));
+    assert_eq!(cargo_network_mode_label(&compiled.config), Some("none"));
   }
 
   #[test]
@@ -1660,6 +1704,7 @@ mod tests {
       let cargo_mode = CargoNetworkMode::new(mode).unwrap();
       let compiled = sandbox(Some(&cargo_mode), None).unwrap().unwrap();
       assert_eq!(network_mode(&compiled.config), Some(mode));
+      assert_eq!(cargo_network_mode_label(&compiled.config), Some(mode));
     }
   }
 
@@ -1800,6 +1845,7 @@ mod tests {
     assert_eq!(labels[LABEL_REPLICA_ORDINAL], "2");
     assert_eq!(labels[LABEL_CONTAINER], "app");
     assert_eq!(labels[LABEL_ROLE], "app");
+    assert_eq!(labels[LABEL_CARGO_NETWORK_MODE], DEFAULT_NETWORK);
     assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
     assert_eq!(labels[LABEL_APPLICATION_CONTAINER], "true");
     assert!(!labels.contains_key(LABEL_INIT_CONTAINER));
@@ -1827,6 +1873,7 @@ mod tests {
     .unwrap();
     let labels = compiled.config.labels.unwrap();
     assert_eq!(labels[LABEL_ROLE], "init");
+    assert_eq!(labels[LABEL_CARGO_NETWORK_MODE], DEFAULT_NETWORK);
     assert_eq!(labels[CARGO_CONTAINER_POSITION_LABEL], "0");
     assert_eq!(labels[LABEL_INIT_CONTAINER], "true");
     assert!(!labels.contains_key(LABEL_APPLICATION_CONTAINER));

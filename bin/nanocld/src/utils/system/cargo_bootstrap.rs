@@ -18,8 +18,8 @@ use crate::{
   models::CargoReplicaProcessRole,
   utils::container::{
     cargo_compiler::{
-      LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_REPLICA,
-      LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+      LABEL_CARGO_KEY, LABEL_CARGO_NETWORK_MODE, LABEL_CONTAINER,
+      LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
     },
     network::DEFAULT_NETWORK,
   },
@@ -115,6 +115,7 @@ struct ParsedCargoProcess {
   container_name: String,
   declaration_position: Option<usize>,
   essential: bool,
+  cargo_network_mode: CargoNetworkMode,
   config: DockerConfig,
   status: Option<ContainerStateStatusEnum>,
 }
@@ -180,6 +181,14 @@ fn parse_process(
         process.process_key
       ))
     })?;
+  let cargo_network_mode =
+    CargoNetworkMode::new(required_label(process, LABEL_CARGO_NETWORK_MODE)?)
+      .map_err(|error| {
+      bootstrap_error(format!(
+        "Cargo process {:?} has invalid Cargo network mode label: {error}",
+        process.process_key
+      ))
+    })?;
   let declaration_position = match role {
     CargoReplicaProcessRole::Sandbox => {
       if process.labels.contains_key(CARGO_CONTAINER_POSITION_LABEL) {
@@ -230,6 +239,7 @@ fn parse_process(
     container_name,
     declaration_position,
     essential,
+    cargo_network_mode,
     config: process.config.clone(),
     status: process.status,
   })
@@ -282,6 +292,17 @@ fn infer_network_ownership(
   processes: &[ParsedCargoProcess],
   replica_count: usize,
 ) -> IoResult<CargoNetworkOwnership> {
+  let effective_mode = processes[0].cargo_network_mode.as_str().to_owned();
+  if processes
+    .iter()
+    .skip(1)
+    .any(|process| process.cargo_network_mode.as_str() != effective_mode)
+  {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} stable processes expose contradictory Cargo network mode labels"
+    )));
+  }
+
   let mut application_counts = HashMap::<uuid::Uuid, usize>::new();
   for process in processes {
     let count = application_counts.entry(process.replica_key).or_default();
@@ -311,19 +332,13 @@ fn infer_network_ownership(
         sandboxes.len()
       )));
     }
-    let effective_mode = observed_network_mode(&sandboxes[0].config);
-    if effective_mode.starts_with("container:") {
-      return Err(bootstrap_error(format!(
-        "Cargo {cargo_key:?} sandbox cannot join another container namespace"
-      )));
-    }
     if application_count <= 1 || effective_mode == "host" {
       return Err(bootstrap_error(format!(
         "Cargo {cargo_key:?} has a sandbox for {application_count} applications on network {effective_mode:?}, which contradicts the canonical Cargo topology"
       )));
     }
     let port_bindings = observed_port_bindings(&sandboxes[0].config);
-    for sandbox in sandboxes.iter().skip(1) {
+    for sandbox in &sandboxes {
       if observed_network_mode(&sandbox.config) != effective_mode
         || observed_port_bindings(&sandbox.config) != port_bindings
       {
@@ -356,15 +371,11 @@ fn infer_network_ownership(
         applications.len()
       )));
     }
-    let effective_mode = observed_network_mode(&applications[0].config);
-    if effective_mode.starts_with("container:") {
-      return Err(bootstrap_error(format!(
-        "Cargo {cargo_key:?} direct application cannot join another container namespace"
-      )));
-    }
     let port_bindings = observed_port_bindings(&applications[0].config);
-    for application in applications.iter().skip(1) {
-      if observed_network_mode(&application.config) != effective_mode
+    for application in &applications {
+      let observed_mode = observed_network_mode(&application.config);
+      if (observed_mode != effective_mode
+        && !matches!(observed_mode.as_str(), "host" | "none"))
         || observed_port_bindings(&application.config) != port_bindings
       {
         return Err(bootstrap_error(format!(
@@ -382,6 +393,11 @@ fn infer_network_ownership(
     });
   }
 
+  if effective_mode != "host" {
+    return Err(bootstrap_error(format!(
+      "Cargo {cargo_key:?} has no sandbox for multiple applications on Cargo network {effective_mode:?}"
+    )));
+  }
   if processes.iter().any(|process| {
     process.role == CargoReplicaProcessRole::App
       && !matches!(
@@ -393,14 +409,6 @@ fn infer_network_ownership(
       "Cargo {cargo_key:?} has no sandbox but its stable application processes do not describe a host-network Cargo"
     )));
   }
-  if !processes.iter().any(|process| {
-    process.role == CargoReplicaProcessRole::App
-      && observed_network_mode(&process.config) == "host"
-  }) {
-    return Err(bootstrap_error(format!(
-      "Cargo {cargo_key:?} has no sandbox but its multiple applications do not expose Cargo-level host ownership"
-    )));
-  }
   if processes
     .iter()
     .any(|process| observed_port_bindings(&process.config).is_some())
@@ -410,11 +418,8 @@ fn infer_network_ownership(
     )));
   }
   Ok(CargoNetworkOwnership {
-    effective_mode: "host".to_owned(),
-    network_mode: Some(
-      CargoNetworkMode::new("host")
-        .expect("the built-in host network mode is always valid"),
-    ),
+    network_mode: cargo_network_mode(&effective_mode)?,
+    effective_mode,
     port_bindings: None,
     has_sandbox: false,
     application_owns_network: false,
@@ -872,6 +877,10 @@ mod tests {
       (LABEL_ROLE.to_owned(), role.to_string()),
       (LABEL_CONTAINER.to_owned(), logical_name.to_owned()),
       (LABEL_ESSENTIAL.to_owned(), "true".to_owned()),
+      (
+        LABEL_CARGO_NETWORK_MODE.to_owned(),
+        DEFAULT_NETWORK.to_owned(),
+      ),
     ]);
     if let Some(position) = position {
       labels.insert(
@@ -906,6 +915,21 @@ mod tests {
       },
       status: Some(ContainerStateStatusEnum::RUNNING),
     }
+  }
+
+  fn set_cargo_network_mode(
+    process: &mut CargoBootstrapProcess,
+    network_mode: &str,
+  ) {
+    process
+      .labels
+      .insert(LABEL_CARGO_NETWORK_MODE.to_owned(), network_mode.to_owned());
+    process
+      .config
+      .labels
+      .as_mut()
+      .unwrap()
+      .insert(LABEL_CARGO_NETWORK_MODE.to_owned(), network_mode.to_owned());
   }
 
   fn sandbox(replica_key: uuid::Uuid, ordinal: i32) -> CargoBootstrapProcess {
@@ -984,6 +1008,7 @@ mod tests {
     let mut app = app(replica_key, ordinal, name, position);
     app.config.host_config.as_mut().unwrap().network_mode =
       Some(network_mode.to_owned());
+    set_cargo_network_mode(&mut app, network_mode);
     app
   }
 
@@ -1033,6 +1058,37 @@ mod tests {
         .processes
         .iter()
         .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
+    );
+  }
+
+  #[test]
+  fn stable_processes_require_valid_consistent_cargo_network_mode_labels() {
+    let replica = replica(1);
+    let mut missing = direct_app(replica, 0, "api", "0", DEFAULT_NETWORK);
+    missing.labels.remove(LABEL_CARGO_NETWORK_MODE);
+    let error = reconstruct_cargo(KEY, &[missing]).unwrap_err();
+    assert!(error.to_string().contains(LABEL_CARGO_NETWORK_MODE));
+
+    let mut invalid = direct_app(replica, 0, "api", "0", DEFAULT_NETWORK);
+    set_cargo_network_mode(&mut invalid, "container:other");
+    let error = reconstruct_cargo(KEY, &[invalid]).unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("invalid Cargo network mode label")
+    );
+
+    let mut worker = app(replica, 0, "worker", "1");
+    set_cargo_network_mode(&mut worker, "private-api");
+    let error = reconstruct_cargo(
+      KEY,
+      &[sandbox(replica, 0), app(replica, 0, "api", "0"), worker],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("contradictory Cargo network mode labels")
     );
   }
 
@@ -1154,20 +1210,20 @@ mod tests {
         host_port: Some("8080".to_owned()),
       }]),
     )]);
-    let mut sandbox = sandbox(replica, 0);
-    let host = sandbox.config.host_config.as_mut().unwrap();
+    let mut network_sandbox = sandbox(replica, 0);
+    let host = network_sandbox.config.host_config.as_mut().unwrap();
     host.network_mode = Some("private-api".to_owned());
     host.port_bindings = Some(bindings.clone());
-    let reconstructed = reconstruct_cargo(
-      KEY,
-      &[
-        sandbox,
-        app(replica, 0, "api", "0"),
-        app(replica, 0, "worker", "1"),
-      ],
-    )
-    .unwrap()
-    .unwrap();
+    set_cargo_network_mode(&mut network_sandbox, "private-api");
+    let mut api = app(replica, 0, "api", "0");
+    set_cargo_network_mode(&mut api, "private-api");
+    api.config.host_config.as_mut().unwrap().network_mode =
+      Some("container:not-the-sandbox-process-key".to_owned());
+    let mut worker = app(replica, 0, "worker", "1");
+    set_cargo_network_mode(&mut worker, "private-api");
+    let reconstructed = reconstruct_cargo(KEY, &[network_sandbox, api, worker])
+      .unwrap()
+      .unwrap();
 
     assert_eq!(
       reconstructed
@@ -1192,6 +1248,23 @@ mod tests {
       process.role == CargoReplicaProcessRole::Sandbox
         && process.container_name == SANDBOX_LOGICAL_NAME
     }));
+
+    let mut mismatched_sandbox = sandbox(replica, 0);
+    set_cargo_network_mode(&mut mismatched_sandbox, "private-api");
+    let mut mismatched_api = app(replica, 0, "api", "0");
+    set_cargo_network_mode(&mut mismatched_api, "private-api");
+    let mut mismatched_worker = app(replica, 0, "worker", "1");
+    set_cargo_network_mode(&mut mismatched_worker, "private-api");
+    let error = reconstruct_cargo(
+      KEY,
+      &[mismatched_sandbox, mismatched_api, mismatched_worker],
+    )
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("contradictory sandbox network ownership")
+    );
   }
 
   #[test]
@@ -1242,9 +1315,11 @@ mod tests {
     let mut candidate = app(replica, 0, "candidate-copy", "1");
     candidate.process_name = "candidate-system.bootstrap-r0-copy.c".to_owned();
     candidate.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
+    candidate.labels.remove(LABEL_CARGO_NETWORK_MODE);
     let mut retained = app(replica, 0, "retained-copy", "1");
     retained.process_name = "tmp-system.bootstrap-r0-copy.c".to_owned();
     retained.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
+    retained.labels.remove(LABEL_CARGO_NETWORK_MODE);
     let reconstructed = reconstruct_cargo(
       KEY,
       &[
@@ -1326,6 +1401,115 @@ mod tests {
   }
 
   #[test]
+  fn direct_installer_cargo_mode_preserves_an_explicit_application_escape() {
+    let replica = replica(1);
+    let mut app = direct_app(replica, 0, "api", "0", "none");
+    app.process_name = format!("{KEY}.c");
+    set_cargo_network_mode(&mut app, "private-api");
+
+    let reconstructed = reconstruct_cargo(KEY, &[app]).unwrap().unwrap();
+    assert!(reconstructed.direct_installer_generation);
+    assert_eq!(
+      reconstructed
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("private-api")
+    );
+    assert_eq!(
+      reconstructed.spec.containers[0]
+        .container_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.network_mode.as_deref()),
+      Some("none")
+    );
+  }
+
+  #[test]
+  fn authoritative_cargo_mode_normalizes_and_preserves_process_escapes() {
+    let replica = replica(1);
+    for (cargo_mode, observed_mode, expected_override) in [
+      ("private-api", "private-api", None),
+      ("private-api", "host", Some("host")),
+      ("private-api", "none", Some("none")),
+      ("host", "host", None),
+      ("host", "none", Some("none")),
+      ("none", "none", None),
+    ] {
+      let mut app = direct_app(replica, 0, "api", "0", observed_mode);
+      set_cargo_network_mode(&mut app, cargo_mode);
+
+      let reconstructed = reconstruct_cargo(KEY, &[app]).unwrap().unwrap();
+      assert_eq!(
+        reconstructed
+          .spec
+          .network_mode
+          .as_ref()
+          .map(CargoNetworkMode::as_str),
+        Some(cargo_mode)
+      );
+      assert_eq!(
+        reconstructed.spec.containers[0]
+          .container_config
+          .host_config
+          .as_ref()
+          .and_then(|host| host.network_mode.as_deref()),
+        expected_override,
+        "Cargo mode {cargo_mode} with observed application mode {observed_mode}"
+      );
+    }
+
+    let mut mismatched = direct_app(replica, 0, "api", "0", "bridge");
+    set_cargo_network_mode(&mut mismatched, "private-api");
+    let error = reconstruct_cargo(KEY, &[mismatched]).unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("contradictory direct application network ownership")
+    );
+
+    for (observed_mode, expected_override) in [
+      ("private-api", None),
+      ("host", Some("host")),
+      ("none", Some("none")),
+    ] {
+      let app = direct_app(replica, 0, "api", "0", "private-api");
+      let mut init = init(replica, 0, "prepare", "0");
+      init.status = Some(ContainerStateStatusEnum::EXITED);
+      init.config.host_config.as_mut().unwrap().network_mode =
+        Some(observed_mode.to_owned());
+      set_cargo_network_mode(&mut init, "private-api");
+
+      let reconstructed =
+        reconstruct_cargo(KEY, &[init, app]).unwrap().unwrap();
+      assert_eq!(
+        reconstructed.spec.init_containers[0]
+          .container_config
+          .host_config
+          .as_ref()
+          .and_then(|host| host.network_mode.as_deref()),
+        expected_override,
+        "Cargo mode private-api with observed init mode {observed_mode}"
+      );
+    }
+
+    let app = direct_app(replica, 0, "api", "0", "private-api");
+    let mut mismatched_init = init(replica, 0, "prepare", "0");
+    mismatched_init.status = Some(ContainerStateStatusEnum::EXITED);
+    mismatched_init
+      .config
+      .host_config
+      .as_mut()
+      .unwrap()
+      .network_mode = Some("bridge".to_owned());
+    set_cargo_network_mode(&mut mismatched_init, "private-api");
+    let error = reconstruct_cargo(KEY, &[mismatched_init, app]).unwrap_err();
+    assert!(error.to_string().contains("instead of the Cargo network"));
+  }
+
+  #[test]
   fn direct_application_ownership_lifts_custom_none_init_and_ports() {
     let replica = replica(1);
     let bindings = HashMap::from([(
@@ -1346,10 +1530,12 @@ mod tests {
     prepare.status = Some(ContainerStateStatusEnum::EXITED);
     prepare.config.host_config.as_mut().unwrap().network_mode =
       Some("private-api".to_owned());
+    set_cargo_network_mode(&mut prepare, "private-api");
     let mut migrate = init(replica, 0, "migrate", "1");
     migrate.status = Some(ContainerStateStatusEnum::EXITED);
     migrate.config.host_config.as_mut().unwrap().network_mode =
       Some("private-api".to_owned());
+    set_cargo_network_mode(&mut migrate, "private-api");
 
     let reconstructed = reconstruct_cargo(KEY, &[prepare, migrate, custom])
       .unwrap()
@@ -1429,13 +1615,14 @@ mod tests {
       .as_mut()
       .unwrap()
       .network_mode = Some("none".to_owned());
+    set_cargo_network_mode(&mut isolated_sandbox, "none");
+    let mut isolated_api = app(replica, 0, "api", "0");
+    set_cargo_network_mode(&mut isolated_api, "none");
+    let mut isolated_worker = app(replica, 0, "worker", "1");
+    set_cargo_network_mode(&mut isolated_worker, "none");
     let isolated = reconstruct_cargo(
       KEY,
-      &[
-        isolated_sandbox,
-        app(replica, 0, "api", "0"),
-        app(replica, 0, "worker", "1"),
-      ],
+      &[isolated_sandbox, isolated_api, isolated_worker],
     )
     .unwrap()
     .unwrap();
@@ -1454,7 +1641,7 @@ mod tests {
         .any(|process| { process.role == CargoReplicaProcessRole::Sandbox })
     );
 
-    for mode in [DEFAULT_NETWORK, "none"] {
+    for mode in [DEFAULT_NETWORK, "private-api", "none"] {
       let error = reconstruct_cargo(
         KEY,
         &[
@@ -1489,6 +1676,31 @@ mod tests {
         .iter()
         .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
     );
+
+    let mut isolated_api = direct_app(replica, 0, "api", "0", "none");
+    set_cargo_network_mode(&mut isolated_api, "host");
+    let mut isolated_worker = direct_app(replica, 0, "worker", "1", "none");
+    set_cargo_network_mode(&mut isolated_worker, "host");
+    let all_none_host =
+      reconstruct_cargo(KEY, &[isolated_api, isolated_worker])
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+      all_none_host
+        .spec
+        .network_mode
+        .as_ref()
+        .map(CargoNetworkMode::as_str),
+      Some("host")
+    );
+    assert!(all_none_host.spec.containers.iter().all(|container| {
+      container
+        .container_config
+        .host_config
+        .as_ref()
+        .and_then(|host| host.network_mode.as_deref())
+        == Some("none")
+    }));
 
     let error = reconstruct_cargo(
       KEY,
@@ -1530,7 +1742,7 @@ mod tests {
     assert!(
       error
         .to_string()
-        .contains("contradictory direct application network ownership")
+        .contains("contradictory Cargo network mode labels")
     );
 
     let error = reconstruct_cargo(

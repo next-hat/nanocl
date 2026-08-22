@@ -38,6 +38,7 @@ services:
       - io.nanocl.cargo.container=nstore
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
       - io.nanocl.cargo.position=0
     command:
       - -c
@@ -74,6 +75,7 @@ services:
       - io.nanocl.cargo.container=nmetrics
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
       - io.nanocl.cargo.position=0
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
@@ -106,6 +108,7 @@ services:
       - io.nanocl.cargo.container=ncproxy
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=host
       - io.nanocl.cargo.position=0
     volumes:
       - type: bind
@@ -144,6 +147,7 @@ services:
       - io.nanocl.cargo.container=ncdns
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=host
       - io.nanocl.cargo.position=0
     volumes:
       - type: bind
@@ -176,6 +180,7 @@ services:
       - io.nanocl.cargo.container=ndaemon
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
       - io.nanocl.cargo.position=0
     environment:
       - RUST_BACKTRACE=1
@@ -233,6 +238,7 @@ services:
       - io.nanocl.cargo.container=dbeaver
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
       - io.nanocl.cargo.position=0
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev}/dbeaver:/opt/cloudbeaver/workspace
@@ -260,6 +266,7 @@ services:
       - io.nanocl.cargo.container=ncvpnkit
       - io.nanocl.cargo.role=app
       - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
       - io.nanocl.cargo.position=0
     volumes:
       - type: bind
