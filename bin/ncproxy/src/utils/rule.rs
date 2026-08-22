@@ -257,40 +257,70 @@ fn process_network_mode(process: &Process) -> Option<&str> {
 }
 
 struct CargoRuntimeGroup<'a> {
+  owner: CargoEndpointOwner,
   sandbox: Option<&'a Process>,
   apps: BTreeMap<String, (&'a Process, bool)>,
   retained: bool,
-  host_mode: bool,
   invalid: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CargoEndpointOwner {
+  Host,
+  DirectApp,
+  Sandbox,
+}
+
+fn cargo_endpoint_owner(
+  application_count: usize,
+  cargo_network_mode: Option<&str>,
+) -> CargoEndpointOwner {
+  if cargo_network_mode == Some("host") {
+    CargoEndpointOwner::Host
+  } else if application_count == 1 {
+    CargoEndpointOwner::DirectApp
+  } else {
+    CargoEndpointOwner::Sandbox
+  }
 }
 
 impl<'a> CargoRuntimeGroup<'a> {
   fn sandbox(process: &'a Process) -> Self {
     Self {
+      owner: CargoEndpointOwner::Sandbox,
       sandbox: Some(process),
       apps: BTreeMap::new(),
       retained: process.name.starts_with("tmp-"),
-      host_mode: false,
       invalid: false,
     }
   }
 
   fn missing_sandbox(retained: bool) -> Self {
     Self {
+      owner: CargoEndpointOwner::Sandbox,
       sandbox: None,
       apps: BTreeMap::new(),
       retained,
-      host_mode: false,
+      invalid: false,
+    }
+  }
+
+  fn direct(retained: bool) -> Self {
+    Self {
+      owner: CargoEndpointOwner::DirectApp,
+      sandbox: None,
+      apps: BTreeMap::new(),
+      retained,
       invalid: false,
     }
   }
 
   fn host(retained: bool) -> Self {
     Self {
+      owner: CargoEndpointOwner::Host,
       sandbox: None,
       apps: BTreeMap::new(),
       retained,
-      host_mode: true,
       invalid: false,
     }
   }
@@ -328,6 +358,7 @@ impl<'a> CargoRuntimeGroup<'a> {
     &self,
     desired_essential_apps: &BTreeSet<String>,
     enforce_desired_apps: bool,
+    expected_owner: Option<CargoEndpointOwner>,
   ) -> Option<String> {
     let essential_apps = self
       .apps
@@ -340,6 +371,7 @@ impl<'a> CargoRuntimeGroup<'a> {
       .filter_map(|(name, (_, essential))| essential.then_some(name.clone()))
       .collect::<BTreeSet<_>>();
     if self.invalid
+      || expected_owner.is_some_and(|owner| owner != self.owner)
       || essential_apps.is_empty()
       // A committed active attempt is compiled from the inspected current
       // revision. Exact membership protects it against incomplete observation.
@@ -354,39 +386,53 @@ impl<'a> CargoRuntimeGroup<'a> {
       return None;
     }
 
-    if let Some(sandbox) = self.sandbox {
-      return process_is_running(sandbox)
-        .then(|| process_network_address(sandbox))
-        .flatten();
+    match self.owner {
+      CargoEndpointOwner::Sandbox => self
+        .sandbox
+        .filter(|sandbox| process_is_running(sandbox))
+        .and_then(|sandbox| process_network_address(sandbox)),
+      CargoEndpointOwner::DirectApp => {
+        if self.apps.len() != 1 {
+          return None;
+        }
+        let (process, _) = self.apps.values().next()?;
+        (process_network_mode(process) != Some("host")
+          && process_is_running(process))
+        .then(|| process_network_address(process))
+        .flatten()
+      }
+      CargoEndpointOwner::Host => {
+        // Cargo-level host mode has no sandbox. Container-level `none` escapes
+        // do not provide an endpoint, while every host app shares the node
+        // address.
+        self.apps.values().find_map(|(process, _)| {
+          (process_is_running(process)
+            && process_network_mode(process) == Some("host"))
+          .then(|| process_network_address(process))
+          .flatten()
+        })
+      }
     }
-    if !self.host_mode {
-      return None;
-    }
-
-    // Cargo-level host mode has no sandbox. Container-level `none` escapes do
-    // not provide an endpoint, while every host app shares the node address.
-    self.apps.values().find_map(|(process, _)| {
-      (process_is_running(process)
-        && process_network_mode(process) == Some("host"))
-      .then(|| process_network_address(process))
-      .flatten()
-    })
   }
 }
 
 /// Resolve one serving endpoint per local Cargo replica.
 ///
-/// Networked Cargoes publish their running sandbox address. During a rollout,
-/// apps are joined to an old or candidate runtime through their effective
-/// `container:<sandbox-id>` network mode, so duplicate logical roles across
-/// generations remain independent. Cargo-level host mode has no sandbox and
-/// is conservatively partitioned by the retained `tmp-` marker instead.
+/// Single-application Cargoes publish their direct application address, while
+/// multi-application Cargoes publish their running sandbox address. During a
+/// rollout, sandbox IDs and the retained `tmp-` marker keep generations
+/// independent. Cargo-level host mode preserves its existing marker-based
+/// grouping and address deduplication.
 fn get_cargo_addresses(
   processes: &[Process],
   local_node: &str,
+  application_count: usize,
+  cargo_network_mode: Option<&str>,
   desired_essential_apps: &BTreeSet<String>,
   cargo_status: &ObjPsStatusKind,
 ) -> IoResult<Vec<String>> {
+  let expected_owner =
+    cargo_endpoint_owner(application_count, cargo_network_mode);
   let mut replicas = BTreeMap::<String, Vec<&Process>>::new();
   for process in processes {
     if process.node_name != local_node || process.name.starts_with("candidate-")
@@ -427,7 +473,10 @@ fn get_cargo_addresses(
       }
     }
 
-    let has_sandbox = groups.values().any(|group| group.sandbox.is_some());
+    let enforce_active_topology = !matches!(
+      cargo_status,
+      ObjPsStatusKind::Updating | ObjPsStatusKind::Fail
+    );
     for process in processes {
       if process_labels(process)
         .and_then(|labels| labels.get(LABEL_ROLE))
@@ -437,9 +486,7 @@ fn get_cargo_addresses(
         continue;
       }
       let retained = process.name.starts_with("tmp-");
-      let Some(mode) = process_network_mode(process) else {
-        continue;
-      };
+      let mode = process_network_mode(process).unwrap_or("nanoclbr0");
 
       if let Some(sandbox_id) = mode
         .strip_prefix("container:")
@@ -448,7 +495,9 @@ fn get_cargo_addresses(
         let group = groups
           .entry(sandbox_id.to_owned())
           .or_insert_with(|| CargoRuntimeGroup::missing_sandbox(retained));
-        if group.retained != retained || group.host_mode {
+        if group.retained != retained
+          || group.owner != CargoEndpointOwner::Sandbox
+        {
           group.invalid = true;
         }
         group.add_app(process);
@@ -456,15 +505,33 @@ fn get_cargo_addresses(
       }
 
       if !matches!(mode, "host" | "none") {
-        continue;
-      }
-      if !has_sandbox {
-        let key = if retained { "host:tmp" } else { "host:active" };
+        let key = if retained {
+          "direct:tmp"
+        } else {
+          "direct:active"
+        };
         groups
           .entry(key.to_owned())
-          .or_insert_with(|| CargoRuntimeGroup::host(retained))
+          .or_insert_with(|| CargoRuntimeGroup::direct(retained))
           .add_app(process);
         continue;
+      }
+
+      if !retained && enforce_active_topology {
+        match expected_owner {
+          CargoEndpointOwner::Host => groups
+            .entry("host:active".to_owned())
+            .or_insert_with(|| CargoRuntimeGroup::host(retained))
+            .add_app(process),
+          CargoEndpointOwner::DirectApp => groups
+            .entry("direct:active".to_owned())
+            .or_insert_with(|| CargoRuntimeGroup::direct(retained))
+            .add_app(process),
+          CargoEndpointOwner::Sandbox => {}
+        }
+        if expected_owner != CargoEndpointOwner::Sandbox {
+          continue;
+        }
       }
 
       // A container-level host/none escape cannot carry its sandbox ID. The
@@ -480,6 +547,31 @@ fn get_cargo_addresses(
         .collect::<Vec<_>>();
       if let [key] = matching.as_slice() {
         groups.get_mut(key).unwrap().add_app(process);
+      } else if matching.is_empty() {
+        let (key, owner) = if expected_owner == CargoEndpointOwner::Host {
+          (
+            if retained { "host:tmp" } else { "host:active" },
+            CargoEndpointOwner::Host,
+          )
+        } else {
+          (
+            if retained {
+              "direct:tmp"
+            } else {
+              "direct:active"
+            },
+            CargoEndpointOwner::DirectApp,
+          )
+        };
+        let group =
+          groups.entry(key.to_owned()).or_insert_with(|| match owner {
+            CargoEndpointOwner::Host => CargoRuntimeGroup::host(retained),
+            CargoEndpointOwner::DirectApp => {
+              CargoRuntimeGroup::direct(retained)
+            }
+            CargoEndpointOwner::Sandbox => unreachable!(),
+          });
+        group.add_app(process);
       } else {
         for key in matching {
           groups.get_mut(&key).unwrap().invalid = true;
@@ -496,9 +588,12 @@ fn get_cargo_addresses(
     let mut retained = Vec::new();
     for group in groups.into_values() {
       let enforce_desired_apps = !group.retained && enforce_active_desired_apps;
-      let Some(address) =
-        group.serving_address(desired_essential_apps, enforce_desired_apps)
-      else {
+      let expected_group_owner = enforce_desired_apps.then_some(expected_owner);
+      let Some(address) = group.serving_address(
+        desired_essential_apps,
+        enforce_desired_apps,
+        expected_group_owner,
+      ) else {
         continue;
       };
       if group.retained {
@@ -720,6 +815,8 @@ pub async fn gen_upstream(
         let addresses = get_cargo_addresses(
           &cargo.instances,
           &local_node,
+          cargo.spec.containers.len(),
+          cargo.spec.network_mode.as_ref().map(|mode| mode.as_str()),
           &desired_essential_apps,
           &cargo.status.actual,
         )?;
@@ -956,11 +1053,26 @@ mod tests {
         probe,
       },
     );
+    let mut sidecar = cargo_process(
+      &format!("worker-{replica}-{attempt}"),
+      replica,
+      "node-a",
+      &sandbox_mode,
+      &[],
+      CargoProcessOpts {
+        logical_name: "sidecar",
+        role: "app",
+        essential: false,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
+    );
     if retained {
       sandbox.name = format!("tmp-{}", sandbox.name);
       app.name = format!("tmp-{}", app.name);
+      sidecar.name = format!("tmp-{}", sidecar.name);
     }
-    vec![sandbox, app]
+    vec![sandbox, app, sidecar]
   }
 
   fn sandbox_replica(
@@ -972,11 +1084,62 @@ mod tests {
     sandbox_attempt(replica, "active", address, app_status, probe, false)
   }
 
+  fn direct_attempt(
+    replica: &str,
+    attempt: &str,
+    mode: &str,
+    networks: &[(&str, &str)],
+    app_status: ContainerStateStatusEnum,
+    probe: Probe,
+    retained: bool,
+  ) -> Vec<Process> {
+    let mut app = cargo_process(
+      &format!("api-{replica}-{attempt}"),
+      replica,
+      "node-a",
+      mode,
+      networks,
+      CargoProcessOpts {
+        logical_name: "api",
+        role: "app",
+        essential: true,
+        status: app_status,
+        probe,
+      },
+    );
+    if retained {
+      app.name = format!("tmp-{}", app.name);
+    }
+    vec![app]
+  }
+
+  fn direct_replica(
+    replica: &str,
+    mode: &str,
+    networks: &[(&str, &str)],
+  ) -> Vec<Process> {
+    direct_attempt(
+      replica,
+      "active",
+      mode,
+      networks,
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+      false,
+    )
+  }
+
   fn cargo_addresses(
     processes: &[Process],
     local_node: &str,
   ) -> IoResult<Vec<String>> {
-    cargo_addresses_with_status(processes, local_node, ObjPsStatusKind::Start)
+    cargo_addresses_with_topology(
+      processes,
+      local_node,
+      2,
+      Some("private"),
+      ObjPsStatusKind::Start,
+    )
   }
 
   fn cargo_addresses_with_status(
@@ -984,9 +1147,27 @@ mod tests {
     local_node: &str,
     status: ObjPsStatusKind,
   ) -> IoResult<Vec<String>> {
+    cargo_addresses_with_topology(
+      processes,
+      local_node,
+      2,
+      Some("private"),
+      status,
+    )
+  }
+
+  fn cargo_addresses_with_topology(
+    processes: &[Process],
+    local_node: &str,
+    application_count: usize,
+    cargo_network_mode: Option<&str>,
+    status: ObjPsStatusKind,
+  ) -> IoResult<Vec<String>> {
     get_cargo_addresses(
       processes,
       local_node,
+      application_count,
+      cargo_network_mode,
       &BTreeSet::from(["api".to_owned()]),
       &status,
     )
@@ -1072,6 +1253,86 @@ mod tests {
   }
 
   #[test]
+  fn cargo_single_app_uses_its_direct_default_or_custom_network_address() {
+    for (cargo_mode, process_mode, networks, expected) in [
+      (
+        None,
+        "nanoclbr0",
+        vec![("nanoclbr0", "172.18.0.10")],
+        "172.18.0.10",
+      ),
+      (
+        Some("private-api"),
+        "private-api",
+        vec![("nanoclbr0", "172.18.0.11"), ("private-api", "172.30.0.10")],
+        "172.30.0.10",
+      ),
+    ] {
+      let processes = direct_replica("direct", process_mode, &networks);
+      assert_eq!(
+        cargo_addresses_with_topology(
+          &processes,
+          "node-a",
+          1,
+          cargo_mode,
+          ObjPsStatusKind::Start,
+        )
+        .unwrap(),
+        vec![expected]
+      );
+    }
+  }
+
+  #[test]
+  fn cargo_single_app_ignores_init_and_per_container_network_escapes() {
+    let mut direct = direct_replica(
+      "direct",
+      "private-api",
+      &[("private-api", "172.30.0.10")],
+    );
+    direct.push(cargo_process(
+      "init-direct",
+      "direct",
+      "node-a",
+      "private-api",
+      &[("private-api", "172.30.0.99")],
+      CargoProcessOpts {
+        logical_name: "migrate",
+        role: "init",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
+    ));
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &direct,
+        "node-a",
+        1,
+        Some("private-api"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["172.30.0.10"]
+    );
+
+    for mode in ["host", "none"] {
+      let escaped = direct_replica("escaped", mode, &[]);
+      assert!(
+        cargo_addresses_with_topology(
+          &escaped,
+          "node-a",
+          1,
+          Some("private-api"),
+          ObjPsStatusKind::Start,
+        )
+        .is_err(),
+        "per-container {mode} must not become a Cargo endpoint"
+      );
+    }
+  }
+
+  #[test]
   fn cargo_uses_one_sandbox_endpoint_and_ignores_app_network_escapes() {
     let mut processes = sandbox_replica(
       "replica-a",
@@ -1091,6 +1352,20 @@ mod tests {
         essential: false,
         status: ContainerStateStatusEnum::RUNNING,
         probe: Probe::Unhealthy,
+      },
+    ));
+    processes.push(cargo_process(
+      "misnetworked-replica-a",
+      "replica-a",
+      "node-a",
+      "private",
+      &[("private", "10.0.0.99")],
+      CargoProcessOpts {
+        logical_name: "misnetworked",
+        role: "app",
+        essential: false,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
       },
     ));
     processes.push(cargo_process(
@@ -1192,7 +1467,14 @@ mod tests {
     ];
 
     assert_eq!(
-      cargo_addresses(&processes, "node-a").unwrap(),
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        2,
+        Some("host"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
       vec!["127.0.0.1"]
     );
   }
@@ -1289,6 +1571,89 @@ mod tests {
   }
 
   #[test]
+  fn cargo_rollout_keeps_direct_and_sandbox_generations_separate() {
+    let mut one_to_multi = direct_attempt(
+      "rollout",
+      "old-direct",
+      "private",
+      &[("private", "10.0.0.2")],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    one_to_multi.extend(sandbox_attempt(
+      "rollout",
+      "new-sandbox",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &one_to_multi,
+        "node-a",
+        2,
+        Some("private"),
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.2"]
+    );
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &one_to_multi,
+        "node-a",
+        2,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.3"]
+    );
+
+    let mut multi_to_one = sandbox_attempt(
+      "rollout",
+      "old-sandbox",
+      "10.0.0.4",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      true,
+    );
+    multi_to_one.extend(direct_attempt(
+      "rollout",
+      "new-direct",
+      "private",
+      &[("private", "10.0.0.5")],
+      ContainerStateStatusEnum::RUNNING,
+      Probe::Healthy,
+      false,
+    ));
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &multi_to_one,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Updating,
+      )
+      .unwrap(),
+      vec!["10.0.0.4"]
+    );
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &multi_to_one,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.5"]
+    );
+  }
+
+  #[test]
   fn cargo_partial_candidate_cannot_replace_complete_retained_attempt() {
     let mut processes = sandbox_attempt(
       "rollout",
@@ -1314,6 +1679,8 @@ mod tests {
       get_cargo_addresses(
         &processes,
         "node-a",
+        2,
+        Some("private"),
         &desired,
         &ObjPsStatusKind::Start,
       )
@@ -1339,6 +1706,8 @@ mod tests {
       get_cargo_addresses(
         &processes,
         "node-a",
+        2,
+        Some("private"),
         &desired,
         &ObjPsStatusKind::Start,
       )
@@ -1421,6 +1790,8 @@ mod tests {
       get_cargo_addresses(
         &processes,
         "node-a",
+        2,
+        Some("private"),
         &BTreeSet::from(["api".to_owned(), "new-worker".to_owned()]),
         &ObjPsStatusKind::Updating,
       )
@@ -1474,6 +1845,8 @@ mod tests {
       get_cargo_addresses(
         &processes,
         "node-a",
+        2,
+        Some("private"),
         &BTreeSet::from(["api".to_owned(), "new-worker".to_owned()]),
         &ObjPsStatusKind::Fail,
       )
@@ -1559,6 +1932,8 @@ mod tests {
       get_cargo_addresses(
         &processes,
         "node-a",
+        2,
+        Some("private"),
         &BTreeSet::from(["api".to_owned(), "worker".to_owned()]),
         &ObjPsStatusKind::Start,
       )
@@ -1601,8 +1976,128 @@ mod tests {
     ];
 
     assert_eq!(
-      cargo_addresses(&processes, "node-a").unwrap(),
+      cargo_addresses_with_topology(
+        &processes,
+        "node-a",
+        1,
+        Some("host"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
       vec!["127.0.0.1"]
+    );
+  }
+
+  #[test]
+  fn cargo_topology_mismatches_do_not_fall_back_to_the_wrong_owner() {
+    let direct =
+      direct_replica("missing-sandbox", "private", &[("private", "10.0.0.2")]);
+    assert!(
+      cargo_addresses_with_topology(
+        &direct,
+        "node-a",
+        2,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .is_err()
+    );
+
+    let legacy_sandbox = sandbox_replica(
+      "unexpected-sandbox",
+      "10.0.0.3",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    assert!(
+      cargo_addresses_with_topology(
+        &legacy_sandbox,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .is_err()
+    );
+
+    let mut direct_with_unexpected_sandbox =
+      direct_replica("direct-owner", "private", &[("private", "10.0.0.4")]);
+    direct_with_unexpected_sandbox.push(cargo_process(
+      "sandbox-direct-owner-unexpected",
+      "direct-owner",
+      "node-a",
+      "private",
+      &[("private", "10.0.0.99")],
+      CargoProcessOpts {
+        logical_name: "_sandbox",
+        role: "sandbox",
+        essential: true,
+        status: ContainerStateStatusEnum::RUNNING,
+        probe: Probe::None,
+      },
+    ));
+    assert_eq!(
+      cargo_addresses_with_topology(
+        &direct_with_unexpected_sandbox,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .unwrap(),
+      vec!["10.0.0.4"]
+    );
+
+    let mut duplicate_direct =
+      direct_replica("duplicate-direct", "private", &[("private", "10.0.0.5")]);
+    let mut duplicate = duplicate_direct[0].clone();
+    duplicate.key = "api-duplicate-direct-second".to_owned();
+    duplicate.name = duplicate.key.clone();
+    duplicate_direct.push(duplicate);
+    assert!(
+      cargo_addresses_with_topology(
+        &duplicate_direct,
+        "node-a",
+        1,
+        Some("private"),
+        ObjPsStatusKind::Start,
+      )
+      .is_err()
+    );
+  }
+
+  #[test]
+  fn cargo_none_preserves_owner_specific_no_address_semantics() {
+    let direct = direct_replica("direct-none", "none", &[]);
+    assert!(
+      cargo_addresses_with_topology(
+        &direct,
+        "node-a",
+        1,
+        Some("none"),
+        ObjPsStatusKind::Start,
+      )
+      .is_err()
+    );
+
+    let sandbox = sandbox_replica(
+      "sandbox-none",
+      "10.0.0.8",
+      ContainerStateStatusEnum::RUNNING,
+      Probe::None,
+    );
+    let mut sandbox = sandbox;
+    sandbox[0].data.host_config.as_mut().unwrap().network_mode =
+      Some("none".to_owned());
+    assert!(
+      cargo_addresses_with_topology(
+        &sandbox,
+        "node-a",
+        2,
+        Some("none"),
+        ObjPsStatusKind::Start,
+      )
+      .is_err()
     );
   }
 
