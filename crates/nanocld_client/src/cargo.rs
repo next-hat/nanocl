@@ -1,5 +1,3 @@
-use bollard_next::service::ContainerSummary;
-
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::{
@@ -268,29 +266,6 @@ impl NanocldClient {
       .send_patch(
         &format!("{}/{key}/histories/{id}/revert", Self::CARGO_PATH),
         None::<String>,
-        None::<String>,
-      )
-      .await?;
-    Self::res_json(res).await
-  }
-
-  /// List all instances of a cargo by its canonical key.
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.list_cargo_instance("global.my-cargo").await;
-  /// ```
-  pub async fn list_cargo_instance(
-    &self,
-    key: &str,
-  ) -> HttpClientResult<Vec<ContainerSummary>> {
-    let res = self
-      .send_get(
-        &format!("{}/{key}/instances", Self::CARGO_PATH),
         None::<String>,
       )
       .await?;
