@@ -43,6 +43,7 @@ use super::{
 mod identity;
 mod init;
 mod readiness;
+mod replacement;
 
 use identity::{
   is_rollout_process_name, process_identity, replica_ordinal,
@@ -56,6 +57,10 @@ use readiness::{
   healthcheck_enabled, observed_container_ready, observed_container_running,
   required_candidate_topology_complete, requires_steady_state_readiness,
   restart_required_slots_ready,
+};
+use replacement::{
+  requires_removal_before_replacement, requires_stop_before_replacement,
+  validate_local_fixed_port_ownership,
 };
 
 const SANDBOX_LOGICAL_NAME: &str = "_sandbox";
@@ -1324,62 +1329,6 @@ pub async fn start(
   Ok(())
 }
 
-fn has_fixed_port_bindings(cargo: &Cargo) -> bool {
-  cargo.spec.port_bindings.as_ref().is_some_and(|bindings| {
-    bindings.values().any(|bindings| {
-      bindings.as_ref().is_some_and(|bindings| {
-        bindings.iter().any(|binding| {
-          binding.host_port.as_deref().is_some_and(|port| {
-            let port = port.trim();
-            !port.is_empty() && port != "0"
-          })
-        })
-      })
-    })
-  })
-}
-
-fn requires_removal_before_replacement(cargo: &Cargo) -> bool {
-  has_fixed_port_bindings(cargo)
-}
-
-fn validate_local_fixed_port_ownership(
-  cargo: &Cargo,
-  local_replicas: usize,
-) -> IoResult<()> {
-  if local_replicas > 1 && has_fixed_port_bindings(cargo) {
-    return Err(IoError::other(
-      "CargoPortOwnership",
-      &format!(
-        "Cargo {:?} assigns {local_replicas} replicas with a fixed host port to one node",
-        cargo.spec.cargo_key
-      ),
-    ));
-  }
-  Ok(())
-}
-
-fn uses_host_network(cargo: &Cargo) -> bool {
-  cargo_network_mode(cargo) == "host"
-    || cargo
-      .spec
-      .containers
-      .iter()
-      .chain(&cargo.spec.init_containers)
-      .any(|container| {
-        container
-          .container_config
-          .host_config
-          .as_ref()
-          .and_then(|host| host.network_mode.as_deref())
-          == Some("host")
-      })
-}
-
-fn requires_stop_before_replacement(cargo: &Cargo) -> bool {
-  requires_removal_before_replacement(cargo) || uses_host_network(cargo)
-}
-
 async fn active_slots(
   task: &CargoReplicaTask,
   state: &SystemState,
@@ -2437,7 +2386,7 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use bollard_next::models::{
     ContainerConfig, ContainerInspectResponse, ContainerState, Health,
-    HealthConfig, HealthStatusEnum, PortBinding,
+    HealthConfig, HealthStatusEnum,
   };
   use nanocl_stubs::process::ProcessKind;
 
@@ -2922,72 +2871,6 @@ mod tests {
       )
       .is_err()
     );
-  }
-
-  #[test]
-  fn cargo_port_bindings_require_stop_before_replacement() {
-    let mut cargo = Cargo::default();
-    cargo.spec.port_bindings = Some(HashMap::from([(
-      "8080/tcp".to_owned(),
-      Some(vec![PortBinding {
-        host_ip: Some("0.0.0.0".to_owned()),
-        host_port: Some("8080".to_owned()),
-      }]),
-    )]));
-    assert!(requires_stop_before_replacement(&cargo));
-    assert!(requires_removal_before_replacement(&cargo));
-
-    cargo
-      .spec
-      .port_bindings
-      .as_mut()
-      .unwrap()
-      .values_mut()
-      .next()
-      .unwrap()
-      .as_mut()
-      .unwrap()[0]
-      .host_port = Some("0".to_owned());
-    assert!(!requires_stop_before_replacement(&cargo));
-    assert!(!requires_removal_before_replacement(&cargo));
-  }
-
-  #[test]
-  fn multiple_local_replicas_cannot_share_a_fixed_host_port() {
-    let mut cargo = readiness_cargo(2);
-    cargo.spec.port_bindings = Some(HashMap::from([(
-      "8080/tcp".to_owned(),
-      Some(vec![PortBinding {
-        host_ip: Some("0.0.0.0".to_owned()),
-        host_port: Some("8080".to_owned()),
-      }]),
-    )]));
-    let error = validate_local_fixed_port_ownership(&cargo, 2).unwrap_err();
-    assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
-    assert!(error.to_string().contains("fixed host port"));
-
-    cargo
-      .spec
-      .port_bindings
-      .as_mut()
-      .unwrap()
-      .values_mut()
-      .next()
-      .unwrap()
-      .as_mut()
-      .unwrap()[0]
-      .host_port = Some("0".to_owned());
-    assert!(validate_local_fixed_port_ownership(&cargo, 2).is_ok());
-  }
-
-  #[test]
-  fn host_network_requires_stop_but_sandbox_network_does_not() {
-    let mut cargo = Cargo::default();
-    cargo.spec.network_mode = Some(CargoNetworkMode::new("host").unwrap());
-    assert!(requires_stop_before_replacement(&cargo));
-    assert!(!requires_removal_before_replacement(&cargo));
-    cargo.spec.network_mode = Some(CargoNetworkMode::new("private").unwrap());
-    assert!(!requires_stop_before_replacement(&cargo));
   }
 
   #[test]
