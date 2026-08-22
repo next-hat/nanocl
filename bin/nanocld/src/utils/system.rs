@@ -636,6 +636,7 @@ mod tests {
     logical_name: &str,
     position: Option<usize>,
     process_name: String,
+    network_mode: String,
   ) -> CargoBootstrapProcess {
     let mut labels = HashMap::from([
       (LABEL_CARGO_KEY.to_owned(), cargo_key.to_owned()),
@@ -652,11 +653,6 @@ mod tests {
         position.to_string(),
       );
     }
-    let network_mode = if role == CargoReplicaProcessRole::Sandbox {
-      "nanoclbr0".to_owned()
-    } else {
-      "container:bootstrap-sandbox".to_owned()
-    };
     CargoBootstrapProcess {
       process_key: uuid::Uuid::new_v4().to_string(),
       process_name,
@@ -731,7 +727,9 @@ mod tests {
       "_sandbox",
       None,
       format!("sandbox-{cargo_key}-r0.c"),
+      "nanoclbr0".to_owned(),
     );
+    let sandbox_mode = format!("container:{}", sandbox.process_key);
     let api = bootstrap_process(
       &cargo_key,
       replica_key,
@@ -739,6 +737,7 @@ mod tests {
       "api",
       Some(0),
       format!("{cargo_key}-r0-api.c"),
+      sandbox_mode.clone(),
     );
     let sidecar = bootstrap_process(
       &cargo_key,
@@ -747,6 +746,7 @@ mod tests {
       "sidecar",
       Some(1),
       format!("{cargo_key}-r0-sidecar.c"),
+      sandbox_mode.clone(),
     );
     let mut candidate = bootstrap_process(
       &cargo_key,
@@ -755,6 +755,7 @@ mod tests {
       "api",
       Some(0),
       format!("candidate-{cargo_key}-r0-api.c"),
+      sandbox_mode.clone(),
     );
     candidate.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
     let mut retained = bootstrap_process(
@@ -764,6 +765,7 @@ mod tests {
       "sidecar",
       Some(1),
       format!("tmp-{cargo_key}-r0-sidecar.c"),
+      sandbox_mode,
     );
     retained.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
     let candidate_key = candidate.process_key.clone();
@@ -869,16 +871,15 @@ mod tests {
     let cargo_name = format!("bootstrap-direct-{}", &suffix[..8]);
     let cargo_key = format!("system.{cargo_name}");
     let replica_key = uuid::Uuid::new_v4();
-    let mut api = bootstrap_process(
+    let api = bootstrap_process(
       &cargo_key,
       replica_key,
       CargoReplicaProcessRole::App,
       "api",
       Some(0),
       format!("{cargo_key}-r0-api.c"),
+      "nanoclbr0".to_owned(),
     );
-    api.config.host_config.as_mut().unwrap().network_mode =
-      Some("nanoclbr0".to_owned());
     insert_observed_process(&cargo_key, &api, &system.state).await;
 
     let reconstructed = reconstruct_cargo(&cargo_key, &[api.clone()])
