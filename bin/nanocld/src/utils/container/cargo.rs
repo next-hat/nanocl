@@ -6,9 +6,9 @@ use std::{
 
 use bollard_next::container::{
   InspectContainerOptions, RemoveContainerOptions, RenameContainerOptions,
-  StartContainerOptions, StopContainerOptions, WaitContainerOptions,
+  StartContainerOptions, StopContainerOptions,
 };
-use futures::{StreamExt, future::try_join_all};
+use futures::future::try_join_all;
 use nanocld_client::{ConnectOpts, NanocldClient};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -41,12 +41,14 @@ use super::{
 };
 
 mod identity;
+mod init;
 mod readiness;
 
 use identity::{
   is_rollout_process_name, process_identity, replica_ordinal,
   validate_observed_identities,
 };
+use init::{create_candidate_containers, reconcile_containers};
 
 pub use readiness::has_container_healthcheck;
 pub(crate) use readiness::{all_desired_replicas_ready, promotion_actions};
@@ -569,68 +571,6 @@ async fn stop_process(process: &Process, state: &SystemState) -> IoResult<()> {
   )
 }
 
-async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
-  let inspected = inspect_process(&process.key, state).await?;
-  let container_state = inspected.state.as_ref();
-  let running = container_state
-    .and_then(|state| state.running)
-    .unwrap_or_default();
-  let status = container_state
-    .and_then(|state| state.status.as_ref())
-    .map(ToString::to_string);
-  let exit_code = container_state.and_then(|state| state.exit_code);
-  match init_container_disposition(running, status.as_deref(), exit_code) {
-    InitContainerDisposition::Complete => return Ok(()),
-    InitContainerDisposition::Start => start_process(process, state).await?,
-    InitContainerDisposition::Wait => {}
-  }
-  let mut stream = state.inner.docker_api.wait_container(
-    &process.key,
-    Some(WaitContainerOptions {
-      condition: "not-running",
-    }),
-  );
-  while let Some(status) = stream.next().await {
-    let status = status.map_err(|error| {
-      IoError::interrupted("CargoInitContainer", &error.to_string())
-    })?;
-    if status.status_code != 0 {
-      let message = status
-        .error
-        .and_then(|error| error.message)
-        .unwrap_or_else(|| "Unknown init-container error".to_owned());
-      return Err(IoError::interrupted(
-        "CargoInitContainer",
-        &format!("{message} (exit {})", status.status_code),
-      ));
-    }
-  }
-  Ok(())
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum InitContainerDisposition {
-  Complete,
-  Start,
-  Wait,
-}
-
-fn init_container_disposition(
-  running: bool,
-  status: Option<&str>,
-  exit_code: Option<i64>,
-) -> InitContainerDisposition {
-  if running {
-    return InitContainerDisposition::Wait;
-  }
-  match status {
-    Some("exited") if exit_code == Some(0) => {
-      InitContainerDisposition::Complete
-    }
-    _ => InitContainerDisposition::Start,
-  }
-}
-
 async fn wait_until_ready(
   slots: &[RuntimeSlot],
   state: &SystemState,
@@ -823,40 +763,16 @@ async fn reconcile_replica(
     None
   };
 
-  for declared in &cargo.spec.init_containers {
-    let config = compile_declared(CompileDeclaredOpts {
-      cargo,
-      task,
-      declared,
-      role: CargoReplicaProcessRole::Init,
-      sandbox_id: sandbox.as_deref(),
-      attempt_id: &attempt_id,
-      gateway: &gateway,
-      state,
-    })
-    .await?;
-    let mapping = ensure_mapping(
-      task,
-      CargoReplicaProcessRole::Init,
-      &declared.name,
-      true,
-      state,
-    )
-    .await?;
-    let slot = ensure_existing_slot(EnsureExistingSlotOpts {
-      cargo,
-      task,
-      mapping,
-      role: CargoReplicaProcessRole::Init,
-      container_name: &declared.name,
-      essential: true,
-      config: &config,
-      state,
-    })
-    .await?;
-    wait_init(&slot.process, state).await?;
-    slots.push(slot);
-  }
+  reconcile_containers(
+    cargo,
+    task,
+    sandbox.as_deref(),
+    &attempt_id,
+    &gateway,
+    &mut slots,
+    state,
+  )
+  .await?;
 
   for declared in &cargo.spec.containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -1720,53 +1636,16 @@ async fn create_candidate(
     } else {
       None
     };
-    for declared in &cargo.spec.init_containers {
-      let config = compile_declared(CompileDeclaredOpts {
-        cargo,
-        task,
-        declared,
-        role: CargoReplicaProcessRole::Init,
-        sandbox_id: sandbox.as_deref(),
-        attempt_id: &attempt_id,
-        gateway: &gateway,
-        state,
-      })
-      .await?;
-      let mapping = ensure_mapping(
-        task,
-        CargoReplicaProcessRole::Init,
-        &declared.name,
-        true,
-        state,
-      )
-      .await?;
-      let process = create_process(
-        cargo,
-        task,
-        CargoReplicaProcessRole::Init,
-        &declared.name,
-        &config,
-        true,
-        state,
-      )
-      .await?;
-      let slot = RuntimeSlot {
-        mapping,
-        process,
-        role: CargoReplicaProcessRole::Init,
-        container_name: declared.name.clone(),
-        essential: true,
-      };
-      slots.push(slot);
-      wait_init(
-        &slots
-          .last()
-          .expect("an init candidate was just inserted")
-          .process,
-        state,
-      )
-      .await?;
-    }
+    create_candidate_containers(
+      cargo,
+      task,
+      sandbox.as_deref(),
+      &attempt_id,
+      &gateway,
+      &mut slots,
+      state,
+    )
+    .await?;
     for declared in &cargo.spec.containers {
       let config = compile_declared(CompileDeclaredOpts {
         cargo,
@@ -3136,26 +3015,6 @@ mod tests {
     assert_eq!(
       rollback_candidate_cleanup(false, false),
       RollbackCandidateCleanup::PreserveForLiveness
-    );
-  }
-
-  #[test]
-  fn init_container_must_run_before_exit_zero_counts_as_complete() {
-    assert_eq!(
-      init_container_disposition(false, Some("created"), Some(0)),
-      InitContainerDisposition::Start
-    );
-    assert_eq!(
-      init_container_disposition(true, Some("running"), Some(0)),
-      InitContainerDisposition::Wait
-    );
-    assert_eq!(
-      init_container_disposition(false, Some("exited"), Some(0)),
-      InitContainerDisposition::Complete
-    );
-    assert_eq!(
-      init_container_disposition(false, Some("exited"), Some(1)),
-      InitContainerDisposition::Start
     );
   }
 }
