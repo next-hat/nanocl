@@ -156,6 +156,8 @@ impl SpecDb {
       replicas: spec.replicas,
       network_mode: spec.network_mode,
       port_bindings: spec.port_bindings,
+      hostname: spec.hostname,
+      dns: spec.dns,
       secrets: spec.secrets,
       placement: spec.placement,
       resource_requirement: spec.resource_requirement,
@@ -230,6 +232,8 @@ mod tests {
           host_port: Some("18080".to_owned()),
         }]),
       )])),
+      hostname: Some("persisted-host".to_owned()),
+      dns: Some(vec!["172.18.0.1".to_owned()]),
       secrets: vec!["shared-secret".to_owned()],
       placement: Some(CargoPlacementSpec {
         strategy: Some(CargoPlacementStrategy::Distinct),
@@ -282,6 +286,8 @@ mod tests {
     assert_eq!(revision.replicas, desired.replicas);
     assert_eq!(revision.network_mode, desired.network_mode);
     assert_eq!(revision.port_bindings, desired.port_bindings);
+    assert_eq!(revision.hostname, desired.hostname);
+    assert_eq!(revision.dns, desired.dns);
     assert_eq!(revision.secrets, desired.secrets);
     assert_eq!(revision.placement, desired.placement);
     assert_eq!(revision.resource_requirement, desired.resource_requirement);

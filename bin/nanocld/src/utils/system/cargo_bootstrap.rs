@@ -262,11 +262,55 @@ fn observed_port_bindings(config: &DockerConfig) -> Option<PortMap> {
     .filter(|bindings| !bindings.is_empty())
 }
 
+fn observed_hostname(process: &ParsedCargoProcess) -> Option<String> {
+  let hostname = process
+    .config
+    .hostname
+    .clone()
+    .filter(|value| !value.is_empty());
+  let docker_default = process.process_key.chars().take(12).collect::<String>();
+  (hostname.as_deref() != Some(docker_default.as_str()))
+    .then_some(hostname)
+    .flatten()
+}
+
+fn observed_dns(config: &DockerConfig) -> Option<Vec<String>> {
+  config
+    .host_config
+    .as_ref()
+    .and_then(|host| host.dns.clone())
+    .filter(|dns| !dns.is_empty())
+}
+
+fn common_network_owner_fields(
+  owners: &[&ParsedCargoProcess],
+) -> (Option<String>, Option<Vec<String>>) {
+  let Some(first) = owners.first() else {
+    return (None, None);
+  };
+  let hostname = observed_hostname(first);
+  let dns = observed_dns(&first.config);
+  (
+    owners
+      .iter()
+      .all(|owner| observed_hostname(owner) == hostname)
+      .then_some(hostname)
+      .flatten(),
+    owners
+      .iter()
+      .all(|owner| observed_dns(&owner.config) == dns)
+      .then_some(dns)
+      .flatten(),
+  )
+}
+
 #[derive(Debug, Clone)]
 struct CargoNetworkOwnership {
   effective_mode: String,
   network_mode: Option<CargoNetworkMode>,
   port_bindings: Option<PortMap>,
+  hostname: Option<String>,
+  dns: Option<Vec<String>>,
   has_sandbox: bool,
   application_owns_network: bool,
   direct_installer_generation: bool,
@@ -338,9 +382,12 @@ fn infer_network_ownership(
       )));
     }
     let port_bindings = observed_port_bindings(&sandboxes[0].config);
+    let (hostname, dns) = common_network_owner_fields(&sandboxes);
     for sandbox in &sandboxes {
       if observed_network_mode(&sandbox.config) != effective_mode
         || observed_port_bindings(&sandbox.config) != port_bindings
+        || observed_hostname(sandbox) != hostname
+        || observed_dns(&sandbox.config) != dns
       {
         return Err(bootstrap_error(format!(
           "Cargo {cargo_key:?} replicas expose contradictory sandbox network ownership"
@@ -351,6 +398,8 @@ fn infer_network_ownership(
       network_mode: cargo_network_mode(&effective_mode)?,
       effective_mode,
       port_bindings,
+      hostname,
+      dns,
       has_sandbox: true,
       application_owns_network: false,
       direct_installer_generation: false,
@@ -372,11 +421,14 @@ fn infer_network_ownership(
       )));
     }
     let port_bindings = observed_port_bindings(&applications[0].config);
+    let (hostname, dns) = common_network_owner_fields(&applications);
     for application in &applications {
       let observed_mode = observed_network_mode(&application.config);
       if (observed_mode != effective_mode
         && !matches!(observed_mode.as_str(), "host" | "none"))
         || observed_port_bindings(&application.config) != port_bindings
+        || observed_hostname(application) != hostname
+        || observed_dns(&application.config) != dns
       {
         return Err(bootstrap_error(format!(
           "Cargo {cargo_key:?} replicas expose contradictory direct application network ownership"
@@ -387,6 +439,8 @@ fn infer_network_ownership(
       network_mode: cargo_network_mode(&effective_mode)?,
       effective_mode,
       port_bindings,
+      hostname,
+      dns,
       has_sandbox: false,
       application_owns_network: true,
       direct_installer_generation,
@@ -417,10 +471,17 @@ fn infer_network_ownership(
       "Cargo {cargo_key:?} has no sandbox but exposes unexpected application-owned port bindings"
     )));
   }
+  let applications = processes
+    .iter()
+    .filter(|process| process.role == CargoReplicaProcessRole::App)
+    .collect::<Vec<_>>();
+  let (hostname, dns) = common_network_owner_fields(&applications);
   Ok(CargoNetworkOwnership {
     network_mode: cargo_network_mode(&effective_mode)?,
     effective_mode,
     port_bindings: None,
+    hostname,
+    dns,
     has_sandbox: false,
     application_owns_network: false,
     direct_installer_generation: false,
@@ -458,6 +519,12 @@ fn normalize_declared_config(
   {
     config.hostname = None;
   }
+  if process.role == CargoReplicaProcessRole::App
+    && !ownership.has_sandbox
+    && config.hostname == ownership.hostname
+  {
+    config.hostname = None;
+  }
 
   if let Some(labels) = config.labels.as_mut() {
     labels.retain(|key, _| {
@@ -483,6 +550,12 @@ fn normalize_declared_config(
   }
 
   let mut host = config.host_config.take().unwrap_or_default();
+  if process.role == CargoReplicaProcessRole::App
+    && !ownership.has_sandbox
+    && host.dns == ownership.dns
+  {
+    host.dns = None;
+  }
   let observed_mode = host
     .network_mode
     .clone()
@@ -840,6 +913,8 @@ pub(super) fn reconstruct_cargo(
     replicas: replicas_by_ordinal.len(),
     network_mode: ownership.network_mode.clone(),
     port_bindings: ownership.port_bindings.clone(),
+    hostname: ownership.hostname.clone(),
+    dns: ownership.dns.clone(),
     secrets: Vec::new(),
     placement: None,
     resource_requirement: None,
@@ -1097,6 +1172,88 @@ mod tests {
         .iter()
         .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
     );
+  }
+
+  #[test]
+  fn network_owner_hostname_and_dns_reconstruct_at_cargo_level_only() {
+    let replica_id = replica(1);
+    let mut direct = direct_app(replica_id, 0, "api", "0", DEFAULT_NETWORK);
+    direct.config.hostname = Some("api".to_owned());
+    direct.config.host_config.as_mut().unwrap().dns =
+      Some(vec!["172.18.0.1".to_owned()]);
+    let mut migrate = init(replica_id, 0, "migrate", "0");
+    migrate.config.hostname = Some("migrate".to_owned());
+    migrate.config.host_config.as_mut().unwrap().dns =
+      Some(vec!["8.8.8.8".to_owned()]);
+
+    let reconstructed =
+      reconstruct_cargo(KEY, &[direct, migrate]).unwrap().unwrap();
+    assert_eq!(reconstructed.spec.hostname.as_deref(), Some("api"));
+    assert_eq!(
+      reconstructed.spec.dns.as_deref(),
+      Some(["172.18.0.1".to_owned()].as_slice())
+    );
+    assert!(
+      reconstructed.spec.containers[0]
+        .container_config
+        .hostname
+        .is_none()
+    );
+    assert!(
+      reconstructed.spec.containers[0]
+        .container_config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .dns
+        .is_none()
+    );
+    assert_eq!(
+      reconstructed.spec.init_containers[0]
+        .container_config
+        .hostname
+        .as_deref(),
+      Some("migrate")
+    );
+    assert_eq!(
+      reconstructed.spec.init_containers[0]
+        .container_config
+        .host_config
+        .as_ref()
+        .unwrap()
+        .dns
+        .as_deref(),
+      Some(["8.8.8.8".to_owned()].as_slice())
+    );
+
+    let replica_id = replica(2);
+    let mut sandbox = sandbox(replica_id, 0);
+    sandbox.config.hostname = Some("api".to_owned());
+    sandbox.config.host_config.as_mut().unwrap().dns =
+      Some(vec!["10.42.0.1".to_owned()]);
+    let reconstructed = reconstruct_cargo(
+      KEY,
+      &[
+        sandbox,
+        app(replica_id, 0, "api", "0"),
+        app(replica_id, 0, "sidecar", "1"),
+      ],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(reconstructed.spec.hostname.as_deref(), Some("api"));
+    assert_eq!(
+      reconstructed.spec.dns.as_deref(),
+      Some(["10.42.0.1".to_owned()].as_slice())
+    );
+    assert!(reconstructed.spec.containers.iter().all(|container| {
+      container.container_config.hostname.is_none()
+        && container
+          .container_config
+          .host_config
+          .as_ref()
+          .is_some_and(|host| host.dns.is_none())
+    }));
   }
 
   #[test]

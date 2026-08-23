@@ -83,6 +83,8 @@ pub(crate) fn cargo_spec_from_revision(
     replicas: revision.replicas,
     network_mode: revision.network_mode.clone(),
     port_bindings: revision.port_bindings.clone(),
+    hostname: revision.hostname.clone(),
+    dns: revision.dns.clone(),
     secrets: revision.secrets.clone(),
     placement: revision.placement.clone(),
     resource_requirement: revision.resource_requirement.clone(),

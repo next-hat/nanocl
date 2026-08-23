@@ -329,15 +329,22 @@ fn compile_declared_config(
   };
   let declaration_position =
     declared_container_position(cargo, declared, role)?;
+  let application_owns_network =
+    role == CargoReplicaProcessRole::App && sandbox_id.is_none();
   let compiled = compile_container(ContainerCompileInput {
     declared,
     declaration_position,
     cargo_network_mode: cargo.spec.network_mode.as_ref(),
     sandbox_id,
-    cargo_port_bindings: (role == CargoReplicaProcessRole::App
-      && sandbox_id.is_none())
-    .then_some(cargo.spec.port_bindings.as_ref())
-    .flatten(),
+    cargo_port_bindings: application_owns_network
+      .then_some(cargo.spec.port_bindings.as_ref())
+      .flatten(),
+    cargo_hostname: application_owns_network
+      .then_some(cargo.spec.hostname.as_deref())
+      .flatten(),
+    cargo_dns: application_owns_network
+      .then_some(cargo.spec.dns.as_deref())
+      .flatten(),
     role: compiler_role,
     runtime,
     internal_gateway: Some(gateway),
@@ -348,6 +355,7 @@ fn compile_declared_config(
 async fn compile_sandbox_config(
   cargo: &Cargo,
   task: &CargoReplicaTask,
+  gateway: &str,
   state: &SystemState,
 ) -> IoResult<Option<DockerConfig>> {
   let replica_id = task.key.to_string();
@@ -357,6 +365,7 @@ async fn compile_sandbox_config(
     cargo,
     &image,
     runtime_metadata(cargo, &replica_id, ordinal, state),
+    gateway,
   )
 }
 
@@ -364,6 +373,7 @@ fn compile_sandbox_config_base(
   cargo: &Cargo,
   image: &str,
   runtime: CargoRuntimeMetadata<'_>,
+  gateway: &str,
 ) -> IoResult<Option<DockerConfig>> {
   if !needs_sandbox(cargo) {
     return Ok(None);
@@ -372,8 +382,11 @@ fn compile_sandbox_config_base(
     compile_sandbox(SandboxCompileInput {
       cargo_network_mode: cargo.spec.network_mode.as_ref(),
       port_bindings: cargo.spec.port_bindings.as_ref(),
+      hostname: cargo.spec.hostname.as_deref(),
+      dns: cargo.spec.dns.as_deref(),
       sandbox_image: image,
       runtime,
+      internal_gateway: Some(gateway),
     })?
     .map(|compiled| compiled.config),
   )
@@ -412,7 +425,8 @@ async fn preflight_replica(
 ) -> IoResult<()> {
   let mode = cargo_network_mode(cargo).to_owned();
   super::network::ensure_networks([mode], state).await?;
-  let sandbox = compile_sandbox_config(cargo, task, state).await?;
+  let gateway = internal_gateway(cargo, state).await?;
+  let sandbox = compile_sandbox_config(cargo, task, &gateway, state).await?;
   if sandbox.is_some() {
     let image = sandbox_image();
     super::image::download(
@@ -425,7 +439,6 @@ async fn preflight_replica(
     .await?;
   }
   download_declared_images(cargo, state).await?;
-  let gateway = internal_gateway(cargo, state).await?;
   let placeholder = sandbox.as_ref().map(|_| "preflight-sandbox");
   for declared in &cargo.spec.init_containers {
     let _ = compile_declared_base(
@@ -777,7 +790,8 @@ async fn reconcile_replica(
   let attempt_id = uuid::Uuid::new_v4().to_string();
   let mut slots = Vec::new();
 
-  let sandbox_config = compile_sandbox_config(cargo, task, state).await?;
+  let sandbox_config =
+    compile_sandbox_config(cargo, task, &gateway, state).await?;
   let sandbox = if let Some(config) = sandbox_config {
     let mapping = ensure_mapping(
       task,
@@ -1257,7 +1271,8 @@ async fn create_candidate(
   let attempt_id = uuid::Uuid::new_v4().to_string();
   let mut slots = Vec::new();
   let result = async {
-    let sandbox_config = compile_sandbox_config(cargo, task, state).await?;
+    let sandbox_config =
+      compile_sandbox_config(cargo, task, &gateway, state).await?;
     let sandbox = if let Some(config) = sandbox_config {
       let mapping = ensure_mapping(
         task,
@@ -2376,6 +2391,7 @@ mod tests {
           &cargo,
           DEFAULT_SANDBOX_IMAGE,
           compiler_runtime(),
+          "172.18.0.1",
         )
         .unwrap()
         .is_some(),
@@ -2396,6 +2412,7 @@ mod tests {
           &cargo,
           DEFAULT_SANDBOX_IMAGE,
           compiler_runtime(),
+          "172.18.0.1",
         )
         .unwrap()
         .is_some()
@@ -2461,6 +2478,131 @@ mod tests {
         .is_none()
     );
     assert!(shared_config.exposed_ports.is_none());
+  }
+
+  #[test]
+  fn runtime_projects_hostname_and_dns_only_to_long_running_network_owners() {
+    let gateway = "10.42.0.1";
+    let cargo_dns = vec!["$$INTERNAL_GATEWAY".to_owned()];
+
+    let mut direct = compilable_topology_cargo(1, 1, Some("private"));
+    direct.spec.hostname = Some("api".to_owned());
+    direct.spec.dns = Some(cargo_dns.clone());
+    direct.spec.init_containers[0].container_config.hostname =
+      Some("migrate".to_owned());
+    direct.spec.init_containers[0]
+      .container_config
+      .host_config
+      .get_or_insert_default()
+      .dns = Some(vec!["8.8.8.8".to_owned()]);
+
+    let direct_app = compile_declared_config(
+      &direct,
+      &direct.spec.containers[0],
+      CargoReplicaProcessRole::App,
+      None,
+      compiler_runtime(),
+      gateway,
+    )
+    .unwrap();
+    assert_eq!(direct_app.hostname.as_deref(), Some("api"));
+    assert_eq!(
+      direct_app.host_config.unwrap().dns,
+      Some(vec![gateway.to_owned()])
+    );
+
+    let direct_init = compile_declared_config(
+      &direct,
+      &direct.spec.init_containers[0],
+      CargoReplicaProcessRole::Init,
+      None,
+      compiler_runtime(),
+      gateway,
+    )
+    .unwrap();
+    assert_eq!(direct_init.hostname.as_deref(), Some("migrate"));
+    assert_eq!(
+      direct_init.host_config.unwrap().dns,
+      Some(vec!["8.8.8.8".to_owned()])
+    );
+
+    let mut shared = compilable_topology_cargo(2, 1, Some("private"));
+    shared.spec.hostname = Some("api".to_owned());
+    shared.spec.dns = Some(cargo_dns);
+    let sandbox = compile_sandbox_config_base(
+      &shared,
+      DEFAULT_SANDBOX_IMAGE,
+      compiler_runtime(),
+      gateway,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(sandbox.hostname.as_deref(), Some("api"));
+    assert_eq!(
+      sandbox.host_config.unwrap().dns,
+      Some(vec![gateway.to_owned()])
+    );
+
+    for declared in &shared.spec.containers {
+      let config = compile_declared_config(
+        &shared,
+        declared,
+        CargoReplicaProcessRole::App,
+        Some("sandbox-docker-id"),
+        compiler_runtime(),
+        gateway,
+      )
+      .unwrap();
+      assert!(config.hostname.is_none());
+      assert!(config.host_config.unwrap().dns.is_none());
+    }
+
+    shared.spec.containers[1]
+      .container_config
+      .host_config
+      .get_or_insert_default()
+      .network_mode = Some("host".to_owned());
+    let escaped = compile_declared_config(
+      &shared,
+      &shared.spec.containers[1],
+      CargoReplicaProcessRole::App,
+      Some("sandbox-docker-id"),
+      compiler_runtime(),
+      gateway,
+    )
+    .unwrap();
+    assert!(escaped.hostname.is_none());
+    assert!(escaped.host_config.unwrap().dns.is_none());
+
+    let mut host = compilable_topology_cargo(2, 0, Some("host"));
+    host.spec.hostname = Some("api".to_owned());
+    host.spec.dns = Some(vec!["1.1.1.1".to_owned()]);
+    assert!(
+      compile_sandbox_config_base(
+        &host,
+        DEFAULT_SANDBOX_IMAGE,
+        compiler_runtime(),
+        gateway,
+      )
+      .unwrap()
+      .is_none()
+    );
+    for declared in &host.spec.containers {
+      let config = compile_declared_config(
+        &host,
+        declared,
+        CargoReplicaProcessRole::App,
+        None,
+        compiler_runtime(),
+        gateway,
+      )
+      .unwrap();
+      assert_eq!(config.hostname.as_deref(), Some("api"));
+      assert_eq!(
+        config.host_config.unwrap().dns,
+        Some(vec!["1.1.1.1".to_owned()])
+      );
+    }
   }
 
   #[test]
