@@ -377,6 +377,9 @@ teardown_file() {
   run docker exec "$ncdns_container" sh -c \
     "nslookup network-partitioning.nanocl.test '$gateway' | tail -n 1"
   [ "$status" -eq 0 ]
+  run docker exec "$ncdns_container" sh -c \
+    "nslookup network-partitioning-secondary.nanocl.test '$gateway' | tail -n 1"
+  [ "$status" -eq 0 ]
 
   run nanocl state rm -ys ./tests/network_partitioning.yml
   [ "$status" -eq 0 ]

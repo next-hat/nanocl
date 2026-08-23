@@ -41,7 +41,7 @@ impl DnsmasqScope {
 /// commit.
 #[derive(Default)]
 pub(crate) struct DnsmasqUpdate {
-  /// Last committed resource snapshot observed by event/periodic reconciliation.
+  /// Last committed resource snapshot observed by event reconciliation.
   pub(crate) persisted: BTreeMap<String, ResourceDnsRule>,
   pub(crate) overrides: BTreeMap<String, PendingDnsRule>,
 }

@@ -7,13 +7,14 @@ use nanocl_error::io::IoResult;
 
 use nanocl_utils::versioning;
 
-use nanocld_client::stubs::resource_kind::{
-  ResourceKindPartial, ResourceKindSpec,
+use nanocld_client::stubs::{
+  resource_kind::{ResourceKindPartial, ResourceKindSpec},
+  system::{EventActor, EventActorKind, EventKind},
 };
 
 use nanocld_client::NanocldClient;
 
-use crate::{dnsmasq::Dnsmasq, vars};
+use crate::{dnsmasq::Dnsmasq, utils, vars};
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
 
@@ -39,14 +40,11 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
-#[cfg(test)]
 fn dns_rule_actor_key(
-  kind: &nanocld_client::stubs::system::EventKind,
+  kind: &EventKind,
   action: &str,
-  actor: Option<&nanocld_client::stubs::system::EventActor>,
+  actor: Option<&EventActor>,
 ) -> Option<String> {
-  use nanocld_client::stubs::system::{EventActorKind, EventKind};
-
   if *kind != EventKind::Normal
     || !matches!(action, "create" | "update" | "destroy")
   {
@@ -68,7 +66,7 @@ fn dns_rule_actor_key(
   actor.key.clone()
 }
 
-async fn watch_loop(client: &NanocldClient, _dnsmasq: &Dnsmasq) {
+async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
   loop {
     if let Err(err) = ensure_self_config(client).await {
       log::warn!("event::loop: unable to ensure resource kind: {err}");
@@ -81,9 +79,36 @@ async fn watch_loop(client: &NanocldClient, _dnsmasq: &Dnsmasq) {
         log::warn!("event::loop: {err}");
       }
       Ok(mut stream) => {
+        if let Err(err) =
+          utils::refresh_committed_rules(None, dnsmasq, client).await
+        {
+          log::warn!("event::loop: committed snapshot refresh failed: {err}");
+          ntex::time::sleep(RETRY_DELAY).await;
+          continue;
+        }
         log::info!("event::loop: subscribed to nanocld events");
-        while let Some(_event) = stream.next().await {
-          // Should only update if containers or VMs are being updated.
+        while let Some(event) = stream.next().await {
+          let event = match event {
+            Ok(event) => event,
+            Err(err) => {
+              log::warn!("event::loop: {err}");
+              continue;
+            }
+          };
+          let Some(key) = dns_rule_actor_key(
+            &event.kind,
+            &event.action,
+            event.actor.as_ref(),
+          ) else {
+            continue;
+          };
+          if let Err(err) =
+            utils::refresh_committed_rules(Some(&key), dnsmasq, client).await
+          {
+            log::warn!(
+              "event::loop: unable to refresh committed DNS rules after {key}: {err}"
+            );
+          }
         }
       }
     }

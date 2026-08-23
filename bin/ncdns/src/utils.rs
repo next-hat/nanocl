@@ -7,11 +7,17 @@ use std::{
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::NetworkKind;
 use nanocld_client::stubs::network::{Network, gen_network_key};
+use nanocld_client::stubs::{
+  dns::ResourceDnsRule,
+  generic::{GenericClause, GenericFilter, NetworkKind},
+};
+use ntex::rt;
 
-use crate::dnsmasq::{Dnsmasq, DnsmasqScope, PendingDnsRule};
+use crate::{
+  dnsmasq::{Dnsmasq, DnsmasqScope, PendingDnsRule},
+  vars,
+};
 
 const OVERRIDE_TTL: Duration = Duration::from_secs(10);
 
@@ -207,7 +213,16 @@ fn retain_uncommitted_overrides(
   now: Instant,
 ) {
   if let Some(key) = acknowledged_key {
-    overrides.remove(key);
+    let committed =
+      overrides
+        .get(key)
+        .is_some_and(|pending| match &pending.desired {
+          Some(desired) => persisted.get(key) == Some(desired),
+          None => !persisted.contains_key(key),
+        });
+    if committed {
+      overrides.remove(key);
+    }
   }
   overrides.retain(|key, pending| {
     if pending.expires_at <= now {
@@ -232,6 +247,91 @@ fn apply_overrides(
   }
 }
 
+fn effective_rules(
+  persisted: &BTreeMap<String, ResourceDnsRule>,
+  mut overrides: BTreeMap<String, PendingDnsRule>,
+  acknowledged_key: Option<&str>,
+  now: Instant,
+) -> (
+  BTreeMap<String, PendingDnsRule>,
+  BTreeMap<String, ResourceDnsRule>,
+) {
+  retain_uncommitted_overrides(
+    persisted,
+    &mut overrides,
+    acknowledged_key,
+    now,
+  );
+  let mut effective = persisted.clone();
+  apply_overrides(&mut effective, &overrides);
+  (overrides, effective)
+}
+
+async fn list_committed_rules(
+  client: &NanocldClient,
+) -> IoResult<BTreeMap<String, ResourceDnsRule>> {
+  let filter = GenericFilter::new()
+    .limit(10_000)
+    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
+  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list ncdns resources from nanocld")
+  })?;
+  resources
+    .into_iter()
+    .map(|resource| {
+      let key = resource.spec.resource_key;
+      let rule = serde_json::from_value(resource.spec.data).map_err(|err| {
+        err.map_err_context(|| {
+          format!("Unable to deserialize ncdns resource {key}")
+        })
+      })?;
+      Ok((key, rule))
+    })
+    .collect()
+}
+
+async fn reconcile_committed_snapshot(
+  persisted: BTreeMap<String, ResourceDnsRule>,
+  acknowledged_key: Option<&str>,
+  dnsmasq: &Dnsmasq,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let mut cache = HashMap::new();
+  loop {
+    let mut update = dnsmasq.lock_updates().await;
+    let (overrides, effective) = effective_rules(
+      &persisted,
+      update.overrides.clone(),
+      acknowledged_key,
+      Instant::now(),
+    );
+    let missing = rule_selectors(&effective, &cache);
+    if !missing.is_empty() {
+      drop(update);
+      resolve_selectors(missing, &mut cache, client).await?;
+      continue;
+    }
+
+    let scopes = build_scopes(&effective, &cache)?;
+    dnsmasq.apply_scopes(scopes).await?;
+    update.persisted = persisted;
+    update.overrides = overrides;
+    return Ok(());
+  }
+}
+
+/// Refresh committed DNS rules outside resource-controller transactions and
+/// atomically reconcile them with any still-pending hook overrides.
+pub(crate) async fn refresh_committed_rules(
+  acknowledged_key: Option<&str>,
+  dnsmasq: &Dnsmasq,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let persisted = list_committed_rules(client).await?;
+  reconcile_committed_snapshot(persisted, acknowledged_key, dnsmasq, client)
+    .await
+}
+
 /// Rebuild all isolated DNS instances from persisted rules, optionally
 /// replacing or removing the rule currently being handled by nanocld.
 pub(crate) async fn reconcile_entries(
@@ -240,7 +340,20 @@ pub(crate) async fn reconcile_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  reconcile_entries_inner(current_key, replacement, dnsmasq, client).await
+  let expires_at =
+    reconcile_entries_inner(current_key, replacement, dnsmasq, client).await?;
+  if let Some(expires_at) = expires_at {
+    let dnsmasq = dnsmasq.clone();
+    let client = client.clone();
+    rt::spawn(async move {
+      ntex::time::sleep(expires_at.saturating_duration_since(Instant::now()))
+        .await;
+      if let Err(err) = refresh_committed_rules(None, &dnsmasq, &client).await {
+        log::warn!("dns::reconcile: override expiry failed: {err}");
+      }
+    });
+  }
+  Ok(())
 }
 
 async fn reconcile_entries_inner(
@@ -248,7 +361,7 @@ async fn reconcile_entries_inner(
   replacement: Option<&ResourceDnsRule>,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
-) -> IoResult<()> {
+) -> IoResult<Option<Instant>> {
   if current_key.is_none() && replacement.is_some() {
     return Err(IoError::invalid_input(
       "DnsRule",
@@ -264,16 +377,20 @@ async fn reconcile_entries_inner(
     let mut update = dnsmasq.lock_updates().await;
     log::debug!("dns::reconcile: acquired update lock");
     let rules = update.persisted.clone();
+    let now = Instant::now();
     let mut overrides = update.overrides.clone();
-    retain_uncommitted_overrides(&rules, &mut overrides, None, Instant::now());
+    retain_uncommitted_overrides(&rules, &mut overrides, None, now);
+    let mut expires_at = None;
     if let Some(key) = current_key {
+      let expiry = now + OVERRIDE_TTL;
       overrides.insert(
         key.to_owned(),
         PendingDnsRule {
           desired: replacement.cloned(),
-          expires_at: Instant::now() + OVERRIDE_TTL,
+          expires_at: expiry,
         },
       );
+      expires_at = Some(expiry);
     }
     let mut effective_rules = rules.clone();
     apply_overrides(&mut effective_rules, &overrides);
@@ -294,21 +411,24 @@ async fn reconcile_entries_inner(
     dnsmasq.apply_scopes(scopes).await?;
     log::debug!("dns::reconcile: applied scopes");
     update.overrides = overrides;
-    return Ok(());
+    return Ok(expires_at);
   }
 }
 
 #[cfg(test)]
 pub mod tests {
-  use std::collections::BTreeMap;
+  use std::collections::{BTreeMap, HashMap};
   use std::time::{Duration, Instant};
 
   pub use nanocl_utils::ntex::test_client::*;
-  use nanocld_client::stubs::{dns::ResourceDnsRule, generic::NetworkKind};
+  use nanocld_client::stubs::{
+    dns::{DnsEntry, ResourceDnsRule},
+    generic::NetworkKind,
+  };
   use nanocld_client::{ConnectOpts, NanocldClient};
   use ntex::rt;
 
-  use super::{apply_overrides, retain_uncommitted_overrides};
+  use super::{build_scopes, effective_rules};
   use crate::{
     dnsmasq::{self, PendingDnsRule},
     services, vars,
@@ -321,111 +441,267 @@ pub mod tests {
     }
   }
 
-  #[test]
-  fn pending_rule_overrides_close_the_pre_commit_window() {
-    let now = Instant::now();
-    let mut persisted = BTreeMap::from([
-      ("updated".to_owned(), rule("old")),
-      ("deleted".to_owned(), rule("private")),
-    ]);
-    let overrides = BTreeMap::from([
-      (
-        "created".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("private")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "updated".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("new")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "deleted".to_owned(),
-        PendingDnsRule {
-          desired: None,
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-    ]);
+  fn rule_with_entry(
+    network: &str,
+    name: &str,
+    address: &str,
+  ) -> ResourceDnsRule {
+    ResourceDnsRule {
+      network: NetworkKind::Named(network.to_owned()),
+      entries: vec![DnsEntry {
+        name: name.to_owned(),
+        ip_address: NetworkKind::Other(address.parse().unwrap()),
+      }],
+    }
+  }
 
-    apply_overrides(&mut persisted, &overrides);
-
-    assert_eq!(persisted.get("created"), Some(&rule("private")));
-    assert_eq!(persisted.get("updated"), Some(&rule("new")));
-    assert!(!persisted.contains_key("deleted"));
+  fn pending(
+    desired: Option<ResourceDnsRule>,
+    expires_at: Instant,
+  ) -> PendingDnsRule {
+    PendingDnsRule {
+      desired,
+      expires_at,
+    }
   }
 
   #[test]
-  fn committed_rule_overrides_are_discarded() {
+  fn persisted_rule_a_alone_produces_a() {
     let now = Instant::now();
-    let persisted = BTreeMap::from([("created".to_owned(), rule("private"))]);
-    let mut overrides = BTreeMap::from([
-      (
-        "created".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("private")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "deleted".to_owned(),
-        PendingDnsRule {
-          desired: None,
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "pending".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("pending")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-    ]);
+    let persisted = BTreeMap::from([("a".to_owned(), rule("network-a"))]);
 
-    retain_uncommitted_overrides(&persisted, &mut overrides, None, now);
+    let (_, effective) =
+      effective_rules(&persisted, BTreeMap::new(), None, now);
 
-    assert!(!overrides.contains_key("created"));
-    assert!(!overrides.contains_key("deleted"));
-    assert!(overrides.contains_key("pending"));
+    assert_eq!(effective, persisted);
   }
 
   #[test]
-  fn acknowledged_and_expired_overrides_yield_to_persisted_state() {
+  fn persisted_rules_a_and_b_both_produce_entries() {
     let now = Instant::now();
     let persisted = BTreeMap::from([
-      ("acknowledged".to_owned(), rule("committed")),
-      ("expired".to_owned(), rule("committed")),
-    ]);
-    let mut overrides = BTreeMap::from([
-      (
-        "acknowledged".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("different")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "expired".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("different")),
-          expires_at: now,
-        },
-      ),
+      ("a".to_owned(), rule("network-a")),
+      ("b".to_owned(), rule("network-b")),
     ]);
 
-    retain_uncommitted_overrides(
-      &persisted,
-      &mut overrides,
-      Some("acknowledged"),
-      now,
-    );
+    let (_, effective) =
+      effective_rules(&persisted, BTreeMap::new(), None, now);
+
+    assert_eq!(effective, persisted);
+  }
+
+  #[test]
+  fn pending_rule_b_is_added_without_removing_persisted_a() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([("a".to_owned(), rule("network-a"))]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(Some(rule("network-b")), now + Duration::from_secs(10)),
+    )]);
+
+    let (_, effective) = effective_rules(&persisted, overrides, None, now);
+
+    assert_eq!(effective.get("a"), Some(&rule("network-a")));
+    assert_eq!(effective.get("b"), Some(&rule("network-b")));
+  }
+
+  #[test]
+  fn committing_rule_b_preserves_persisted_a() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("b".to_owned(), rule("network-b")),
+    ]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(Some(rule("network-b")), now + Duration::from_secs(10)),
+    )]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, Some("b"), now);
+
+    assert_eq!(effective, persisted);
+    assert!(!overrides.contains_key("b"));
+  }
+
+  #[test]
+  fn updating_committed_b_preserves_a_and_replaces_only_b() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("b".to_owned(), rule("network-b-new")),
+    ]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(Some(rule("network-b-new")), now + Duration::from_secs(10)),
+    )]);
+
+    let (_, effective) = effective_rules(&persisted, overrides, Some("b"), now);
+
+    assert_eq!(effective.get("a"), Some(&rule("network-a")));
+    assert_eq!(effective.get("b"), Some(&rule("network-b-new")));
+  }
+
+  #[test]
+  fn deleting_committed_b_preserves_a() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([("a".to_owned(), rule("network-a"))]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(None, now + Duration::from_secs(10)),
+    )]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, Some("b"), now);
+
+    assert_eq!(effective, persisted);
+    assert!(!overrides.contains_key("b"));
+  }
+
+  #[test]
+  fn pending_b_shadows_only_persisted_b_before_commit() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("b".to_owned(), rule("network-b-old")),
+    ]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(
+        Some(rule("network-b-pending")),
+        now + Duration::from_secs(10),
+      ),
+    )]);
+
+    let (_, effective) = effective_rules(&persisted, overrides, None, now);
+
+    assert_eq!(effective.get("a"), Some(&rule("network-a")));
+    assert_eq!(effective.get("b"), Some(&rule("network-b-pending")));
+  }
+
+  #[test]
+  fn committed_refresh_for_b_acknowledges_b_override() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([("b".to_owned(), rule("committed-b"))]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(Some(rule("committed-b")), now + Duration::from_secs(10)),
+    )]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, Some("b"), now);
 
     assert!(overrides.is_empty());
+    assert_eq!(effective, persisted);
+  }
+
+  #[test]
+  fn stale_committed_event_does_not_acknowledge_newer_b_override() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([("b".to_owned(), rule("older-b"))]);
+    let overrides = BTreeMap::from([(
+      "b".to_owned(),
+      pending(Some(rule("newer-b")), now + Duration::from_secs(10)),
+    )]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, Some("b"), now);
+
+    assert!(overrides.contains_key("b"));
+    assert_eq!(effective.get("b"), Some(&rule("newer-b")));
+  }
+
+  #[test]
+  fn committing_b_does_not_acknowledge_unrelated_override_a() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([
+      ("a".to_owned(), rule("committed-a")),
+      ("b".to_owned(), rule("committed-b")),
+    ]);
+    let overrides = BTreeMap::from([(
+      "a".to_owned(),
+      pending(Some(rule("pending-a")), now + Duration::from_secs(10)),
+    )]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, Some("b"), now);
+
+    assert!(overrides.contains_key("a"));
+    assert_eq!(effective.get("a"), Some(&rule("pending-a")));
+    assert_eq!(effective.get("b"), Some(&rule("committed-b")));
+  }
+
+  #[test]
+  fn expired_override_falls_back_to_complete_persisted_state() {
+    let now = Instant::now();
+    let persisted = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("b".to_owned(), rule("network-b")),
+    ]);
+    let overrides =
+      BTreeMap::from([("b".to_owned(), pending(Some(rule("stale-b")), now))]);
+
+    let (overrides, effective) =
+      effective_rules(&persisted, overrides, None, now);
+
+    assert!(overrides.is_empty());
+    assert_eq!(effective, persisted);
+  }
+
+  #[test]
+  fn rules_for_the_same_listener_are_merged_into_one_scope() {
+    let rules = BTreeMap::from([
+      (
+        "a".to_owned(),
+        rule_with_entry("shared", "a.internal", "10.0.0.2"),
+      ),
+      (
+        "b".to_owned(),
+        rule_with_entry("shared", "b.internal", "10.0.0.3"),
+      ),
+    ]);
+    let cache = HashMap::from([
+      (
+        NetworkKind::Named("shared".to_owned()),
+        "10.0.0.1".parse().unwrap(),
+      ),
+      (
+        NetworkKind::Other("10.0.0.2".parse().unwrap()),
+        "10.0.0.2".parse().unwrap(),
+      ),
+      (
+        NetworkKind::Other("10.0.0.3".parse().unwrap()),
+        "10.0.0.3".parse().unwrap(),
+      ),
+    ]);
+
+    let scopes = build_scopes(&rules, &cache).unwrap();
+
+    assert_eq!(scopes.len(), 1);
+    assert!(scopes[0].entries.contains_key("a.internal"));
+    assert!(scopes[0].entries.contains_key("b.internal"));
+  }
+
+  #[test]
+  fn reconnect_full_refresh_replaces_the_committed_snapshot() {
+    let now = Instant::now();
+    let initial = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("deleted".to_owned(), rule("network-deleted")),
+    ]);
+    let refreshed = BTreeMap::from([
+      ("a".to_owned(), rule("network-a")),
+      ("c".to_owned(), rule("network-c")),
+    ]);
+
+    let (_, initial_effective) =
+      effective_rules(&initial, BTreeMap::new(), None, now);
+    let (_, refreshed_effective) =
+      effective_rules(&refreshed, BTreeMap::new(), None, now);
+
+    assert!(initial_effective.contains_key("deleted"));
+    assert!(!refreshed_effective.contains_key("deleted"));
+    assert_eq!(refreshed_effective, refreshed);
   }
 
   #[test]
