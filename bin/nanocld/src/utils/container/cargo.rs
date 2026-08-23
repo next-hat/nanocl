@@ -2269,8 +2269,10 @@ mod tests {
   }
 
   fn naming_fixture() -> (Cargo, CargoReplicaTask) {
-    let mut cargo = Cargo::default();
-    cargo.namespace_name = "global".to_owned();
+    let mut cargo = Cargo {
+      namespace_name: "global".to_owned(),
+      ..Default::default()
+    };
     cargo.spec.name = "deploy-example".to_owned();
     let task = CargoReplicaTask {
       key: uuid::Uuid::nil(),

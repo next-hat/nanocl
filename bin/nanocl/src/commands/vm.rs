@@ -20,6 +20,7 @@ use nanocld_client::{
   stubs::{
     generic::{GenericFilter, GenericListQueryNsp},
     process::{OutputKind, OutputLog},
+    resource_key::ResourceKey,
     system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
     vm_spec::VmSpecPartial,
@@ -160,6 +161,13 @@ pub async fn exec_vm_patch(
   Ok(())
 }
 
+fn vm_process_name(key: &str) -> IoResult<String> {
+  let key = key
+    .parse::<ResourceKey>()
+    .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
+  Ok(format!("{key}.v"))
+}
+
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
 #[cfg(not(target_os = "windows"))]
@@ -167,7 +175,8 @@ pub async fn exec_vm_attach(cli_conf: &CliConfig, key: &str) -> IoResult<()> {
   let client = &cli_conf.client;
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-  let conn = client.attach_vm(key).await?;
+  let process_name = vm_process_name(key)?;
+  let conn = client.attach_process(&process_name).await?;
   let (mut tx, mut rx) = mpsc::unbounded();
   // start heartbeat task
   let sink = conn.sink();
@@ -285,5 +294,19 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
         Ok(())
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::vm_process_name;
+
+  #[test]
+  fn vm_attach_maps_canonical_key_to_runtime_process_name() {
+    assert_eq!(
+      vm_process_name("team.production.database").unwrap(),
+      "team.production.database.v"
+    );
+    assert!(vm_process_name("database").is_err());
   }
 }

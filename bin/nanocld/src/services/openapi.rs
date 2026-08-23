@@ -85,7 +85,6 @@ impl Modify for VersionModifier {
     vm::count_vm,
     vm::list_vm_history,
     vm::patch_vm,
-    vm::vm_attach,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,
@@ -118,6 +117,7 @@ impl Modify for VersionModifier {
     process::stats_processes,
     process::count_processes,
     process::inspect_process,
+    process::attach_process,
     process::start_process_by_pk,
     process::process_stats_by_name,
     // Event
@@ -235,6 +235,18 @@ mod tests {
       include_str!("../../specs/swagger.yaml"),
       "run the ignored regenerate_checked_in_swagger test"
     );
+  }
+
+  #[test]
+  fn generated_openapi_exposes_only_process_attach() {
+    let document =
+      serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
+    let paths = document["paths"]
+      .as_object()
+      .expect("OpenAPI must contain paths");
+
+    assert!(paths.contains_key("/processes/{name}/attach"));
+    assert!(!paths.contains_key("/vms/{key}/attach"));
   }
 
   /// Regenerate the checked-in daemon OpenAPI without starting Nanocld.
