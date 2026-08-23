@@ -14,14 +14,15 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: crash-example.global.c
+          Key: global.crash-example.c
           Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: crash-example
-  Container:
+  Containers:
+  - Name: crash-example
     Image: ubuntu:latest
     Cmd:
     - bash

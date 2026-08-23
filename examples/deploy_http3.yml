@@ -76,12 +76,13 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: ${{ Args.name }}.global.c
+          Key: global.${{ Args.name }}.c
           Port: 9000
 
 Cargoes:
 - Name: ${{ Args.name }}
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
       - APP=SECRET_TLS

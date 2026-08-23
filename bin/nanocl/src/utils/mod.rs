@@ -1,3 +1,4 @@
+pub mod cargo;
 pub mod context;
 pub mod dialog;
 pub mod docker;

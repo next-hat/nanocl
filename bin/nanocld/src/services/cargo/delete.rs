@@ -9,29 +9,27 @@ use crate::{
   utils,
 };
 
-/// Delete a cargo by it's name
+/// Delete a cargo by its canonical key
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Cargoes",
-  path = "/cargoes/{name}",
+  path = "/cargoes/{key}",
   params(
-    ("name" = String, Path, description = "Name of the cargo"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
     ("force" = bool, Query, description = "If true forces the delete operation even if the cargo is started"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes belongs default to 'global'"),
   ),
   responses(
     (status = 202, description = "Cargo deleted"),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/cargoes/{name}")]
+#[web::delete("/cargoes/{key}")]
 pub async fn delete_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<CargoDeleteQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  CargoDb::del_obj_by_pk(&key, &qs, &state).await?;
+  let key = utils::key::parse_resource_key(&path.1)?;
+  CargoDb::del_obj_by_pk(key.as_str(), &qs, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }

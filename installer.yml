@@ -9,7 +9,8 @@ Namespace: system
 
 Cargoes:
 - Name: nstore
-  Container:
+  Containers:
+  - Name: nstore
     Image: docker.io/cockroachdb/cockroach:v25.4.13
     Tty: true
     Hostname: store.nanocl.internal
@@ -39,7 +40,8 @@ Cargoes:
       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
 
 - Name: nmetrics
-  Container:
+  Containers:
+  - Name: nmetrics
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/metrsd:0.5.8
     # {% else %}
@@ -58,7 +60,9 @@ Cargoes:
       # {% endif %}
 
 - Name: ncproxy
-  Container:
+  NetworkMode: host
+  Containers:
+  - Name: ncproxy
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncproxy:0.15.0-nightly
     # {% else %}
@@ -72,7 +76,6 @@ Cargoes:
     - --state-dir
     - ${{ state_dir }}/proxy
     HostConfig:
-      NetworkMode: host
       Binds:
       # {% if is_docker_desktop %}
       - //run:/run
@@ -84,7 +87,9 @@ Cargoes:
       - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
 
 - Name: ncdns
-  Container:
+  NetworkMode: host
+  Containers:
+  - Name: ncdns
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncdns:0.10.0-nightly
     # {% else %}
@@ -102,7 +107,6 @@ Cargoes:
     - --dns
     - 1.0.0.1
     HostConfig:
-      NetworkMode: host
       Binds:
       # {% if is_docker_desktop %}
       - //run/guest-services/nanocl:/run/nanocl
@@ -112,7 +116,8 @@ Cargoes:
       - ${{ state_dir }}/dns:${{ state_dir }}/dns
 
 - Name: ndaemon
-  Container:
+  Containers:
+  - Name: ndaemon
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nanocld:0.18.0-nightly
     # {% else %}
@@ -159,7 +164,8 @@ Cargoes:
 # Enable vpnkit on docker desktop
 # {% if is_docker_desktop %}
 - Name: ncvpnkit
-  Container:
+  Containers:
+  - Name: ncvpnkit
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncvpnkit:0.8.0-nightly
     # {% else %}

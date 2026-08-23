@@ -22,7 +22,8 @@ Jobs:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: ${{ Args.name }}-sub-child-example
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}-sub-child-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - RANDOM_PORT=${{ Args.port }}

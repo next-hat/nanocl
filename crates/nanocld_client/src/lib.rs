@@ -1,7 +1,6 @@
 mod http_client;
 
 pub(crate) mod cargo;
-pub(crate) mod exec;
 pub(crate) mod job;
 pub(crate) mod metric;
 pub(crate) mod namespace;

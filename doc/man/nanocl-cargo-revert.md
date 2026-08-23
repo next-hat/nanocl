@@ -11,7 +11,7 @@ revert - Revert cargo to a specific history
 
 ## SYNOPSIS
 
-**revert** \[**-h**\|**--help**\] \<*NAME*\> \<*HISTORY_ID*\>
+**revert** \[**-h**\|**--help**\] \<*KEY*\> \<*HISTORY_ID*\>
 
 ## DESCRIPTION
 
@@ -22,8 +22,8 @@ Revert cargo to a specific history
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of cargo to revert
+\<*KEY*\>
+Canonical key of the cargo to revert
 
 \<*HISTORY_ID*\>  
 Revert to a specific historic

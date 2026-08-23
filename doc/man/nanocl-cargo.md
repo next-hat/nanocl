@@ -11,17 +11,13 @@ cargo - Manage cargoes
 
 ## SYNOPSIS
 
-**cargo** \[**-n**\|**--namespace**\] \[**-h**\|**--help**\]
-\<*subcommands*\>
+**cargo** \[**-h**\|**--help**\] \<*subcommands*\>
 
 ## DESCRIPTION
 
 Manage cargoes
 
 ## OPTIONS
-
-**-n**, **--namespace** *\<NAMESPACE\>*  
-namespace to target by default global is used
 
 **-h**, **--help**  
 Print help
@@ -35,25 +31,22 @@ cargo-create(1)
 Create a new cargo
 
 cargo-start(1)  
-Start cargoes by names
+Start cargoes by canonical keys
 
 cargo-stop(1)  
-Stop cargoes by names
+Stop cargoes by canonical keys
 
 cargo-restart(1)  
-Restart a cargo by its name
+Restart cargoes by canonical keys
 
 cargo-remove(1)  
-Remove cargo by its name
+Remove cargoes by canonical keys
 
 cargo-inspect(1)  
-Inspect a cargo by its name
+Inspect a cargo by its canonical key
 
 cargo-patch(1)  
-Update a cargo by its name
-
-cargo-exec(1)  
-Execute a command inside a cargo
+Update a cargo by its canonical key
 
 cargo-history(1)  
 List cargo history

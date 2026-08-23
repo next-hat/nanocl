@@ -455,18 +455,14 @@ impl utoipa::PartialSchema for NetworkKind {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for NetworkKind {
-  fn schema_name() -> std::borrow::Cow<'static, str> {
-    "NetworkKind".into()
-  }
-
-  fn schema_id() -> std::borrow::Cow<'static, str> {
-    concat!(module_path!(), "::NetworkKind").into()
+  fn schema_name() -> String {
+    "NetworkKind".to_owned()
   }
 
   fn json_schema(
-    _generator: &mut schemars::SchemaGenerator,
-  ) -> schemars::Schema {
-    schemars::json_schema!({
+    _generator: &mut schemars::r#gen::SchemaGenerator,
+  ) -> schemars::schema::Schema {
+    serde_json::from_value(serde_json::json!({
       "description": "Network binding selector",
       "oneOf": [
         {
@@ -491,7 +487,8 @@ impl schemars::JsonSchema for NetworkKind {
           "additionalProperties": false
         }
       ]
-    })
+    }))
+    .expect("the static NetworkKind schema must be valid")
   }
 }
 

@@ -1,5 +1,6 @@
 use chrono::DateTime;
-use clap::Args;
+use clap::{Args, Parser};
+use std::path::PathBuf;
 use tabled::Tabled;
 
 use bollard_next::{
@@ -12,6 +13,53 @@ use nanocld_client::stubs::{
 };
 
 pub struct ProcessArg;
+
+/// `nanocl exec` available options
+#[derive(Clone, Parser)]
+pub struct ExecOpts {
+  /// Run the command in the background
+  #[clap(short = 'd', long)]
+  pub detach: bool,
+  /// Override the key sequence for detaching from an interactive exec
+  #[clap(long)]
+  pub detach_keys: Option<String>,
+  /// Set an environment variable
+  #[clap(short = 'e', long = "env")]
+  pub env: Vec<String>,
+  /// Read environment variables from a file
+  #[clap(long = "env-file")]
+  pub env_file: Vec<PathBuf>,
+  /// Keep standard input open
+  #[clap(short = 'i', long)]
+  pub interactive: bool,
+  /// Give the command extended privileges
+  #[clap(long)]
+  pub privileged: bool,
+  /// Allocate a pseudo-TTY
+  #[clap(short = 't', long)]
+  pub tty: bool,
+  /// User and optional group for the command
+  #[clap(short = 'u', long)]
+  pub user: Option<String>,
+  /// Working directory inside the process
+  #[clap(short = 'w', long)]
+  pub workdir: Option<String>,
+  /// Concrete process name or full Docker ID
+  pub process: String,
+  /// Command and arguments to execute
+  #[clap(required = true, num_args = 1.., trailing_var_arg = true)]
+  pub command: Vec<String>,
+}
+
+/// `nanocl kill` available options
+#[derive(Clone, Parser)]
+pub struct KillOpts {
+  /// Signal to send to the process
+  #[clap(short, long, default_value = "SIGKILL")]
+  pub signal: String,
+  /// Concrete process name or full Docker ID
+  pub process: String,
+}
 
 /// `nanocl ps` available options
 #[derive(Default, Clone, Args)]
@@ -85,8 +133,6 @@ impl From<Process> for ProcessRow {
   fn from(process: Process) -> Self {
     let container = process.data;
     let name = container.name.unwrap_or_default().replace('/', "");
-    let mut names = name.split('.');
-    let _next_name = names.next().unwrap_or(&name);
     let config = container.config.unwrap_or_default();
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
@@ -240,5 +286,57 @@ impl From<ProcessStats> for ProcessStatsRow {
       block_io,
       pids,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::path::PathBuf;
+
+  use clap::Parser;
+
+  use crate::models::{Cli, Command};
+
+  #[test]
+  fn exec_command_parses_options_and_preserves_command_arguments() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "exec",
+      "-it",
+      "--env-file",
+      "first.env",
+      "-e",
+      "FOO=bar",
+      "process-id",
+      "sh",
+      "-c",
+      "echo hello",
+      "--privileged",
+    ])
+    .expect("exec command must parse");
+    let Command::Exec(options) = cli.command else {
+      panic!("expected exec command");
+    };
+    assert!(options.interactive);
+    assert!(options.tty);
+    assert_eq!(options.env_file, [PathBuf::from("first.env")]);
+    assert_eq!(options.env, ["FOO=bar"]);
+    assert_eq!(options.process, "process-id");
+    assert_eq!(options.command, ["sh", "-c", "echo hello", "--privileged"]);
+
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "exec",
+      "process-id",
+      "--",
+      "sh",
+      "-c",
+      "echo hello",
+    ])
+    .expect("exec command with separator must parse");
+    let Command::Exec(options) = cli.command else {
+      panic!("expected exec command");
+    };
+    assert_eq!(options.command, ["sh", "-c", "echo hello"]);
   }
 }

@@ -13,16 +13,16 @@ use crate::{
 use super::{event, metric};
 
 pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
-  {
+  let client = {
     use nanocld_client::ConnectOpts;
-    client = NanocldClient::connect_to(&ConnectOpts {
+    NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
-    })?;
-  }
+    })?
+  };
+  #[cfg(not(any(feature = "dev", feature = "test")))]
+  let client = NanocldClient::connect_with_unix_default();
   let config_lock = Arc::new(futures::lock::Mutex::new(()));
   let event_emitter: EventEmitter =
     EventEmitter::new(&cli.state_dir, Arc::clone(&config_lock));

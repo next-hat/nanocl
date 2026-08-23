@@ -283,22 +283,27 @@ pub async fn reconcile_networks(state: &SystemState) -> IoResult<()> {
 
 /// Ensure that a user-defined network exists on the current Docker node and
 /// persist its latest inspection data.
+///
+/// Returns the inspected network's canonical name, or `None` when the mode is
+/// a Docker built-in mode rather than a user-defined network.
 pub async fn ensure_network_exists(
   network_mode: &str,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<Option<String>> {
   if !is_custom_network(network_mode) {
-    return Ok(());
+    return Ok(None);
   }
 
   let _guard = lifecycle_lock().lock().await;
-  ensure_network_exists_unlocked(network_mode, state).await
+  ensure_network_exists_unlocked(network_mode, state)
+    .await
+    .map(Some)
 }
 
 async fn ensure_network_exists_unlocked(
   network_mode: &str,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<String> {
   let network = match inspect_network(network_mode, state).await {
     Ok(network) => network,
     Err(err) if has_status(&err, 404) => {
@@ -346,9 +351,7 @@ async fn ensure_network_exists_unlocked(
     }
   };
 
-  persist_network(network_mode, network, state)
-    .await
-    .map(|_| ())
+  persist_network(network_mode, network, state).await
 }
 
 /// Ensure each effective mode once, in deterministic order.
@@ -362,7 +365,7 @@ pub async fn ensure_networks(
   }
   let _guard = lifecycle_lock().lock().await;
   for network_mode in network_modes {
-    ensure_network_exists_unlocked(&network_mode, state).await?;
+    let _ = ensure_network_exists_unlocked(&network_mode, state).await?;
   }
   Ok(())
 }

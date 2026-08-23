@@ -7,7 +7,7 @@ sidebar_position: 6
 
 # NAME
 
-inspect - Inspect a cargo by its name
+inspect - Inspect a cargo by its canonical key
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ inspect - Inspect a cargo by its name
 
 ## DESCRIPTION
 
-Inspect a cargo by its name
+Inspect a cargo by its canonical key
 
 ## OPTIONS
 
@@ -29,4 +29,4 @@ Display format
 Print help
 
 \<*KEY*\>  
-Key or Name of the object to inspect
+Canonical key of the object to inspect

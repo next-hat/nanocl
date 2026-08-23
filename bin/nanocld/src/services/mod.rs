@@ -7,7 +7,6 @@ pub mod openapi;
 
 mod cargo;
 mod event;
-mod exec;
 mod job;
 mod metric;
 mod namespace;
@@ -50,7 +49,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
         nanocl_utils::ntex::middlewares::Versioning::new(crate::vars::VERSION)
           .finish(),
       )
-      .configure(exec::ntex_config)
       .configure(network::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)

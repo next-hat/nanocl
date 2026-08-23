@@ -1,0 +1,24 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-none
+  Replicas: 1
+  NetworkMode: none
+  Containers:
+  - Name: server
+    Image: alpine:latest
+    Cmd:
+    - sh
+    - -c
+    - |
+      while true; do
+        printf 'HTTP/1.1 200 OK\r\nContent-Length: 14\r\nConnection: close\r\n\r\ncargo-none-ok\n' |
+          nc -l -p 9000
+      done
+  - Name: client
+    Image: alpine:latest
+    Cmd:
+    - sleep
+    - "300"

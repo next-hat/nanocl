@@ -12,7 +12,7 @@ logs - Show logs
 ## SYNOPSIS
 
 **logs** \[**-s **\] \[**-u **\] \[**-t **\] \[**--timestamps**\] \[**-f
-**\] \[**-h**\|**--help**\] \<*NAME*\>
+**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
 
@@ -38,5 +38,5 @@ Bool, if set open the log as stream
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of cargo to show logs
+\<*KEY*\>
+Canonical key of the cargo whose logs to show

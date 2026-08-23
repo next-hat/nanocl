@@ -1,12 +1,20 @@
 use bollard_next::{container::Config, secret::HostConfig};
 use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::stubs::{
-  cargo_spec::CargoSpecPartial, generic::GenericFilterNsp, job::JobPartial,
-  resource::ResourcePartial, secret::SecretPartial, statefile::Statefile,
+  cargo_spec::{CargoSpec, ContainerSpec},
+  generic::GenericFilterNsp,
+  job::JobPartial,
+  resource::ResourcePartial,
+  secret::SecretPartial,
+  statefile::Statefile,
   vm_spec::VmSpecPartial,
 };
 
-use crate::{config::CliConfig, models::BackupOpts, utils};
+use crate::{
+  config::CliConfig,
+  models::BackupOpts,
+  utils::{self, cargo::cargo_spec_from_revision},
+};
 
 /// Path inside containers where nanocld automatically mounts TLS secrets.
 const NANOCL_SECRET_MOUNT: &str = "/opt/nanocl.io/secrets";
@@ -39,11 +47,22 @@ fn clean_config_binds(config: &Config) -> Config {
   config
 }
 
-/// Remove nanocld auto-mounted secret binds from a cargo spec.
-fn clean_cargo_binds(cargo: &CargoSpecPartial) -> CargoSpecPartial {
-  CargoSpecPartial {
-    container: clean_config_binds(&cargo.container),
-    init_container: cargo.init_container.as_ref().map(clean_config_binds),
+fn clean_container_binds(container: &ContainerSpec) -> ContainerSpec {
+  ContainerSpec {
+    container_config: clean_config_binds(&container.container_config),
+    ..container.clone()
+  }
+}
+
+/// Remove nanocld auto-mounted secret binds from every Cargo container.
+fn clean_cargo_binds(cargo: &CargoSpec) -> CargoSpec {
+  CargoSpec {
+    init_containers: cargo
+      .init_containers
+      .iter()
+      .map(clean_container_binds)
+      .collect(),
+    containers: cargo.containers.iter().map(clean_container_binds).collect(),
     ..cargo.clone()
   }
 }
@@ -82,10 +101,10 @@ pub async fn exec_backup(
       .await?
       .iter()
       .map(|cargo| {
-        let cargo: CargoSpecPartial = cargo.spec.clone().into();
+        let cargo = cargo_spec_from_revision(&cargo.spec);
         clean_cargo_binds(&cargo)
       })
-      .collect::<Vec<CargoSpecPartial>>();
+      .collect::<Vec<CargoSpec>>();
     pg.set_message("(processing: virtual machines)");
     let vms = cli_conf
       .client

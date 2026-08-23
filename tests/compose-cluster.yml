@@ -5,20 +5,20 @@ volumes:
     name: "nanocl-deps"
 
 networks:
-  system:
-    name: system
+  nanoclbr0:
+    name: nanoclbr0
     driver: bridge
     external: false
     driver_opts:
-      com.docker.network.bridge.name: nanocl.system
+      com.docker.network.bridge.name: nanoclbr0
 
 services:
   nmetrics:
-    container_name: nmetrics.system.c
+    container_name: system.nmetrics.c
     image: ghcr.io/next-hat/metrsd:0.5.4
     tty: true
     networks:
-      - system
+      - nanoclbr0
     environment:
       - LOG_LEVEL=metrsd=info
     command:
@@ -27,25 +27,25 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=nmetrics.system
+      - io.nanocl.c=system.nmetrics
       - io.nanocl.n=system
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
   nanocld:
-    container_name: ndaemon.system.c
+    container_name: system.ndaemon.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
     networks:
-      - system
+      - nanoclbr0
     ports:
       - 8585:8585
       - 9443:9443
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
+      - io.nanocl.c=system.ndaemon
       - io.nanocl.n=system
     volumes:
       - type: bind
@@ -78,4 +78,3 @@ services:
           --cert-ca ./tests/ca.crt \
           --node 192.168.121.157:8585 \
           --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
-

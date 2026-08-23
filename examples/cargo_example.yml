@@ -6,8 +6,9 @@ Namespace: cargo-example
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: cargo-example
-  ImagePullPolicy: Always
   Metadata:
     Certbot: managed
-  Container:
+  Containers:
+  - Name: cargo-example
+    ImagePullPolicy: Always
     Image: nginx:latest
