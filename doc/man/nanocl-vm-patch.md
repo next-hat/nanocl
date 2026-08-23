@@ -13,7 +13,7 @@ patch - Patch a vm
 
 **patch** \[**--user**\] \[**--password**\] \[**--ssh-key**\]
 \[**--hostname**\] \[**--cpu**\] \[**--mem**\] \[**--kvm**\]
-\[**--net-iface**\] \[**-h**\|**--help**\] \<*NAME*\>
+\[**--net-iface**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
 
@@ -48,5 +48,5 @@ network interface of the vm
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of the vm
+\<*KEY*\>
+Canonical key of the VM

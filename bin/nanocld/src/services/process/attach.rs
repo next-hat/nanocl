@@ -13,7 +13,7 @@ use tokio::io::AsyncWriteExt;
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_error::http::HttpError;
-use nanocl_stubs::{generic::GenericNspQuery, process::OutputLog};
+use nanocl_stubs::process::OutputLog;
 
 use crate::{
   models::{SystemState, WsConState},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 async fn ws_attach_service(
-  (key, sink, state): (String, ws::WsSink, web::types::State<SystemState>),
+  (name, sink, state): (String, ws::WsSink, web::types::State<SystemState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
   web::Error,
@@ -35,7 +35,7 @@ async fn ws_attach_service(
     .inner
     .docker_api
     .attach_container(
-      &format!("{key}.v"),
+      &name,
       Some(AttachContainerOptions::<String> {
         stdin: Some(true),
         stdout: Some(true),
@@ -118,33 +118,30 @@ async fn ws_attach_service(
   Ok(chain(service).and_then(on_shutdown))
 }
 
-/// Attach to a virtual machine via websocket
+/// Attach to a process via websocket
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
-  tag = "Vms",
-  path = "/vms/{name}/attach",
+  tag = "Processes",
+  path = "/processes/{name}/attach",
   params(
-    ("name" = String, Path, description = "Name of the virtual machine"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the virtual machine belongs default to 'global'"),
+    ("name" = String, Path, description = "Name or id of the container"),
   ),
   responses(
     (status = 101, description = "Websocket connection"),
   ),
 ))]
-pub async fn vm_attach(
+pub async fn attach_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, web::Error> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
+  let (_, name) = path.into_inner();
   web::ws::start(
     req,
     None::<&str>,
     // inject chat server send to a ws_service factory
     map_config(fn_factory_with_config(ws_attach_service), move |cfg| {
-      (key.clone(), cfg, state.clone())
+      (name.clone(), cfg, state.clone())
     }),
   )
   .await

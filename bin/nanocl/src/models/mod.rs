@@ -82,7 +82,6 @@ pub struct LogsOpts {
 impl From<LogsOpts> for ProcessLogQuery {
   fn from(opts: LogsOpts) -> Self {
     Self {
-      namespace: None,
       since: opts.since,
       until: opts.until,
       tail: opts.tail,
@@ -125,6 +124,10 @@ pub enum Command {
   Logs(LogsOpts),
   /// Inspect a process
   Inspect(GenericInspectOpts),
+  /// Execute a command in a process
+  Exec(ExecOpts),
+  /// Send a signal to a process
+  Kill(KillOpts),
   /// Show nanocl host information
   Info,
   /// Show nanocl version information

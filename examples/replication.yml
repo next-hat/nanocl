@@ -14,25 +14,24 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: replication-example.global.c
+          Key: global.replication-example.c
           Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: replication-auto-example
-  Replication:
-    Mode: Auto
-  Container:
+  Replicas: 1
+  Containers:
+  - Name: replication-auto-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1
 
 - Name: replication-static-example
-  Replication:
-    Mode: Static
-    Number: 3
-  Container:
+  Replicas: 3
+  Containers:
+  - Name: replication-static-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1

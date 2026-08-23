@@ -14,7 +14,9 @@ pub(crate) mod tests {
   use nanocld_client::{
     ConnectOpts, NanocldClient,
     stubs::{
-      cargo::CargoDeleteQuery, cargo_spec::CargoSpecPartial,
+      cargo::CargoDeleteQuery,
+      cargo_spec::{CargoSpec, ContainerSpec},
+      generic::ImagePullPolicy,
       proxy::ResourceProxyRule,
     },
   };
@@ -30,43 +32,45 @@ pub(crate) mod tests {
 
   pub async fn ensure_test_cargo() -> IoResult<()> {
     const CARGO_NAME: &str = "ncproxy-test";
+    const CARGO_KEY: &str = "global.ncproxy-test";
     const CARGO_IMAGE: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".to_owned(),
       ..Default::default()
     })?;
-    if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
-      let cargo = CargoSpecPartial {
+    if client.inspect_cargo(CARGO_KEY).await.is_err() {
+      let cargo = CargoSpec {
         name: CARGO_NAME.to_owned(),
-        container: Config {
-          image: Some(CARGO_IMAGE.to_owned()),
-          ..Default::default()
-        },
+        containers: vec![ContainerSpec {
+          name: "main".to_owned(),
+          essential: true,
+          secrets: Vec::new(),
+          image_pull_secret: None,
+          image_pull_policy: ImagePullPolicy::IfNotPresent,
+          container_config: Config {
+            image: Some(CARGO_IMAGE.to_owned()),
+            ..Default::default()
+          },
+        }],
         ..Default::default()
       };
       client.create_cargo(&cargo, None).await?;
     }
-    client.start_process("cargo", CARGO_NAME, None).await?;
+    client.start_process("cargo", CARGO_KEY).await?;
     Ok(())
   }
 
   pub async fn clean_test_cargo() -> IoResult<()> {
-    const CARGO_NAME: &str = "ncproxy-test";
+    const CARGO_KEY: &str = "global.ncproxy-test";
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
+    if client.inspect_cargo(CARGO_KEY).await.is_err() {
       return Ok(());
     }
     client
-      .delete_cargo(
-        CARGO_NAME,
-        Some(&CargoDeleteQuery {
-          force: Some(true),
-          ..Default::default()
-        }),
-      )
+      .delete_cargo(CARGO_KEY, Some(&CargoDeleteQuery { force: Some(true) }))
       .await?;
     Ok(())
   }

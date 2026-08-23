@@ -27,12 +27,11 @@ pub fn set_env_target_arch() -> Result<()> {
 
 /// Set the release channel as an environment variable for the produced binary
 pub fn set_channel() -> Result<()> {
-  #[allow(unused)]
-  let mut default_channel = "stable";
-  #[cfg(feature = "dev")]
-  {
-    default_channel = "nightly";
-  }
+  let default_channel = if cfg!(feature = "dev") {
+    "nightly"
+  } else {
+    "stable"
+  };
   let channel =
     std::env::var("NANOCL_CHANNEL").unwrap_or(default_channel.into());
   println!("cargo:rustc-env=CHANNEL={channel}");

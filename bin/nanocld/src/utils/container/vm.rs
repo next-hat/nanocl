@@ -102,7 +102,7 @@ async fn create_init_container(
   init_container.labels = Some(labels);
   let short_id = utils::key::generate_short_id(6);
   let name =
-    format!("init-{}-{}.{}.v", vm.spec.name, short_id, vm.namespace_name);
+    format!("init-{}.{}-{}.v", vm.namespace_name, vm.spec.name, short_id);
   let process = super::process::create(
     &ProcessKind::Vm,
     &name,
@@ -406,17 +406,17 @@ mod tests {
 
   #[test]
   fn vm_update_process_roles_keep_runtime_and_init_ids_separate() {
-    let runtime_name = "ubuntu.global.v";
+    let runtime_name = "global.ubuntu.v";
     assert_eq!(
       vm_process_role(runtime_name, runtime_name),
       VmProcessRole::Runtime
     );
     assert_eq!(
-      vm_process_role("init-ubuntu-a1b2c3.global.v", runtime_name),
+      vm_process_role("init-global.ubuntu-a1b2c3.v", runtime_name),
       VmProcessRole::Init
     );
     assert_eq!(
-      vm_process_role("tmp-ubuntu.global.v", runtime_name),
+      vm_process_role("tmp-global.ubuntu.v", runtime_name),
       VmProcessRole::Other
     );
   }
@@ -424,12 +424,12 @@ mod tests {
   #[test]
   fn vm_update_prefers_ids_but_keeps_an_orphan_name_fallback() {
     assert_eq!(
-      runtime_delete_targets(vec!["runtime-id".to_owned()], "ubuntu.global.v"),
+      runtime_delete_targets(vec!["runtime-id".to_owned()], "global.ubuntu.v"),
       vec!["runtime-id".to_owned()]
     );
     assert_eq!(
-      runtime_delete_targets(Vec::new(), "ubuntu.global.v"),
-      vec!["ubuntu.global.v".to_owned()]
+      runtime_delete_targets(Vec::new(), "global.ubuntu.v"),
+      vec!["global.ubuntu.v".to_owned()]
     );
   }
 }

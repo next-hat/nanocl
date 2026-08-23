@@ -11,7 +11,7 @@ use crate::{
 
 /// Start cargo instances on the node used for node to node communication
 #[cfg_attr(feature = "dev", utoipa::path(
-  get,
+  post,
   tag = "Nodes",
   path = "/nodes/cargoes/start",
   request_body = StartNodeCargoParams,
@@ -19,14 +19,14 @@ use crate::{
     (status = 200, description = "Cargoes sucessfully started"),
   ),
 ))]
-#[web::get("/nodes/cargoes/start")]
+#[web::post("/nodes/cargoes/start")]
 pub async fn start_node_cargo(
   state: web::types::State<SystemState>,
   params: web::types::Json<StartNodeCargoParams>,
 ) -> HttpResult<web::HttpResponse> {
   let cargo =
     CargoDb::transform_read_by_pk(&params.cargo_key, &state.inner.pool).await?;
-  utils::container::cargo::start(&cargo, params.replicas, &state).await?;
+  utils::container::cargo::start(&cargo, &params.replicas, &state).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
 

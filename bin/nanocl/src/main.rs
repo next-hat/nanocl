@@ -97,6 +97,14 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
     Command::Logs(args) => commands::logs_process(&cli_conf, args).await,
     Command::Inspect(args) => commands::inspect_process(&cli_conf, args).await,
+    Command::Exec(args) => {
+      let code = commands::exec_process_command(&cli_conf, args).await?;
+      if code != 0 {
+        std::process::exit(code);
+      }
+      Ok(())
+    }
+    Command::Kill(args) => commands::kill_process(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
     Command::Install(args) => {
       #[cfg(not(target_os = "windows"))]
@@ -188,31 +196,32 @@ mod tests {
     // Try to list cargoes
     assert_cli_ok!("cargo", "ls");
     // Try to start a cargo
-    assert_cli_ok!("cargo", "start", CARGO_NAME);
+    const CARGO_KEY: &str = "global.cli-test";
+    assert_cli_ok!("cargo", "start", CARGO_KEY);
     // Try to inspect a cargo
-    assert_cli_ok!("cargo", "inspect", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", CARGO_KEY);
     // Try to inspect cargo json
-    assert_cli_ok!("cargo", "inspect", "--display", "toml", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", "--display", "toml", CARGO_KEY);
     // Try to inspect cargo toml
-    assert_cli_ok!("cargo", "inspect", "--display", "json", CARGO_NAME);
+    assert_cli_ok!("cargo", "inspect", "--display", "json", CARGO_KEY);
     // Try to patch a cargo
     assert_cli_ok!(
-      "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env", "TEST=1",
+      "cargo", "patch", CARGO_KEY, "--image", IMAGE_NAME, "--env", "TEST=1",
     );
-    assert_cli_ok!("cargo", "history", CARGO_NAME);
+    assert_cli_ok!("cargo", "history", CARGO_KEY);
     let client = get_test_client();
     let history = client
-      .list_history_cargo(CARGO_NAME, None)
+      .list_history_cargo(CARGO_KEY)
       .await
       .unwrap()
       .last()
       .unwrap()
       .clone();
-    assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
+    assert_cli_ok!("cargo", "revert", CARGO_KEY, &history.key.to_string());
     // Try to stop a cargo
-    assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    assert_cli_ok!("cargo", "stop", CARGO_KEY);
     // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_KEY);
   }
 
   /// Test state file when then include other state files
@@ -325,60 +334,81 @@ mod tests {
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.yml");
   }
 
-  /// Test cargo exec command
-  #[ntex::test]
-  async fn cargo_exec() {
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "--",
-      "echo",
-      "hello",
+  #[test]
+  fn cargo_exec_and_kill_are_not_cli_subcommands() {
+    assert!(
+      Cli::try_parse_from([
+        "nanocl",
+        "cargo",
+        "exec",
+        "system.nstore",
+        "--",
+        "echo",
+        "hello",
+      ])
+      .is_err()
     );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "-e",
-      "A=test",
-      "--",
-      "env",
+    assert!(
+      Cli::try_parse_from(["nanocl", "cargo", "kill", "system.nstore"])
+        .is_err()
     );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "--privileged",
-      "--",
-      "whoami",
-    );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "-t",
-      "--",
-      "ls",
-    );
-    assert_cli_ok!(
-      "cargo",
-      "--namespace",
-      "system",
-      "exec",
-      "nstore",
-      "-u",
-      "0",
-      "--",
-      "whoami",
+  }
+
+  #[test]
+  fn kill_command_defaults_to_sigkill() {
+    let cli = Cli::try_parse_from(["nanocl", "kill", "global.foo-r0-abc.c"])
+      .expect("kill command must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "global.foo-r0-abc.c");
+    assert_eq!(opts.signal, "SIGKILL");
+  }
+
+  #[test]
+  fn kill_command_accepts_short_signal() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "kill",
+      "-s",
+      "SIGTERM",
+      "global.foo-r0-abc.c",
+    ])
+    .expect("kill command with short signal must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "global.foo-r0-abc.c");
+    assert_eq!(opts.signal, "SIGTERM");
+  }
+
+  #[test]
+  fn kill_command_accepts_long_signal() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "kill",
+      "--signal",
+      "SIGINT",
+      "9f8e7d6c5b4a",
+    ])
+    .expect("kill command with long signal must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "9f8e7d6c5b4a");
+    assert_eq!(opts.signal, "SIGINT");
+  }
+
+  #[test]
+  fn kill_command_requires_process() {
+    assert!(Cli::try_parse_from(["nanocl", "kill"]).is_err());
+  }
+
+  #[test]
+  fn kill_command_rejects_multiple_processes() {
+    assert!(
+      Cli::try_parse_from(["nanocl", "kill", "process-one", "process-two"])
+        .is_err()
     );
   }
 
@@ -711,7 +741,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_basic() {
-    const CARGO_NAME: &str = "cli-test-run";
+    const CARGO_KEY: &str = "global.cli-test-run";
     assert_cli_ok!(
       "cargo",
       "run",
@@ -721,12 +751,12 @@ mod tests {
       "MESSAGE=GREETING",
     );
     ntex::rt::spawn(async {
-      assert_cli_ok!("cargo", "stats", CARGO_NAME);
+      assert_cli_ok!("cargo", "stats", CARGO_KEY);
     });
-    assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    assert_cli_ok!("cargo", "stop", CARGO_KEY);
     assert_cli_ok!("cargo", "ls");
     assert_cli_ok!("cargo", "ls", "-q");
-    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_KEY);
   }
 
   #[ntex::test]
@@ -749,9 +779,9 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_logs() {
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nanocld");
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore");
-    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore", "-t", "10");
+    assert_cli_ok!("cargo", "logs", "system.nanocld");
+    assert_cli_ok!("cargo", "logs", "system.nstore");
+    assert_cli_ok!("cargo", "logs", "system.nstore", "-t", "10");
   }
 
   #[ntex::test]
@@ -866,6 +896,7 @@ mod tests {
 
   #[ntex::test]
   async fn virtual_machine() {
+    const VM_KEY: &str = "global.test-cli-vm";
     assert_cli_ok!(
       "vm",
       "create",
@@ -873,23 +904,23 @@ mod tests {
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
     assert_cli_ok!("vm", "ls");
-    assert_cli_ok!("vm", "inspect", "test-cli-vm");
-    assert_cli_ok!("vm", "start", "test-cli-vm");
-    assert_cli_ok!("vm", "stop", "test-cli-vm");
-    assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
+    assert_cli_ok!("vm", "inspect", VM_KEY);
+    assert_cli_ok!("vm", "start", VM_KEY);
+    assert_cli_ok!("vm", "stop", VM_KEY);
+    assert_cli_ok!("vm", "rm", "-y", VM_KEY);
     assert_cli_ok!(
       "vm",
       "run",
       "test-cli-vm",
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
-    assert_cli_ok!("vm", "rm", "-y", "test-cli-vm");
+    assert_cli_ok!("vm", "rm", "-y", VM_KEY);
   }
 
   #[ntex::test]
   async fn stats() {
     ntex::rt::spawn(async {
-      assert_cli_ok!("stats", "nstore.system.c");
+      assert_cli_ok!("stats", "system.nstore.c");
     });
   }
 
@@ -901,12 +932,12 @@ mod tests {
 
   #[ntex::test]
   async fn logs() {
-    assert_cli_ok!("logs", "nstore.system.c");
-    assert_cli_ok!("logs", "nstore.system.c", "-s", "0");
+    assert_cli_ok!("logs", "system.nstore.c");
+    assert_cli_ok!("logs", "system.nstore.c", "-s", "0");
   }
 
   #[ntex::test]
   async fn inspect() {
-    assert_cli_ok!("inspect", "nstore.system.c");
+    assert_cli_ok!("inspect", "system.nstore.c");
   }
 }
