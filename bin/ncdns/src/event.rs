@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures::StreamExt;
 use ntex::rt;
 
 use nanocl_error::io::IoResult;

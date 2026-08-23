@@ -1,7 +1,6 @@
 use std::{
   collections::{BTreeMap, BTreeSet},
   ffi::OsStr,
-  fmt::Write as _,
   fs,
   net::IpAddr,
   path::{Path, PathBuf},
@@ -12,7 +11,6 @@ use std::{
 
 use futures::lock::Mutex;
 use ntex::{rt, web};
-use openssl::sha::sha256;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
@@ -293,16 +291,17 @@ impl Dnsmasq {
     Ok(config)
   }
 
-  fn rule_filename(key: &str) -> String {
-    let digest = sha256(key.as_bytes());
-    let mut filename = String::with_capacity(71);
-    filename.push_str("r-");
-    for byte in digest {
-      write!(&mut filename, "{byte:02x}")
-        .expect("writing a SHA-256 digest to String cannot fail");
+  fn rule_filename(name: &str) -> IoResult<String> {
+    if name.is_empty()
+      || name.starts_with('.')
+      || name.contains(['/', '\\', '\0'])
+    {
+      return Err(IoError::invalid_data(
+        "dnsmasq rule",
+        &format!("Resource name {name:?} is not a safe filename"),
+      ));
     }
-    filename.push_str(".conf");
-    filename
+    Ok(format!("{name}.conf"))
   }
 
   fn read_optional(path: &Path) -> IoResult<Option<String>> {
@@ -577,7 +576,7 @@ impl Dnsmasq {
     key: &str,
     scope: &DnsmasqScope,
   ) -> IoResult<()> {
-    let filename = Self::rule_filename(key);
+    let filename = Self::rule_filename(key)?;
     let target = self.paths_for(scope.listen_address);
     let old = self.find_rule_instance(&filename)?;
     let target_snapshot = Self::snapshot(&target, &filename)?;
@@ -687,7 +686,7 @@ impl Dnsmasq {
   }
 
   fn remove_rule_blocking(&self, key: &str) -> IoResult<()> {
-    let filename = Self::rule_filename(key);
+    let filename = Self::rule_filename(key)?;
     let Some(paths) = self.find_rule_instance(&filename)? else {
       return Ok(());
     };
@@ -822,7 +821,7 @@ mod tests {
     key: &str,
     content: &str,
   ) -> String {
-    let filename = Dnsmasq::rule_filename(key);
+    let filename = Dnsmasq::rule_filename(key).unwrap();
     Dnsmasq::stage_rule(paths, &filename, content).unwrap();
     Dnsmasq::commit_rule(paths, &filename).unwrap();
     filename
@@ -841,21 +840,26 @@ mod tests {
   }
 
   #[test]
-  fn resource_filenames_are_safe_and_deterministic() {
-    let first = Dnsmasq::rule_filename("../unsafe/resource name");
-    let second = Dnsmasq::rule_filename("../unsafe/resource name");
-    let other = Dnsmasq::rule_filename("another-resource");
-
-    assert_eq!(first, second);
-    assert_ne!(first, other);
-    assert_eq!(first.len(), 71);
-    assert!(first.starts_with("r-"));
-    assert!(first.ends_with(".conf"));
-    assert!(
-      first[2..66]
-        .chars()
-        .all(|character| character.is_ascii_hexdigit())
-    );
+  fn resource_filenames_preserve_safe_names_and_reject_traversal() {
+    for (name, filename) in [
+      ("foo", "foo.conf"),
+      ("internal-dns", "internal-dns.conf"),
+      ("example.com", "example.com.conf"),
+    ] {
+      assert_eq!(Dnsmasq::rule_filename(name).unwrap(), filename);
+    }
+    for name in [
+      "",
+      ".",
+      "..",
+      ".hidden",
+      "../foo",
+      "dir/foo",
+      "dir\\foo",
+      "nul\0name",
+    ] {
+      assert!(Dnsmasq::rule_filename(name).is_err(), "{name:?} must fail");
+    }
   }
 
   #[test]
