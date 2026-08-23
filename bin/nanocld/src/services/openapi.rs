@@ -119,6 +119,9 @@ impl Modify for VersionModifier {
     process::inspect_process,
     process::kill_process,
     process::attach_process,
+    process::create_process_exec,
+    process::start_process_exec_detached,
+    process::start_process_exec_attached,
     process::start_process_by_pk,
     process::process_stats_by_name,
     // Event
@@ -148,6 +151,12 @@ pub struct ApiDoc;
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn generated_openapi_yaml() -> String {
+    ApiDoc::openapi()
+      .to_yaml()
+      .expect("OpenAPI must serialize as YAML")
+  }
 
   fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
     match schema {
@@ -228,9 +237,7 @@ mod tests {
 
   #[test]
   fn checked_in_swagger_matches_generated_openapi() {
-    let generated = ApiDoc::openapi()
-      .to_yaml()
-      .expect("OpenAPI must serialize as YAML");
+    let generated = generated_openapi_yaml();
     assert_eq!(
       generated,
       include_str!("../../specs/swagger.yaml"),
@@ -239,7 +246,7 @@ mod tests {
   }
 
   #[test]
-  fn generated_openapi_exposes_only_process_attach() {
+  fn generated_openapi_exposes_process_attach_and_exec() {
     let document =
       serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
     let paths = document["paths"]
@@ -248,6 +255,21 @@ mod tests {
 
     assert!(paths.contains_key("/processes/{name}/attach"));
     assert!(!paths.contains_key("/vms/{key}/attach"));
+    assert_eq!(
+      paths["/processes/{name}/exec"]["post"]["requestBody"]["content"]["application/json"]
+        ["schema"]["$ref"],
+      "#/components/schemas/ProcessExecCreateOptions"
+    );
+    assert_eq!(
+      paths["/processes/{name}/exec"]["post"]["responses"]["201"]["content"]["application/json"]
+        ["schema"]["$ref"],
+      "#/components/schemas/ProcessExecCreated"
+    );
+    assert!(paths["/exec/{id}/start"].get("post").is_some());
+    assert_eq!(
+      paths["/exec/{id}/start"]["get"]["responses"]["101"]["description"],
+      "Attached process exec WebSocket"
+    );
   }
 
   #[test]
@@ -278,9 +300,7 @@ mod tests {
   fn regenerate_checked_in_swagger() {
     let destination = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
       .join("specs/swagger.yaml");
-    let yaml = ApiDoc::openapi()
-      .to_yaml()
-      .expect("OpenAPI must serialize as YAML");
+    let yaml = generated_openapi_yaml();
     std::fs::write(destination, yaml)
       .expect("checked-in daemon OpenAPI must be writable");
   }
