@@ -19,10 +19,10 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::Config;
   use futures::{StreamExt, TryStreamExt};
   use nanocl_stubs::{
-    cargo_spec::CargoSpecPartial,
+    cargo_spec::{CargoSpec, Config, ContainerSpec},
+    generic::ImagePullPolicy,
     system::{
       Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
     },
@@ -66,7 +66,7 @@ mod tests {
     let client_ptr = client.clone();
     let conditions = [EventCondition {
       actor_kind: Some(EventActorKind::Cargo),
-      actor_key: Some(format!("{CARGO_NAME}.global")),
+      actor_key: Some(format!("global.{CARGO_NAME}")),
       kind: [EventKind::Normal].to_vec(),
       action: [NativeEventAction::Start].to_vec(),
       ..Default::default()
@@ -86,12 +86,19 @@ mod tests {
         log::info!("Received event: {string}");
       }
     });
-    let cargo = CargoSpecPartial {
+    let cargo = CargoSpec {
       name: CARGO_NAME.to_owned(),
-      container: Config {
-        image: Some("alpine:latest".to_owned()),
-        ..Default::default()
-      },
+      containers: vec![ContainerSpec {
+        name: "main".to_owned(),
+        essential: true,
+        secrets: Vec::new(),
+        image_pull_secret: None,
+        image_pull_policy: ImagePullPolicy::IfNotPresent,
+        container_config: Config {
+          image: Some("alpine:latest".to_owned()),
+          ..Default::default()
+        },
+      }],
       ..Default::default()
     };
     let _ = client
@@ -99,14 +106,14 @@ mod tests {
       .await;
     let _ = client
       .send_post(
-        &format!("/processes/cargo/{CARGO_NAME}/start"),
+        &format!("/processes/cargo/global.{CARGO_NAME}/start"),
         None::<String>,
         None::<String>,
       )
       .await;
     assert!(wait_task.await.is_ok());
     let _ = client
-      .send_delete(&format!("/cargoes/{CARGO_NAME}"), None::<String>)
+      .send_delete(&format!("/cargoes/global.{CARGO_NAME}"), None::<String>)
       .await;
     system.state.wait_event_loop().await;
   }

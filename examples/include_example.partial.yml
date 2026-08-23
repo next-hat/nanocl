@@ -1,5 +1,6 @@
 # Include example partial
 
 - Name: "{{ name }}"
-  Container:
+  Containers:
+  - Name: "{{ name }}"
     Image: ghcr.io/next-hat/nanocl-get-started:latest

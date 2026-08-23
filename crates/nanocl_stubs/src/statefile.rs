@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  cargo_spec::CargoSpecPartial, job::JobPartial, resource::ResourcePartial,
+  cargo_spec::CargoSpec, job::JobPartial, resource::ResourcePartial,
   secret::SecretPartial, vm_spec::VmSpecPartial,
 };
 
@@ -291,7 +291,7 @@ pub struct Statefile {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub cargoes: Option<Vec<CargoSpecPartial>>,
+  pub cargoes: Option<Vec<CargoSpec>>,
   /// List of virtual machines to create and run
   #[cfg_attr(
     feature = "serde",

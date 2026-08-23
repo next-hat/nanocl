@@ -5,7 +5,6 @@ pub mod ws;
 pub mod container;
 pub mod cron;
 pub mod ctrl_client;
-pub mod exec;
 pub mod query_string;
 pub mod secret;
 pub mod server;

@@ -28,14 +28,15 @@ pub(crate) async fn apply_rule(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("rule::apply: reconciling {}", path.1);
-  utils::reconcile_entries(Some(&path.1), Some(&payload), &dnsmasq, &client)
-    .await?;
-  log::debug!("rule::apply: reconciled {}", path.1);
+  log::debug!("rule::apply: resolving {}", path.1);
+  let scope = utils::resolve_rule(&payload, &client).await?;
+  log::debug!("rule::apply: applying {}", path.1);
+  dnsmasq.apply_rule(&path.1, scope).await?;
+  log::debug!("rule::apply: applied {}", path.1);
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
 
-/// Delete a ProxyRule
+/// Delete a DnsRule
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Rules",
@@ -53,12 +54,11 @@ pub(crate) async fn remove_rule(
   dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
-  // nanocld invokes the controller before deleting the persisted resource, so
-  // reconciliation explicitly excludes the current key.
-  log::debug!("rule::remove: reconciling {}", path.1);
+  // Nanocld invokes the controller before deleting the persisted resource.
   client.inspect_resource(&path.1).await?;
-  utils::reconcile_entries(Some(&path.1), None, &dnsmasq, &client).await?;
-  log::debug!("rule::remove: reconciled {}", path.1);
+  log::debug!("rule::remove: removing {}", path.1);
+  dnsmasq.remove_rule(&path.1).await?;
+  log::debug!("rule::remove: removed {}", path.1);
   Ok(web::HttpResponse::Ok().finish())
 }
 

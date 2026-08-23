@@ -9,7 +9,7 @@ use super::NamespaceDb;
 /// A vm is a virtual machine that is running on the server.
 /// The vm is linked to a namespace.
 /// We use the `spec_key` to link to the vm spec.
-/// The `key` is used to identify the vm and is generated as follow: `namespace_name-vm_name`.
+/// The `key` identifies the VM in `{namespace}.{name}` format.
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vms)]

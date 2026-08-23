@@ -7,19 +7,20 @@ sidebar_position: 91
 
 # NAME
 
-stop - Stop a vm
+stop - Stop VMs by canonical keys
 
 ## SYNOPSIS
 
-**stop** \[**-h**\|**--help**\] \[*NAMES*\]
+**stop** \[**-h**\|**--help**\] \[*KEYS*\]
 
 ## DESCRIPTION
 
-Stop a vm
+Stop VMs by canonical keys
 
 ## OPTIONS
 
 **-h**, **--help**  
 Print help
 
-\[*NAMES*\]  
+\[*KEYS*\]
+Canonical keys of the resources to stop

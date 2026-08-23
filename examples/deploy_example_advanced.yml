@@ -34,21 +34,21 @@ Resources:
                 Burst: 2
                 Delay: 600
               Target:
-                Key: deploy-example2.global.c
+                Key: global.deploy-example2.c
                 Port: 9000
             - Path: /v1
               Target:
-                Key: deploy-example.global.c
+                Key: global.deploy-example.c
                 Port: 9000
             - Path: /v2
               Target:
-                Key: deploy-example2.global.c
+                Key: global.deploy-example2.c
                 Port: 9000
             - Path: /private
               AllowedIps:
                 - 127.0.0.2
               Target:
-                Key: deploy-example2.global.c
+                Key: global.deploy-example2.c
                 Port: 9000
 
   - Name: proxy-get-started
@@ -73,13 +73,15 @@ Cargoes:
     Secrets:
       - env.deploy-example.com
       - env.deploy-secret
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
+    Containers:
+      - Name: deploy-example
+        Image: ghcr.io/next-hat/nanocl-get-started:latest
 
   - Name: deploy-example2
     Secrets:
       - env.trash
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest
-      Env:
-        - APP=GET_STARTED2
+    Containers:
+      - Name: deploy-example2
+        Image: ghcr.io/next-hat/nanocl-get-started:latest
+        Env:
+          - APP=GET_STARTED2

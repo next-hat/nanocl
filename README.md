@@ -102,8 +102,9 @@ Create a minimal Statefile and apply it:
 ApiVersion: v0.16
 Cargoes:
   - Name: hello
-    Container:
-      Image: ghcr.io/next-hat/documentation:0.16.0
+    Containers:
+      - Name: hello
+        Image: ghcr.io/next-hat/documentation:0.16.0
 ```
 
 Apply & inspect:
@@ -111,8 +112,22 @@ Apply & inspect:
 ```bash
 nanocl state apply -s ./state.yml
 nanocl cargo ls
-nanocl cargo logs hello
+nanocl cargo logs global.hello
 ```
+
+Cargoes and virtual machines use canonical keys in
+`{namespace}.{name}` order, such as `global.hello` or `system.ncproxy`.
+Collection commands return every namespace unless `--namespace` is provided:
+
+```bash
+nanocl cargo ls
+nanocl cargo ls --namespace system
+nanocl vm ls
+```
+
+Commands targeting an existing Cargo or VM take that key directly and do not
+accept a namespace option. Creation commands still default to `global` when
+`--namespace` is omitted.
 
 Remove it:
 
@@ -141,8 +156,9 @@ Statefiles drive everything. Here's the Statefile we use to deploy our own [docu
 ApiVersion: v0.16
 Cargoes:
   - Name: doc
-    Container:
-      Image: ghcr.io/next-hat/documentation:0.16.0
+    Containers:
+      - Name: doc
+        Image: ghcr.io/next-hat/documentation:0.16.0
 Resources:
   - Name: docs.next-hat.com
     Kind: ncproxy.io/rule
@@ -153,7 +169,7 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Key: doc.global.c
+                Key: global.doc.c
                 Port: 80
 ```
 
@@ -298,7 +314,7 @@ You may use either license at your discretion.
  </span>
 </blockquote>
 
-[![Star History Chart](https://api.star-history.com/svg?repos=next-hat/nanocl&type=Date)](https://star-history.com/#next-hat/nanocl&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=next-hat/nanocl&type=Date)](https://star-history.dera.page/#next-hat/nanocl&type=date)
 
 [contributing_guide]: ./CONTRIBUTING.md
 [next_hat]: https://next-hat.com

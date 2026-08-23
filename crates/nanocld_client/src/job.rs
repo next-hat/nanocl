@@ -142,10 +142,7 @@ mod tests {
       .wait_process("job", &job.spec.name, None)
       .await
       .unwrap();
-    client
-      .start_process("job", &job.spec.name, None)
-      .await
-      .unwrap();
+    client.start_process("job", &job.spec.name).await.unwrap();
     while let Some(Ok(_)) = stream.next().await {}
     let job = client.inspect_job(&job.spec.name).await.unwrap();
     client.delete_job(&job.spec.name).await.unwrap();

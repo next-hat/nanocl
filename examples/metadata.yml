@@ -16,17 +16,17 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: deploy-example2.global.c
+          Key: global.deploy-example2.c
           Port: 9000
 
       - Path: /v1
         Target:
-          Key: deploy-example.global.c
+          Key: global.deploy-example.c
           Port: 9000
 
       - Path: /v2
         Target:
-          Key: deploy-example2.global.c
+          Key: global.deploy-example2.c
           Port: 9000
 
 # See all options:
@@ -35,13 +35,15 @@ Cargoes:
 - Name: deploy-example
   Metadata:
     SomeKey: SomeValue
-  Container:
+  Containers:
+  - Name: deploy-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1
 
 - Name: deploy-example2
-  Container:
+  Containers:
+  - Name: deploy-example2
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED2

@@ -71,14 +71,15 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: secret-tls.global.c
+          Key: global.secret-tls.c
           Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: secret-tls
-  Container:
+  Containers:
+  - Name: secret-tls
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
       - APP=SECRET_TLS

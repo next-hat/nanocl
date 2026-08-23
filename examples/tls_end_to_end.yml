@@ -290,7 +290,7 @@ Resources:
         Locations:
         - Path: /
           Target:
-            Key: test-web-tls.global.c
+            Key: global.test-web-tls.c
             Port: 443
             Ssl: test-client
 
@@ -298,7 +298,8 @@ Cargoes:
   - Name: test-web-tls
     Secrets:
     - test-srv
-    Container:
+    Containers:
+    - Name: test-web-tls
       Image: docker.io/nginx:alpine
       Cmd:
       - /bin/sh

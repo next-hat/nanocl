@@ -11,7 +11,7 @@ list - List existing cargo
 
 ## SYNOPSIS
 
-**list** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
+**list** \[**-n**\|**--namespace**\] \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
 \[**-o**\|**--offset**\] \[**--filters**\] \[**-h**\|**--help**\]
 
 ## DESCRIPTION
@@ -19,6 +19,9 @@ list - List existing cargo
 List existing cargo
 
 ## OPTIONS
+
+**-n**, **--namespace** *\<NAMESPACE\>*
+Optional namespace filter; omitted returns resources from all namespaces
 
 **-q**, **--quiet**  
 Only show keys

@@ -15,7 +15,7 @@ use crate::{
   path = "/cargoes",
   params(
     ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"test\" } } } }"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes belongs default to 'global'"),
+    ("namespace" = Option<String>, Query, description = "Optional namespace filter; omitted or blank returns all namespaces"),
   ),
   responses(
     (status = 200, description = "List of cargoes", body = [nanocl_stubs::cargo::CargoSummary]),

@@ -11,7 +11,7 @@ stats - Show stats of cargo
 
 ## SYNOPSIS
 
-**stats** \[**--no-stream**\] \[**-h**\|**--help**\] \[*NAMES*\]
+**stats** \[**--no-stream**\] \[**-h**\|**--help**\] \[*KEYS*\]
 
 ## DESCRIPTION
 
@@ -25,5 +25,5 @@ Disable streaming stats and only pull the first result
 **-h**, **--help**  
 Print help
 
-\[*NAMES*\]  
-Names of cargo to show stats
+\[*KEYS*\]
+Canonical keys of cargoes whose stats to show

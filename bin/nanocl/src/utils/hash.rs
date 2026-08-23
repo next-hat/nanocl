@@ -1,8 +1,7 @@
 use ring::digest;
 
 /// Calculate the SHA256 hash of a string
-#[allow(non_snake_case)]
-pub fn calculate_SHA256(name: &str) -> String {
+pub fn calculate_sha256(name: &str) -> String {
   let mut context = digest::Context::new(&digest::SHA256);
   context.update(name.as_bytes());
   let hash_value: digest::Digest = context.finish();
@@ -16,7 +15,7 @@ pub fn calculate_SHA256(name: &str) -> String {
 mod tests {
   #[test]
   fn sha256() {
-    let hash = super::calculate_SHA256("test");
+    let hash = super::calculate_sha256("test");
     assert_eq!(
       hash,
       "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"

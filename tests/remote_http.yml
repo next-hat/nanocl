@@ -6,7 +6,8 @@ Namespace: global
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: remote-example
-  Container:
+  Containers:
+  - Name: remote-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED

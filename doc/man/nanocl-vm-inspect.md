@@ -7,7 +7,7 @@ sidebar_position: 85
 
 # NAME
 
-inspect - Inspect a vm
+inspect - Inspect a VM by canonical key
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ inspect - Inspect a vm
 
 ## DESCRIPTION
 
-Inspect a vm
+Inspect a VM by canonical key
 
 ## OPTIONS
 
@@ -29,4 +29,4 @@ Display format
 Print help
 
 \<*KEY*\>  
-Key or Name of the object to inspect
+Canonical key of the object to inspect
