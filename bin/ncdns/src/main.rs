@@ -17,7 +17,6 @@ use cli::Cli;
 use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
-  // Spawn a new thread to listen events from nanocld
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
     .with_dns(cli.dns.clone())
     .ensure()?;
@@ -32,7 +31,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
   #[cfg(not(any(feature = "dev", feature = "test")))]
   let client = NanocldClient::connect_with_unix_default();
   // Do not block socket binding on nanocld availability.
-  event::spawn(&client, &dnsmasq);
+  event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
   dnsmasq.spawn();
   server.await?;

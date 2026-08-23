@@ -1,0 +1,12 @@
+ApiVersion: v0.18
+
+Group: network-partitioning-dns-secondary
+
+Resources:
+- Name: e2e-network-dns-secondary
+  Kind: ncdns.io/rule
+  Data:
+    Network: e2e-private
+    Entries:
+    - Name: network-partitioning-secondary.nanocl.test
+      IpAddress: 192.0.2.42

@@ -11,6 +11,7 @@ cleanup_nanocl_artifacts() {
   cleanup_statefile ./tests/job_with_error.yml
   cleanup_statefile ./tests/multi_container_networking.yml
   cleanup_statefile ./tests/cargo_none.yml
+  cleanup_statefile ./tests/network_partitioning_dns_secondary.yml
   cleanup_statefile ./tests/network_partitioning.yml
   local cargo
   for cargo in \
@@ -24,6 +25,29 @@ cleanup_nanocl_artifacts() {
     nanocl cargo rm -yf "$cargo" >/dev/null 2>&1 || true
   done
   docker network rm e2e-private >/dev/null 2>&1 || true
+}
+
+assert_dns_address() {
+  local container="$1"
+  local name="$2"
+  local server="$3"
+  local expected="$4"
+  local answers
+  run docker exec "$container" nslookup "$name" "$server"
+  [ "$status" -eq 0 ]
+  answers="$(printf '%s\n' "$output" | awk '
+    /^Name:[[:space:]]/ { answer = 1; next }
+    answer && /^Address(:|[[:space:]][0-9]+:)/ { print $NF }
+  ')"
+  [ "$answers" = "$expected" ]
+}
+
+assert_dns_missing() {
+  local container="$1"
+  local name="$2"
+  local server="$3"
+  run docker exec "$container" nslookup "$name" "$server"
+  [ "$status" -ne 0 ]
 }
 
 running_cargo_container() {
@@ -374,12 +398,37 @@ teardown_file() {
   [ "$status" -eq 0 ]
 
   ncdns_container="$(running_installer_cargo system.ncdns)"
-  run docker exec "$ncdns_container" sh -c \
-    "nslookup network-partitioning.nanocl.test '$gateway' | tail -n 1"
+  assert_dns_address \
+    "$ncdns_container" network-partitioning.nanocl.test "$gateway" "$gateway"
+
+  sleep 11
+  assert_dns_address \
+    "$ncdns_container" network-partitioning.nanocl.test "$gateway" "$gateway"
+
+  run nanocl state apply -ys \
+    ./tests/network_partitioning_dns_secondary.yml
   [ "$status" -eq 0 ]
-  run docker exec "$ncdns_container" sh -c \
-    "nslookup network-partitioning-secondary.nanocl.test '$gateway' | tail -n 1"
+  assert_dns_address \
+    "$ncdns_container" network-partitioning.nanocl.test "$gateway" "$gateway"
+  assert_dns_address \
+    "$ncdns_container" network-partitioning-secondary.nanocl.test \
+    "$gateway" "$gateway"
+
+  run nanocl state apply -ys \
+    ./tests/network_partitioning_dns_secondary_updated.yml
   [ "$status" -eq 0 ]
+  assert_dns_address \
+    "$ncdns_container" network-partitioning.nanocl.test "$gateway" "$gateway"
+  assert_dns_address \
+    "$ncdns_container" network-partitioning-secondary.nanocl.test \
+    "$gateway" 192.0.2.42
+
+  run nanocl state rm -ys ./tests/network_partitioning_dns_secondary.yml
+  [ "$status" -eq 0 ]
+  assert_dns_address \
+    "$ncdns_container" network-partitioning.nanocl.test "$gateway" "$gateway"
+  assert_dns_missing \
+    "$ncdns_container" network-partitioning-secondary.nanocl.test "$gateway"
 
   run nanocl state rm -ys ./tests/network_partitioning.yml
   [ "$status" -eq 0 ]

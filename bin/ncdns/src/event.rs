@@ -1,20 +1,15 @@
 use std::time::Duration;
 
-use futures::StreamExt;
 use ntex::rt;
 
 use nanocl_error::io::IoResult;
-
 use nanocl_utils::versioning;
-
-use nanocld_client::stubs::{
-  resource_kind::{ResourceKindPartial, ResourceKindSpec},
-  system::{EventActor, EventActorKind, EventKind},
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::resource_kind::{
+  ResourceKindPartial, ResourceKindSpec,
 };
 
-use nanocld_client::NanocldClient;
-
-use crate::{dnsmasq::Dnsmasq, utils, vars};
+use crate::vars;
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
 
@@ -40,149 +35,25 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
-fn dns_rule_actor_key(
-  kind: &EventKind,
-  action: &str,
-  actor: Option<&EventActor>,
-) -> Option<String> {
-  if *kind != EventKind::Normal
-    || !matches!(action, "create" | "update" | "destroy")
-  {
-    return None;
-  }
-  let actor = actor.filter(|actor| actor.kind == EventActorKind::Resource)?;
-  let resource_kind = actor
-    .attributes
-    .as_ref()?
-    .get("Kind")?
-    .as_str()?
-    .split('/')
-    .take(2)
-    .collect::<Vec<_>>()
-    .join("/");
-  if resource_kind != vars::RULE_KEY {
-    return None;
-  }
-  actor.key.clone()
-}
-
-async fn watch_loop(client: &NanocldClient, dnsmasq: &Dnsmasq) {
+async fn ensure_loop(client: &NanocldClient) {
   loop {
-    if let Err(err) = ensure_self_config(client).await {
-      log::warn!("event::loop: unable to ensure resource kind: {err}");
-      ntex::time::sleep(RETRY_DELAY).await;
-      continue;
-    }
-    log::info!("event::loop: subscribing to nanocld events");
-    match client.watch_events(None).await {
+    match ensure_self_config(client).await {
+      Ok(()) => return,
       Err(err) => {
-        log::warn!("event::loop: {err}");
-      }
-      Ok(mut stream) => {
-        if let Err(err) =
-          utils::refresh_committed_rules(None, dnsmasq, client).await
-        {
-          log::warn!("event::loop: committed snapshot refresh failed: {err}");
-          ntex::time::sleep(RETRY_DELAY).await;
-          continue;
-        }
-        log::info!("event::loop: subscribed to nanocld events");
-        while let Some(event) = stream.next().await {
-          let event = match event {
-            Ok(event) => event,
-            Err(err) => {
-              log::warn!("event::loop: {err}");
-              continue;
-            }
-          };
-          let Some(key) = dns_rule_actor_key(
-            &event.kind,
-            &event.action,
-            event.actor.as_ref(),
-          ) else {
-            continue;
-          };
-          if let Err(err) =
-            utils::refresh_committed_rules(Some(&key), dnsmasq, client).await
-          {
-            log::warn!(
-              "event::loop: unable to refresh committed DNS rules after {key}: {err}"
-            );
-          }
-        }
+        log::warn!("event::loop: unable to ensure resource kind: {err}");
+        ntex::time::sleep(RETRY_DELAY).await;
       }
     }
-    log::warn!("event::loop: retrying in 2 seconds");
-    ntex::time::sleep(RETRY_DELAY).await;
   }
 }
 
-/// Spawn new thread with event loop to watch for nanocld events
-pub(crate) fn spawn(client: &NanocldClient, dnsmasq: &Dnsmasq) {
+/// Spawn a background task to register the ncdns ResourceKind.
+pub(crate) fn spawn(client: &NanocldClient) {
   let client = client.clone();
-  let dnsmasq = dnsmasq.clone();
   rt::Arbiter::new().handle().spawn(async move {
     rt::spawn(async move {
-      watch_loop(&client, &dnsmasq).await;
+      ensure_loop(&client).await;
       rt::Arbiter::current().stop();
     });
   });
-}
-
-#[cfg(test)]
-mod tests {
-  use nanocld_client::stubs::system::{EventActor, EventActorKind, EventKind};
-
-  use super::dns_rule_actor_key;
-
-  fn actor(kind: &str) -> EventActor {
-    EventActor {
-      key: Some("rule-a".to_owned()),
-      kind: EventActorKind::Resource,
-      attributes: Some(serde_json::json!({ "Kind": kind })),
-    }
-  }
-
-  #[test]
-  fn committed_dns_resource_events_acknowledge_their_key() {
-    for action in ["create", "update", "destroy"] {
-      assert_eq!(
-        dns_rule_actor_key(
-          &EventKind::Normal,
-          action,
-          Some(&actor("ncdns.io/rule"))
-        )
-        .as_deref(),
-        Some("rule-a")
-      );
-    }
-  }
-
-  #[test]
-  fn unrelated_or_failed_events_do_not_acknowledge_overrides() {
-    assert!(
-      dns_rule_actor_key(
-        &EventKind::Normal,
-        "create",
-        Some(&actor("ncproxy.io/rule"))
-      )
-      .is_none()
-    );
-    assert!(
-      dns_rule_actor_key(
-        &EventKind::Error,
-        "create",
-        Some(&actor("ncdns.io/rule"))
-      )
-      .is_none()
-    );
-    assert!(
-      dns_rule_actor_key(
-        &EventKind::Normal,
-        "starting",
-        Some(&actor("ncdns.io/rule"))
-      )
-      .is_none()
-    );
-  }
 }

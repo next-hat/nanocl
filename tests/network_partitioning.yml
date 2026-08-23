@@ -58,11 +58,3 @@ Resources:
     Entries:
     - Name: network-partitioning.nanocl.test
       IpAddress: e2e-private
-
-- Name: e2e-network-dns-secondary
-  Kind: ncdns.io/rule
-  Data:
-    Network: e2e-private
-    Entries:
-    - Name: network-partitioning-secondary.nanocl.test
-      IpAddress: e2e-private

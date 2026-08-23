@@ -1,31 +1,33 @@
 use std::{
   collections::{BTreeMap, BTreeSet},
+  ffi::OsStr,
+  fmt::Write as _,
   fs,
   net::IpAddr,
   path::{Path, PathBuf},
   process::{Command, Stdio},
   sync::{Arc, mpsc},
-  time::{Duration, Instant},
+  time::Duration,
 };
 
-use futures::lock::{Mutex, MutexGuard};
+use futures::lock::Mutex;
 use ntex::{rt, web};
+use openssl::sha::sha256;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocld_client::stubs::dns::ResourceDnsRule;
 
 /// Fully resolved configuration for one bind address. A separate dnsmasq
 /// process is used for each address so records do not leak between networks.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DnsmasqScope {
-  pub(crate) listen_address: Option<IpAddr>,
+  pub(crate) listen_address: IpAddr,
   pub(crate) entries: BTreeMap<String, BTreeSet<IpAddr>>,
 }
 
 impl DnsmasqScope {
   pub(crate) fn new(listen_address: IpAddr) -> Self {
     Self {
-      listen_address: Some(listen_address),
+      listen_address,
       entries: BTreeMap::new(),
     }
   }
@@ -35,29 +37,13 @@ impl DnsmasqScope {
   }
 }
 
-/// State kept while resource hooks are in flight. Nanocld invokes a resource
-/// controller before committing the corresponding database mutation, so the
-/// override map closes the window between controller reconciliation and that
-/// commit.
-#[derive(Default)]
-pub(crate) struct DnsmasqUpdate {
-  /// Last committed resource snapshot observed by event reconciliation.
-  pub(crate) persisted: BTreeMap<String, ResourceDnsRule>,
-  pub(crate) overrides: BTreeMap<String, PendingDnsRule>,
-}
-
-#[derive(Clone)]
-pub(crate) struct PendingDnsRule {
-  pub(crate) desired: Option<ResourceDnsRule>,
-  pub(crate) expires_at: Instant,
-}
-
 #[derive(Clone, Debug)]
 struct InstancePaths {
   dir: PathBuf,
   config: PathBuf,
   candidate: PathBuf,
   pid: PathBuf,
+  rules: PathBuf,
 }
 
 impl InstancePaths {
@@ -67,37 +53,17 @@ impl InstancePaths {
       config: dir.join("dnsmasq.conf"),
       candidate: dir.join("dnsmasq.conf.next"),
       pid: dir.join("dnsmasq.pid"),
+      rules: dir.join("rules"),
       dir,
     }
   }
-}
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum InstanceAction {
-  Keep,
-  Start,
-  Create,
-  Replace,
-  Remove,
-}
+  fn rule(&self, filename: &str) -> PathBuf {
+    self.rules.join(filename)
+  }
 
-fn classify_instance(
-  current: Option<&str>,
-  desired: Option<&str>,
-  running: bool,
-) -> InstanceAction {
-  match (current, desired) {
-    (Some(current), Some(desired)) if current == desired => {
-      if running {
-        InstanceAction::Keep
-      } else {
-        InstanceAction::Start
-      }
-    }
-    (Some(_), Some(_)) => InstanceAction::Replace,
-    (None, Some(_)) => InstanceAction::Create,
-    (Some(_), None) => InstanceAction::Remove,
-    (None, None) => InstanceAction::Keep,
+  fn rule_candidate(&self, filename: &str) -> PathBuf {
+    self.rules.join(format!("{filename}.next"))
   }
 }
 
@@ -105,15 +71,9 @@ fn classify_instance(
 struct InstanceSnapshot {
   paths: InstancePaths,
   config: Option<String>,
+  rule: Option<String>,
   was_running: bool,
   dir_existed: bool,
-}
-
-#[derive(Clone, Debug)]
-struct InstanceChange {
-  action: InstanceAction,
-  snapshot: InstanceSnapshot,
-  desired_config: Option<String>,
 }
 
 /// Manager for isolated dnsmasq processes, one per resolved bind address.
@@ -121,7 +81,7 @@ struct InstanceChange {
 pub struct Dnsmasq {
   config_dir: String,
   dns: Vec<String>,
-  update_lock: Arc<Mutex<DnsmasqUpdate>>,
+  update_lock: Arc<Mutex<()>>,
 }
 
 impl Dnsmasq {
@@ -129,7 +89,7 @@ impl Dnsmasq {
     Self {
       config_dir: config_path.to_owned(),
       dns: Vec::new(),
-      update_lock: Arc::new(Mutex::new(DnsmasqUpdate::default())),
+      update_lock: Arc::new(Mutex::new(())),
     }
   }
 
@@ -290,17 +250,15 @@ impl Dnsmasq {
     Err(Self::command_error("dnsmasq config", output))
   }
 
-  fn render_config(
+  fn render_instance_config(
     &self,
-    scope: &DnsmasqScope,
-    pid_path: &Path,
+    listen_address: IpAddr,
+    paths: &InstancePaths,
   ) -> IoResult<String> {
-    let listen_address = scope.listen_address.ok_or_else(|| {
-      IoError::invalid_data("dnsmasq", "scope is missing a listen address")
-    })?;
     let mut config = format!(
-      "bind-dynamic\nno-resolv\nno-poll\nno-hosts\nproxy-dnssec\nlisten-address={listen_address}\npid-file={}\n",
-      pid_path.display()
+      "bind-dynamic\nno-resolv\nno-poll\nno-hosts\nproxy-dnssec\nlisten-address={listen_address}\npid-file={}\nconf-dir={},*.conf\n",
+      paths.pid.display(),
+      paths.rules.display()
     );
     for dns in &self.dns {
       let dns = dns.parse::<IpAddr>().map_err(|err| {
@@ -311,6 +269,11 @@ impl Dnsmasq {
       })?;
       config.push_str(&format!("server={dns}\n"));
     }
+    Ok(config)
+  }
+
+  fn render_rule_config(scope: &DnsmasqScope) -> IoResult<String> {
+    let mut config = String::new();
     for (name, addresses) in &scope.entries {
       if name.is_empty()
         || name.chars().any(|character| {
@@ -328,6 +291,163 @@ impl Dnsmasq {
       }
     }
     Ok(config)
+  }
+
+  fn rule_filename(key: &str) -> String {
+    let digest = sha256(key.as_bytes());
+    let mut filename = String::with_capacity(71);
+    filename.push_str("r-");
+    for byte in digest {
+      write!(&mut filename, "{byte:02x}")
+        .expect("writing a SHA-256 digest to String cannot fail");
+    }
+    filename.push_str(".conf");
+    filename
+  }
+
+  fn read_optional(path: &Path) -> IoResult<Option<String>> {
+    match fs::read_to_string(path) {
+      Ok(content) => Ok(Some(content)),
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+      Err(err) => Err(*err.map_err_context(|| {
+        format!("unable to read dnsmasq file {}", path.display())
+      })),
+    }
+  }
+
+  fn rule_fragments(paths: &InstancePaths) -> IoResult<Vec<PathBuf>> {
+    let entries = match fs::read_dir(&paths.rules) {
+      Ok(entries) => entries,
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+        return Ok(Vec::new());
+      }
+      Err(err) => {
+        return Err(*err.map_err_context(|| {
+          format!(
+            "unable to read dnsmasq rules directory {}",
+            paths.rules.display()
+          )
+        }));
+      }
+    };
+    let mut rules = Vec::new();
+    for entry in entries {
+      let entry = entry?;
+      if entry.file_type()?.is_file()
+        && entry.path().extension() == Some(OsStr::new("conf"))
+      {
+        rules.push(entry.path());
+      }
+    }
+    rules.sort();
+    Ok(rules)
+  }
+
+  fn has_rule_fragments(paths: &InstancePaths) -> IoResult<bool> {
+    Ok(!Self::rule_fragments(paths)?.is_empty())
+  }
+
+  fn find_rule_instance(
+    &self,
+    filename: &str,
+  ) -> IoResult<Option<InstancePaths>> {
+    let root = self.instances_dir();
+    let entries = match fs::read_dir(&root) {
+      Ok(entries) => entries,
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+        return Ok(None);
+      }
+      Err(err) => {
+        return Err(*err.map_err_context(|| {
+          format!("unable to read dnsmasq instances in {}", root.display())
+        }));
+      }
+    };
+    let mut found = None;
+    for entry in entries {
+      let entry = entry?;
+      if !entry.file_type()?.is_dir() {
+        continue;
+      }
+      let id = entry.file_name();
+      let id = id.to_string_lossy();
+      let paths = InstancePaths::new(&root, &id);
+      if !paths.rule(filename).is_file() {
+        continue;
+      }
+      if found.is_some() {
+        return Err(IoError::invalid_data(
+          "dnsmasq rule",
+          &format!("Resource fragment {filename} exists in multiple instances"),
+        ));
+      }
+      found = Some(paths);
+    }
+    Ok(found)
+  }
+
+  fn stage_rule(
+    paths: &InstancePaths,
+    filename: &str,
+    config: &str,
+  ) -> IoResult<()> {
+    fs::create_dir_all(&paths.rules).map_err(|err| {
+      err.map_err_context(|| {
+        format!(
+          "unable to create dnsmasq rules directory {}",
+          paths.rules.display()
+        )
+      })
+    })?;
+    let candidate = paths.rule_candidate(filename);
+    fs::write(&candidate, config).map_err(|err| {
+      err.map_err_context(|| {
+        format!("unable to stage dnsmasq rule {}", candidate.display())
+      })
+    })?;
+    Ok(())
+  }
+
+  fn commit_rule(paths: &InstancePaths, filename: &str) -> IoResult<()> {
+    let candidate = paths.rule_candidate(filename);
+    let rule = paths.rule(filename);
+    fs::rename(&candidate, &rule).map_err(|err| {
+      err.map_err_context(|| {
+        format!("unable to commit dnsmasq rule {}", rule.display())
+      })
+    })?;
+    Ok(())
+  }
+
+  /// Quarantine one Resource fragment. If it was the final fragment, also
+  /// quarantine the root config so the process monitor cannot restart an empty
+  /// instance while best-effort directory cleanup is pending.
+  fn remove_rule_file(paths: &InstancePaths, filename: &str) -> IoResult<bool> {
+    let candidate = paths.rule_candidate(filename);
+    let _ = fs::remove_file(&candidate);
+    fs::rename(paths.rule(filename), &candidate).map_err(|err| {
+      err.map_err_context(|| {
+        format!(
+          "unable to remove dnsmasq rule {}",
+          paths.rule(filename).display()
+        )
+      })
+    })?;
+    let has_rules = Self::has_rule_fragments(paths)?;
+    if has_rules {
+      return Ok(true);
+    }
+    let _ = fs::remove_file(&paths.candidate);
+    match fs::rename(&paths.config, &paths.candidate) {
+      Ok(()) => {}
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+      Err(err) => {
+        return Err(*err.map_err_context(|| {
+          format!("unable to retire dnsmasq instance {}", paths.dir.display())
+        }));
+      }
+    }
+    Ok(false)
   }
 
   fn configured_instances(&self) -> IoResult<Vec<InstancePaths>> {
@@ -353,70 +473,69 @@ impl Dnsmasq {
     Ok(instances)
   }
 
-  fn instance_id(paths: &InstancePaths) -> IoResult<String> {
-    paths
-      .dir
-      .file_name()
-      .and_then(|name| name.to_str())
-      .map(str::to_owned)
-      .ok_or_else(|| {
-        IoError::invalid_data(
-          "dnsmasq instance",
-          &format!("invalid instance path {}", paths.dir.display()),
-        )
-      })
+  fn snapshot(
+    paths: &InstancePaths,
+    filename: &str,
+  ) -> IoResult<InstanceSnapshot> {
+    Ok(InstanceSnapshot {
+      config: Self::read_optional(&paths.config)?,
+      rule: Self::read_optional(&paths.rule(filename))?,
+      was_running: Self::is_running(&paths.pid),
+      dir_existed: paths.dir.is_dir(),
+      paths: paths.clone(),
+    })
   }
 
-  fn discard_staged(changes: &BTreeMap<String, InstanceChange>) {
-    for change in changes.values() {
-      let _ = fs::remove_file(&change.snapshot.paths.candidate);
-      if change.action == InstanceAction::Create && !change.snapshot.dir_existed
-      {
-        let _ = fs::remove_dir_all(&change.snapshot.paths.dir);
-      }
+  fn discard_staged(snapshot: &InstanceSnapshot, filename: &str) {
+    let _ = fs::remove_file(&snapshot.paths.candidate);
+    let _ = fs::remove_file(snapshot.paths.rule_candidate(filename));
+    if !snapshot.dir_existed {
+      let _ = fs::remove_dir_all(&snapshot.paths.dir);
     }
   }
 
-  fn rollback_changes(
-    changes: &BTreeMap<String, InstanceChange>,
+  fn rollback_snapshots(
+    snapshots: &[InstanceSnapshot],
+    filename: &str,
   ) -> IoResult<()> {
     let mut errors = Vec::new();
 
-    // Stop every process touched by the failed transaction before restoring
-    // its previous configuration and running state.
-    for change in changes.values() {
-      if let Err(err) = Self::stop_instance(&change.snapshot.paths) {
+    for snapshot in snapshots {
+      if let Err(err) = Self::stop_instance(&snapshot.paths) {
         errors.push(err.to_string());
       }
     }
 
-    for change in changes.values() {
-      let snapshot = &change.snapshot;
+    for snapshot in snapshots {
       let _ = fs::remove_file(&snapshot.paths.candidate);
+      let _ = fs::remove_file(snapshot.paths.rule_candidate(filename));
       let _ = fs::remove_file(&snapshot.paths.config);
-      match &snapshot.config {
-        Some(config) => {
-          if let Err(err) = fs::create_dir_all(&snapshot.paths.dir) {
-            errors.push(err.to_string());
-            continue;
-          }
-          if let Err(err) = fs::write(&snapshot.paths.config, config) {
-            errors.push(err.to_string());
-          }
+      let _ = fs::remove_file(snapshot.paths.rule(filename));
+      if !snapshot.dir_existed {
+        if let Err(err) = fs::remove_dir_all(&snapshot.paths.dir)
+          && err.kind() != std::io::ErrorKind::NotFound
+        {
+          errors.push(err.to_string());
         }
-        None if !snapshot.dir_existed => {
-          if let Err(err) = fs::remove_dir_all(&snapshot.paths.dir)
-            && err.kind() != std::io::ErrorKind::NotFound
-          {
-            errors.push(err.to_string());
-          }
-        }
-        None => {}
+        continue;
+      }
+      if let Err(err) = fs::create_dir_all(&snapshot.paths.rules) {
+        errors.push(err.to_string());
+        continue;
+      }
+      if let Some(config) = &snapshot.config
+        && let Err(err) = fs::write(&snapshot.paths.config, config)
+      {
+        errors.push(err.to_string());
+      }
+      if let Some(rule) = &snapshot.rule
+        && let Err(err) = fs::write(snapshot.paths.rule(filename), rule)
+      {
+        errors.push(err.to_string());
       }
     }
 
-    for change in changes.values() {
-      let snapshot = &change.snapshot;
+    for snapshot in snapshots {
       if snapshot.was_running {
         if snapshot.config.is_none() {
           errors.push(format!(
@@ -441,222 +560,191 @@ impl Dnsmasq {
 
   fn rollback_error(
     original: IoError,
-    changes: &BTreeMap<String, InstanceChange>,
+    snapshots: &[InstanceSnapshot],
+    filename: &str,
   ) -> IoError {
-    match Self::rollback_changes(changes) {
+    match Self::rollback_snapshots(snapshots, filename) {
       Ok(()) => original,
       Err(rollback) => IoError::other(
-        "dnsmasq reconcile".to_owned(),
+        "dnsmasq rule".to_owned(),
         format!("{original}; rollback failed: {rollback}"),
       ),
     }
   }
 
-  fn reconcile_blocking(&self, scopes: Vec<DnsmasqScope>) -> IoResult<()> {
-    let mut desired = BTreeMap::<String, (InstancePaths, String)>::new();
-    for scope in scopes {
-      let address = scope.listen_address.ok_or_else(|| {
-        IoError::invalid_data("dnsmasq", "scope is missing a listen address")
-      })?;
-      let id = Self::scope_id(address);
-      let paths = self.paths_for(address);
-      let config = self.render_config(&scope, &paths.pid)?;
-      desired.insert(id, (paths, config));
+  fn apply_rule_blocking(
+    &self,
+    key: &str,
+    scope: &DnsmasqScope,
+  ) -> IoResult<()> {
+    let filename = Self::rule_filename(key);
+    let target = self.paths_for(scope.listen_address);
+    let old = self.find_rule_instance(&filename)?;
+    let target_snapshot = Self::snapshot(&target, &filename)?;
+    let mut snapshots = vec![target_snapshot.clone()];
+    if let Some(old) = &old
+      && old.dir != target.dir
+    {
+      snapshots.push(Self::snapshot(old, &filename)?);
     }
 
-    let mut current = BTreeMap::<String, (InstancePaths, String, bool)>::new();
-    for paths in self.configured_instances()? {
-      let id = Self::instance_id(&paths)?;
-      let config = fs::read_to_string(&paths.config).map_err(|err| {
+    let rule_config = Self::render_rule_config(scope)?;
+    let instance_config =
+      self.render_instance_config(scope.listen_address, &target)?;
+    let root_changed =
+      target_snapshot.config.as_deref() != Some(instance_config.as_str());
+
+    let stage_result = (|| -> IoResult<()> {
+      fs::create_dir_all(&target.rules).map_err(|err| {
         err.map_err_context(|| {
-          format!("unable to read dnsmasq config {}", paths.config.display())
+          format!("unable to create dnsmasq instance {}", target.dir.display())
         })
       })?;
-      let running = Self::is_running(&paths.pid);
-      current.insert(id, (paths, config, running));
-    }
-
-    let ids = current
-      .keys()
-      .chain(desired.keys())
-      .cloned()
-      .collect::<BTreeSet<_>>();
-    let mut changes = BTreeMap::<String, InstanceChange>::new();
-    for id in ids {
-      let current_instance = current.get(&id);
-      let desired_instance = desired.get(&id);
-      let running = current_instance
-        .map(|(_, _, running)| *running)
-        .unwrap_or(false);
-      let action = classify_instance(
-        current_instance.map(|(_, config, _)| config.as_str()),
-        desired_instance.map(|(_, config)| config.as_str()),
-        running,
-      );
-      if action == InstanceAction::Keep {
-        continue;
-      }
-      let paths = desired_instance
-        .map(|(paths, _)| paths.clone())
-        .or_else(|| current_instance.map(|(paths, _, _)| paths.clone()))
-        .expect("instance change must have current or desired paths");
-      changes.insert(
-        id,
-        InstanceChange {
-          action,
-          snapshot: InstanceSnapshot {
-            dir_existed: paths.dir.is_dir(),
-            paths,
-            config: current_instance.map(|(_, config, _)| config.clone()),
-            was_running: running,
-          },
-          desired_config: desired_instance.map(|(_, config)| config.clone()),
-        },
-      );
-    }
-
-    // Validate every changed/new candidate before touching any running
-    // instance. A staging failure only needs to discard temporary files.
-    let stage_result = (|| -> IoResult<()> {
-      for change in changes.values() {
-        if !matches!(
-          change.action,
-          InstanceAction::Create | InstanceAction::Replace
-        ) {
-          continue;
-        }
-        let paths = &change.snapshot.paths;
-        fs::create_dir_all(&paths.dir).map_err(|err| {
-          err.map_err_context(|| {
-            format!("unable to create dnsmasq instance {}", paths.dir.display())
-          })
-        })?;
-        let config = change
-          .desired_config
-          .as_ref()
-          .expect("changed instance must have desired config");
-        fs::write(&paths.candidate, config).map_err(|err| {
+      let _ = fs::remove_file(&target.candidate);
+      let _ = fs::remove_file(target.rule_candidate(&filename));
+      Self::stage_rule(&target, &filename, &rule_config)?;
+      Self::validate_config(&target.rule_candidate(&filename))?;
+      if root_changed {
+        fs::write(&target.candidate, &instance_config).map_err(|err| {
           err.map_err_context(|| {
             format!(
               "unable to stage dnsmasq config {}",
-              paths.candidate.display()
+              target.candidate.display()
             )
           })
         })?;
-        Self::validate_config(&paths.candidate)?;
+        Self::validate_config(&target.candidate)?;
       }
       Ok(())
     })();
     if let Err(err) = stage_result {
-      Self::discard_staged(&changes);
+      Self::discard_staged(&target_snapshot, &filename);
       return Err(err);
     }
 
-    let apply_result = (|| -> IoResult<()> {
-      // Stop every old process that will be replaced or removed before any
-      // configuration is committed.
-      for change in changes.values() {
-        if change.snapshot.was_running
-          && matches!(
-            change.action,
-            InstanceAction::Create
-              | InstanceAction::Replace
-              | InstanceAction::Remove
-          )
-        {
-          Self::stop_instance(&change.snapshot.paths)?;
+    let apply_result = (|| -> IoResult<bool> {
+      for snapshot in &snapshots {
+        if snapshot.was_running {
+          Self::stop_instance(&snapshot.paths)?;
         }
+      }
+      if root_changed {
+        fs::rename(&target.candidate, &target.config).map_err(|err| {
+          err.map_err_context(|| {
+            format!(
+              "unable to commit dnsmasq config {}",
+              target.config.display()
+            )
+          })
+        })?;
+      }
+      Self::commit_rule(&target, &filename)?;
+      let mut old_retired = false;
+      if let Some(old) = &old
+        && old.dir != target.dir
+      {
+        old_retired = !Self::remove_rule_file(old, &filename)?;
       }
 
-      for change in changes.values() {
-        if matches!(
-          change.action,
-          InstanceAction::Create | InstanceAction::Replace
-        ) {
-          fs::rename(
-            &change.snapshot.paths.candidate,
-            &change.snapshot.paths.config,
-          )
-          .map_err(|err| {
-            err.map_err_context(|| {
-              format!(
-                "unable to commit dnsmasq config {}",
-                change.snapshot.paths.config.display()
-              )
-            })
-          })?;
-        }
+      if !target.config.is_file() {
+        return Err(IoError::invalid_data(
+          "dnsmasq instance",
+          &format!("missing dnsmasq config {}", target.config.display()),
+        ));
       }
-
-      for change in changes.values() {
-        if matches!(
-          change.action,
-          InstanceAction::Start
-            | InstanceAction::Create
-            | InstanceAction::Replace
-        ) {
-          Self::start_instance(&change.snapshot.paths)?;
+      Self::start_instance(&target)?;
+      if let Some(old) = &old
+        && old.dir != target.dir
+        && !old_retired
+      {
+        if !old.config.is_file() {
+          return Err(IoError::invalid_data(
+            "dnsmasq instance",
+            &format!("missing dnsmasq config {}", old.config.display()),
+          ));
         }
+        Self::start_instance(old)?;
       }
-
-      // Quarantine removed configs only after every desired process is live.
-      // If any rename fails, rollback restores all desired and removed scopes.
-      for change in changes.values() {
-        if change.action == InstanceAction::Remove {
-          let _ = fs::remove_file(&change.snapshot.paths.candidate);
-          fs::rename(
-            &change.snapshot.paths.config,
-            &change.snapshot.paths.candidate,
-          )
-          .map_err(|err| {
-            err.map_err_context(|| {
-              format!(
-                "unable to quarantine dnsmasq instance {}",
-                change.snapshot.paths.dir.display()
-              )
-            })
-          })?;
-        }
-      }
-      Ok(())
+      Ok(old_retired)
     })();
+    let old_retired = apply_result
+      .map_err(|err| Self::rollback_error(err, &snapshots, &filename))?;
 
-    if let Err(err) = apply_result {
-      return Err(Self::rollback_error(err, &changes));
+    for snapshot in &snapshots {
+      let _ = fs::remove_file(&snapshot.paths.candidate);
+      let _ = fs::remove_file(snapshot.paths.rule_candidate(&filename));
     }
+    if old_retired
+      && let Some(old) = &old
+      && let Err(err) = fs::remove_dir_all(&old.dir)
+    {
+      log::warn!(
+        "dnsmasq::rule: unable to clean unused instance {}: {err}",
+        old.dir.display()
+      );
+    }
+    Ok(())
+  }
 
-    // Removed configs are already outside the configured instance set. Cleanup
-    // is best-effort so a harmless leftover directory cannot roll back a fully
-    // committed, running configuration.
-    for change in changes.values() {
-      if change.action == InstanceAction::Remove {
-        if let Err(err) = fs::remove_dir_all(&change.snapshot.paths.dir) {
-          log::warn!(
-            "dnsmasq::reconcile: unable to clean removed instance {}: {err}",
-            change.snapshot.paths.dir.display()
-          );
+  fn remove_rule_blocking(&self, key: &str) -> IoResult<()> {
+    let filename = Self::rule_filename(key);
+    let Some(paths) = self.find_rule_instance(&filename)? else {
+      return Ok(());
+    };
+    let snapshot = Self::snapshot(&paths, &filename)?;
+    let snapshots = [snapshot];
+    let apply_result = (|| -> IoResult<bool> {
+      if snapshots[0].was_running {
+        Self::stop_instance(&paths)?;
+      }
+      let has_rules = Self::remove_rule_file(&paths, &filename)?;
+      if has_rules {
+        if !paths.config.is_file() {
+          return Err(IoError::invalid_data(
+            "dnsmasq instance",
+            &format!("missing dnsmasq config {}", paths.config.display()),
+          ));
         }
-      } else {
-        let _ = fs::remove_file(&change.snapshot.paths.candidate);
+        Self::validate_config(&paths.config)?;
+        Self::start_instance(&paths)?;
+      }
+      Ok(!has_rules)
+    })();
+    let retired = apply_result
+      .map_err(|err| Self::rollback_error(err, &snapshots, &filename))?;
+
+    let _ = fs::remove_file(paths.rule_candidate(&filename));
+    if retired {
+      let _ = fs::remove_file(&paths.candidate);
+      if let Err(err) = fs::remove_dir_all(&paths.dir) {
+        log::warn!(
+          "dnsmasq::rule: unable to clean unused instance {}: {err}",
+          paths.dir.display()
+        );
       }
     }
     Ok(())
   }
 
-  /// Serialize rule snapshot construction and filesystem reconciliation.
-  pub(crate) async fn lock_updates(&self) -> MutexGuard<'_, DnsmasqUpdate> {
-    self.update_lock.lock().await
+  /// Persist one Resource fragment and restart only its affected instance(s).
+  pub(crate) async fn apply_rule(
+    &self,
+    key: &str,
+    scope: DnsmasqScope,
+  ) -> IoResult<()> {
+    let _guard = self.update_lock.lock().await;
+    let manager = self.clone();
+    let key = key.to_owned();
+    web::block(move || manager.apply_rule_blocking(&key, &scope)).await?;
+    Ok(())
   }
 
-  /// Atomically validate and apply a complete desired DNS configuration while
-  /// the caller holds [`Dnsmasq::lock_updates`]. Changed instances receive a
-  /// hard restart.
-  pub(crate) async fn apply_scopes(
-    &self,
-    scopes: Vec<DnsmasqScope>,
-  ) -> IoResult<()> {
+  /// Remove one Resource fragment and preserve every other Resource file.
+  pub(crate) async fn remove_rule(&self, key: &str) -> IoResult<()> {
+    let _guard = self.update_lock.lock().await;
     let manager = self.clone();
-    web::block(move || manager.reconcile_blocking(scopes)).await?;
+    let key = key.to_owned();
+    web::block(move || manager.remove_rule_blocking(&key)).await?;
     Ok(())
   }
 
@@ -677,6 +765,7 @@ impl Dnsmasq {
       config: Path::new(&self.config_dir).join("dnsmasq.conf"),
       candidate: Path::new(&self.config_dir).join("dnsmasq.conf.next"),
       pid: Path::new(&self.config_dir).join("dnsmasq.pid"),
+      rules: Path::new(&self.config_dir).join("rules"),
     };
     if legacy.pid.is_file() {
       Self::stop_instance(&legacy)?;
@@ -684,7 +773,7 @@ impl Dnsmasq {
     Ok(self.clone())
   }
 
-  /// Start all persisted instances. Normally reconciliation creates them;
+  /// Start all persisted instances. Normally rule application creates them;
   /// this method is also used by the process monitor after a crash.
   pub(crate) async fn start(&self) -> IoResult<()> {
     let _guard = self.update_lock.lock().await;
@@ -716,6 +805,29 @@ impl Dnsmasq {
 mod tests {
   use super::*;
 
+  fn test_manager(name: &str) -> (PathBuf, Dnsmasq) {
+    let root = std::env::temp_dir().join(format!(
+      "ncdns-resource-rules-{}-{name}",
+      std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let manager = Dnsmasq::new(root.to_str().unwrap());
+    manager.ensure().unwrap();
+    (root, manager)
+  }
+
+  fn commit_fragment(
+    paths: &InstancePaths,
+    key: &str,
+    content: &str,
+  ) -> String {
+    let filename = Dnsmasq::rule_filename(key);
+    Dnsmasq::stage_rule(paths, &filename, content).unwrap();
+    Dnsmasq::commit_rule(paths, &filename).unwrap();
+    filename
+  }
+
   #[test]
   fn scope_ids_are_safe_and_deterministic() {
     assert_eq!(
@@ -729,121 +841,218 @@ mod tests {
   }
 
   #[test]
-  fn rendered_scope_has_no_nanoclbr0_singleton_and_is_isolated() {
+  fn resource_filenames_are_safe_and_deterministic() {
+    let first = Dnsmasq::rule_filename("../unsafe/resource name");
+    let second = Dnsmasq::rule_filename("../unsafe/resource name");
+    let other = Dnsmasq::rule_filename("another-resource");
+
+    assert_eq!(first, second);
+    assert_ne!(first, other);
+    assert_eq!(first.len(), 71);
+    assert!(first.starts_with("r-"));
+    assert!(first.ends_with(".conf"));
+    assert!(
+      first[2..66]
+        .chars()
+        .all(|character| character.is_ascii_hexdigit())
+    );
+  }
+
+  #[test]
+  fn instance_and_resource_configuration_are_separate() {
     let manager =
       Dnsmasq::new("/tmp/ncdns-test").with_dns(vec!["1.1.1.1".to_owned()]);
     let mut scope = DnsmasqScope::new("172.30.0.1".parse().unwrap());
     scope.add_entry("api.internal".to_owned(), "172.30.0.2".parse().unwrap());
-    let config = manager
-      .render_config(&scope, Path::new("/tmp/ncdns-test.pid"))
+    scope.add_entry("api.internal".to_owned(), "172.30.0.2".parse().unwrap());
+    let paths = manager.paths_for(scope.listen_address);
+    let root = manager
+      .render_instance_config(scope.listen_address, &paths)
       .unwrap();
-    assert!(config.contains("listen-address=172.30.0.1"));
-    assert!(config.contains("address=/api.internal/172.30.0.2"));
-    assert!(!config.contains("interface=nanoclbr0"));
+    let rule = Dnsmasq::render_rule_config(&scope).unwrap();
+
+    assert!(root.contains("listen-address=172.30.0.1"));
+    assert!(
+      root.contains(&format!("conf-dir={},*.conf", paths.rules.display()))
+    );
+    assert!(!root.contains("address=/"));
+    assert!(!root.contains("interface=nanoclbr0"));
+    assert_eq!(rule, "address=/api.internal/172.30.0.2\n");
   }
 
   #[test]
   fn invalid_names_cannot_inject_dnsmasq_directives() {
-    let manager = Dnsmasq::new("/tmp/ncdns-test");
     let mut scope = DnsmasqScope::new("127.0.0.1".parse().unwrap());
     scope.add_entry("ok\nserver=evil".to_owned(), "127.0.0.1".parse().unwrap());
+    assert!(Dnsmasq::render_rule_config(&scope).is_err());
+  }
+
+  #[test]
+  fn adding_b_does_not_remove_a_fragment() {
+    let (root, manager) = test_manager("add-b");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let a = commit_fragment(&paths, "resource-a", "address=/a.test/10.0.0.2\n");
+    let b = commit_fragment(&paths, "resource-b", "address=/b.test/10.0.0.3\n");
+
+    assert_eq!(
+      fs::read_to_string(paths.rule(&a)).unwrap(),
+      "address=/a.test/10.0.0.2\n"
+    );
+    assert!(paths.rule(&b).is_file());
+    assert_eq!(Dnsmasq::rule_fragments(&paths).unwrap().len(), 2);
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn updating_b_does_not_modify_a_fragment() {
+    let (root, manager) = test_manager("update-b");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let a = commit_fragment(&paths, "resource-a", "address=/a.test/10.0.0.2\n");
+    let b = commit_fragment(&paths, "resource-b", "address=/b.test/10.0.0.3\n");
+    let original_a = fs::read(paths.rule(&a)).unwrap();
+
+    Dnsmasq::stage_rule(&paths, &b, "address=/b.test/10.0.0.4\n").unwrap();
+    Dnsmasq::commit_rule(&paths, &b).unwrap();
+
+    assert_eq!(fs::read(paths.rule(&a)).unwrap(), original_a);
+    assert_eq!(
+      fs::read_to_string(paths.rule(&b)).unwrap(),
+      "address=/b.test/10.0.0.4\n"
+    );
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn deleting_b_leaves_a_and_the_shared_instance() {
+    let (root, manager) = test_manager("delete-b");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let a = commit_fragment(&paths, "resource-a", "address=/a.test/10.0.0.2\n");
+    let b = commit_fragment(&paths, "resource-b", "address=/b.test/10.0.0.3\n");
+    fs::write(&paths.config, "root").unwrap();
+
+    assert!(Dnsmasq::remove_rule_file(&paths, &b).unwrap());
+
+    assert!(paths.rule(&a).is_file());
+    assert!(!paths.rule(&b).exists());
+    assert!(paths.config.is_file());
+    assert!(Dnsmasq::has_rule_fragments(&paths).unwrap());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn moving_a_resource_removes_its_old_fragment() {
+    let (root, manager) = test_manager("move-resource");
+    let old = manager.paths_for("10.0.0.1".parse().unwrap());
+    let target = manager.paths_for("10.0.1.1".parse().unwrap());
+    let filename =
+      commit_fragment(&old, "resource-b", "address=/b.test/10.0.0.3\n");
+    fs::write(&old.config, "old root").unwrap();
+    assert_eq!(
+      manager.find_rule_instance(&filename).unwrap().unwrap().dir,
+      old.dir
+    );
+
+    commit_fragment(&target, "resource-b", "address=/b.test/10.0.1.3\n");
+    assert!(!Dnsmasq::remove_rule_file(&old, &filename).unwrap());
+
+    assert_eq!(
+      manager.find_rule_instance(&filename).unwrap().unwrap().dir,
+      target.dir
+    );
+    assert!(!old.rule(&filename).exists());
+    assert!(!old.config.exists());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn final_resource_fragment_controls_instance_ownership() {
+    let (root, manager) = test_manager("instance-ownership");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let a = commit_fragment(&paths, "resource-a", "");
+    let b = commit_fragment(&paths, "resource-b", "");
+    fs::write(&paths.config, "root").unwrap();
+
+    assert!(Dnsmasq::remove_rule_file(&paths, &b).unwrap());
+    assert!(Dnsmasq::has_rule_fragments(&paths).unwrap());
+    assert!(paths.config.is_file());
+    assert!(!Dnsmasq::remove_rule_file(&paths, &a).unwrap());
+    assert!(!paths.config.exists());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn deleting_the_final_resource_removes_its_instance() {
+    let (root, manager) = test_manager("remove-final-instance");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    commit_fragment(&paths, "resource-a", "");
+    fs::write(&paths.config, "root").unwrap();
+
+    manager.remove_rule_blocking("resource-a").unwrap();
+
+    assert!(!paths.dir.exists());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn startup_discovers_persisted_instance_with_rules_directory() {
+    let (root, manager) = test_manager("startup");
+    let address = "10.0.0.1".parse().unwrap();
+    let paths = manager.paths_for(address);
+    commit_fragment(&paths, "resource-a", "address=/a.test/10.0.0.2\n");
+    let config = manager.render_instance_config(address, &paths).unwrap();
+    fs::write(&paths.config, &config).unwrap();
+
+    let restarted = Dnsmasq::new(root.to_str().unwrap());
+    let instances = restarted.configured_instances().unwrap();
+
+    assert_eq!(instances.len(), 1);
+    assert_eq!(instances[0].dir, paths.dir);
     assert!(
-      manager
-        .render_config(&scope, Path::new("/tmp/ncdns-test.pid"))
-        .is_err()
+      config.contains(&format!("conf-dir={},*.conf", paths.rules.display()))
     );
+    fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
-  fn instance_actions_cover_transaction_phases() {
+  fn persisted_fragments_are_discovered_without_runtime_rule_state() {
+    let (root, manager) = test_manager("persisted-discovery");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let filename = commit_fragment(&paths, "resource-a", "");
+    drop(manager);
+
+    let restarted = Dnsmasq::new(root.to_str().unwrap());
+
     assert_eq!(
-      classify_instance(Some("same"), Some("same"), true),
-      InstanceAction::Keep
+      restarted
+        .find_rule_instance(&filename)
+        .unwrap()
+        .unwrap()
+        .dir,
+      paths.dir
     );
-    assert_eq!(
-      classify_instance(Some("same"), Some("same"), false),
-      InstanceAction::Start
-    );
-    assert_eq!(
-      classify_instance(None, Some("new"), false),
-      InstanceAction::Create
-    );
-    assert_eq!(
-      classify_instance(Some("old"), Some("new"), true),
-      InstanceAction::Replace
-    );
-    assert_eq!(
-      classify_instance(Some("old"), None, true),
-      InstanceAction::Remove
-    );
+    fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
-  fn rollback_restores_old_configs_and_removes_new_instances() {
-    let root = std::env::temp_dir()
-      .join(format!("ncdns-rollback-test-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&root);
-    fs::create_dir_all(&root).unwrap();
+  fn rollback_restores_only_the_target_resource_fragment() {
+    let (root, manager) = test_manager("rollback");
+    let paths = manager.paths_for("10.0.0.1".parse().unwrap());
+    let a = commit_fragment(&paths, "resource-a", "address=/a.test/10.0.0.2\n");
+    let b = commit_fragment(&paths, "resource-b", "address=/b.test/10.0.0.3\n");
+    fs::write(&paths.config, "old root").unwrap();
+    let snapshot = Dnsmasq::snapshot(&paths, &b).unwrap();
+    let original_a = fs::read(paths.rule(&a)).unwrap();
+    fs::write(&paths.config, "new root").unwrap();
+    fs::write(paths.rule(&b), "address=/b.test/10.0.0.4\n").unwrap();
 
-    let replace_paths = InstancePaths::new(&root, "replace");
-    fs::create_dir_all(&replace_paths.dir).unwrap();
-    fs::write(&replace_paths.config, "new").unwrap();
+    Dnsmasq::rollback_snapshots(&[snapshot], &b).unwrap();
 
-    let remove_paths = InstancePaths::new(&root, "remove");
-    fs::create_dir_all(&remove_paths.dir).unwrap();
-    fs::write(&remove_paths.candidate, "old").unwrap();
-
-    let create_paths = InstancePaths::new(&root, "create");
-    fs::create_dir_all(&create_paths.dir).unwrap();
-    fs::write(&create_paths.config, "new").unwrap();
-
-    let changes = BTreeMap::from([
-      (
-        "replace".to_owned(),
-        InstanceChange {
-          action: InstanceAction::Replace,
-          snapshot: InstanceSnapshot {
-            paths: replace_paths.clone(),
-            config: Some("old".to_owned()),
-            was_running: false,
-            dir_existed: true,
-          },
-          desired_config: Some("new".to_owned()),
-        },
-      ),
-      (
-        "remove".to_owned(),
-        InstanceChange {
-          action: InstanceAction::Remove,
-          snapshot: InstanceSnapshot {
-            paths: remove_paths.clone(),
-            config: Some("old".to_owned()),
-            was_running: false,
-            dir_existed: true,
-          },
-          desired_config: None,
-        },
-      ),
-      (
-        "create".to_owned(),
-        InstanceChange {
-          action: InstanceAction::Create,
-          snapshot: InstanceSnapshot {
-            paths: create_paths.clone(),
-            config: None,
-            was_running: false,
-            dir_existed: false,
-          },
-          desired_config: Some("new".to_owned()),
-        },
-      ),
-    ]);
-
-    Dnsmasq::rollback_changes(&changes).unwrap();
-
-    assert_eq!(fs::read_to_string(replace_paths.config).unwrap(), "old");
-    assert_eq!(fs::read_to_string(remove_paths.config).unwrap(), "old");
-    assert!(!create_paths.dir.exists());
+    assert_eq!(fs::read_to_string(&paths.config).unwrap(), "old root");
+    assert_eq!(
+      fs::read_to_string(paths.rule(&b)).unwrap(),
+      "address=/b.test/10.0.0.3\n"
+    );
+    assert_eq!(fs::read(paths.rule(&a)).unwrap(), original_a);
     fs::remove_dir_all(root).unwrap();
   }
 }
