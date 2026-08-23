@@ -11,6 +11,8 @@ Cargoes:
 
 - Name: e2e-private-peer
   NetworkMode: e2e-private
+  Dns:
+  - $$INTERNAL_GATEWAY
   Containers:
   - Name: peer
     Image: alpine:latest
@@ -19,9 +21,6 @@ Cargoes:
     - "300"
     Env:
     - E2E_INTERNAL_GATEWAY=$$INTERNAL_GATEWAY
-    HostConfig:
-      Dns:
-      - $$INTERNAL_GATEWAY
 
 - Name: e2e-default-client
   Containers:

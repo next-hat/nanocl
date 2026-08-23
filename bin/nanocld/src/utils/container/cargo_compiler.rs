@@ -67,6 +67,10 @@ pub(super) struct ContainerCompileInput<'a> {
   pub(super) sandbox_id: Option<&'a str>,
   /// Cargo-level ports projected only when this direct application owns them.
   pub(super) cargo_port_bindings: Option<&'a PortMap>,
+  /// Cargo-level hostname projected only when this application owns networking.
+  pub(super) cargo_hostname: Option<&'a str>,
+  /// Cargo-level DNS projected only when this application owns networking.
+  pub(super) cargo_dns: Option<&'a [String]>,
   pub(super) role: CargoContainerRole,
   pub(super) runtime: CargoRuntimeMetadata<'a>,
   pub(super) internal_gateway: Option<&'a str>,
@@ -77,8 +81,11 @@ pub(super) struct ContainerCompileInput<'a> {
 pub(super) struct SandboxCompileInput<'a> {
   pub(super) cargo_network_mode: Option<&'a CargoNetworkMode>,
   pub(super) port_bindings: Option<&'a PortMap>,
+  pub(super) hostname: Option<&'a str>,
+  pub(super) dns: Option<&'a [String]>,
   pub(super) sandbox_image: &'a str,
   pub(super) runtime: CargoRuntimeMetadata<'a>,
+  pub(super) internal_gateway: Option<&'a str>,
 }
 
 /// Effective Docker configuration for one named declared container.
@@ -128,6 +135,11 @@ pub(super) enum CargoCompilerError {
     port_key: String,
     host_port: Option<String>,
     reason: &'static str,
+  },
+  ConflictingNetworkOwnerField {
+    container: String,
+    cargo_field: &'static str,
+    container_field: &'static str,
   },
   UnresolvedInternalGateway {
     container: String,
@@ -201,6 +213,14 @@ impl std::fmt::Display for CargoCompilerError {
         }
         write!(f, ": {reason}")
       }
+      Self::ConflictingNetworkOwnerField {
+        container,
+        cargo_field,
+        container_field,
+      } => write!(
+        f,
+        "container {container:?} explicitly configures {container_field} while {cargo_field} is owned at Cargo level"
+      ),
       Self::UnresolvedInternalGateway { container } => write!(
         f,
         "container {container:?} contains {INTERNAL_GATEWAY_TOKEN} but no resolved internal gateway was supplied"
@@ -248,6 +268,7 @@ impl From<CargoCompilerError> for IoError {
       | CargoCompilerError::InvalidNetworkCombination { .. }
       | CargoCompilerError::InvalidCargoPortBindingCombination { .. }
       | CargoCompilerError::InvalidCargoPortBinding { .. }
+      | CargoCompilerError::ConflictingNetworkOwnerField { .. }
       | CargoCompilerError::InternalGatewayMapKeyCollision { .. }
       | CargoCompilerError::ReservedLabelCollision { .. }
       | CargoCompilerError::ReservedEnvironmentCollision { .. } => {
@@ -348,6 +369,12 @@ pub(super) fn compile_container(
   }
 
   let mut config = input.declared.container_config.clone();
+  apply_cargo_network_owner_config(
+    &mut config,
+    input.cargo_hostname,
+    input.cargo_dns,
+    &input.declared.name,
+  )?;
   expand_internal_gateway(
     &mut config,
     input.internal_gateway,
@@ -439,13 +466,15 @@ pub(super) fn compile_sandbox(
     SANDBOX_LOGICAL_NAME,
     true,
   );
-  let config = DockerConfig {
+  let mut config = DockerConfig {
     image: Some(input.sandbox_image.to_owned()),
+    hostname: input.hostname.map(str::to_owned),
     exposed_ports,
     labels: Some(labels),
     host_config: Some(HostConfig {
       network_mode: Some(cargo_mode.to_owned()),
       port_bindings,
+      dns: input.dns.map(<[String]>::to_vec),
       restart_policy: Some(RestartPolicy {
         name: Some(RestartPolicyNameEnum::ALWAYS),
         maximum_retry_count: None,
@@ -454,6 +483,11 @@ pub(super) fn compile_sandbox(
     }),
     ..Default::default()
   };
+  expand_internal_gateway(
+    &mut config,
+    input.internal_gateway,
+    SANDBOX_LOGICAL_NAME,
+  )?;
 
   Ok(Some(CompiledSandbox {
     replica_id: input.runtime.replica_id.to_owned(),
@@ -463,6 +497,36 @@ pub(super) fn compile_sandbox(
 
 fn effective_cargo_mode(mode: Option<&CargoNetworkMode>) -> &str {
   mode.map_or(DEFAULT_NETWORK, CargoNetworkMode::as_str)
+}
+
+fn apply_cargo_network_owner_config(
+  config: &mut DockerConfig,
+  hostname: Option<&str>,
+  dns: Option<&[String]>,
+  container: &str,
+) -> Result<(), CargoCompilerError> {
+  if let Some(hostname) = hostname {
+    if config.hostname.is_some() {
+      return Err(CargoCompilerError::ConflictingNetworkOwnerField {
+        container: container.to_owned(),
+        cargo_field: "Cargo.Hostname",
+        container_field: "Container.Hostname",
+      });
+    }
+    config.hostname = Some(hostname.to_owned());
+  }
+  if let Some(dns) = dns {
+    let host_config = config.host_config.get_or_insert_default();
+    if host_config.dns.is_some() {
+      return Err(CargoCompilerError::ConflictingNetworkOwnerField {
+        container: container.to_owned(),
+        cargo_field: "Cargo.Dns",
+        container_field: "Container.HostConfig.Dns",
+      });
+    }
+    host_config.dns = Some(dns.to_vec());
+  }
+  Ok(())
 }
 
 fn validate_cargo_port_bindings(
@@ -816,6 +880,8 @@ mod tests {
       cargo_network_mode,
       sandbox_id,
       cargo_port_bindings,
+      cargo_hostname: None,
+      cargo_dns: None,
       role,
       runtime: runtime(),
       internal_gateway,
@@ -876,8 +942,11 @@ mod tests {
     compile_sandbox(SandboxCompileInput {
       cargo_network_mode,
       port_bindings,
+      hostname: None,
+      dns: None,
       sandbox_image: "registry.nanocl.io/pause@sha256:abc",
       runtime: runtime(),
+      internal_gateway: None,
     })
   }
 
@@ -943,6 +1012,117 @@ mod tests {
     assert_eq!(
       compiled.config.env.as_ref().unwrap()[0],
       "PROXY=http://172.18.0.1:8080"
+    );
+  }
+
+  #[test]
+  fn direct_network_owner_receives_cargo_hostname_and_expanded_dns() {
+    for (mode, gateway) in [
+      (None, "172.18.0.1"),
+      (Some("private-api"), "10.42.0.1"),
+      (Some("host"), "172.18.0.1"),
+    ] {
+      let cargo_mode = mode.map(|mode| CargoNetworkMode::new(mode).unwrap());
+      let dns = vec![INTERNAL_GATEWAY_TOKEN.to_owned(), "1.1.1.1".to_owned()];
+      let compiled = compile_container(ContainerCompileInput {
+        declared: &minimal_spec(),
+        declaration_position: 0,
+        cargo_network_mode: cargo_mode.as_ref(),
+        sandbox_id: None,
+        cargo_port_bindings: None,
+        cargo_hostname: Some("api"),
+        cargo_dns: Some(&dns),
+        role: CargoContainerRole::Application,
+        runtime: runtime(),
+        internal_gateway: Some(gateway),
+      })
+      .unwrap()
+      .config;
+
+      assert_eq!(compiled.hostname.as_deref(), Some("api"));
+      assert_eq!(
+        compiled.host_config.unwrap().dns,
+        Some(vec![gateway.to_owned(), "1.1.1.1".to_owned()])
+      );
+    }
+  }
+
+  #[test]
+  fn cargo_network_owner_fields_reject_explicit_container_conflicts() {
+    let mut declared = minimal_spec();
+    declared.container_config.hostname = Some("container-api".to_owned());
+    let error = compile_container(ContainerCompileInput {
+      declared: &declared,
+      declaration_position: 0,
+      cargo_network_mode: None,
+      sandbox_id: None,
+      cargo_port_bindings: None,
+      cargo_hostname: Some("cargo-api"),
+      cargo_dns: None,
+      role: CargoContainerRole::Application,
+      runtime: runtime(),
+      internal_gateway: None,
+    })
+    .unwrap_err();
+    assert_eq!(
+      error,
+      CargoCompilerError::ConflictingNetworkOwnerField {
+        container: "app".to_owned(),
+        cargo_field: "Cargo.Hostname",
+        container_field: "Container.Hostname",
+      }
+    );
+
+    let mut declared = minimal_spec();
+    declared
+      .container_config
+      .host_config
+      .get_or_insert_default()
+      .dns = Some(vec!["8.8.8.8".to_owned()]);
+    let dns = vec!["1.1.1.1".to_owned()];
+    let error = compile_container(ContainerCompileInput {
+      declared: &declared,
+      declaration_position: 0,
+      cargo_network_mode: None,
+      sandbox_id: None,
+      cargo_port_bindings: None,
+      cargo_hostname: None,
+      cargo_dns: Some(&dns),
+      role: CargoContainerRole::Application,
+      runtime: runtime(),
+      internal_gateway: None,
+    })
+    .unwrap_err();
+    assert_eq!(
+      error,
+      CargoCompilerError::ConflictingNetworkOwnerField {
+        container: "app".to_owned(),
+        cargo_field: "Cargo.Dns",
+        container_field: "Container.HostConfig.Dns",
+      }
+    );
+  }
+
+  #[test]
+  fn sandbox_network_owner_receives_cargo_hostname_and_expanded_dns() {
+    let dns = vec![INTERNAL_GATEWAY_TOKEN.to_owned()];
+    let compiled = compile_sandbox(SandboxCompileInput {
+      cargo_network_mode: None,
+      port_bindings: None,
+      hostname: Some("api"),
+      dns: Some(&dns),
+      sandbox_image: "registry.nanocl.io/pause@sha256:abc",
+      runtime: runtime(),
+      internal_gateway: Some(GATEWAY),
+    })
+    .unwrap()
+    .unwrap()
+    .config;
+
+    assert_eq!(compiled.hostname.as_deref(), Some("api"));
+    assert_eq!(
+      compiled.host_config.unwrap().dns,
+      Some(vec![GATEWAY.to_owned()])
     );
   }
 
@@ -1683,8 +1863,11 @@ mod tests {
     let compiled = compile_sandbox(SandboxCompileInput {
       cargo_network_mode: Some(&cargo_mode),
       port_bindings: None,
+      hostname: None,
+      dns: None,
       sandbox_image: "",
       runtime: runtime(),
+      internal_gateway: None,
     })
     .unwrap();
     assert!(compiled.is_none());

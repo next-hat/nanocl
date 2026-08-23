@@ -74,6 +74,12 @@ fn apply_cargo_spec_patch(
   if let Some(port_bindings) = &patch.port_bindings {
     current.port_bindings = Some(port_bindings.clone());
   }
+  if let Some(hostname) = &patch.hostname {
+    current.hostname = Some(hostname.clone());
+  }
+  if let Some(dns) = &patch.dns {
+    current.dns = Some(dns.clone());
+  }
   if let Some(secrets) = &patch.secrets {
     current.secrets.clone_from(secrets);
   }
@@ -374,6 +380,8 @@ mod tests {
       replicas: Some(4),
       network_mode: Some(replacement_network.clone()),
       port_bindings: Some(replacement_ports.clone()),
+      hostname: Some("replacement-api".to_owned()),
+      dns: Some(vec!["10.42.0.1".to_owned()]),
       secrets: Some(replacement_secrets.clone()),
       placement: Some(replacement_placement.clone()),
       resource_requirement: Some(replacement_resources.clone()),
@@ -389,6 +397,8 @@ mod tests {
     assert_eq!(patched.replicas, 4);
     assert_eq!(patched.network_mode, Some(replacement_network));
     assert_eq!(patched.port_bindings, Some(replacement_ports));
+    assert_eq!(patched.hostname.as_deref(), Some("replacement-api"));
+    assert_eq!(patched.dns, Some(vec!["10.42.0.1".to_owned()]));
     assert_eq!(patched.secrets, replacement_secrets);
     assert_eq!(patched.placement, Some(replacement_placement));
     assert_eq!(patched.resource_requirement, Some(replacement_resources));

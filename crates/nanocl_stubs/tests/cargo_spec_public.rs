@@ -79,6 +79,33 @@ Containers:
 }
 
 #[test]
+fn cargo_hostname_and_dns_use_top_level_pascal_case_fields() {
+  let spec = parse_validate_and_round_trip(
+    r#"
+Name: api
+Hostname: my-service
+Dns:
+  - $$INTERNAL_GATEWAY
+  - 1.1.1.1
+Containers:
+  - Name: api
+    Image: example/api
+"#,
+  );
+
+  assert_eq!(spec.hostname.as_deref(), Some("my-service"));
+  assert_eq!(
+    spec.dns.as_deref(),
+    Some(["$$INTERNAL_GATEWAY".to_owned(), "1.1.1.1".to_owned()].as_slice())
+  );
+  let yaml = serde_yaml::to_value(&spec).unwrap();
+  assert_eq!(yaml["Hostname"], "my-service");
+  assert_eq!(yaml["Dns"][0], "$$INTERNAL_GATEWAY");
+  assert!(yaml["Containers"][0].get("Hostname").is_none());
+  assert!(yaml["Containers"][0].get("Dns").is_none());
+}
+
+#[test]
 fn multi_container_shape_preserves_order_and_cargo_ownership() {
   let spec = parse_validate_and_round_trip(
     r#"
@@ -598,6 +625,8 @@ fn revision_preserves_metadata_and_uses_the_final_declaration_shape() {
     "Name":"api",
     "Replicas":2,
     "NetworkMode":"private-api",
+    "Hostname":"api",
+    "Dns":["172.18.0.1"],
     "Secrets":["common-secret"],
     "InitContainers":[],
     "Containers":[{
@@ -609,6 +638,11 @@ fn revision_preserves_metadata_and_uses_the_final_declaration_shape() {
   revision.validate().unwrap();
   assert_eq!(revision.cargo_key, "global.api");
   assert_eq!(revision.replicas, 2);
+  assert_eq!(revision.hostname.as_deref(), Some("api"));
+  assert_eq!(
+    revision.dns.as_deref(),
+    Some(["172.18.0.1".to_owned()].as_slice())
+  );
   assert_eq!(revision.containers[0].name, "app");
 
   let encoded = serde_json::to_string(&revision).unwrap();
@@ -621,6 +655,9 @@ fn patch_collections_have_whole_field_replacement_shape() {
   let patch: CargoSpecPatch = serde_yaml::from_str(
     r#"
 Replicas: 2
+Hostname: replacement-api
+Dns:
+  - 10.0.0.53
 Secrets:
   - replacement-secret
 PortBindings:
@@ -635,6 +672,11 @@ Containers:
   .unwrap();
 
   assert_eq!(patch.replicas, Some(2));
+  assert_eq!(patch.hostname.as_deref(), Some("replacement-api"));
+  assert_eq!(
+    patch.dns.as_deref(),
+    Some(["10.0.0.53".to_owned()].as_slice())
+  );
   assert_eq!(patch.secrets.unwrap(), ["replacement-secret"]);
   assert_eq!(patch.init_containers, Some(Vec::new()));
   assert_eq!(patch.containers.unwrap()[0].name, "replacement");
@@ -683,6 +725,8 @@ fn assert_final_cargo_schema(schema: &serde_json::Value) {
     property_names(schema),
     BTreeSet::from([
       "Containers",
+      "Dns",
+      "Hostname",
       "InitContainers",
       "Metadata",
       "Name",
@@ -761,6 +805,8 @@ fn assert_related_cargo_schemas(
       "CargoKey",
       "Containers",
       "CreatedAt",
+      "Dns",
+      "Hostname",
       "InitContainers",
       "Key",
       "Metadata",
@@ -779,6 +825,8 @@ fn assert_related_cargo_schemas(
     property_names(patch),
     BTreeSet::from([
       "Containers",
+      "Dns",
+      "Hostname",
       "InitContainers",
       "Metadata",
       "Name",

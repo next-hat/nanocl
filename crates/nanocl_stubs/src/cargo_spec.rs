@@ -1217,6 +1217,18 @@ pub struct CargoSpec {
     )
   )]
   pub port_bindings: Option<PortMap>,
+  /// Docker hostname assigned to the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub hostname: Option<String>,
+  /// DNS servers assigned to the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub dns: Option<Vec<String>>,
   /// Secrets inherited by every regular and init container.
   #[cfg_attr(feature = "serde", serde(default))]
   pub secrets: Vec<String>,
@@ -1248,6 +1260,8 @@ impl Default for CargoSpec {
       replicas: default_cargo_replicas(),
       network_mode: None,
       port_bindings: None,
+      hostname: None,
+      dns: None,
       secrets: Vec::new(),
       placement: None,
       resource_requirement: None,
@@ -1476,6 +1490,18 @@ pub struct CargoSpecPatch {
     )
   )]
   pub port_bindings: Option<PortMap>,
+  /// New Docker hostname for the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub hostname: Option<String>,
+  /// Replacement DNS servers for the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub dns: Option<Vec<String>>,
   /// Replacement Cargo-level shared secrets.
   #[cfg_attr(
     feature = "serde",
@@ -1557,6 +1583,18 @@ pub struct CargoSpecRevision {
     )
   )]
   pub port_bindings: Option<PortMap>,
+  /// Docker hostname assigned to the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub hostname: Option<String>,
+  /// DNS servers assigned to the Cargo network owner.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub dns: Option<Vec<String>>,
   /// Secrets inherited by every regular and init container.
   #[cfg_attr(feature = "serde", serde(default))]
   pub secrets: Vec<String>,
@@ -1591,6 +1629,8 @@ impl Default for CargoSpecRevision {
       replicas: default_cargo_replicas(),
       network_mode: None,
       port_bindings: None,
+      hostname: None,
+      dns: None,
       secrets: Vec::new(),
       placement: None,
       resource_requirement: None,
