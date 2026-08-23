@@ -7,7 +7,6 @@ use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
-  cargo::CargoKillOptions,
   generic::{GenericClause, GenericFilter},
   process::{Process, ProcessKind, ProcessPartial},
   system::{NativeEventAction, ObjPsStatusKind},
@@ -17,32 +16,6 @@ use crate::{
   models::{ObjPsStatusDb, ProcessDb, SystemState},
   repositories::generic::*,
 };
-
-pub async fn container_has_healthcheck(
-  container_id: &str,
-  state: &SystemState,
-) -> IoResult<bool> {
-  if container_id.is_empty() {
-    return Ok(false);
-  }
-  let inspected = state
-    .inner
-    .docker_api
-    .inspect_container(container_id, None::<InspectContainerOptions>)
-    .await
-    .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
-  let has_config_healthcheck = inspected
-    .config
-    .as_ref()
-    .and_then(|config| config.healthcheck.as_ref())
-    .is_some();
-  let has_state_health = inspected
-    .state
-    .as_ref()
-    .and_then(|container_state| container_state.health.as_ref())
-    .is_some();
-  Ok(has_config_healthcheck || has_state_health)
-}
 
 /// Create a process (container) based on the kind and the item
 pub async fn create(
@@ -80,38 +53,57 @@ pub async fn create(
     )
     .await
     .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
-  let inspect = state
-    .inner
-    .docker_api
-    .inspect_container(&res.id, None::<InspectContainerOptions>)
-    .await
-    .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
-  let created_at = inspect.created.clone().unwrap_or_default();
-  let new_instance = ProcessPartial {
-    key: res.id,
-    name: name.to_owned(),
-    kind: kind.clone(),
-    data: serde_json::to_value(&inspect)
-      .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
-    node_name: state.inner.config.hostname.clone(),
-    kind_key: kind_key.to_owned(),
-    created_at: Some(
-      chrono::NaiveDateTime::parse_from_str(
-        &created_at,
-        "%Y-%m-%dT%H:%M:%S%.fZ",
-      )
-      .map_err(|err| {
-        IoError::interrupted(
-          "CreateProcess",
-          &format!("Error while creating process {err}"),
+  let process_key = res.id;
+  let result = async {
+    let inspect = state
+      .inner
+      .docker_api
+      .inspect_container(&process_key, None::<InspectContainerOptions>)
+      .await
+      .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
+    let created_at = inspect.created.clone().unwrap_or_default();
+    let new_instance = ProcessPartial {
+      key: process_key.clone(),
+      name: name.to_owned(),
+      kind: kind.clone(),
+      data: serde_json::to_value(&inspect)
+        .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
+      node_name: state.inner.config.hostname.clone(),
+      kind_key: kind_key.to_owned(),
+      created_at: Some(
+        chrono::NaiveDateTime::parse_from_str(
+          &created_at,
+          "%Y-%m-%dT%H:%M:%S%.fZ",
         )
-      })?,
-    ),
-  };
-  let process =
-    ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
-  Process::try_from(process)
-    .map_err(|err| err.map_err_context(|| "CreateProcess"))
+        .map_err(|err| {
+          IoError::interrupted(
+            "CreateProcess",
+            &format!("Error while creating process {err}"),
+          )
+        })?,
+      ),
+    };
+    let process =
+      ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
+    Process::try_from(process)
+      .map_err(|err| err.map_err_context(|| "CreateProcess"))
+  }
+  .await;
+  if result.is_err() {
+    let _ = state
+      .inner
+      .docker_api
+      .remove_container(
+        &process_key,
+        Some(RemoveContainerOptions {
+          force: true,
+          ..Default::default()
+        }),
+      )
+      .await;
+    let _ = ProcessDb::del_by_pk(&process_key, &state.inner.pool).await;
+  }
+  result
 }
 
 /// Delete a single instance (container) by his name
@@ -171,26 +163,6 @@ pub async fn delete_instances(
     .await
     .into_iter()
     .collect::<IoResult<()>>()
-}
-
-/// Kill instances (containers) by their kind key
-/// Eg: kill a (job, cargo, vm)
-pub async fn kill_by_kind_key(
-  pk: &str,
-  opts: &CargoKillOptions,
-  state: &SystemState,
-) -> IoResult<()> {
-  let processes =
-    ProcessDb::read_by_kind_key(pk, None, &state.inner.pool).await?;
-  for process in processes {
-    state
-      .inner
-      .docker_api
-      .kill_container(&process.key, Some(opts.clone().into()))
-      .await
-      .map_err(|err| err.map_err_context(|| "KillProcess"))?;
-  }
-  Ok(())
 }
 
 /// Restart the group of process for a kind key

@@ -9,73 +9,53 @@ use nanocl_utils::versioning;
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    proxy::ResourceProxyRule,
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActor, EventActorKind, NativeEventAction},
+    system::{EventActorKind, NativeEventAction},
   },
 };
 
 use crate::{models::SystemStateRef, utils, vars};
 
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
-const RECONCILE_INTERVAL: std::time::Duration =
-  std::time::Duration::from_secs(30);
 
-fn is_proxy_resource(actor: &EventActor) -> bool {
-  actor
-    .attributes
-    .as_ref()
-    .and_then(|attributes| attributes.get("Kind"))
-    .and_then(serde_json::Value::as_str)
-    == Some(vars::RULE_KEY)
+fn cargo_has_committed_start(
+  cargo: &nanocld_client::stubs::cargo::CargoInspect,
+) -> bool {
+  cargo.status.actual == nanocld_client::stubs::system::ObjPsStatusKind::Start
 }
 
-fn proxy_resource_name(actor: &EventActor) -> IoResult<&str> {
-  actor
-    .key
-    .as_deref()
-    .filter(|name| !name.is_empty())
-    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing key"))
-}
-
-fn proxy_resource_rule(actor: &EventActor) -> IoResult<ResourceProxyRule> {
-  let data = actor
-    .attributes
-    .as_ref()
-    .and_then(|attributes| attributes.get("Spec"))
-    .ok_or_else(|| IoError::invalid_data("Resource event", "Missing Spec"))?;
-  utils::resource::serialize(data)
-}
-
-fn has_healthcheck(cargo: &nanocld_client::stubs::cargo::CargoInspect) -> bool {
-  if cargo.spec.container.healthcheck.is_some() {
-    return true;
+fn cargo_event_refreshes_route(
+  cargo: &nanocld_client::stubs::cargo::CargoInspect,
+  action: &NativeEventAction,
+) -> bool {
+  if !cargo_has_committed_start(cargo) {
+    return false;
   }
-  cargo.instances.iter().any(|instance| {
-    instance
-      .data
-      .config
-      .as_ref()
-      .and_then(|config| config.healthcheck.as_ref())
-      .is_some()
-      || instance
-        .data
-        .state
-        .as_ref()
-        .and_then(|container_state| container_state.health.as_ref())
-        .is_some()
-  })
+  // Preserve nightly's single handoff: healthless/NONE Cargoes refresh on
+  // Start, while a health-gated Cargo refreshes on the following Healthy.
+  // Nanocld commits aggregate health and actual state before either event.
+  let healthchecked = cargo.status.health
+    == nanocld_client::stubs::system::ObjPsHealthStatusKind::Healthy;
+  match action {
+    NativeEventAction::Start => !healthchecked,
+    NativeEventAction::Healthy => healthchecked,
+    _ => false,
+  }
 }
 
-async fn should_wait_for_healthy_event(
+async fn cargo_event_should_refresh_route(
   name: &str,
   namespace: &str,
+  action: &NativeEventAction,
   state: &SystemStateRef,
 ) -> IoResult<bool> {
-  let cargo = state.client.inspect_cargo(name, Some(namespace)).await?;
-  Ok(has_healthcheck(&cargo))
+  let key =
+    nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
+      .map_err(|err| IoError::invalid_input("Cargo key", &err.to_string()))?;
+  let cargo = state.client.inspect_cargo(key.as_str()).await?;
+  Ok(cargo_event_refreshes_route(&cargo, action))
 }
 
 /// Get workload name and namespace attributes from a nanocld event.
@@ -202,19 +182,30 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
-    (EventActorKind::Cargo, NativeEventAction::Healthy) => {
+    (EventActorKind::Cargo, action @ NativeEventAction::Start)
+    | (EventActorKind::Cargo, action @ NativeEventAction::Healthy) => {
       let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      if cargo_event_should_refresh_route(&name, &namespace, &action, state)
+        .await?
+      {
+        update_cargo_rule(&name, &namespace, state).await?;
+        let _ = state.event_emitter.emit_reload().await;
+      }
+      Ok(())
+    }
+    (EventActorKind::Cargo, NativeEventAction::Unhealthy) => {
+      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
+      // Recompute the serving replica set. A failed candidate can leave an
+      // older ready generation routable, while an actually unhealthy replica
+      // must disappear from the generated upstream.
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventActorKind::Cargo, NativeEventAction::Start)
-    | (EventActorKind::Cargo, NativeEventAction::Update) => {
-      let (name, namespace) = get_workload_attributes(&actor.attributes)?;
-      if !should_wait_for_healthy_event(&name, &namespace, state).await? {
-        update_cargo_rule(&name, &namespace, state).await?;
-        let _ = state.event_emitter.emit_reload().await;
-      }
+    (EventActorKind::Cargo, NativeEventAction::Update) => {
+      // Start/Healthy already performed the route handoff. Update is the
+      // terminal rollout-completion signal for command and API waiters, so it
+      // must not trigger a second reload.
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)
@@ -238,27 +229,6 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    // This shouldn't be required as nanocld call the endpoint.
-    // (EventActorKind::Resource, NativeEventAction::Create)
-    // | (EventActorKind::Resource, NativeEventAction::Update) => {
-    //   if !is_proxy_resource(&actor) {
-    //     return Ok(());
-    //   }
-    //   let name = proxy_resource_name(&actor)?;
-    //   let rule = proxy_resource_rule(&actor)?;
-    //   utils::nginx::add_rule(name, &rule, state).await?;
-    //   state.event_emitter.emit_reload().await;
-    //   Ok(())
-    // }
-    // (EventActorKind::Resource, NativeEventAction::Destroy) => {
-    //   if !is_proxy_resource(&actor) {
-    //     return Ok(());
-    //   }
-    //   let name = proxy_resource_name(&actor)?;
-    //   utils::nginx::del_rule(name, state).await?;
-    //   state.event_emitter.emit_reload().await;
-    //   Ok(())
-    // }
     (EventActorKind::Secret, NativeEventAction::Create)
     | (EventActorKind::Secret, NativeEventAction::Update) => {
       let resources = utils::resource::list_by_secret(
@@ -271,16 +241,6 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       Ok(())
     }
     _ => Ok(()),
-  }
-}
-
-async fn reconcile_loop(state: &SystemStateRef) {
-  loop {
-    log::info!("event::reconcile: rebuilding committed proxy resources");
-    if let Err(err) = utils::resource::rebuild_all_rules(state).await {
-      log::warn!("event::reconcile: {err}");
-    }
-    ntex::time::sleep(RECONCILE_INTERVAL).await;
   }
 }
 
@@ -351,18 +311,88 @@ pub(crate) fn spawn(state: &SystemStateRef) {
       rt::Arbiter::current().stop();
     });
   });
-  // let reconcile_state = Arc::clone(state);
-  // rt::Arbiter::new().handle().spawn(async move {
-  //   rt::spawn(async move {
-  //     reconcile_loop(&reconcile_state).await;
-  //     rt::Arbiter::current().stop();
-  //   });
-  // });
 }
 
 #[cfg(test)]
 mod tests {
+  use nanocld_client::stubs::{
+    cargo::CargoInspect,
+    system::{ObjPsHealthStatusKind, ObjPsStatusKind},
+  };
+
   use super::*;
+
+  fn cargo(actual: ObjPsStatusKind) -> CargoInspect {
+    CargoInspect {
+      namespace_name: "global".to_owned(),
+      created_at: chrono::Utc::now().naive_utc(),
+      instance_total: 0,
+      instance_running: 0,
+      status: nanocld_client::stubs::system::ObjPsStatus {
+        actual,
+        ..Default::default()
+      },
+      spec: nanocld_client::stubs::cargo_spec::CargoSpecRevision {
+        name: "api".to_owned(),
+        cargo_key: "global.api".to_owned(),
+        ..Default::default()
+      },
+      instances: Vec::new(),
+    }
+  }
+
+  #[test]
+  fn only_committed_start_is_ready_for_route_refresh() {
+    assert!(cargo_has_committed_start(&cargo(ObjPsStatusKind::Start)));
+    for status in [
+      ObjPsStatusKind::Starting,
+      ObjPsStatusKind::Updating,
+      ObjPsStatusKind::Fail,
+      ObjPsStatusKind::Stop,
+    ] {
+      assert!(!cargo_has_committed_start(&cargo(status)));
+    }
+  }
+
+  #[test]
+  fn cargo_promotion_refreshes_proxy_once_for_its_readiness_kind() {
+    // Healthless and explicitly disabled healthchecks both retain aggregate
+    // health Unknown and hand off on Start.
+    let healthless = cargo(ObjPsStatusKind::Start);
+    assert!(cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Start
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Healthy
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthless,
+      &NativeEventAction::Update
+    ));
+
+    let mut healthchecked = cargo(ObjPsStatusKind::Start);
+    healthchecked.status.health = ObjPsHealthStatusKind::Healthy;
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Start
+    ));
+    assert!(cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Healthy
+    ));
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Update
+    ));
+
+    healthchecked.status.actual = ObjPsStatusKind::Updating;
+    assert!(!cargo_event_refreshes_route(
+      &healthchecked,
+      &NativeEventAction::Healthy
+    ));
+  }
 
   #[test]
   fn workload_attributes_are_shared_by_cargo_and_vm_events() {
@@ -374,36 +404,5 @@ mod tests {
       get_workload_attributes(&attributes).unwrap(),
       ("database".to_owned(), "private".to_owned())
     );
-  }
-
-  #[test]
-  fn committed_proxy_resource_events_expose_name_and_rule() {
-    let actor = EventActor {
-      key: Some("public-api".to_owned()),
-      kind: EventActorKind::Resource,
-      attributes: Some(serde_json::json!({
-        "Kind": vars::RULE_KEY,
-        "Version": "v0.15.0",
-        "Spec": { "Rules": [] },
-      })),
-    };
-
-    assert!(is_proxy_resource(&actor));
-    assert_eq!(proxy_resource_name(&actor).unwrap(), "public-api");
-    assert!(proxy_resource_rule(&actor).unwrap().rules.is_empty());
-  }
-
-  #[test]
-  fn resource_events_for_other_controllers_are_ignored() {
-    let actor = EventActor {
-      key: Some("dns-rule".to_owned()),
-      kind: EventActorKind::Resource,
-      attributes: Some(serde_json::json!({
-        "Kind": "ncdns.io/rule",
-        "Spec": { "Rules": [] },
-      })),
-    };
-
-    assert!(!is_proxy_resource(&actor));
   }
 }

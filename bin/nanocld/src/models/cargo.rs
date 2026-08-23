@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
+use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPatch};
 
 use crate::schema::cargoes;
 
@@ -45,18 +45,18 @@ pub struct CargoUpdateDb {
 /// Arguments to create a new cargo obj
 pub struct CargoObjCreateIn {
   pub namespace: String,
-  pub spec: CargoSpecPartial,
+  pub spec: CargoSpec,
   pub version: String,
 }
 
 /// Arguments to create a new cargo history entry
 pub struct CargoObjPutIn {
-  pub spec: CargoSpecPartial,
+  pub spec: CargoSpec,
   pub version: String,
 }
 
 /// Arguments to update a cargo history entry
 pub struct CargoObjPatchIn {
-  pub spec: CargoSpecUpdate,
+  pub spec: CargoSpecPatch,
   pub version: String,
 }

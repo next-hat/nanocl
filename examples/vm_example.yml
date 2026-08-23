@@ -13,7 +13,7 @@ Resources:
       Protocol: Tcp
       Port: 5555
       Target:
-        Key: vm-test.global.v
+        Key: global.vm-test.v
         Port: 22
 
 # See all options:

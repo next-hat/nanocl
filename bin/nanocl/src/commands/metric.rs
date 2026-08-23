@@ -35,10 +35,10 @@ pub async fn exec_metric(
 ) -> IoResult<()> {
   match &args.command {
     MetricCommand::List(opts) => {
-      MetricArg::exec_ls(&cli_conf.client, args, opts).await
+      MetricArg::exec_ls(&cli_conf.client, args, opts, None).await
     }
     MetricCommand::Inspect(opts) => {
-      MetricArg::exec_inspect(cli_conf, opts, None).await
+      MetricArg::exec_inspect(cli_conf, opts).await
     }
   }
 }

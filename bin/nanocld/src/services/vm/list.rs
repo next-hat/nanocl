@@ -15,7 +15,7 @@ use crate::{
   path = "/vms",
   params(
     ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"filter\": { \"where\": { \"name\": { \"eq\": \"my-vm\" } } } }"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the virtual machine belongs default to 'global'"),
+    ("namespace" = Option<String>, Query, description = "Optional namespace filter; omitted or blank returns all namespaces"),
   ),
   responses(
     (status = 200, description = "List of virtual machine", body = [nanocl_stubs::vm::VmSummary]),

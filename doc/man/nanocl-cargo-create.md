@@ -11,7 +11,7 @@ create - Create a new cargo
 
 ## SYNOPSIS
 
-**create** \[**-v**\|**--volume**\] \[**-e**\|**--env**\]
+**create** \[**-n**\|**--namespace**\] \[**-v**\|**--volume**\] \[**-e**\|**--env**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
 ## DESCRIPTION
@@ -19,6 +19,9 @@ create - Create a new cargo
 Create a new cargo
 
 ## OPTIONS
+
+**-n**, **--namespace** *\<NAMESPACE\>*
+Namespace for the new cargo; defaults to global
 
 **-v**, **--volume** *\<VOLUMES\>*  
 Volumes of the cargo

@@ -48,7 +48,8 @@ Namespace: global
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: ${{ Args.name }}
-  Container:
+  Containers:
+  - Name: ${{ Args.name }}
     Image: ${{ Args.image }}
 
 # See all options:
@@ -63,5 +64,5 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: ${{ Args.name }}.global.c
+          Key: global.${{ Args.name }}.c
           Port: ${{ Args.port }}

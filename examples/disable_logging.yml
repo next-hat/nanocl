@@ -14,12 +14,12 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: deploy-example.global.c
+          Key: global.deploy-example.c
           Port: 9000
 
       - Path: /v2/
         Target:
-          Key: deploy-example.global.c
+          Key: global.deploy-example.c
           Port: 9000
           Path: /v2/
           DisableLogging: true
@@ -28,7 +28,8 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: deploy-example
-  Container:
+  Containers:
+  - Name: deploy-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=DISABLE_LOGGING

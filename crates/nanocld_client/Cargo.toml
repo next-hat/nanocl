@@ -17,6 +17,7 @@ default = ["tokio"]
 tokio = ["ntex/tokio"]
 utoipa = ["nanocl_stubs/utoipa"]
 openssl = ["dep:openssl"]
+test = []
 
 [dev-dependencies]
 tokio-util = "0.7"

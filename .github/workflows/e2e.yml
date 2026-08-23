@@ -42,7 +42,6 @@ jobs:
       # Build nightly image and install nanocl
       - name: Prepare CI
         run: |
-          chmod +x ./tests/e2e_prepare_ci.sh
           ./tests/e2e_prepare_ci.sh
       # Run E2E tests
       - name: E2E

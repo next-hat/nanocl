@@ -65,13 +65,13 @@ pub async fn exec_resource(
 ) -> IoResult<()> {
   match &args.command {
     ResourceCommand::List(opts) => {
-      ResourceArg::exec_ls(&cli_conf.client, args, opts).await
+      ResourceArg::exec_ls(&cli_conf.client, args, opts, None).await
     }
     ResourceCommand::Remove(opts) => {
-      ResourceArg::exec_rm(&cli_conf.client, opts, None).await
+      ResourceArg::exec_rm(&cli_conf.client, opts).await
     }
     ResourceCommand::Inspect(opts) => {
-      ResourceArg::exec_inspect(cli_conf, opts, None).await
+      ResourceArg::exec_inspect(cli_conf, opts).await
     }
     ResourceCommand::History(opts) => {
       exec_resource_history(cli_conf, opts).await

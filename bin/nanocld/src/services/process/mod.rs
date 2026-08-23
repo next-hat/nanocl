@@ -1,6 +1,8 @@
 use ntex::web;
 
+pub mod attach;
 pub mod count;
+pub mod exec;
 pub mod inspect;
 pub mod kill;
 pub mod list;
@@ -11,7 +13,9 @@ pub mod stats;
 pub mod stop;
 pub mod wait;
 
+pub use attach::*;
 pub use count::*;
+pub use exec::*;
 pub use inspect::*;
 pub use kill::*;
 pub use list::*;
@@ -23,7 +27,17 @@ pub use stop::*;
 pub use wait::*;
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
+  config.service(
+    web::resource("/processes/{name}/attach")
+      .route(web::get().to(attach_process)),
+  );
   config.service(logs_process);
+  config.service(create_process_exec);
+  config.service(
+    web::resource("/exec/{id}/start")
+      .route(web::post().to(start_process_exec_detached))
+      .route(web::get().to(start_process_exec_attached)),
+  );
   config.service(inspect_process);
   config.service(list_processes);
   config.service(logs_processes);
@@ -34,7 +48,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(restart_processes);
   config.service(start_processes);
   config.service(stop_processes);
-  config.service(kill_processes);
   config.service(wait_processes);
   config.service(stats_processes);
   config.service(count_processes);
@@ -67,9 +80,8 @@ mod tests {
     let client = system.client;
     let res = client
       .send_get(
-        "/processes/cargo/nstore/stats",
+        "/processes/cargo/system.nstore/stats",
         Some(ProcessStatsQuery {
-          namespace: Some("system".to_owned()),
           stream: Some(false),
           one_shot: Some(true),
         }),
@@ -82,7 +94,7 @@ mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let res = client
-      .send_get("/process/nstore.system.c/stats", None::<String>)
+      .send_get("/process/system.nstore.c/stats", None::<String>)
       .await;
     test_status_code!(
       res.status(),
@@ -109,7 +121,7 @@ mod tests {
     let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
-    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
+    assert!(items.iter().any(|i| i.name == "system.nstore.c"));
     // Filter by limit and offset
     let filter = GenericFilter::new().limit(1).offset(1);
     let qs = GenericListQuery::try_from(filter).unwrap();
@@ -119,13 +131,13 @@ mod tests {
     assert_eq!(items.len(), 1);
     // Filter by name and kind
     let filter = GenericFilter::new()
-      .r#where("name", GenericClause::Like("nstore%".to_owned()))
+      .r#where("name", GenericClause::Like("system.nstore%".to_owned()))
       .r#where("kind", GenericClause::Eq("cargo".to_owned()));
     let qs = GenericListQuery::try_from(filter).unwrap();
     let res = client.send_get("/processes", Some(qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
-    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
+    assert!(items.iter().any(|i| i.name == "system.nstore.c"));
   }
 
   #[ntex::test]
@@ -133,7 +145,7 @@ mod tests {
     let system = gen_default_test_system().await;
     let client = system.client;
     let res = client
-      .send_get("/processes/nstore.system.c/inspect", None::<String>)
+      .send_get("/processes/system.nstore.c/inspect", None::<String>)
       .await;
     test_status_code!(
       res.status(),

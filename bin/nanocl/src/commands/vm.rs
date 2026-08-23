@@ -18,7 +18,9 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::{
   NanocldClient,
   stubs::{
+    generic::{GenericFilter, GenericListQueryNsp},
     process::{OutputKind, OutputLog},
+    resource_key::ResourceKey,
     system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
     vm_spec::VmSpecPartial,
@@ -51,7 +53,17 @@ impl GenericCommandLs for VmArg {
   type ApiItem = nanocld_client::stubs::vm::VmSummary;
 
   fn get_key(item: &Self::Item) -> String {
-    item.name.clone()
+    item.key.clone()
+  }
+
+  fn transform_filter(
+    _args: &Self::Args,
+    filter: &GenericFilter,
+    namespace: Option<&str>,
+  ) -> impl serde::Serialize {
+    GenericListQueryNsp::try_from(filter.clone())
+      .unwrap()
+      .with_namespace(namespace)
   }
 }
 
@@ -66,13 +78,12 @@ impl GenericCommandInspect for VmArg {
 }
 
 async fn wait_vm_state(
-  name: &str,
-  args: &VmArg,
+  key: &str,
   action: NativeEventAction,
   client: &NanocldClient,
 ) -> IoResult<rt::JoinHandle<IoResult<()>>> {
   let waiter = utils::process::wait_process_state(
-    &format!("{}.{}", name, args.namespace.as_deref().unwrap_or("global")),
+    key,
     EventActorKind::Vm,
     [action].to_vec(),
     client,
@@ -85,7 +96,7 @@ async fn wait_vm_state(
 /// It will create a new virtual machine but not start it
 pub async fn exec_vm_create(
   cli_conf: &CliConfig,
-  args: &VmArg,
+  _args: &VmArg,
   options: &VmCreateOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -93,7 +104,7 @@ pub async fn exec_vm_create(
   let image_full_path = utils::path::resolve_full_path(&options.image)?;
   options.image = image_full_path;
   let vm = options.clone().into();
-  let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
+  let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
   Ok(())
 }
@@ -103,7 +114,7 @@ pub async fn exec_vm_create(
 /// If the `attach` option is set, it will attach to the virtual machine console.
 pub async fn exec_vm_run(
   cli_conf: &CliConfig,
-  args: &VmArg,
+  _args: &VmArg,
   options: &VmRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -111,12 +122,10 @@ pub async fn exec_vm_run(
   let image_full_path = utils::path::resolve_full_path(&options.image)?;
   options.image = image_full_path;
   let vm: VmSpecPartial = options.clone().into();
+  let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
   let waiter =
-    wait_vm_state(&vm.name, args, NativeEventAction::Start, client).await?;
-  let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
-  client
-    .start_process("vm", &vm.spec.name, args.namespace.as_deref())
-    .await?;
+    wait_vm_state(&vm.spec.vm_key, NativeEventAction::Start, client).await?;
+  client.start_process("vm", &vm.spec.vm_key).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_process_state", &err.to_string())
   })??;
@@ -124,7 +133,7 @@ pub async fn exec_vm_run(
   if options.attach {
     #[cfg(not(target_os = "windows"))]
     {
-      exec_vm_attach(cli_conf, args, &options.name).await?;
+      exec_vm_attach(cli_conf, &vm.spec.vm_key).await?;
     }
     #[cfg(target_os = "windows")]
     {
@@ -138,35 +147,36 @@ pub async fn exec_vm_run(
 /// It will patch a virtual machine with the provided options
 pub async fn exec_vm_patch(
   cli_conf: &CliConfig,
-  args: &VmArg,
+  _args: &VmArg,
   options: &VmPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let waiter =
-    wait_vm_state(&options.name, args, NativeEventAction::Start, client)
-      .await?;
+    wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
   let vm = options.clone().into();
-  client
-    .patch_vm(&options.name, &vm, args.namespace.as_deref())
-    .await?;
+  client.patch_vm(&options.key, &vm).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_process_state", &err.to_string())
   })??;
   Ok(())
 }
 
+fn vm_process_name(key: &str) -> IoResult<String> {
+  let key = key
+    .parse::<ResourceKey>()
+    .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
+  Ok(format!("{key}.v"))
+}
+
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
 #[cfg(not(target_os = "windows"))]
-pub async fn exec_vm_attach(
-  cli_conf: &CliConfig,
-  args: &VmArg,
-  name: &str,
-) -> IoResult<()> {
+pub async fn exec_vm_attach(cli_conf: &CliConfig, key: &str) -> IoResult<()> {
   let client = &cli_conf.client;
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-  let conn = client.attach_vm(name, args.namespace.as_deref()).await?;
+  let process_name = vm_process_name(key)?;
+  let conn = client.attach_process(&process_name).await?;
   let (mut tx, mut rx) = mpsc::unbounded();
   // start heartbeat task
   let sink = conn.sink();
@@ -262,28 +272,21 @@ pub async fn exec_vm_attach(
 /// It will execute the subcommand passed as argument
 pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   let client = &cli_conf.client;
-  let namespace = args.namespace.clone().unwrap_or("global".to_owned());
   match &args.command {
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
-    VmCommand::List(opts) => VmArg::exec_ls(client, args, opts).await,
-    VmCommand::Remove(opts) => {
-      VmArg::exec_rm(&cli_conf.client, opts, Some(namespace.clone())).await
+    VmCommand::List(opts) => {
+      VmArg::exec_ls(client, args, &opts.list, opts.namespace.as_deref()).await
     }
-    VmCommand::Inspect(opts) => {
-      VmArg::exec_inspect(cli_conf, opts, Some(namespace.clone())).await
-    }
-    VmCommand::Start(opts) => {
-      VmArg::exec_start(client, opts, Some(namespace.clone())).await
-    }
-    VmCommand::Stop(opts) => {
-      VmArg::exec_stop(client, opts, Some(namespace.clone())).await
-    }
+    VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
+    VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
+    VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
+    VmCommand::Stop(opts) => VmArg::exec_stop(client, opts).await,
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
-    VmCommand::Attach { name } => {
+    VmCommand::Attach { key } => {
       #[cfg(not(target_os = "windows"))]
       {
-        exec_vm_attach(cli_conf, args, name).await
+        exec_vm_attach(cli_conf, key).await
       }
       #[cfg(target_os = "windows")]
       {
@@ -291,5 +294,19 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
         Ok(())
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::vm_process_name;
+
+  #[test]
+  fn vm_attach_maps_canonical_key_to_runtime_process_name() {
+    assert_eq!(
+      vm_process_name("team.production.database").unwrap(),
+      "team.production.database.v"
+    );
+    assert!(vm_process_name("database").is_err());
   }
 }

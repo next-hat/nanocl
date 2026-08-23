@@ -13,5 +13,6 @@ Jobs:
 
 Cargoes:
 - Name: include-example
-  Container:
+  Containers:
+  - Name: include-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest

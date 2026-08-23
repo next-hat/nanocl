@@ -13,7 +13,7 @@ networks:
 
 services:
   nstore:
-    container_name: nstore.system.c
+    container_name: system.nstore.c
     hostname: store.nanocl.internal
     image: docker.io/cockroachdb/cockroach:v25.4.13
     entrypoint: /bin/sh
@@ -30,9 +30,16 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=nstore.system
+      - io.nanocl.c=system.nstore
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=d5826ac7-1153-4405-a5ff-6737b16aa5f0
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=nstore
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
+      - io.nanocl.cargo.position=0
     command:
       - -c
       - |
@@ -47,7 +54,7 @@ services:
         cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --store=$$STATE_DIR/data --insecure
 
   nmetrics:
-    container_name: nmetrics.system.c
+    container_name: system.nmetrics.c
     image: ghcr.io/next-hat/metrsd:0.5.8
     tty: true
     environment:
@@ -60,14 +67,21 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=nmetrics.system
+      - io.nanocl.c=system.nmetrics
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=08e65023-afcb-40cb-a4be-b8e030a12aa1
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=nmetrics
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
+      - io.nanocl.cargo.position=0
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
   ncproxy:
-    container_name: ncproxy.system.c
+    container_name: system.ncproxy.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
@@ -86,9 +100,16 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ncproxy.system
+      - io.nanocl.c=system.ncproxy
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=8939e8d5-8ca1-4fee-9ff2-d8b20c89df4e
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=ncproxy
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=host
+      - io.nanocl.cargo.position=0
     volumes:
       - type: bind
         source: .
@@ -99,7 +120,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
 
   ncdns:
-    container_name: ncdns.system.c
+    container_name: system.ncdns.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     profiles:
@@ -118,9 +139,16 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ncdns.system
+      - io.nanocl.c=system.ncdns
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=9318217b-d461-4f5f-a0bb-d73446fdb93b
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=ncdns
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=host
+      - io.nanocl.cargo.position=0
     volumes:
       - type: bind
         source: .
@@ -131,7 +159,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
 
   nanocld:
-    container_name: ndaemon.system.c
+    container_name: system.ndaemon.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
@@ -144,9 +172,16 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
+      - io.nanocl.c=system.ndaemon
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=270a8143-4f58-4504-9c30-05924e2cc7d4
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=ndaemon
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
+      - io.nanocl.cargo.position=0
     environment:
       - RUST_BACKTRACE=1
     volumes:
@@ -178,7 +213,7 @@ services:
           --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
   dbeaver:
-    container_name: dbeaver.system.c
+    container_name: system.dbeaver.c
     image: dbeaver/cloudbeaver:25.0
     tty: true
     user: root
@@ -195,14 +230,21 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=dbeaver.system
+      - io.nanocl.c=system.dbeaver
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=bf3484e4-d743-4068-89af-2c18423c83dd
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=dbeaver
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
+      - io.nanocl.cargo.position=0
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev}/dbeaver:/opt/cloudbeaver/workspace
 
   ncvpnkit:
-    container_name: ncvpnkit.system.c
+    container_name: system.ncvpnkit.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     networks:
@@ -216,9 +258,16 @@ services:
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
+      - io.nanocl.c=system.ncvpnkit
       - io.nanocl.n=system
       - io.nanocl.not-init-c=true
+      - io.nanocl.cargo.replica=fd920f8e-0cd5-43a2-a4b5-be4c363a9f70
+      - io.nanocl.cargo.replica-ordinal=0
+      - io.nanocl.cargo.container=ncvpnkit
+      - io.nanocl.cargo.role=app
+      - io.nanocl.cargo.essential=true
+      - io.nanocl.cargo.network-mode=nanoclbr0
+      - io.nanocl.cargo.position=0
     volumes:
       - type: bind
         source: .

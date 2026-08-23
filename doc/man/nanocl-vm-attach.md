@@ -11,7 +11,7 @@ attach - Attach to a vm
 
 ## SYNOPSIS
 
-**attach** \[**-h**\|**--help**\] \<*NAME*\>
+**attach** \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
 
@@ -22,5 +22,5 @@ Attach to a vm
 **-h**, **--help**  
 Print help
 
-\<*NAME*\>  
-Name of the vm
+\<*KEY*\>
+Canonical key of the VM

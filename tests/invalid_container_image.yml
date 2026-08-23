@@ -6,5 +6,6 @@ Namespace: global
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: invalid_container_image
-  Container:
+  Containers:
+  - Name: app
     Image: doesntexists:latest

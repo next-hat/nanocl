@@ -99,7 +99,7 @@ mod tests {
         locations: vec![ProxyHttpLocation {
           path: "/".into(),
           target: LocationTarget::Upstream(UpstreamTarget {
-            key: "ncproxy-test.global.c".into(),
+            key: "global.ncproxy-test.c".into(),
             port: 9000,
             path: None,
             disable_logging: None,

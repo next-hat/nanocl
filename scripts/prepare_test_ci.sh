@@ -17,7 +17,7 @@ docker run -i --rm \
 # Wait for CockroachDB SQL endpoint before starting nanocld.
 i=0
 while [ "$i" -lt 120 ]; do
-  if docker exec nstore.system.c \
+  if docker exec system.nstore.c \
     cockroach sql --insecure --host=127.0.0.1:26258 -e "select 1" \
     >/dev/null 2>&1; then
     break
@@ -28,7 +28,7 @@ done
 
 if [ "$i" -eq 120 ]; then
   echo "nstore did not become ready" >&2
-  docker logs nstore.system.c || true
+  docker logs system.nstore.c || true
   exit 1
 fi
 

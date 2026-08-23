@@ -7,19 +7,19 @@ sidebar_position: 11
 
 # NAME
 
-restart - Restart a cargo by its name
+restart - Restart cargoes by canonical keys
 
 ## SYNOPSIS
 
-**restart** \[**-h**\|**--help**\] \[*NAMES*\]
+**restart** \[**-h**\|**--help**\] \[*KEYS*\]
 
 ## DESCRIPTION
 
-Restart a cargo by its name
+Restart cargoes by canonical keys
 
 ## OPTIONS
 
 **-h**, **--help**  
 Print help
 
-\[*NAMES*\]  
+\[*KEYS*\]
