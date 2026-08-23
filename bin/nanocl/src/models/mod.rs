@@ -124,6 +124,8 @@ pub enum Command {
   Logs(LogsOpts),
   /// Inspect a process
   Inspect(GenericInspectOpts),
+  /// Execute a command in a process
+  Exec(ExecOpts),
   /// Send a signal to a process
   Kill(KillOpts),
   /// Show nanocl host information
