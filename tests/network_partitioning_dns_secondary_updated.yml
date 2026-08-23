@@ -8,5 +8,5 @@ Resources:
   Data:
     Network: e2e-private
     Entries:
-    - Name: network-partitioning-secondary.nanocl.test
+    - Name: network-partitioning-secondary-updated.nanocl.test
       IpAddress: 192.0.2.42
