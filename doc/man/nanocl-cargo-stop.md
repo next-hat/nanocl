@@ -7,19 +7,20 @@ sidebar_position: 16
 
 # NAME
 
-stop - Stop cargoes by names
+stop - Stop cargoes by canonical keys
 
 ## SYNOPSIS
 
-**stop** \[**-h**\|**--help**\] \[*NAMES*\]
+**stop** \[**-h**\|**--help**\] \[*KEYS*\]
 
 ## DESCRIPTION
 
-Stop cargoes by names
+Stop cargoes by canonical keys
 
 ## OPTIONS
 
 **-h**, **--help**  
 Print help
 
-\[*NAMES*\]  
+\[*KEYS*\]
+Canonical keys of the resources to stop

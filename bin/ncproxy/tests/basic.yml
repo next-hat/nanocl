@@ -18,37 +18,37 @@ Rules:
       UnixPath: /tmp/ncproxy.sock
   - Path: /cargo
     Target:
-      Key: ncproxy-test.global.c
+      Key: global.ncproxy-test.c
       Port: 9000
 - Protocol: Tcp
   Port: 9998
   Network: Local
   Target:
-    Key: ncproxy-test.global.c
+    Key: global.ncproxy-test.c
     Port: 9000
 - Protocol: Tcp
   Port: 9999
   Network: All
   Target:
-    Key: ncproxy-test.global.c
+    Key: global.ncproxy-test.c
     Port: 9000
 - Protocol: Tcp
   Port: 9997
   Network: Local
   Target:
-    Key: ncproxy-test.global.c
+    Key: global.ncproxy-test.c
     Port: 9000
 - Protocol: Tcp
   Port: 9988
   Network: Local
   Ssl: test-secret
   Target:
-    Key: ncproxy-test.global.c
+    Key: global.ncproxy-test.c
     Port: 9000
 - Protocol: Udp
   Port: 9999
   Network: Local
   Ssl: test-secret
   Target:
-    Key: ncproxy-test.global.c
+    Key: global.ncproxy-test.c
     Port: 9000

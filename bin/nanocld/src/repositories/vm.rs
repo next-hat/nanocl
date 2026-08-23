@@ -159,13 +159,7 @@ impl VmDb {
     query: &GenericFilterNsp,
     pool: &Pool,
   ) -> HttpResult<Vec<VmSummary>> {
-    let namespace = utils::key::resolve_nsp(&query.namespace);
-    let namespace = NamespaceDb::read_by_pk(&namespace, pool).await?;
-    let filter = query
-      .filter
-      .clone()
-      .unwrap_or_default()
-      .r#where("namespace_name", GenericClause::Eq(namespace.name.clone()));
+    let filter = Self::collection_filter(query, pool).await?;
     let vms = VmDb::transform_read_by(&filter, pool).await?;
     let mut vm_summaries = Vec::new();
     for vm in vms {
@@ -186,6 +180,25 @@ impl VmDb {
       });
     }
     Ok(vm_summaries)
+  }
+
+  /// Count VMs using the same namespace semantics as [`VmDb::list`].
+  pub async fn count(query: &GenericFilterNsp, pool: &Pool) -> HttpResult<i64> {
+    let filter = Self::collection_filter(query, pool).await?;
+    Ok(VmDb::count_by(&filter, pool).await?)
+  }
+
+  async fn collection_filter(
+    query: &GenericFilterNsp,
+    pool: &Pool,
+  ) -> HttpResult<GenericFilter> {
+    let mut filter = query.filter.clone().unwrap_or_default();
+    if let Some(namespace) = utils::key::normalize_nsp(&query.namespace) {
+      NamespaceDb::read_by_pk(namespace, pool).await?;
+      filter = filter
+        .r#where("namespace_name", GenericClause::Eq(namespace.to_owned()));
+    }
+    Ok(filter)
   }
 
   pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {

@@ -6,7 +6,7 @@ use nanocld_client::stubs::{generic::GenericFilter, system::ObjPsStatus};
 use super::DisplayFormat;
 
 /// An empty filter to use as default
-#[derive(Clone, Default, Args)]
+#[derive(Clone, Debug, Default, Args)]
 pub struct GenericDefaultOpts;
 
 /// A generic filter to use in the list operations
@@ -43,6 +43,16 @@ where
   pub filters: Option<Vec<String>>,
   #[clap(flatten)]
   pub others: Option<T>,
+}
+
+/// List options for namespaced resource collections.
+#[derive(Default, Debug, Clone, Parser)]
+pub struct NamespacedListOpts {
+  /// Optional namespace filter; omitted returns resources from all namespaces
+  #[clap(long, short)]
+  pub namespace: Option<String>,
+  #[clap(flatten)]
+  pub list: GenericListOpts,
 }
 
 /// Convert the generic list options to a generic filter
@@ -84,13 +94,15 @@ pub struct GenericRemoveForceOpts {
 /// Generic start options for the start command
 #[derive(Clone, Parser)]
 pub struct GenericStartOpts {
-  pub names: Vec<String>,
+  /// Canonical keys of the resources to start
+  pub keys: Vec<String>,
 }
 
 /// Generic stop options for the stop command
 #[derive(Clone, Parser)]
 pub struct GenericStopOpts {
-  pub names: Vec<String>,
+  /// Canonical keys of the resources to stop
+  pub keys: Vec<String>,
 }
 
 /// Generic inspect options for the inspect command
@@ -99,6 +111,6 @@ pub struct GenericInspectOpts {
   /// Display format
   #[clap(long)]
   pub display: Option<DisplayFormat>,
-  /// Key or Name of the object to inspect
+  /// Canonical key of the object to inspect
   pub key: String,
 }

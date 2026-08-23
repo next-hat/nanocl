@@ -4,12 +4,26 @@ use ntex::rt;
 
 use nanocl_error::io::IoResult;
 use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter},
+  cargo::Cargo,
+  generic::GenericFilter,
   system::{
     Event, EventActor, EventActorKind, EventKind, NativeEventAction,
     ObjPsHealthStatusKind, ObjPsStatusKind,
   },
 };
+
+fn cargo_references_secret(cargo: &Cargo, key: &str) -> bool {
+  cargo.spec.secrets.iter().any(|secret| secret == key)
+    || cargo
+      .spec
+      .containers
+      .iter()
+      .chain(&cargo.spec.init_containers)
+      .any(|container| {
+        container.secrets.iter().any(|secret| secret == key)
+          || container.image_pull_secret.as_deref() == Some(key)
+      })
+}
 
 use crate::{
   models::{
@@ -163,17 +177,21 @@ async fn update(
     // If a secret is updated we check for the cargoes using it and fire an update for them
     EventActorKind::Secret => {
       log::debug!("handling update event for secret {key}");
-      let filter = GenericFilter::new().r#where(
-        "data",
-        GenericClause::Contains(serde_json::json!({
-          "Secrets": [
-            key
-          ]
-        })),
-      );
-      let cargoes = CargoDb::transform_read_by(&filter, &state.inner.pool)
-        .await
-        .unwrap();
+      let cargoes = match CargoDb::transform_read_by(
+        &GenericFilter::new(),
+        &state.inner.pool,
+      )
+      .await
+      {
+        Ok(cargoes) => cargoes
+          .into_iter()
+          .filter(|cargo| cargo_references_secret(cargo, key))
+          .collect::<Vec<_>>(),
+        Err(error) => {
+          log::error!("unable to find Cargoes using secret {key}: {error}");
+          return None;
+        }
+      };
       log::debug!("found {} cargoes using secret {key}", cargoes.len());
       for cargo in &cargoes {
         ObjPsStatusDb::update_health_status(
@@ -222,6 +240,33 @@ fn stopping(
   }
 }
 
+fn event_waits_for_object_task(
+  actor_kind: &EventActorKind,
+  action: &NativeEventAction,
+  active_task_kind: Option<&NativeEventAction>,
+) -> bool {
+  match actor_kind {
+    // Cargo update tasks emit their route-handoff actions before completing.
+    // Waiting for that same task here would delay raw subscribers (including
+    // ncproxy) until after retained-generation cleanup. Other tasks retain the
+    // existing completion barrier.
+    EventActorKind::Cargo
+      if active_task_kind == Some(&NativeEventAction::Updating)
+        && matches!(
+          action,
+          NativeEventAction::Start
+            | NativeEventAction::Healthy
+            | NativeEventAction::Unhealthy
+        ) =>
+    {
+      false
+    }
+    EventActorKind::Cargo => true,
+    EventActorKind::Vm => true,
+    _ => false,
+  }
+}
+
 /// Take action when event is received
 /// and push the action into the task manager
 /// The task manager will execute the action in background
@@ -244,18 +289,37 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // Specific key of the task for this object
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
-  let task_key = format!("{}@{key}", &actor.kind);
+  let task_key = format!("{}@{key}", actor.kind);
   let action = NativeEventAction::from_str(e.action.as_str())?;
+  let active_task_kind = if actor.kind == EventActorKind::Cargo
+    && matches!(
+      &action,
+      NativeEventAction::Start
+        | NativeEventAction::Healthy
+        | NativeEventAction::Unhealthy
+    ) {
+    state
+      .inner
+      .task_manager
+      .get_task(&task_key)
+      .await
+      .map(|task| task.kind)
+  } else {
+    None
+  };
   // Check if the task already exists
-  match (&actor.kind, &action) {
-    (EventActorKind::Cargo | EventActorKind::Vm, _) => {
-      state.inner.task_manager.wait_task(&task_key).await;
-    }
-    (EventActorKind::Job, NativeEventAction::Destroying) => {
-      log::debug!("Removing task for job {key}");
-      state.inner.task_manager.remove_task(&task_key).await;
-    }
-    _ => {}
+  if event_waits_for_object_task(
+    &actor.kind,
+    &action,
+    active_task_kind.as_ref(),
+  ) {
+    state.inner.task_manager.wait_task(&task_key).await;
+  } else if matches!(
+    (&actor.kind, &action),
+    (EventActorKind::Job, NativeEventAction::Destroying)
+  ) {
+    log::debug!("Removing task for job {key}");
+    state.inner.task_manager.remove_task(&task_key).await;
   }
   let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => starting(&key, actor, state),
@@ -311,4 +375,87 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
     })
     .await;
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocl_stubs::{
+    cargo_spec::{Config, ContainerSpec},
+    generic::ImagePullPolicy,
+  };
+
+  use super::*;
+
+  fn container(name: &str) -> ContainerSpec {
+    ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: ImagePullPolicy::IfNotPresent,
+      container_config: Config {
+        image: Some("example/app:1".to_owned()),
+        ..Default::default()
+      },
+    }
+  }
+
+  #[test]
+  fn secret_updates_cover_shared_container_init_and_pull_references() {
+    let mut cargo = Cargo::default();
+    cargo.spec.secrets = vec!["shared".to_owned()];
+    cargo.spec.containers = vec![container("app")];
+    cargo.spec.containers[0].secrets = vec!["app-env".to_owned()];
+    cargo.spec.containers[0].image_pull_secret = Some("registry".to_owned());
+    cargo.spec.init_containers = vec![container("migrate")];
+    cargo.spec.init_containers[0].secrets = vec!["init-env".to_owned()];
+
+    for key in ["shared", "app-env", "registry", "init-env"] {
+      assert!(cargo_references_secret(&cargo, key));
+    }
+    assert!(!cargo_references_secret(&cargo, "unrelated"));
+  }
+
+  #[test]
+  fn cargo_handoff_events_bypass_the_update_task_but_completion_waits() {
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Updating),
+    ));
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Healthy,
+      Some(&NativeEventAction::Updating),
+    ));
+    assert!(!event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Unhealthy,
+      Some(&NativeEventAction::Updating),
+    ));
+
+    for action in [
+      NativeEventAction::Starting,
+      NativeEventAction::Stopping,
+      NativeEventAction::Updating,
+      NativeEventAction::Update,
+      NativeEventAction::Destroying,
+    ] {
+      assert!(event_waits_for_object_task(
+        &EventActorKind::Cargo,
+        &action,
+        Some(&NativeEventAction::Updating),
+      ));
+    }
+    assert!(event_waits_for_object_task(
+      &EventActorKind::Cargo,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Starting),
+    ));
+    assert!(event_waits_for_object_task(
+      &EventActorKind::Vm,
+      &NativeEventAction::Start,
+      Some(&NativeEventAction::Updating),
+    ));
+  }
 }

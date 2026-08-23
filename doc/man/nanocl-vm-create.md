@@ -11,7 +11,7 @@ create - Create a vm
 
 ## SYNOPSIS
 
-**create** \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
+**create** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
 \[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
 \[**--kvm**\] \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
@@ -20,6 +20,9 @@ create - Create a vm
 Create a vm
 
 ## OPTIONS
+
+**-n**, **--namespace** *\<NAMESPACE\>*
+Namespace for the new VM; defaults to global
 
 **--hostname** *\<HOSTNAME\>*
 hostname of the vm

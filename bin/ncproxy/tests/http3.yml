@@ -6,5 +6,5 @@ Rules:
   Locations:
   - Path: /
     Target:
-      Key: ncproxy-test.global.c
+      Key: global.ncproxy-test.c
       Port: 9000

@@ -5,6 +5,11 @@ mod ws;
 use nanocl_error::io::{IoError, IoResult};
 pub use ws::*;
 
+#[cfg(feature = "dev")]
+mod api_error;
+#[cfg(feature = "dev")]
+pub(crate) use api_error::*;
+
 mod node;
 pub use node::*;
 
@@ -22,6 +27,12 @@ pub use network::*;
 
 mod cargo;
 pub use cargo::*;
+
+mod cargo_replica;
+pub(crate) use cargo_replica::*;
+
+mod cargo_runtime;
+pub(crate) use cargo_runtime::*;
 
 mod distributed_mutex;
 pub use distributed_mutex::*;

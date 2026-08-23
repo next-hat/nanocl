@@ -23,12 +23,13 @@ Jobs:
 # {% endif %}
 
 Cargoes:
+# The final shared-sandbox model does not expose stable per-replica DNS names.
+# Replace the legacy join names below with deployment-specific discovery before
+# using this as an operational CockroachDB cluster.
 - Name: db-replication
-  Replication:
-    Mode: Static
-    Number: 3
-  Container:
-    Hostname: store.local
+  Replicas: 3
+  Containers:
+  - Name: db-replication
     Image: cockroachdb/cockroach:v24.3.8
     Entrypoint:
     - /bin/sh

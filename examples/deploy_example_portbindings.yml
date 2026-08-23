@@ -10,14 +10,14 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: deploy-example.global.c
+          Key: global.deploy-example.c
           Port: 9000
 
 Cargoes:
 - Name: deploy-example
-  Container:
+  PortBindings:
+    "9000/tcp":
+      - HostPort: "9000"
+  Containers:
+  - Name: deploy-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
-    HostConfig:
-      PortBindings:
-        "9000/tcp":
-          - HostPort: "9000"

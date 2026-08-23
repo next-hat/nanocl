@@ -7,7 +7,7 @@ sidebar_position: 88
 
 # NAME
 
-remove - Remove vms
+remove - Remove VMs by canonical keys
 
 ## SYNOPSIS
 
@@ -16,7 +16,7 @@ remove - Remove vms
 
 ## DESCRIPTION
 
-Remove vms
+Remove VMs by canonical keys
 
 ## OPTIONS
 

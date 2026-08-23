@@ -4,22 +4,27 @@ Namespace: global
 
 Cargoes:
 - Name: e2e-private-api
-  Container:
+  NetworkMode: e2e-private
+  Containers:
+  - Name: api
     Image: ghcr.io/next-hat/nanocl-get-started:latest
-    HostConfig:
-      NetworkMode: e2e-private
 
 - Name: e2e-private-peer
-  Container:
+  NetworkMode: e2e-private
+  Dns:
+  - $$INTERNAL_GATEWAY
+  Containers:
+  - Name: peer
     Image: alpine:latest
     Cmd:
     - sleep
     - "300"
-    HostConfig:
-      NetworkMode: e2e-private
+    Env:
+    - E2E_INTERNAL_GATEWAY=$$INTERNAL_GATEWAY
 
 - Name: e2e-default-client
-  Container:
+  Containers:
+  - Name: client
     Image: alpine:latest
     Cmd:
     - sleep
@@ -45,7 +50,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: e2e-private-api.global.c
+          Key: global.e2e-private-api.c
           Port: 9000
 
 - Name: e2e-network-dns

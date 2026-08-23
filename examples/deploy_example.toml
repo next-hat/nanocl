@@ -5,14 +5,16 @@ Namespace = "global"
 [[Cargoes]]
 Name = "deploy-example"
 
-[Cargoes.Container]
+[[Cargoes.Containers]]
+Name = "deploy-example"
 Image = "ghcr.io/next-hat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED1"]
 
 [[Cargoes]]
 Name = "deploy-example2"
 
-[Cargoes.Container]
+[[Cargoes.Containers]]
+Name = "deploy-example2"
 Image = "ghcr.io/next-hat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED2"]
 
@@ -29,19 +31,19 @@ Network = "All"
 Path = "/"
 
 [Resources.Data.Rules.Locations.Target]
-Key = "deploy-example2.global.c"
+Key = "global.deploy-example2.c"
 Port = 9_000
 
 [[Resources.Data.Rules.Locations]]
 Path = "/v1"
 
 [Resources.Data.Rules.Locations.Target]
-Key = "deploy-example.global.c"
+Key = "global.deploy-example.c"
 Port = 9_000
 
 [[Resources.Data.Rules.Locations]]
 Path = "/v2"
 
 [Resources.Data.Rules.Locations.Target]
-Key = "deploy-example2.global.c"
+Key = "global.deploy-example2.c"
 Port = 9_000

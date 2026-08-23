@@ -1,7 +1,6 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::{
   models::{CargoDb, SystemState},
@@ -9,27 +8,24 @@ use crate::{
   utils,
 };
 
-/// Get detailed information about a cargo by its name
+/// Get detailed information about a cargo by its canonical key
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{name}/inspect",
+  path = "/cargoes/{key}/inspect",
   params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes belongs default to 'global'"),
+    ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
     (status = 200, description = "Cargo details", body = nanocl_stubs::cargo::CargoInspect),
   ),
 ))]
-#[web::get("/cargoes/{name}/inspect")]
+#[web::get("/cargoes/{key}/inspect")]
 pub async fn inspect_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = CargoDb::inspect_obj_by_pk(&key, &state).await?;
+  let key = utils::key::parse_resource_key(&path.1)?;
+  let cargo = CargoDb::inspect_obj_by_pk(key.as_str(), &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }

@@ -1,4 +1,5 @@
 mod cargo;
+mod cargo_replica;
 mod distributed_mutex;
 mod event;
 mod job;

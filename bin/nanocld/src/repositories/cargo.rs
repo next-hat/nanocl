@@ -9,7 +9,7 @@ use nanocl_error::{
 
 use nanocl_stubs::{
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
-  cargo_spec::{CargoSpec, CargoSpecPartial},
+  cargo_spec::{CargoSpec, CargoSpecRevision},
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
   system::ObjPsStatus,
 };
@@ -120,7 +120,7 @@ impl RepositoryReadByTransform for CargoDb {
     item: (CargoDb, SpecDb, ObjPsStatusDb),
   ) -> IoResult<Self::NewOutput> {
     let (cargo_db, spec_db, status) = item;
-    let spec = spec_db.try_to_cargo_spec()?;
+    let spec = spec_db.try_to_cargo_spec_revision()?;
     let item = cargo_db.with_spec(&(spec, status.try_into()?));
     Ok(item)
   }
@@ -128,7 +128,7 @@ impl RepositoryReadByTransform for CargoDb {
 
 impl WithSpec for CargoDb {
   type Output = Cargo;
-  type Relation = (CargoSpec, ObjPsStatus);
+  type Relation = (CargoSpecRevision, ObjPsStatus);
 
   fn with_spec(self, r: &Self::Relation) -> Self::Output {
     Self::Output {
@@ -144,16 +144,16 @@ impl CargoDb {
   /// Update a cargo from its specification.
   pub async fn update_from_spec(
     key: &str,
-    item: &CargoSpecPartial,
+    item: &CargoSpec,
     version: &str,
     pool: &Pool,
   ) -> IoResult<Cargo> {
     let version = version.to_owned();
     let mut cargo = CargoDb::transform_read_by_pk(key, pool).await?;
-    let new_spec = SpecDb::try_from_cargo_partial(key, &version, item)?;
+    let new_spec = SpecDb::try_from_cargo_spec(key, &version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
       .await?
-      .try_to_cargo_spec()?;
+      .try_to_cargo_spec_revision()?;
     let new_item = CargoUpdateDb {
       name: Some(item.name.to_owned()),
       spec_key: Some(spec.key),
@@ -224,20 +224,14 @@ impl CargoDb {
     query: &GenericFilterNsp,
     state: &SystemState,
   ) -> HttpResult<Vec<CargoSummary>> {
-    let namespace = utils::key::resolve_nsp(&query.namespace);
-    let filter = query
-      .filter
-      .clone()
-      .unwrap_or_default()
-      .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
-    NamespaceDb::read_by_pk(&namespace, &state.inner.pool).await?;
+    let filter = Self::collection_filter(query, state).await?;
     let cargoes =
       CargoDb::transform_read_by(&filter, &state.inner.pool).await?;
     let mut cargo_summaries = Vec::new();
     for cargo in cargoes {
       let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
         .await?
-        .try_to_cargo_spec()?;
+        .try_to_cargo_spec_revision()?;
       let filter = GenericFilter::new().r#where(
         "data",
         GenericClause::Contains(serde_json::json!({
@@ -266,6 +260,28 @@ impl CargoDb {
       });
     }
     Ok(cargo_summaries)
+  }
+
+  /// Count cargoes using the same namespace semantics as [`CargoDb::list`].
+  pub async fn count(
+    query: &GenericFilterNsp,
+    state: &SystemState,
+  ) -> HttpResult<i64> {
+    let filter = Self::collection_filter(query, state).await?;
+    Ok(CargoDb::count_by(&filter, &state.inner.pool).await?)
+  }
+
+  async fn collection_filter(
+    query: &GenericFilterNsp,
+    state: &SystemState,
+  ) -> HttpResult<GenericFilter> {
+    let mut filter = query.filter.clone().unwrap_or_default();
+    if let Some(namespace) = utils::key::normalize_nsp(&query.namespace) {
+      NamespaceDb::read_by_pk(namespace, &state.inner.pool).await?;
+      filter = filter
+        .r#where("namespace_name", GenericClause::Eq(namespace.to_owned()));
+    }
+    Ok(filter)
   }
 
   /// Delete a cargo and it's relations (Spec, ObjPsStatus).
