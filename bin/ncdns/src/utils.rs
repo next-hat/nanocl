@@ -1,19 +1,14 @@
-use std::{
-  collections::{BTreeMap, HashMap, HashSet},
-  net::IpAddr,
-  time::{Duration, Instant},
-};
+use std::{collections::HashMap, net::IpAddr};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
-
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::NetworkKind;
-use nanocld_client::stubs::network::{Network, gen_network_key};
+use nanocld_client::stubs::{
+  dns::ResourceDnsRule,
+  generic::NetworkKind,
+  network::{Network, gen_network_key},
+};
 
-use crate::dnsmasq::{Dnsmasq, DnsmasqScope, PendingDnsRule};
-
-const OVERRIDE_TTL: Duration = Duration::from_secs(10);
+use crate::dnsmasq::DnsmasqScope;
 
 /// Get public address of host
 async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
@@ -141,291 +136,83 @@ async fn resolve_cached(
   Ok(address)
 }
 
-fn rule_selectors(
-  rules: &BTreeMap<String, ResourceDnsRule>,
+fn build_scope(
+  rule: &ResourceDnsRule,
   cache: &HashMap<NetworkKind, IpAddr>,
-) -> Vec<NetworkKind> {
-  let mut selectors = HashSet::new();
-  for rule in rules.values() {
-    if !cache.contains_key(&rule.network) {
-      selectors.insert(rule.network.clone());
-    }
-    for entry in &rule.entries {
-      if !cache.contains_key(&entry.ip_address) {
-        selectors.insert(entry.ip_address.clone());
-      }
-    }
-  }
-  selectors.into_iter().collect()
-}
-
-async fn resolve_selectors(
-  selectors: Vec<NetworkKind>,
-  cache: &mut HashMap<NetworkKind, IpAddr>,
-  client: &NanocldClient,
-) -> IoResult<()> {
-  for selector in selectors {
-    log::debug!("dns::reconcile: resolving selector {selector}");
-    resolve_cached(&selector, cache, client).await?;
-    log::debug!("dns::reconcile: resolved selector {selector}");
-  }
-  Ok(())
-}
-
-fn build_scopes(
-  rules: &BTreeMap<String, ResourceDnsRule>,
-  cache: &HashMap<NetworkKind, IpAddr>,
-) -> IoResult<Vec<DnsmasqScope>> {
-  let mut scopes = BTreeMap::<IpAddr, DnsmasqScope>::new();
-  for rule in rules.values() {
-    let listen_address = *cache.get(&rule.network).ok_or_else(|| {
+) -> IoResult<DnsmasqScope> {
+  let listen_address = *cache.get(&rule.network).ok_or_else(|| {
+    IoError::invalid_data(
+      "Network",
+      &format!("Network selector {} was not resolved", rule.network),
+    )
+  })?;
+  let mut scope = DnsmasqScope::new(listen_address);
+  for entry in &rule.entries {
+    let address = *cache.get(&entry.ip_address).ok_or_else(|| {
       IoError::invalid_data(
         "Network",
-        &format!("Network selector {} was not resolved", rule.network),
+        &format!("Network selector {} was not resolved", entry.ip_address),
       )
     })?;
-    let scope = scopes
-      .entry(listen_address)
-      .or_insert_with(|| DnsmasqScope::new(listen_address));
-    for entry in &rule.entries {
-      let address = *cache.get(&entry.ip_address).ok_or_else(|| {
-        IoError::invalid_data(
-          "Network",
-          &format!("Network selector {} was not resolved", entry.ip_address),
-        )
-      })?;
-      scope.add_entry(entry.name.clone(), address);
-    }
+    scope.add_entry(entry.name.clone(), address);
   }
-  Ok(scopes.into_values().collect())
+  Ok(scope)
 }
 
-fn retain_uncommitted_overrides(
-  persisted: &BTreeMap<String, ResourceDnsRule>,
-  overrides: &mut BTreeMap<String, PendingDnsRule>,
-  acknowledged_key: Option<&str>,
-  now: Instant,
-) {
-  if let Some(key) = acknowledged_key {
-    overrides.remove(key);
-  }
-  overrides.retain(|key, pending| {
-    if pending.expires_at <= now {
-      return false;
-    }
-    match &pending.desired {
-      Some(desired) => persisted.get(key) != Some(desired),
-      None => persisted.contains_key(key),
-    }
-  });
-}
-
-fn apply_overrides(
-  persisted: &mut BTreeMap<String, ResourceDnsRule>,
-  overrides: &BTreeMap<String, PendingDnsRule>,
-) {
-  for (key, pending) in overrides {
-    persisted.remove(key);
-    if let Some(desired) = &pending.desired {
-      persisted.insert(key.clone(), desired.clone());
-    }
-  }
-}
-
-/// Rebuild all isolated DNS instances from persisted rules, optionally
-/// replacing or removing the rule currently being handled by nanocld.
-pub(crate) async fn reconcile_entries(
-  current_key: Option<&str>,
-  replacement: Option<&ResourceDnsRule>,
-  dnsmasq: &Dnsmasq,
+/// Resolve one complete Resource into its single dnsmasq listener scope.
+pub(crate) async fn resolve_rule(
+  rule: &ResourceDnsRule,
   client: &NanocldClient,
-) -> IoResult<()> {
-  reconcile_entries_inner(current_key, replacement, dnsmasq, client).await
-}
-
-async fn reconcile_entries_inner(
-  current_key: Option<&str>,
-  replacement: Option<&ResourceDnsRule>,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
-) -> IoResult<()> {
-  if current_key.is_none() && replacement.is_some() {
-    return Err(IoError::invalid_input(
-      "DnsRule",
-      "a replacement requires a resource key",
-    ));
-  }
-  // Resource hooks run inside nanocld's resource transaction. They must use the
-  // last committed in-memory snapshot rather than calling list_resource, which
-  // waits for the transaction that is itself waiting for this hook.
+) -> IoResult<DnsmasqScope> {
   let mut cache = HashMap::new();
-  loop {
-    log::debug!("dns::reconcile: waiting for update lock");
-    let mut update = dnsmasq.lock_updates().await;
-    log::debug!("dns::reconcile: acquired update lock");
-    let rules = update.persisted.clone();
-    let mut overrides = update.overrides.clone();
-    retain_uncommitted_overrides(&rules, &mut overrides, None, Instant::now());
-    if let Some(key) = current_key {
-      overrides.insert(
-        key.to_owned(),
-        PendingDnsRule {
-          desired: replacement.cloned(),
-          expires_at: Instant::now() + OVERRIDE_TTL,
-        },
-      );
-    }
-    let mut effective_rules = rules.clone();
-    apply_overrides(&mut effective_rules, &overrides);
-
-    let missing = rule_selectors(&effective_rules, &cache);
-    if !missing.is_empty() {
-      log::debug!(
-        "dns::reconcile: resolving {} selectors outside update lock",
-        missing.len()
-      );
-      drop(update);
-      resolve_selectors(missing, &mut cache, client).await?;
-      continue;
-    }
-
-    let scopes = build_scopes(&effective_rules, &cache)?;
-    log::debug!("dns::reconcile: applying {} scopes", scopes.len());
-    dnsmasq.apply_scopes(scopes).await?;
-    log::debug!("dns::reconcile: applied scopes");
-    update.overrides = overrides;
-    return Ok(());
+  resolve_cached(&rule.network, &mut cache, client).await?;
+  for entry in &rule.entries {
+    resolve_cached(&entry.ip_address, &mut cache, client).await?;
   }
+  build_scope(rule, &cache)
 }
 
 #[cfg(test)]
 pub mod tests {
-  use std::collections::BTreeMap;
-  use std::time::{Duration, Instant};
+  use std::collections::HashMap;
 
   pub use nanocl_utils::ntex::test_client::*;
-  use nanocld_client::stubs::{dns::ResourceDnsRule, generic::NetworkKind};
+  use nanocld_client::stubs::{
+    dns::{DnsEntry, ResourceDnsRule},
+    generic::NetworkKind,
+  };
   use nanocld_client::{ConnectOpts, NanocldClient};
   use ntex::rt;
 
-  use super::{apply_overrides, retain_uncommitted_overrides};
-  use crate::{
-    dnsmasq::{self, PendingDnsRule},
-    services, vars,
-  };
-
-  fn rule(network: &str) -> ResourceDnsRule {
-    ResourceDnsRule {
-      network: NetworkKind::Named(network.to_owned()),
-      entries: Vec::new(),
-    }
-  }
+  use super::build_scope;
+  use crate::{dnsmasq, services, vars};
 
   #[test]
-  fn pending_rule_overrides_close_the_pre_commit_window() {
-    let now = Instant::now();
-    let mut persisted = BTreeMap::from([
-      ("updated".to_owned(), rule("old")),
-      ("deleted".to_owned(), rule("private")),
-    ]);
-    let overrides = BTreeMap::from([
-      (
-        "created".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("private")),
-          expires_at: now + Duration::from_secs(10),
+  fn one_rule_builds_one_scope_and_deduplicates_its_entries() {
+    let listener = "10.0.0.1".parse().unwrap();
+    let address = "10.0.0.2".parse().unwrap();
+    let rule = ResourceDnsRule {
+      network: NetworkKind::Other(listener),
+      entries: vec![
+        DnsEntry {
+          name: "api.internal".to_owned(),
+          ip_address: NetworkKind::Other(address),
         },
-      ),
-      (
-        "updated".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("new")),
-          expires_at: now + Duration::from_secs(10),
+        DnsEntry {
+          name: "api.internal".to_owned(),
+          ip_address: NetworkKind::Other(address),
         },
-      ),
-      (
-        "deleted".to_owned(),
-        PendingDnsRule {
-          desired: None,
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
+      ],
+    };
+    let cache = HashMap::from([
+      (rule.network.clone(), listener),
+      (rule.entries[0].ip_address.clone(), address),
     ]);
 
-    apply_overrides(&mut persisted, &overrides);
+    let scope = build_scope(&rule, &cache).unwrap();
 
-    assert_eq!(persisted.get("created"), Some(&rule("private")));
-    assert_eq!(persisted.get("updated"), Some(&rule("new")));
-    assert!(!persisted.contains_key("deleted"));
-  }
-
-  #[test]
-  fn committed_rule_overrides_are_discarded() {
-    let now = Instant::now();
-    let persisted = BTreeMap::from([("created".to_owned(), rule("private"))]);
-    let mut overrides = BTreeMap::from([
-      (
-        "created".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("private")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "deleted".to_owned(),
-        PendingDnsRule {
-          desired: None,
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "pending".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("pending")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-    ]);
-
-    retain_uncommitted_overrides(&persisted, &mut overrides, None, now);
-
-    assert!(!overrides.contains_key("created"));
-    assert!(!overrides.contains_key("deleted"));
-    assert!(overrides.contains_key("pending"));
-  }
-
-  #[test]
-  fn acknowledged_and_expired_overrides_yield_to_persisted_state() {
-    let now = Instant::now();
-    let persisted = BTreeMap::from([
-      ("acknowledged".to_owned(), rule("committed")),
-      ("expired".to_owned(), rule("committed")),
-    ]);
-    let mut overrides = BTreeMap::from([
-      (
-        "acknowledged".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("different")),
-          expires_at: now + Duration::from_secs(10),
-        },
-      ),
-      (
-        "expired".to_owned(),
-        PendingDnsRule {
-          desired: Some(rule("different")),
-          expires_at: now,
-        },
-      ),
-    ]);
-
-    retain_uncommitted_overrides(
-      &persisted,
-      &mut overrides,
-      Some("acknowledged"),
-      now,
-    );
-
-    assert!(overrides.is_empty());
+    assert_eq!(scope.listen_address, listener);
+    assert_eq!(scope.entries["api.internal"].len(), 1);
   }
 
   #[test]
