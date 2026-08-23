@@ -37,13 +37,25 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
 
 async fn ensure_loop(client: &NanocldClient) {
   loop {
-    match ensure_self_config(client).await {
-      Ok(()) => return,
+    if let Err(err) = ensure_self_config(client).await {
+      log::warn!("event::loop: unable to ensure resource kind: {err}");
+      ntex::time::sleep(RETRY_DELAY).await;
+      continue;
+    }
+    log::info!("event::loop: subscribing to nanocld events");
+    match client.watch_events(None).await {
       Err(err) => {
-        log::warn!("event::loop: unable to ensure resource kind: {err}");
-        ntex::time::sleep(RETRY_DELAY).await;
+        log::warn!("event::loop: {err}");
+      }
+      Ok(mut stream) => {
+        log::info!("event::loop: subscribed to nanocld events");
+        while let Some(_event) = stream.next().await {
+          // We stay connection to the server to receive events, to freez the loop.
+        }
       }
     }
+    log::warn!("event::loop: retrying in {} seconds", RETRY_DELAY.as_secs());
+    ntex::time::sleep(RETRY_DELAY).await;
   }
 }
 
