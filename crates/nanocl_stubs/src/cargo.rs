@@ -1,8 +1,6 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use bollard_next::container::KillContainerOptions;
-
 use crate::{
   cargo_spec::CargoSpecRevision,
   process::Process,
@@ -94,32 +92,6 @@ pub struct CargoInspect {
   pub spec: CargoSpecRevision,
   /// List of instances
   pub instances: Vec<Process>,
-}
-
-/// Options for the kill command
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CargoKillOptions {
-  /// Signal to send to the container default: SIGKILL
-  pub signal: String,
-}
-
-impl Default for CargoKillOptions {
-  fn default() -> Self {
-    Self {
-      signal: "SIGKILL".to_owned(),
-    }
-  }
-}
-
-impl From<CargoKillOptions> for KillContainerOptions<String> {
-  fn from(options: CargoKillOptions) -> Self {
-    Self {
-      signal: options.signal,
-    }
-  }
 }
 
 /// Delete cargo query

@@ -33,7 +33,7 @@ pub use job::exec_job;
 pub use metric::exec_metric;
 pub use namespace::exec_namespace;
 pub use node::exec_node;
-pub use process::{exec_process, inspect_process, logs_process};
+pub use process::{exec_process, inspect_process, kill_process, logs_process};
 pub use resource::exec_resource;
 pub use secret::exec_secret;
 pub use state::exec_state;

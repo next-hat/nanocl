@@ -97,6 +97,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
     Command::Logs(args) => commands::logs_process(&cli_conf, args).await,
     Command::Inspect(args) => commands::inspect_process(&cli_conf, args).await,
+    Command::Kill(args) => commands::kill_process(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
     Command::Install(args) => {
       #[cfg(not(target_os = "windows"))]
@@ -342,6 +343,64 @@ mod tests {
     );
     assert!(
       Cli::try_parse_from(["nanocl", "cargo", "kill", "system.nstore"])
+        .is_err()
+    );
+  }
+
+  #[test]
+  fn kill_command_defaults_to_sigkill() {
+    let cli = Cli::try_parse_from(["nanocl", "kill", "global.foo-r0-abc.c"])
+      .expect("kill command must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "global.foo-r0-abc.c");
+    assert_eq!(opts.signal, "SIGKILL");
+  }
+
+  #[test]
+  fn kill_command_accepts_short_signal() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "kill",
+      "-s",
+      "SIGTERM",
+      "global.foo-r0-abc.c",
+    ])
+    .expect("kill command with short signal must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "global.foo-r0-abc.c");
+    assert_eq!(opts.signal, "SIGTERM");
+  }
+
+  #[test]
+  fn kill_command_accepts_long_signal() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "kill",
+      "--signal",
+      "SIGINT",
+      "9f8e7d6c5b4a",
+    ])
+    .expect("kill command with long signal must parse");
+    let Command::Kill(opts) = cli.command else {
+      panic!("expected kill command");
+    };
+    assert_eq!(opts.process, "9f8e7d6c5b4a");
+    assert_eq!(opts.signal, "SIGINT");
+  }
+
+  #[test]
+  fn kill_command_requires_process() {
+    assert!(Cli::try_parse_from(["nanocl", "kill"]).is_err());
+  }
+
+  #[test]
+  fn kill_command_rejects_multiple_processes() {
+    assert!(
+      Cli::try_parse_from(["nanocl", "kill", "process-one", "process-two"])
         .is_err()
     );
   }

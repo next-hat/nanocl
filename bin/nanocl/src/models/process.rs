@@ -1,5 +1,5 @@
 use chrono::DateTime;
-use clap::Args;
+use clap::{Args, Parser};
 use tabled::Tabled;
 
 use bollard_next::{
@@ -12,6 +12,16 @@ use nanocld_client::stubs::{
 };
 
 pub struct ProcessArg;
+
+/// `nanocl kill` available options
+#[derive(Clone, Parser)]
+pub struct KillOpts {
+  /// Signal to send to the process
+  #[clap(short, long, default_value = "SIGKILL")]
+  pub signal: String,
+  /// Concrete process name or full Docker ID
+  pub process: String,
+}
 
 /// `nanocl ps` available options
 #[derive(Default, Clone, Args)]

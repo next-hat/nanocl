@@ -117,6 +117,7 @@ impl Modify for VersionModifier {
     process::stats_processes,
     process::count_processes,
     process::inspect_process,
+    process::kill_process,
     process::attach_process,
     process::start_process_by_pk,
     process::process_stats_by_name,
@@ -247,6 +248,28 @@ mod tests {
 
     assert!(paths.contains_key("/processes/{name}/attach"));
     assert!(!paths.contains_key("/vms/{key}/attach"));
+  }
+
+  #[test]
+  fn generated_openapi_exposes_process_kill() {
+    let document =
+      serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
+
+    assert_eq!(
+      document["paths"]["/processes/{name}/kill"]["post"]["requestBody"]["content"]
+        ["application/json"]["schema"]["$ref"],
+      "#/components/schemas/ProcessKillOptions"
+    );
+
+    assert_eq!(
+      document["components"]["schemas"]["ProcessKillOptions"]["required"],
+      serde_json::json!(["signal"])
+    );
+    assert_eq!(
+      document["components"]["schemas"]["ProcessKillOptions"]["properties"]["signal"]
+        ["type"],
+      "string"
+    );
   }
 
   /// Regenerate the checked-in daemon OpenAPI without starting Nanocld.
