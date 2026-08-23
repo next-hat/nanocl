@@ -882,9 +882,10 @@ mod tests {
     );
     insert_observed_process(&cargo_key, &api, &system.state).await;
 
-    let reconstructed = reconstruct_cargo(&cargo_key, &[api.clone()])
-      .unwrap()
-      .unwrap();
+    let reconstructed =
+      reconstruct_cargo(&cargo_key, std::slice::from_ref(&api))
+        .unwrap()
+        .unwrap();
     persist_reconstructed_cargo(&cargo_key, &reconstructed, &system.state)
       .await
       .unwrap();

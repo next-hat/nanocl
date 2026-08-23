@@ -1,6 +1,8 @@
-use ntex::channel::mpsc::Receiver;
+use ntex::{channel::mpsc::Receiver, io, rt, ws};
 
-use nanocl_error::{http::HttpResult, http_client::HttpClientResult};
+use nanocl_error::{
+  http::HttpResult, http_client::HttpClientResult, io::FromIo,
+};
 
 use nanocl_stubs::{
   generic::GenericFilter,
@@ -14,6 +16,73 @@ use super::NanocldClient;
 
 impl NanocldClient {
   const PROCESS_PATH: &'static str = "/processes";
+
+  fn process_attach_url(&self, name: &str) -> String {
+    self.gen_url(&format!("{}/{name}/attach", Self::PROCESS_PATH))
+  }
+
+  /// Attach to a process by its concrete Docker-backed name or ID.
+  /// Returns a WebSocket stream for sending input and receiving process output.
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::{ConnectOpts, NanocldClient};
+  ///
+  /// let client = NanocldClient::connect_to(&ConnectOpts::default()).unwrap();
+  /// let res = client.attach_process("global.my-vm.v").await;
+  /// ```
+  pub async fn attach_process(
+    &self,
+    name: &str,
+  ) -> HttpClientResult<ws::WsConnection<io::Base>> {
+    let url = self.process_attach_url(name);
+    // Open a WebSocket connection over the configured HTTP transport.
+    #[cfg(not(target_os = "windows"))]
+    {
+      use nanocl_error::io::IoError;
+
+      let con = match &self.unix_socket {
+        Some(path) => ws::WsClient::builder(&url)
+          .connector::<_, _>(ntex::service::fn_service(|_| async move {
+            Ok(rt::unix_connect(&path, ntex::SharedCfg::default()).await?)
+          }))
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::interrupted(
+              "Unable to build websocket client",
+              &format!("{err:?}"),
+            )
+          })?
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| path))?,
+        None => ws::WsClient::builder(&url)
+          .build(ntex::SharedCfg::default())
+          .await
+          .map_err(|err| {
+            IoError::interrupted(
+              "Unable to build websocket client",
+              &format!("{err:?}"),
+            )
+          })?
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| &self.url))?,
+      };
+      Ok(con)
+    }
+    #[cfg(target_os = "windows")]
+    {
+      let con = ws::WsClient::builder(&url)
+        .map_err(|err| err.map_err_context(|| &self.url))?
+        .connect()
+        .await
+        .map_err(|err| err.map_err_context(|| &self.url))?;
+      Ok(con)
+    }
+  }
 
   /// List of current processes (vm, job, cargo) managed by the daemon
   ///
@@ -231,6 +300,20 @@ mod tests {
   use super::*;
 
   use futures::StreamExt;
+
+  #[test]
+  fn process_attach_url_uses_process_route() {
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    })
+    .expect("Failed to create a nanocl client");
+
+    assert_eq!(
+      client.process_attach_url("global.my-vm.v"),
+      "http://nanocl.internal:8585/v0.18.0/processes/global.my-vm.v/attach"
+    );
+  }
 
   #[ntex::test]
   async fn logs_process() {

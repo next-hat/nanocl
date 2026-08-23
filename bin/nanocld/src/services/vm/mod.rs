@@ -1,6 +1,5 @@
 use ntex::web;
 
-pub mod attach;
 pub mod count;
 pub mod create;
 pub mod delete;
@@ -9,7 +8,6 @@ pub mod list;
 pub mod list_history;
 pub mod patch;
 
-pub use attach::*;
 pub use count::*;
 pub use create::*;
 pub use delete::*;
@@ -26,9 +24,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(count_vm);
   config.service(list_vm_history);
   config.service(patch_vm);
-  config.service(
-    web::resource("/vms/{key}/attach").route(web::get().to(vm_attach)),
-  );
 }
 
 #[cfg(test)]

@@ -1,7 +1,4 @@
-use ntex::{io, rt, ws};
-
 use nanocl_error::http_client::HttpClientResult;
-use nanocl_error::io::FromIo;
 
 use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
@@ -100,68 +97,5 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
-  }
-
-  /// Attach to a VM by its canonical key.
-  /// and return websocket stream to send input and receive output from the vm tty
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.attach_vm("global.my-vm").await;
-  /// ```
-  pub async fn attach_vm(
-    &self,
-    key: &str,
-  ) -> HttpClientResult<ws::WsConnection<io::Base>> {
-    let url = format!("{}/{}/vms/{key}/attach", self.url, &self.version);
-    // open websockets connection over http transport
-    #[cfg(not(target_os = "windows"))]
-    {
-      use nanocl_error::io::IoError;
-
-      let con = match &self.unix_socket {
-        Some(path) => ws::WsClient::builder(&url)
-          .connector::<_, _>(ntex::service::fn_service(|_| async move {
-            Ok(rt::unix_connect(&path, ntex::SharedCfg::default()).await?)
-          }))
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::interrupted(
-              "Unable to build websocket client",
-              &format!("{err:?}"),
-            )
-          })?
-          .connect()
-          .await
-          .map_err(|err| err.map_err_context(|| path))?,
-        None => ws::WsClient::builder(&url)
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::interrupted(
-              "Unable to build websocket client",
-              &format!("{err:?}"),
-            )
-          })?
-          .connect()
-          .await
-          .map_err(|err| err.map_err_context(|| &self.url))?,
-      };
-      Ok(con)
-    }
-    #[cfg(target_os = "windows")]
-    {
-      let con = ws::WsClient::builder(&url)
-        .map_err(|err| err.map_err_context(|| &self.url))?
-        .connect()
-        .await
-        .map_err(|err| err.map_err_context(|| &self.url))?;
-      Ok(con)
-    }
   }
 }
