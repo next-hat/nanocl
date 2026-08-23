@@ -385,6 +385,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+  /exec/{id}/start:
+    get:
+      tags:
+      - Processes
+      summary: Start and attach to a Docker exec instance through an RFC6455 WebSocket
+      description: Binary client frames are raw stdin. Text controls are stdin_eof, resize, and detach. Server binary frames begin with 0x01 stdout, 0x02 stderr, or 0x03 console; text controls report exit, detached, or error.
+      operationId: start_process_exec_attached
+      parameters:
+      - name: id
+        in: path
+        description: Docker exec instance ID
+        required: true
+        schema:
+          type: string
+      responses:
+        '101':
+          description: Attached process exec WebSocket
+        '404':
+          description: Process exec doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      tags:
+      - Processes
+      summary: Start a Docker exec instance without attaching streams
+      operationId: start_process_exec_detached
+      parameters:
+      - name: id
+        in: path
+        description: Docker exec instance ID
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Process exec started detached
+        '404':
+          description: Process exec doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /info:
     get:
       tags:
@@ -1142,6 +1186,38 @@ paths:
       responses:
         '101':
           description: Websocket connection
+  /processes/{name}/exec:
+    post:
+      tags:
+      - Processes
+      summary: Create an exec instance for a concrete process name or ID
+      operationId: create_process_exec
+      parameters:
+      - name: name
+        in: path
+        description: Name or id of the container
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessExecCreateOptions'
+        required: true
+      responses:
+        '201':
+          description: Process exec created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessExecCreated'
+        '404':
+          description: Process doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /processes/{name}/inspect:
     get:
       tags:
@@ -7086,6 +7162,73 @@ components:
         Data:
           $ref: '#/components/schemas/ContainerInspectResponse'
           description: The data of the process a ContainerInspect
+    ProcessExecCreateOptions:
+      type: object
+      description: Options for creating an exec instance in a concrete process
+      properties:
+        AttachStdin:
+          type:
+          - boolean
+          - 'null'
+          description: Attach to standard input
+        AttachStdout:
+          type:
+          - boolean
+          - 'null'
+          description: Attach to standard output
+        AttachStderr:
+          type:
+          - boolean
+          - 'null'
+          description: Attach to standard error
+        Tty:
+          type:
+          - boolean
+          - 'null'
+          description: Allocate a pseudo-TTY
+        DetachKeys:
+          type:
+          - string
+          - 'null'
+          description: Docker-compatible detach key sequence
+        Env:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Environment variables in `NAME=value` form
+        Cmd:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Command and arguments to execute
+        Privileged:
+          type:
+          - boolean
+          - 'null'
+          description: Run the command with extended privileges
+        User:
+          type:
+          - string
+          - 'null'
+          description: User and optional group for the command
+        WorkingDir:
+          type:
+          - string
+          - 'null'
+          description: Working directory inside the process
+    ProcessExecCreated:
+      type: object
+      description: Result of creating a process exec instance
+      required:
+      - Id
+      properties:
+        Id:
+          type: string
+          description: Docker-owned exec instance ID
     ProcessKillOptions:
       type: object
       description: Options for killing a concrete process

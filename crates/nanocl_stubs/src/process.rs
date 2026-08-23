@@ -7,6 +7,7 @@ use bollard_next::{
   container::{
     KillContainerOptions, LogOutput, LogsOptions, Stats, StatsOptions,
   },
+  exec::{CreateExecOptions, CreateExecResults},
   service::{
     ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
   },
@@ -147,6 +148,150 @@ impl From<ProcessKillOptions> for KillContainerOptions<String> {
     Self {
       signal: options.signal,
     }
+  }
+}
+
+/// Options for creating an exec instance in a concrete process
+#[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessExecCreateOptions {
+  /// Attach to standard input
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub attach_stdin: Option<bool>,
+  /// Attach to standard output
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub attach_stdout: Option<bool>,
+  /// Attach to standard error
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub attach_stderr: Option<bool>,
+  /// Allocate a pseudo-TTY
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub tty: Option<bool>,
+  /// Docker-compatible detach key sequence
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub detach_keys: Option<String>,
+  /// Environment variables in `NAME=value` form
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub env: Option<Vec<String>>,
+  /// Command and arguments to execute
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cmd: Option<Vec<String>>,
+  /// Run the command with extended privileges
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub privileged: Option<bool>,
+  /// User and optional group for the command
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub user: Option<String>,
+  /// Working directory inside the process
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub working_dir: Option<String>,
+}
+
+impl From<ProcessExecCreateOptions> for CreateExecOptions {
+  fn from(options: ProcessExecCreateOptions) -> Self {
+    Self {
+      attach_stdin: options.attach_stdin,
+      attach_stdout: options.attach_stdout,
+      attach_stderr: options.attach_stderr,
+      tty: options.tty,
+      detach_keys: options.detach_keys,
+      env: options.env,
+      cmd: options.cmd,
+      privileged: options.privileged,
+      user: options.user,
+      working_dir: options.working_dir,
+    }
+  }
+}
+
+/// Result of creating a process exec instance
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessExecCreated {
+  /// Docker-owned exec instance ID
+  pub id: String,
+}
+
+impl From<CreateExecResults> for ProcessExecCreated {
+  fn from(result: CreateExecResults) -> Self {
+    Self { id: result.id }
+  }
+}
+
+/// Text controls accepted by an attached process exec WebSocket
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "snake_case"))]
+pub enum ProcessExecInputControl {
+  /// Close the Docker stdin side while continuing to receive output
+  StdinEof,
+  /// Resize an attached TTY
+  Resize { width: u16, height: u16 },
+  /// Drop this attachment without stopping the Docker exec
+  Detach,
+}
+
+/// Text controls emitted by an attached process exec WebSocket
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "snake_case"))]
+pub enum ProcessExecOutputControl {
+  /// The exec completed with this exit code
+  Exit { code: i64 },
+  /// The client attachment was detached
+  Detached,
+  /// The bridge failed or rejected a protocol message
+  Error { message: String },
+}
+
+/// Channel marker at the beginning of a server-to-client binary exec frame
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ProcessExecOutputChannel {
+  Stdout = 0x01,
+  Stderr = 0x02,
+  Console = 0x03,
+}
+
+impl ProcessExecOutputChannel {
+  pub const fn marker(self) -> u8 {
+    self as u8
   }
 }
 
@@ -416,7 +561,12 @@ impl From<ProcessStatsQuery> for StatsOptions {
 
 #[cfg(test)]
 mod tests {
-  use super::ProcessKillOptions;
+  use bollard_next::exec::CreateExecOptions;
+
+  use super::{
+    ProcessExecCreateOptions, ProcessExecCreated, ProcessExecInputControl,
+    ProcessExecOutputControl, ProcessKillOptions,
+  };
 
   #[test]
   fn process_kill_options_preserve_wire_shape() {
@@ -426,5 +576,124 @@ mod tests {
     .expect("ProcessKillOptions must serialize");
 
     assert_eq!(value, serde_json::json!({ "signal": "SIGTERM" }));
+  }
+
+  #[test]
+  fn process_exec_create_options_preserve_wire_shape_and_command() {
+    let options = ProcessExecCreateOptions {
+      attach_stdin: Some(true),
+      attach_stdout: Some(true),
+      attach_stderr: Some(true),
+      tty: Some(true),
+      detach_keys: Some("ctrl-p,ctrl-q".to_owned()),
+      env: Some(vec!["FOO=bar".to_owned()]),
+      cmd: Some(vec!["/bin/sh".to_owned(), "-l".to_owned()]),
+      privileged: Some(false),
+      user: Some("1000:1000".to_owned()),
+      working_dir: Some("/work".to_owned()),
+    };
+
+    let value = serde_json::to_value(&options)
+      .expect("ProcessExecCreateOptions must serialize");
+    assert_eq!(
+      value,
+      serde_json::json!({
+        "AttachStdin": true,
+        "AttachStdout": true,
+        "AttachStderr": true,
+        "Tty": true,
+        "DetachKeys": "ctrl-p,ctrl-q",
+        "Env": ["FOO=bar"],
+        "Cmd": ["/bin/sh", "-l"],
+        "Privileged": false,
+        "User": "1000:1000",
+        "WorkingDir": "/work"
+      })
+    );
+
+    let docker_options: CreateExecOptions = options.into();
+    assert_eq!(docker_options.attach_stdin, Some(true));
+    assert_eq!(docker_options.attach_stdout, Some(true));
+    assert_eq!(docker_options.attach_stderr, Some(true));
+    assert_eq!(docker_options.tty, Some(true));
+    assert_eq!(docker_options.detach_keys.as_deref(), Some("ctrl-p,ctrl-q"));
+    assert_eq!(docker_options.env, Some(vec!["FOO=bar".to_owned()]));
+    assert_eq!(
+      docker_options.cmd,
+      Some(vec!["/bin/sh".to_owned(), "-l".to_owned()])
+    );
+    assert_eq!(docker_options.privileged, Some(false));
+    assert_eq!(docker_options.user.as_deref(), Some("1000:1000"));
+    assert_eq!(docker_options.working_dir.as_deref(), Some("/work"));
+  }
+
+  #[test]
+  fn process_exec_create_options_keep_absent_values_absent() {
+    let options = ProcessExecCreateOptions::default();
+    let value = serde_json::to_value(&options)
+      .expect("ProcessExecCreateOptions must serialize");
+    let docker_options: CreateExecOptions = options.into();
+
+    assert_eq!(value, serde_json::json!({}));
+    assert_eq!(docker_options, CreateExecOptions::default());
+  }
+
+  #[test]
+  fn process_exec_created_preserves_wire_shape() {
+    let value = serde_json::to_value(ProcessExecCreated {
+      id: "docker-exec-id".to_owned(),
+    })
+    .expect("ProcessExecCreated must serialize");
+
+    assert_eq!(value, serde_json::json!({ "Id": "docker-exec-id" }));
+  }
+
+  #[test]
+  fn process_exec_input_controls_parse() {
+    assert_eq!(
+      serde_json::from_str::<ProcessExecInputControl>(
+        r#"{"type":"stdin_eof"}"#
+      )
+      .unwrap(),
+      ProcessExecInputControl::StdinEof
+    );
+    assert_eq!(
+      serde_json::from_str::<ProcessExecInputControl>(
+        r#"{"type":"resize","width":80,"height":24}"#
+      )
+      .unwrap(),
+      ProcessExecInputControl::Resize {
+        width: 80,
+        height: 24,
+      }
+    );
+    assert_eq!(
+      serde_json::from_str::<ProcessExecInputControl>(r#"{"type":"detach"}"#)
+        .unwrap(),
+      ProcessExecInputControl::Detach
+    );
+  }
+
+  #[test]
+  fn process_exec_output_controls_serialize() {
+    assert_eq!(
+      serde_json::to_value(ProcessExecOutputControl::Exit { code: 42 })
+        .unwrap(),
+      serde_json::json!({ "type": "exit", "code": 42 })
+    );
+    assert_eq!(
+      serde_json::to_value(ProcessExecOutputControl::Detached).unwrap(),
+      serde_json::json!({ "type": "detached" })
+    );
+    assert_eq!(
+      serde_json::to_value(ProcessExecOutputControl::Error {
+        message: "bridge failed".to_owned(),
+      })
+      .unwrap(),
+      serde_json::json!({
+        "type": "error",
+        "message": "bridge failed"
+      })
+    );
   }
 }

@@ -2,6 +2,7 @@ use ntex::web;
 
 pub mod attach;
 pub mod count;
+pub mod exec;
 pub mod inspect;
 pub mod kill;
 pub mod list;
@@ -14,6 +15,7 @@ pub mod wait;
 
 pub use attach::*;
 pub use count::*;
+pub use exec::*;
 pub use inspect::*;
 pub use kill::*;
 pub use list::*;
@@ -30,6 +32,12 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .route(web::get().to(attach_process)),
   );
   config.service(logs_process);
+  config.service(create_process_exec);
+  config.service(
+    web::resource("/exec/{id}/start")
+      .route(web::post().to(start_process_exec_detached))
+      .route(web::get().to(start_process_exec_attached)),
+  );
   config.service(inspect_process);
   config.service(list_processes);
   config.service(logs_processes);
