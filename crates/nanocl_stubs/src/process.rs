@@ -4,7 +4,9 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use bollard_next::{
-  container::{LogOutput, LogsOptions, Stats, StatsOptions},
+  container::{
+    KillContainerOptions, LogOutput, LogsOptions, Stats, StatsOptions,
+  },
   service::{
     ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
   },
@@ -120,6 +122,32 @@ pub struct Process {
   pub kind_key: String,
   /// The data of the process a ContainerInspect
   pub data: ContainerInspectResponse,
+}
+
+/// Options for killing a concrete process
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ProcessKillOptions {
+  /// Signal to send to the process; defaults to SIGKILL
+  pub signal: String,
+}
+
+impl Default for ProcessKillOptions {
+  fn default() -> Self {
+    Self {
+      signal: "SIGKILL".to_owned(),
+    }
+  }
+}
+
+impl From<ProcessKillOptions> for KillContainerOptions<String> {
+  fn from(options: ProcessKillOptions) -> Self {
+    Self {
+      signal: options.signal,
+    }
+  }
 }
 
 /// Kind of Output
@@ -383,5 +411,20 @@ impl From<ProcessStatsQuery> for StatsOptions {
       stream: query.stream.unwrap_or(true),
       one_shot: query.one_shot.unwrap_or_default(),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ProcessKillOptions;
+
+  #[test]
+  fn process_kill_options_preserve_wire_shape() {
+    let value = serde_json::to_value(ProcessKillOptions {
+      signal: "SIGTERM".to_owned(),
+    })
+    .expect("ProcessKillOptions must serialize");
+
+    assert_eq!(value, serde_json::json!({ "signal": "SIGTERM" }));
   }
 }

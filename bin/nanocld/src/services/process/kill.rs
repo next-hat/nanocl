@@ -1,7 +1,7 @@
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::cargo::CargoKillOptions;
+use nanocl_stubs::process::ProcessKillOptions;
 
 use crate::models::SystemState;
 
@@ -9,7 +9,7 @@ use crate::models::SystemState;
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
-  request_body = CargoKillOptions,
+  request_body = ProcessKillOptions,
   path = "/processes/{name}/kill",
   params(
     ("name" = String, Path, description = "Name or id of the container", example = "system.nstore.c"),
@@ -22,7 +22,7 @@ use crate::models::SystemState;
 pub async fn kill_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
-  payload: web::types::Json<CargoKillOptions>,
+  payload: web::types::Json<ProcessKillOptions>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
   state

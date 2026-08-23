@@ -1,11 +1,13 @@
 use nanocl_error::io::IoResult;
-use nanocld_client::stubs::process::{Process, ProcessLogQuery};
+use nanocld_client::stubs::process::{
+  Process, ProcessKillOptions, ProcessLogQuery,
+};
 
 use crate::{
   config::CliConfig,
   models::{
-    GenericInspectOpts, GenericListOpts, LogsOpts, ProcessArg, ProcessFilter,
-    ProcessRow,
+    GenericInspectOpts, GenericListOpts, KillOpts, LogsOpts, ProcessArg,
+    ProcessFilter, ProcessRow,
   },
   utils,
 };
@@ -55,6 +57,23 @@ pub async fn inspect_process(
   opts: &GenericInspectOpts,
 ) -> IoResult<()> {
   ProcessArg::exec_inspect(cli_conf, opts).await?;
+  Ok(())
+}
+
+/// Send a signal to a concrete process by its name or full Docker ID
+pub async fn kill_process(
+  cli_conf: &CliConfig,
+  opts: &KillOpts,
+) -> IoResult<()> {
+  cli_conf
+    .client
+    .kill_process(
+      &opts.process,
+      &ProcessKillOptions {
+        signal: opts.signal.clone(),
+      },
+    )
+    .await?;
   Ok(())
 }
 

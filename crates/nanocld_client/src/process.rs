@@ -7,8 +7,8 @@ use nanocl_error::{
 use nanocl_stubs::{
   generic::GenericFilter,
   process::{
-    Process, ProcessLogQuery, ProcessOutputLog, ProcessStats,
-    ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
+    Process, ProcessKillOptions, ProcessLogQuery, ProcessOutputLog,
+    ProcessStats, ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
   },
 };
 
@@ -19,6 +19,10 @@ impl NanocldClient {
 
   fn process_attach_url(&self, name: &str) -> String {
     self.gen_url(&format!("{}/{name}/attach", Self::PROCESS_PATH))
+  }
+
+  fn process_kill_path(name: &str) -> String {
+    format!("{}/{name}/kill", Self::PROCESS_PATH)
   }
 
   /// Attach to a process by its concrete Docker-backed name or ID.
@@ -82,6 +86,22 @@ impl NanocldClient {
         .map_err(|err| err.map_err_context(|| &self.url))?;
       Ok(con)
     }
+  }
+
+  /// Send a signal to a concrete process by its Docker-backed name or ID.
+  pub async fn kill_process(
+    &self,
+    name: &str,
+    options: &ProcessKillOptions,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &Self::process_kill_path(name),
+        Some(options),
+        None::<String>,
+      )
+      .await?;
+    Ok(())
   }
 
   /// List of current processes (vm, job, cargo) managed by the daemon
@@ -312,6 +332,14 @@ mod tests {
     assert_eq!(
       client.process_attach_url("global.my-vm.v"),
       "http://nanocl.internal:8585/v0.18.0/processes/global.my-vm.v/attach"
+    );
+  }
+
+  #[test]
+  fn process_kill_path_uses_process_route() {
+    assert_eq!(
+      NanocldClient::process_kill_path("global.foo-r0-abc.c"),
+      "/processes/global.foo-r0-abc.c/kill"
     );
   }
 
