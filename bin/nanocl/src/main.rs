@@ -97,6 +97,13 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
     Command::Logs(args) => commands::logs_process(&cli_conf, args).await,
     Command::Inspect(args) => commands::inspect_process(&cli_conf, args).await,
+    Command::Exec(args) => {
+      let code = commands::exec_process_command(&cli_conf, args).await?;
+      if code != 0 {
+        std::process::exit(code);
+      }
+      Ok(())
+    }
     Command::Kill(args) => commands::kill_process(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
     Command::Install(args) => {
