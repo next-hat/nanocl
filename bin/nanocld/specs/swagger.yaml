@@ -2520,6 +2520,18 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Cargo-owned host port bindings.
+        Hostname:
+          type:
+          - string
+          - 'null'
+          description: Docker hostname assigned to the Cargo network owner.
+        Dns:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: DNS servers assigned to the Cargo network owner.
         Secrets:
           type: array
           items:
@@ -2584,6 +2596,18 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Replacement Cargo-owned port bindings.
+        Hostname:
+          type:
+          - string
+          - 'null'
+          description: New Docker hostname for the Cargo network owner.
+        Dns:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Replacement DNS servers for the Cargo network owner.
         Secrets:
           type:
           - array
@@ -2668,6 +2692,18 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Cargo-owned host port bindings.
+        Hostname:
+          type:
+          - string
+          - 'null'
+          description: Docker hostname assigned to the Cargo network owner.
+        Dns:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: DNS servers assigned to the Cargo network owner.
         Secrets:
           type: array
           items:
