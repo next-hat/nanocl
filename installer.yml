@@ -11,7 +11,11 @@ Cargoes:
 - Name: nstore
   Containers:
   - Name: nstore
+    # {% if supports_modern_cockroachdb_image %}
     Image: docker.io/cockroachdb/cockroach:v25.4.13
+    # {% else %}
+    Image: docker.io/cockroachdb/cockroach:v23.1.30
+    # {% endif %}
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:

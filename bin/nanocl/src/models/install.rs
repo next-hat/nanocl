@@ -65,6 +65,8 @@ pub struct NanocldArg {
   /// Specify if the docker host is docker desktop
   /// detected if docker context is desktop-linux
   pub(crate) is_docker_desktop: bool,
+  /// Specify if the CPU supports the modern CockroachDB image
+  pub(crate) supports_modern_cockroachdb_image: bool,
   /// Build channel used
   pub(crate) channel: String,
   /// Specify if the docker host is unix socket
@@ -86,6 +88,8 @@ impl From<NanocldArg> for liquid::Object {
       "gid": arg.gid,
       "advertise_addr": arg.advertise_addr,
       "is_docker_desktop": arg.is_docker_desktop,
+      "supports_modern_cockroachdb_image":
+        arg.supports_modern_cockroachdb_image,
       "home_dir": arg.home_dir,
       "channel": arg.channel,
       "docker_uds_path": arg.docker_uds_path,
