@@ -13,15 +13,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Cargo health status in command output.
-- Start and delete cargo instances on a specific node.
+- Process-scoped `nanocl exec` and `nanocl kill` commands for targeting one
+  concrete container by process name or Docker ID.
+- Cargo health status and named application containers in command output.
+- Start and delete Cargo instances on a specific node.
 
 ### Changed
 
+- **Breaking:** Cargo Statefiles now use named `Containers` and ordered
+  `InitContainers`, an integer `Replicas` field, and Cargo-owned network, port,
+  hostname, and DNS settings. The previous single-container fields and
+  replication modes are no longer accepted.
+- **Breaking:** Cargo and VM commands now identify namespaced resources with
+  canonical `{namespace}.{name}` keys; list commands can span namespaces.
+- `nanocl cargo patch` accepts `--container` to select the application container
+  to update and requires it when a Cargo has multiple application containers.
+- VM Statefiles now use a full local `Image` path and an optional
+  `InitContainer`; VM attach uses the process-scoped daemon endpoint.
 - Statefile rendering and argument handling support required, multiple, described and default values.
+
+### Removed
+
+- Cargo-scoped exec and group-wide kill operations; use process-scoped
+  `nanocl exec` and `nanocl kill` instead.
+- The `--rm` option from `nanocl cargo run`.
+- The `nanocl vm image` command and daemon-managed VM image workflow.
 
 ### Fixed
 
+- Job list and inspection output now reads status and timestamps from their
+  corrected top-level API fields.
 - `nanocl backup` now strips the nanocld auto-mounted secret bind (`/opt/nanocl.io/secrets`) from cargoes and jobs so backups can be reapplied without manual edits.
 
 ## [0.17.1] - 17-09-2025

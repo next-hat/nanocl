@@ -7,17 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.28.0-n0.15.0] - unreleased
 
-### Core
-
-- Upgrade dependencies
-
 ### Changed
 
-- Default html page with 502
+- Replace the generic welcome page with an explanatory HTTP 502 error page,
+  now shipped by the embedded Nginx data plane in `ncproxy`.
 
 ### Removed
 
-- The standalone proxy data plane is superseded by the Nginx integration in `ncproxy`.
+- The standalone proxy image release is superseded by the Nginx integration in
+  `ncproxy`.
 
 ## [1.28.0-n0.14.0] - 2025-09-11
 

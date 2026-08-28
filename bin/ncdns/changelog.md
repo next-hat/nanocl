@@ -5,11 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0]
+## [0.10.0] - unreleased
 
 ### Core
 
 - Integrated dnsmasq data plane and health endpoint; DNS rule updates no longer require a separate `ndns` container or `docker exec`.
+
+### Added
+
+- Named Docker network selectors backed by nanocld's persisted network
+  inspection data.
+
+### Fixed
+
+- Persist each DNS resource as an independent dnsmasq fragment so applying,
+  updating, moving, or deleting one rule preserves other committed rules on the
+  same listener.
+- Validate rule changes before activation, roll back failed updates, and
+  restart persisted dnsmasq instances after ncdns restarts.
 
 ## [0.9.0] - 2025-09-12
 
