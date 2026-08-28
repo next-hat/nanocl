@@ -69,7 +69,7 @@ paths:
     delete:
       tags:
       - Rules
-      summary: Delete a ProxyRule
+      summary: Delete a DnsRule
       operationId: remove_rule
       parameters:
       - name: name
