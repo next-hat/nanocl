@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0] - 2026-03-25
 
-## Core
+### Core
 
 - Upgrade dependencies
+
+### Changed
+
+- Use the Nanocl 0.18 client and controller API dependencies.
 
 ## [0.7.0] - 2025-09-12
 
@@ -78,4 +82,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Watch nanocld event for new Resource ProxyRule to add or remove vpnkit rule.
-

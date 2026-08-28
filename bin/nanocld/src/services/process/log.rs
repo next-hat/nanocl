@@ -3,7 +3,7 @@ use ntex::web;
 
 use bollard_next::container::LogsOptions;
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::process::{ProcessKind, ProcessLogQuery, ProcessOutputLog};
 
 use crate::{
   models::{ProcessDb, SystemState},
@@ -97,7 +97,13 @@ async fn logs_processes(
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
     .into_iter()
-    .filter(|process| !process.name.starts_with("tmp-"))
+    .filter(|process| {
+      if kind == ProcessKind::Cargo {
+        !utils::container::cargo::is_retained_process_name(&process.name)
+      } else {
+        !process.name.starts_with("tmp-")
+      }
+    })
     .collect::<Vec<_>>()
     .into_iter()
     .map(|process| {

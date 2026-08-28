@@ -215,6 +215,14 @@ fn process_labels(
   process.data.config.as_ref()?.labels.as_ref()
 }
 
+fn cargo_process_is_candidate(name: &str) -> bool {
+  name.ends_with(".candidate.c")
+}
+
+fn cargo_process_is_retained(name: &str) -> bool {
+  name.ends_with(".tmp.c")
+}
+
 fn process_has_enabled_healthcheck(process: &Process) -> bool {
   let Some(healthcheck) = process
     .data
@@ -296,7 +304,7 @@ impl<'a> CargoRuntimeGroup<'a> {
       owner: CargoEndpointOwner::Sandbox,
       sandbox: Some(process),
       apps: BTreeMap::new(),
-      retained: process.name.starts_with("tmp-"),
+      retained: cargo_process_is_retained(&process.name),
       invalid: false,
     }
   }
@@ -459,7 +467,7 @@ impl<'a> CargoRuntimeGroup<'a> {
 ///
 /// Single-application Cargoes publish their direct application address, while
 /// multi-application Cargoes publish their running sandbox address. During a
-/// rollout, sandbox IDs and the retained `tmp-` marker keep generations
+/// rollout, sandbox IDs and the retained `.tmp.c` suffix keep generations
 /// independent. Cargo-level host mode preserves its existing marker-based
 /// grouping and address deduplication.
 fn get_cargo_addresses(
@@ -474,7 +482,8 @@ fn get_cargo_addresses(
     cargo_endpoint_owner(application_count, cargo_network_mode);
   let mut replicas = BTreeMap::<String, Vec<&Process>>::new();
   for process in processes {
-    if process.node_name != local_node || process.name.starts_with("candidate-")
+    if process.node_name != local_node
+      || cargo_process_is_candidate(&process.name)
     {
       continue;
     }
@@ -524,7 +533,7 @@ fn get_cargo_addresses(
       {
         continue;
       }
-      let retained = process.name.starts_with("tmp-");
+      let retained = cargo_process_is_retained(&process.name);
       let mode = process_network_mode(process).unwrap_or("nanoclbr0");
 
       if let Some(sandbox_id) = mode
@@ -701,7 +710,7 @@ pub async fn get_addresses(
   for process in processes {
     log::debug!("get_addresses from: {}", process.name);
     if process.name.starts_with("tmp-")
-      || process.name.starts_with("init-")
+      || process.name.ends_with(".init.v")
       || process.node_name != local_node
       || !process_is_running(process)
     {
@@ -937,6 +946,22 @@ mod tests {
 
   use super::*;
 
+  #[test]
+  fn cargo_lifecycle_classification_requires_reserved_suffixes() {
+    for name in [
+      "tmp-production.foo-r0-abc123.c",
+      "candidate-team.foo-r0-abc123.c",
+      "global.foo-r0-tmp-candidate-abc123.c",
+    ] {
+      assert!(!cargo_process_is_candidate(name));
+      assert!(!cargo_process_is_retained(name));
+    }
+    assert!(cargo_process_is_candidate(
+      "global.foo-r0-abc123.candidate.c"
+    ));
+    assert!(cargo_process_is_retained("global.foo-r0-abc123.tmp.c"));
+  }
+
   #[derive(Clone, Copy)]
   enum CargoProcessProbe {
     None,
@@ -1111,9 +1136,9 @@ mod tests {
       },
     );
     if retained {
-      sandbox.name = format!("tmp-{}", sandbox.name);
-      app.name = format!("tmp-{}", app.name);
-      sidecar.name = format!("tmp-{}", sidecar.name);
+      sandbox.name = format!("{}.tmp.c", sandbox.name);
+      app.name = format!("{}.tmp.c", app.name);
+      sidecar.name = format!("{}.tmp.c", sidecar.name);
     }
     vec![sandbox, app, sidecar]
   }
@@ -1151,7 +1176,7 @@ mod tests {
       },
     );
     if retained {
-      app.name = format!("tmp-{}", app.name);
+      app.name = format!("{}.tmp.c", app.name);
     }
     vec![app]
   }
@@ -1268,7 +1293,7 @@ mod tests {
         &[("private", "10.0.0.3")],
       ),
       process(
-        "init-api-2",
+        "api-2.init.v",
         "node-a",
         "private",
         running,
@@ -1922,7 +1947,7 @@ mod tests {
       false,
     );
     for process in &mut candidate {
-      process.name = format!("candidate-{}", process.name);
+      process.name = format!("{}.candidate.c", process.name);
     }
     processes.extend(candidate);
 
@@ -2079,7 +2104,7 @@ mod tests {
       true,
     );
     processes.push(cargo_process(
-      "tmp-worker-rollout-old",
+      "worker-rollout-old.tmp.c",
       "rollout",
       "node-a",
       "host",
@@ -2133,7 +2158,7 @@ mod tests {
   fn cargo_host_rollout_uses_the_ready_retained_group_as_fallback() {
     let processes = vec![
       cargo_process(
-        "tmp-api-host",
+        "api-host.tmp.c",
         "host",
         "node-a",
         "host",

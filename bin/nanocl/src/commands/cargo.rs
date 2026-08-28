@@ -319,10 +319,8 @@ mod tests {
   fn quiet_output_uses_canonical_key() {
     let row = CargoRow {
       key: "system.same".to_owned(),
-      containers: String::new(),
       status: String::new(),
       instances: String::new(),
-      version: String::new(),
       created_at: String::new(),
       updated_at: String::new(),
     };
