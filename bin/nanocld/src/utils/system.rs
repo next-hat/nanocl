@@ -26,9 +26,12 @@ use crate::{
   },
   objects::generic::ObjCreate,
   repositories::generic::*,
-  utils::container::cargo_compiler::{
-    LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_KIND,
-    LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+  utils::container::{
+    cargo::is_rollout_process_name,
+    cargo_compiler::{
+      LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_KIND,
+      LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+    },
   },
   vars,
 };
@@ -45,8 +48,7 @@ async fn reattach_cargo_process(
   labels: &HashMap<String, String>,
   state: &SystemState,
 ) -> IoResult<()> {
-  if process_name.starts_with("tmp-") || process_name.starts_with("candidate-")
-  {
+  if is_rollout_process_name(process_name) {
     return Ok(());
   }
   if labels.get(LABEL_CARGO_KEY).map(String::as_str) != Some(cargo_key) {
@@ -507,10 +509,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
           .any(|process| process.process_name == format!("{cargo_key}.c"));
         let has_reconstruction_identity_labels = observed
           .iter()
-          .filter(|process| {
-            !process.process_name.starts_with("tmp-")
-              && !process.process_name.starts_with("candidate-")
-          })
+          .filter(|process| !is_rollout_process_name(&process.process_name))
           .any(|process| {
             [
               LABEL_REPLICA,
@@ -754,7 +753,7 @@ mod tests {
       CargoReplicaProcessRole::App,
       "api",
       Some(0),
-      format!("candidate-{cargo_key}-r0-api.c"),
+      format!("{cargo_key}-r0-api.candidate.c"),
       sandbox_mode.clone(),
     );
     candidate.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
@@ -764,7 +763,7 @@ mod tests {
       CargoReplicaProcessRole::App,
       "sidecar",
       Some(1),
-      format!("tmp-{cargo_key}-r0-sidecar.c"),
+      format!("{cargo_key}-r0-sidecar.tmp.c"),
       sandbox_mode,
     );
     retained.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
