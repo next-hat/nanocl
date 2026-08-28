@@ -5,7 +5,7 @@ use nanocl_stubs::{cargo::Cargo, process::Process, system::NativeEventAction};
 
 use crate::models::CargoReplicaProcessRole;
 
-use super::{RuntimeSlot, needs_sandbox};
+use super::{RuntimeSlot, is_rollout_process_name, needs_sandbox};
 use crate::utils::container::cargo_compiler::{
   LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_ROLE,
 };
@@ -91,9 +91,7 @@ pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
     container.essential
       && healthcheck_enabled(container.container_config.healthcheck.as_ref())
   }) || instances.iter().any(|instance| {
-    if instance.name.starts_with("tmp-")
-      || instance.name.starts_with("candidate-")
-    {
+    if is_rollout_process_name(&instance.name) {
       return false;
     }
     let labels = instance
@@ -183,10 +181,7 @@ pub(crate) fn all_desired_replicas_ready(
     .collect::<HashSet<_>>();
   let mut replicas = HashMap::<uuid::Uuid, ReplicaReadinessObservation>::new();
   for process in instances {
-    if process.name.starts_with("tmp-")
-      || process.name.starts_with("candidate-")
-      || process.name.starts_with("init-")
-    {
+    if is_rollout_process_name(&process.name) {
       continue;
     }
     let Some(labels) = process
@@ -532,7 +527,7 @@ mod tests {
       ),
       readiness_process(
         replica,
-        "init-global.api-migrate.c",
+        "global.api-migrate.init.c",
         "init",
         "migrate",
         true,
@@ -683,9 +678,9 @@ mod tests {
     assert!(!all_desired_replicas_ready(&cargo, &desired, &with_sandbox));
 
     let mut retained = app.clone();
-    retained.name = format!("tmp-{}", retained.name);
+    retained.name = "global.api-api.tmp.c".to_owned();
     let mut candidate = app;
-    candidate.name = format!("candidate-{}", candidate.name);
+    candidate.name = "global.api-api.candidate.c".to_owned();
     assert!(!all_desired_replicas_ready(
       &cargo,
       &desired,

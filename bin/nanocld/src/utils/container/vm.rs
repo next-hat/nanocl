@@ -44,7 +44,7 @@ enum VmProcessRole {
 fn vm_process_role(process_name: &str, runtime_name: &str) -> VmProcessRole {
   if process_name == runtime_name {
     VmProcessRole::Runtime
-  } else if process_name.starts_with("init-") {
+  } else if process_name.ends_with(".init.v") {
     VmProcessRole::Init
   } else {
     VmProcessRole::Other
@@ -102,7 +102,7 @@ async fn create_init_container(
   init_container.labels = Some(labels);
   let short_id = utils::key::generate_short_id(6);
   let name =
-    format!("init-{}.{}-{}.v", vm.namespace_name, vm.spec.name, short_id);
+    format!("{}.{}-{}.init.v", vm.namespace_name, vm.spec.name, short_id);
   let process = super::process::create(
     &ProcessKind::Vm,
     &name,
@@ -412,8 +412,13 @@ mod tests {
       VmProcessRole::Runtime
     );
     assert_eq!(
-      vm_process_role("init-global.ubuntu-a1b2c3.v", runtime_name),
+      vm_process_role("global.ubuntu-a1b2c3.init.v", runtime_name),
       VmProcessRole::Init
+    );
+    let prefixed_runtime_name = "init-services.ubuntu.v";
+    assert_eq!(
+      vm_process_role(prefixed_runtime_name, prefixed_runtime_name),
+      VmProcessRole::Runtime
     );
     assert_eq!(
       vm_process_role("tmp-global.ubuntu.v", runtime_name),

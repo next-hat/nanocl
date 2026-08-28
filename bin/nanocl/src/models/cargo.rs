@@ -7,9 +7,6 @@ use nanocld_client::stubs::{
   cargo_spec::{CargoSpec, Config, ContainerSpec, HostConfig},
 };
 
-#[cfg(test)]
-use nanocld_client::stubs::cargo_spec::CargoSpecRevision;
-
 use super::{
   GenericInspectOpts, GenericRemoveForceOpts, GenericRemoveOpts,
   GenericStartOpts, GenericStopOpts, NamespacedListOpts,
@@ -225,14 +222,10 @@ pub struct CargoArg {
 pub struct CargoRow {
   /// Canonical key of the cargo
   pub(crate) key: String,
-  /// Named application containers and their images
-  pub(crate) containers: String,
   /// Status of the cargo
   pub(crate) status: String,
   /// Number of running instances
   pub(crate) instances: String,
-  /// Spec version of the cargo
-  pub(crate) version: String,
   /// When the cargo was created
   #[tabled(rename = "CREATED AT")]
   pub(crate) created_at: String,
@@ -246,7 +239,6 @@ impl From<CargoSummary> for CargoRow {
   fn from(cargo: CargoSummary) -> Self {
     let binding = chrono::Local::now();
     let tz = binding.offset();
-    // Convert the created_at and updated_at to the current timezone
     let created_at = tz
       .timestamp_opt(cargo.created_at.and_utc().timestamp(), 0)
       .unwrap()
@@ -257,24 +249,6 @@ impl From<CargoSummary> for CargoRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       key: cargo.spec.cargo_key,
-      containers: cargo
-        .spec
-        .containers
-        .iter()
-        .map(|container| {
-          format!(
-            "{}={}",
-            container.name,
-            container
-              .container_config
-              .image
-              .as_deref()
-              .unwrap_or_default()
-          )
-        })
-        .collect::<Vec<_>>()
-        .join(", "),
-      version: cargo.spec.version,
       status: format!(
         "{}/{} ({})",
         cargo.status.actual, cargo.status.wanted, cargo.status.health
@@ -558,29 +532,6 @@ mod tests {
   }
 
   #[test]
-  fn list_row_renders_every_application_container_in_declaration_order() {
-    let row = CargoRow::from(CargoSummary {
-      namespace_name: "global".to_owned(),
-      status: Default::default(),
-      created_at: Default::default(),
-      instance_total: 1,
-      instance_running: 1,
-      spec: CargoSpecRevision {
-        cargo_key: "global.stack".to_owned(),
-        version: "v1".to_owned(),
-        containers: vec![
-          container("api", "example/api:1"),
-          container("worker", "example/worker:2"),
-        ],
-        ..Default::default()
-      },
-    });
-
-    assert_eq!(row.containers, "api=example/api:1, worker=example/worker:2");
-    assert!(tabled::Table::new([row]).to_string().contains("CONTAINERS"));
-  }
-
-  #[test]
   fn namespace_is_only_available_for_collection_and_creation_commands() {
     let inspect =
       CargoArg::try_parse_from(["cargo", "inspect", "system.same"]).unwrap();
@@ -617,19 +568,15 @@ mod tests {
     let table = tabled::Table::new([
       CargoRow {
         key: "global.same".to_owned(),
-        containers: "same=alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
-        version: "v1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
       },
       CargoRow {
         key: "system.same".to_owned(),
-        containers: "same=alpine".to_owned(),
         status: "running".to_owned(),
         instances: "1/1".to_owned(),
-        version: "v1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
       },

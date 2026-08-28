@@ -396,7 +396,7 @@ mod tests {
         format!("global.api-r{ordinal}-sandbox.c")
       }
       CargoReplicaProcessRole::Init => {
-        format!("init-global.api-r{ordinal}-{logical_name}.c")
+        format!("global.api-r{ordinal}-{logical_name}.init.c")
       }
       CargoReplicaProcessRole::App => {
         format!("global.api-r{ordinal}-{logical_name}.c")
@@ -624,10 +624,10 @@ mod tests {
       .unwrap()
       .clone();
     candidate.key = "candidate-id".to_owned();
-    candidate.name = "candidate-global.api-r0-api.c".to_owned();
+    candidate.name = "global.api-r0-api.candidate.c".to_owned();
     let mut retained = candidate.clone();
     retained.key = "retained-id".to_owned();
-    retained.name = "tmp-global.api-r0-api.c".to_owned();
+    retained.name = "global.api-r0-api.tmp.c".to_owned();
     processes.extend([candidate, retained]);
 
     let plan =

@@ -10,13 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Docker daemon background thread health check to restart nanocld if docker is not reachable.
+- Durable Cargo replicas with named application and ordered init containers.
+  Multi-container replicas share a sandbox network namespace, while a
+  single-application replica runs directly without a sandbox.
 - Health-aware cargo rollouts: wait for replacement containers to become healthy before removing previous instances, and restore the previous instances when a replacement becomes unhealthy.
+- Process-scoped exec and kill APIs for one concrete container.
+- Persisted Docker network discovery, inspection APIs, and automatic creation
+  of missing named bridge networks used by workloads.
 - Persist CockroachDB TLS certificate, private-key and CA PEM values instead of filesystem paths; readable legacy path records are migrated at daemon startup.
 - Node placement and resource requirements for cargoes, and commands to start or delete a cargo on a specific node.
 
 ### Changed
 
-- Use init containers for VM image handling.
+- **Breaking:** The Cargo API and Statefile model now use named `Containers` and
+  ordered `InitContainers`, an integer `Replicas` field, and Cargo-owned
+  network mode, port bindings, hostname, and DNS settings. The former
+  single-container shape and replication modes were removed.
+- **Breaking:** Namespaced Cargo and VM APIs now require canonical
+  `{namespace}.{name}` resource keys, and managed process identities use that
+  ordering.
+- **Breaking:** Job status and timestamps moved out of `Spec` to top-level
+  fields in job, summary, and inspection responses.
+- VM image preparation now uses an optional init container and a full local
+  image path in the VM specification.
+- The installer runs proxy and DNS controllers with their embedded Nginx and
+  dnsmasq data planes instead of separate `nproxy` and `ndns` containers.
+
+### Removed
+
+- Cargo-scoped exec endpoints and daemon-managed VM image APIs.
+
+### Fixed
+
+- Persisted replica/process mappings and startup reconstruction now recover
+  managed Cargo topology, including direct single-container and shared-sandbox
+  replicas, after daemon or installer bootstrap.
+- Container updates now apply changed host-port bindings.
+- `$$INTERNAL_GATEWAY` resolves from the workload's effective custom network
+  instead of always using the default bridge gateway.
+- TLS secret mounts reject unsafe names and use private directory and file
+  permissions.
 
 ## [0.17.0] - 2025-09-12
 

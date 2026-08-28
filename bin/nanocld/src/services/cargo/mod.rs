@@ -134,8 +134,8 @@ mod tests {
       .instances
       .iter()
       .find(|process| {
-        if process.name.starts_with("tmp-")
-          || process.name.starts_with("candidate-")
+        if process.name.ends_with(".tmp.c")
+          || process.name.ends_with(".candidate.c")
         {
           return false;
         }
@@ -1299,7 +1299,7 @@ mod tests {
     assert_eq!(at_promotion.status.actual, ObjPsStatusKind::Start);
     assert_eq!(at_promotion.status.health, ObjPsHealthStatusKind::Healthy);
     assert!(at_promotion.instances.iter().any(|process| {
-      process.name.starts_with("tmp-")
+      process.name.ends_with(".tmp.c")
         && process.data.state.as_ref().and_then(|state| state.running)
           == Some(true)
     }));
@@ -1373,8 +1373,8 @@ mod tests {
     assert_eq!(cargo.spec.containers, replacement.containers);
     assert_eq!(cargo.instance_total, 6);
     assert!(cargo.instances.iter().all(|process| {
-      !process.name.starts_with("tmp-")
-        && !process.name.starts_with("candidate-")
+      !process.name.ends_with(".tmp.c")
+        && !process.name.ends_with(".candidate.c")
     }));
     let init_states = cargo
       .instances
