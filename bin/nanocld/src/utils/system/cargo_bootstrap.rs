@@ -17,6 +17,7 @@ use nanocl_stubs::{
 use crate::{
   models::CargoReplicaProcessRole,
   utils::container::{
+    cargo::is_rollout_process_name,
     cargo_compiler::{
       LABEL_CARGO_KEY, LABEL_CARGO_NETWORK_MODE, LABEL_CONTAINER,
       LABEL_ESSENTIAL, LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
@@ -42,7 +43,7 @@ fn bootstrap_error(message: impl AsRef<str>) -> IoError {
 
 fn is_rollout_artifact(name: &str) -> bool {
   let name = name.trim_start_matches('/');
-  name.starts_with("tmp-") || name.starts_with("candidate-")
+  is_rollout_process_name(name)
 }
 
 /// One managed Docker process observed during startup inventory.
@@ -1137,7 +1138,7 @@ mod tests {
       CargoReplicaProcessRole::Init,
       name,
       Some(position),
-      &format!("init-system.bootstrap-r{ordinal}-{name}.c"),
+      &format!("system.bootstrap-r{ordinal}-{name}.init.c"),
     );
     init.config.host_config.as_mut().unwrap().network_mode =
       Some(DEFAULT_NETWORK.to_owned());
@@ -1509,8 +1510,8 @@ mod tests {
     }
 
     for (artifact_name, artifact_key) in [
-      ("tmp-system.bootstrap-r0-sandbox.c", "a".repeat(64)),
-      ("candidate-system.bootstrap-r0-sandbox.c", "b".repeat(64)),
+      ("system.bootstrap-r0-sandbox.tmp.c", "a".repeat(64)),
+      ("system.bootstrap-r0-sandbox.candidate.c", "b".repeat(64)),
     ] {
       let mut artifact = sandbox(first, 0);
       artifact.process_name = artifact_name.to_owned();
@@ -1637,11 +1638,11 @@ mod tests {
   fn pending_and_retained_rollout_processes_are_excluded() {
     let replica = replica(1);
     let mut candidate = app(replica, 0, "candidate-copy", "1");
-    candidate.process_name = "candidate-system.bootstrap-r0-copy.c".to_owned();
+    candidate.process_name = "system.bootstrap-r0-copy.candidate.c".to_owned();
     candidate.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
     candidate.labels.remove(LABEL_CARGO_NETWORK_MODE);
     let mut retained = app(replica, 0, "retained-copy", "1");
-    retained.process_name = "tmp-system.bootstrap-r0-copy.c".to_owned();
+    retained.process_name = "system.bootstrap-r0-copy.tmp.c".to_owned();
     retained.labels.remove(CARGO_CONTAINER_POSITION_LABEL);
     retained.labels.remove(LABEL_CARGO_NETWORK_MODE);
     let reconstructed = reconstruct_cargo(
@@ -1658,7 +1659,7 @@ mod tests {
     assert_eq!(reconstructed.spec.containers[0].name, "api");
 
     let mut only_candidate = app(replica, 0, "api", "0");
-    only_candidate.process_name = "candidate-only.c".to_owned();
+    only_candidate.process_name = "only.candidate.c".to_owned();
     assert!(reconstruct_cargo(KEY, &[only_candidate]).unwrap().is_none());
   }
 

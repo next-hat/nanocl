@@ -12,12 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default server with reuseport to avoid binding problem
 - More header in logs to support cloudflare real ip
 - Integrated Nginx data plane and health endpoint; proxy rules no longer require updates through a separate `nproxy` container.
+- Named Docker network selectors backed by nanocld's persisted network
+  inspection data.
 
 ### Changed
 
 - Drop old ssl version support
 - Improve the default global Nginx configuration and HTTP 502 page.
+- Proxy targets use canonical `{namespace}.{name}` Cargo and VM keys and resolve
+  the network owner for both direct single-container Cargoes and shared-sandbox
+  multi-container Cargoes.
+- Cargo routes are handed over only after the committed replacement is ready
+  and healthy; a healthy retained route remains active during replacement.
 
+### Fixed
+
+- Rebuild all committed proxy rules on startup and event-stream reconnect,
+  removing stale configuration left by changes made while ncproxy was offline.
+- Validate Nginx configuration before each transactional reload and restore the
+  previous configuration if validation or reload fails.
+- Remove routes for stopped, unhealthy, or addressless Cargo processes.
 
 ## [0.14.0] - 2025-09-12
 

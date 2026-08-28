@@ -20,6 +20,41 @@ use crate::{
   utils,
 };
 
+#[cfg(target_arch = "x86_64")]
+pub(super) fn supports_modern_cockroachdb_image() -> bool {
+  const EXTENDED_FEATURES_LEAF: u32 = 0x8000_0001;
+  const LAHF_SAHF_BIT: u32 = 1 << 0;
+
+  // Rust does not expose LAHF/SAHF through is_x86_feature_detected!.
+  let maximum_extended_leaf = std::arch::x86_64::__cpuid(0x8000_0000).eax;
+  let has_lahf_sahf = maximum_extended_leaf >= EXTENDED_FEATURES_LEAF
+    && (std::arch::x86_64::__cpuid(EXTENDED_FEATURES_LEAF).ecx & LAHF_SAHF_BIT
+      != 0);
+
+  has_lahf_sahf
+    && std::is_x86_feature_detected!("cmpxchg16b")
+    && std::is_x86_feature_detected!("popcnt")
+    && std::is_x86_feature_detected!("sse3")
+    && std::is_x86_feature_detected!("ssse3")
+    && std::is_x86_feature_detected!("sse4.1")
+    && std::is_x86_feature_detected!("sse4.2")
+    // x86-64-v3 is cumulative. Rust's AVX detection also verifies that the
+    // operating system has enabled XSAVE state for XMM and YMM registers.
+    && std::is_x86_feature_detected!("avx")
+    && std::is_x86_feature_detected!("avx2")
+    && std::is_x86_feature_detected!("bmi1")
+    && std::is_x86_feature_detected!("bmi2")
+    && std::is_x86_feature_detected!("f16c")
+    && std::is_x86_feature_detected!("fma")
+    && std::is_x86_feature_detected!("lzcnt")
+    && std::is_x86_feature_detected!("movbe")
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub(super) fn supports_modern_cockroachdb_image() -> bool {
+  true
+}
+
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
 ///
@@ -100,6 +135,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     hostname,
     advertise_addr,
     is_docker_desktop,
+    supports_modern_cockroachdb_image: supports_modern_cockroachdb_image(),
     gid: group.gid.into(),
     home_dir: home_dir.clone(),
     channel: crate::version::CHANNEL.to_owned(),
@@ -252,4 +288,58 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .await;
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn nstore_image(supports_modern_cockroachdb_image: bool) -> String {
+    let data = liquid::object!({
+      "docker_host": "unix:///var/run/docker.sock",
+      "state_dir": "/tmp/state",
+      "conf_dir": "/tmp/conf",
+      "gateway": "127.0.0.1",
+      "hostname": "localhost",
+      "advertise_addr": "127.0.0.1",
+      "is_docker_desktop": false,
+      "supports_modern_cockroachdb_image": supports_modern_cockroachdb_image,
+      "gid": 0,
+      "home_dir": "/tmp/home",
+      "channel": "nightly",
+      "docker_uds_path": "/var/run/docker.sock",
+      "docker_uds_host_path": "/var/run/docker.sock",
+    });
+    let installer = utils::state::compile(
+      include_str!("../../../../installer.yml"),
+      &data,
+      StateRoot::None,
+    )
+    .unwrap();
+    let deployment = serde_yaml::from_str::<Statefile>(&installer).unwrap();
+    let nstore = deployment
+      .cargoes
+      .unwrap()
+      .into_iter()
+      .find(|cargo| cargo.name == "nstore")
+      .unwrap();
+    utils::docker::single_application_container(&nstore)
+      .unwrap()
+      .container_config
+      .image
+      .clone()
+      .unwrap()
+  }
+
+  #[test]
+  fn installer_selects_cockroachdb_image_for_x86_64_v3_support() {
+    assert_eq!(
+      nstore_image(true),
+      "docker.io/cockroachdb/cockroach:v25.4.13"
+    );
+    assert_eq!(
+      nstore_image(false),
+      "docker.io/cockroachdb/cockroach:v23.1.30"
+    );
+  }
 }
