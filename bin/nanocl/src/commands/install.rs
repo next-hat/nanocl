@@ -20,6 +20,16 @@ use crate::{
   utils,
 };
 
+#[cfg(target_arch = "x86_64")]
+pub(super) fn has_avx() -> bool {
+  std::is_x86_feature_detected!("avx")
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub(super) fn has_avx() -> bool {
+  true
+}
+
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
 ///
@@ -100,6 +110,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     hostname,
     advertise_addr,
     is_docker_desktop,
+    has_avx: has_avx(),
     gid: group.gid.into(),
     home_dir: home_dir.clone(),
     channel: crate::version::CHANNEL.to_owned(),
@@ -252,4 +263,58 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .await;
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn nstore_image(has_avx: bool) -> String {
+    let data = liquid::object!({
+      "docker_host": "unix:///var/run/docker.sock",
+      "state_dir": "/tmp/state",
+      "conf_dir": "/tmp/conf",
+      "gateway": "127.0.0.1",
+      "hostname": "localhost",
+      "advertise_addr": "127.0.0.1",
+      "is_docker_desktop": false,
+      "has_avx": has_avx,
+      "gid": 0,
+      "home_dir": "/tmp/home",
+      "channel": "nightly",
+      "docker_uds_path": "/var/run/docker.sock",
+      "docker_uds_host_path": "/var/run/docker.sock",
+    });
+    let installer = utils::state::compile(
+      include_str!("../../../../installer.yml"),
+      &data,
+      StateRoot::None,
+    )
+    .unwrap();
+    let deployment = serde_yaml::from_str::<Statefile>(&installer).unwrap();
+    let nstore = deployment
+      .cargoes
+      .unwrap()
+      .into_iter()
+      .find(|cargo| cargo.name == "nstore")
+      .unwrap();
+    utils::docker::single_application_container(&nstore)
+      .unwrap()
+      .container_config
+      .image
+      .clone()
+      .unwrap()
+  }
+
+  #[test]
+  fn installer_selects_cockroachdb_image_for_avx_support() {
+    assert_eq!(
+      nstore_image(true),
+      "docker.io/cockroachdb/cockroach:v25.4.13"
+    );
+    assert_eq!(
+      nstore_image(false),
+      "docker.io/cockroachdb/cockroach:v23.2.31"
+    );
+  }
 }

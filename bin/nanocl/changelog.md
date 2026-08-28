@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Select a compatible CockroachDB LTS image when AVX is unavailable.
 - Job list and inspection output now reads status and timestamps from their
   corrected top-level API fields.
 - `nanocl backup` now strips the nanocld auto-mounted secret bind (`/opt/nanocl.io/secrets`) from cargoes and jobs so backups can be reapplied without manual edits.

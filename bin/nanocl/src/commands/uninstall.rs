@@ -31,6 +31,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "hostname": "localhost",
     "advertise_addr": "127.0.0.1:8585",
     "is_docker_desktop": is_docker_desktop,
+    "has_avx": super::install::has_avx(),
     "gid": "0",
     "home_dir": "/tmp/random",
     "channel": version::CHANNEL.to_owned(),
