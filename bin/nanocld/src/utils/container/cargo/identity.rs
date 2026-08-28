@@ -152,8 +152,16 @@ pub(super) fn validate_observed_identities(
   Ok(())
 }
 
-pub(super) fn is_rollout_process_name(name: &str) -> bool {
-  name.starts_with("tmp-") || name.starts_with("candidate-")
+pub(crate) fn is_candidate_process_name(name: &str) -> bool {
+  name.ends_with(".candidate.c")
+}
+
+pub(crate) fn is_retained_process_name(name: &str) -> bool {
+  name.ends_with(".tmp.c")
+}
+
+pub(crate) fn is_rollout_process_name(name: &str) -> bool {
+  is_candidate_process_name(name) || is_retained_process_name(name)
 }
 
 #[cfg(test)]
@@ -210,6 +218,80 @@ mod tests {
     assert_eq!(identity.role, CargoReplicaProcessRole::App);
     assert_eq!(identity.container_name, "api");
     assert!(identity.essential);
+  }
+
+  #[test]
+  fn rollout_name_classification_requires_reserved_lifecycle_suffixes() {
+    for name in [
+      "tmp-production.foo-r0-abc123.c",
+      "candidate-team.foo-r0-abc123.c",
+      "init-services.foo-r0-abc123.c",
+      "global.foo-r0-tmp-candidate-init-abc123.c",
+      "global.foo-r0-abc123.init.c",
+    ] {
+      assert!(
+        !is_candidate_process_name(name),
+        "unexpected candidate: {name}"
+      );
+      assert!(
+        !is_retained_process_name(name),
+        "unexpected retained: {name}"
+      );
+      assert!(!is_rollout_process_name(name), "unexpected rollout: {name}");
+    }
+
+    for name in [
+      "global.foo-r0-abc123.candidate.c",
+      "global.foo-r0-abc123.init.candidate.c",
+    ] {
+      assert!(is_candidate_process_name(name));
+      assert!(!is_retained_process_name(name));
+      assert!(is_rollout_process_name(name));
+    }
+
+    for name in [
+      "global.foo-r0-abc123.tmp.c",
+      "global.foo-r0-abc123.init.tmp.c",
+    ] {
+      assert!(!is_candidate_process_name(name));
+      assert!(is_retained_process_name(name));
+      assert!(is_rollout_process_name(name));
+    }
+  }
+
+  #[test]
+  fn process_role_labels_remain_authoritative_across_lifecycle_suffixes() {
+    let mut leading_init = labelled_process();
+    leading_init.name = "init-services.foo-r0-abc123.c".to_owned();
+    assert_eq!(
+      process_identity(&leading_init).unwrap().role,
+      CargoReplicaProcessRole::App
+    );
+    assert!(!is_rollout_process_name(&leading_init.name));
+
+    for (name, candidate, retained) in [
+      ("global.foo-r0-abc123.init.candidate.c", true, false),
+      ("global.foo-r0-abc123.init.tmp.c", false, true),
+    ] {
+      let mut process = labelled_process();
+      process.name = name.to_owned();
+      process
+        .data
+        .config
+        .as_mut()
+        .unwrap()
+        .labels
+        .as_mut()
+        .unwrap()
+        .insert(LABEL_ROLE.to_owned(), "init".to_owned());
+
+      assert_eq!(
+        process_identity(&process).unwrap().role,
+        CargoReplicaProcessRole::Init
+      );
+      assert_eq!(is_candidate_process_name(name), candidate);
+      assert_eq!(is_retained_process_name(name), retained);
+    }
   }
 
   #[test]

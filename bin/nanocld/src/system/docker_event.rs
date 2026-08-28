@@ -32,10 +32,7 @@ fn labels_describe_active_cargo_application(
   process_name: &str,
   labels: Option<&HashMap<String, String>>,
 ) -> bool {
-  if process_name.starts_with("tmp-")
-    || process_name.starts_with("candidate-")
-    || process_name.starts_with("init-")
-  {
+  if utils::container::cargo::is_rollout_process_name(process_name) {
     return false;
   }
   let Some(labels) = labels else {
@@ -56,10 +53,7 @@ fn labels_describe_active_cargo_runtime(
   process_name: &str,
   labels: Option<&HashMap<String, String>>,
 ) -> bool {
-  if process_name.starts_with("tmp-")
-    || process_name.starts_with("candidate-")
-    || process_name.starts_with("init-")
-  {
+  if utils::container::cargo::is_rollout_process_name(process_name) {
     return false;
   }
   let Some(labels) = labels else {
@@ -112,7 +106,7 @@ fn vm_runtime_failure_effect(
 ) -> VmRuntimeFailureEffect {
   if action != "die"
     || process_name.starts_with("tmp-")
-    || process_name.starts_with("init-")
+    || process_name.ends_with(".init.v")
     || wanted == ObjPsStatusKind::Stop.to_string()
     || wanted == ObjPsStatusKind::Destroy.to_string()
     || prev_actual == ObjPsStatusKind::Updating.to_string()
@@ -711,13 +705,20 @@ mod tests {
       Some(&nonessential)
     ));
     assert!(!labels_describe_active_cargo_application(
-      "tmp-demo-api.c",
+      "demo-api.tmp.c",
       Some(&app)
     ));
     assert!(!labels_describe_active_cargo_application(
-      "init-demo-db.c",
+      "demo-db.init.c",
       Some(&init)
     ));
+    for name in [
+      "tmp-production.demo-api.c",
+      "candidate-team.demo-api.c",
+      "init-services.demo-api.c",
+    ] {
+      assert!(labels_describe_active_cargo_application(name, Some(&app)));
+    }
     assert!(!labels_describe_active_cargo_application(
       "sandbox-demo.c",
       Some(&sandbox)
@@ -769,19 +770,19 @@ mod tests {
     ]);
     let promoted = current_process_name(
       Some("/global.api-api-1.c"),
-      "candidate-global.api-api-1.c",
+      "global.api-api-1.candidate.c",
     );
     assert_eq!(promoted, "global.api-api-1.c");
     assert!(labels_describe_active_cargo_runtime(&promoted, Some(&app)));
     assert!(
       !(labels_describe_active_cargo_runtime(
-        "candidate-global.api-api-1.c",
+        "global.api-api-1.candidate.c",
         Some(&app)
       ) && labels_describe_active_cargo_runtime(&promoted, Some(&app)))
     );
 
     let rolled_back = current_process_name(
-      Some("/candidate-global.api-api-1.c"),
+      Some("/global.api-api-1.candidate.c"),
       "global.api-api-1.c",
     );
     assert!(!labels_describe_active_cargo_runtime(
@@ -789,8 +790,8 @@ mod tests {
       Some(&app)
     ));
     assert_eq!(
-      current_process_name(None, "candidate-global.api-api-1.c"),
-      "candidate-global.api-api-1.c"
+      current_process_name(None, "global.api-api-1.candidate.c"),
+      "global.api-api-1.candidate.c"
     );
   }
 
@@ -813,7 +814,7 @@ mod tests {
     assert_eq!(
       vm_failure_effect(
         "die",
-        "init-global.ubuntu-a1b2c3.v",
+        "global.ubuntu-a1b2c3.init.v",
         ObjPsStatusKind::Start,
         ObjPsStatusKind::Start,
       ),
@@ -825,7 +826,7 @@ mod tests {
   fn vm_docker_event_init_die_does_not_request_runtime_failure_event() {
     let effect = vm_failure_effect(
       "die",
-      "init-global.ubuntu-a1b2c3.v",
+      "global.ubuntu-a1b2c3.init.v",
       ObjPsStatusKind::Start,
       ObjPsStatusKind::Start,
     );
@@ -936,15 +937,15 @@ mod tests {
       Some(&nonessential_app)
     ));
     assert!(!labels_describe_active_cargo_runtime(
-      "init-demo-db.c",
+      "demo-db.init.c",
       Some(&init)
     ));
     assert!(!labels_describe_active_cargo_runtime(
-      "tmp-demo-api.c",
+      "demo-api.tmp.c",
       Some(&essential_app)
     ));
     assert!(!labels_describe_active_cargo_runtime(
-      "candidate-demo-api.c",
+      "demo-api.candidate.c",
       Some(&essential_app)
     ));
   }
