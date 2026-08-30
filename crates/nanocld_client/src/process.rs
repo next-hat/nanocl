@@ -1,4 +1,7 @@
-use ntex::{channel::mpsc::Receiver, io, rt, ws};
+use ntex::{channel::mpsc::Receiver, io, ws};
+
+#[cfg(not(target_os = "windows"))]
+use ntex::rt;
 
 use nanocl_error::{
   http::HttpResult, http_client::HttpClientResult, io::FromIo,
@@ -79,8 +82,17 @@ impl NanocldClient {
     }
     #[cfg(target_os = "windows")]
     {
+      use nanocl_error::io::IoError;
+
       let con = ws::WsClient::builder(url)
-        .map_err(|err| err.map_err_context(|| &self.url))?
+        .build(ntex::SharedCfg::default())
+        .await
+        .map_err(|err| {
+          IoError::interrupted(
+            "Unable to build websocket client",
+            &format!("{err:?}"),
+          )
+        })?
         .connect()
         .await
         .map_err(|err| err.map_err_context(|| &self.url))?;
