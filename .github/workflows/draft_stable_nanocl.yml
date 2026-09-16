@@ -23,7 +23,7 @@ jobs:
           apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base dpkg pandoc github-cli bash
           rustup target add x86_64-unknown-linux-musl
       - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
       - uses: actions/checkout@v7
       # Extract branch info
       - name: Set info
@@ -89,7 +89,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.96.0-aarch64-apple-darwin
       - name: Set info
@@ -160,7 +160,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.96.0-x86_64-pc-windows-msvc
       - name: Set info
