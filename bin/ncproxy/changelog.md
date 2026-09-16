@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.0] - 2026-09-05
+## [0.15.1] - 2026-09-16
+
+### Added
+
+- Typed per-location reverse-proxy options for request and response buffering,
+  body size and timeouts, cache zones, upstream retry behavior, and error
+  interception. These options are rendered inside the generated Nginx
+  `location` block and remain optional for backward compatibility.
+
+
+## [0.15.0] - 2026-03-25
 
 ### Added
 
