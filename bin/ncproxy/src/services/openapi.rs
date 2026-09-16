@@ -1,7 +1,7 @@
 use utoipa::OpenApi;
 
 use nanocld_client::stubs::proxy::{
-  Hsts, HttpTarget, LocationTarget, NginxDuration, NginxSize,
+  Hsts, HttpTarget, LocationTarget, NginxDuration, NginxSize, ProxyCache,
   ProxyHttpLocation, ProxyNextUpstream, ProxyRule, ProxyRuleHttp,
   ProxyRuleStream, ProxySsl, ProxySslConfig, ProxyStreamProtocol,
   ResourceProxyRule, StreamTarget, UnixTarget, UpstreamTarget, UriTarget,
@@ -49,6 +49,7 @@ impl utoipa::Modify for VersionModifier {
     ProxyHttpLocation,
     NginxSize,
     NginxDuration,
+    ProxyCache,
     ProxyNextUpstream,
     ProxySsl,
     ProxySslConfig,

@@ -192,6 +192,15 @@ components:
           Other:
             type: string
       description: Network binding selector
+    NginxDuration:
+      type: string
+      description: A validated nginx timeout value, such as `900s` or `5m`.
+    NginxSize:
+      type: string
+      description: A validated nginx size value, such as `0`, `10m`, or `2g`.
+    ProxyCache:
+      type: string
+      description: 'A validated nginx proxy cache value: `off` or a configured cache zone.'
     ProxyHttp3:
       oneOf:
       - type: boolean
@@ -282,7 +291,62 @@ components:
           - 'null'
           format: double
           description: Http version to use
+        ClientMaxBodySize:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/NginxSize'
+            description: Maximum request body size for this location
+        ClientBodyTimeout:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/NginxDuration'
+            description: Request body read timeout
+        RequestBuffering:
+          type:
+          - boolean
+          - 'null'
+          description: Buffer client request bodies
+        ResponseBuffering:
+          type:
+          - boolean
+          - 'null'
+          description: Buffer upstream responses
+        Cache:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProxyCache'
+            description: Enable the proxy cache
+        ReadTimeout:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/NginxDuration'
+            description: Upstream response read timeout
+        SendTimeout:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/NginxDuration'
+            description: Upstream response send timeout
+        ConnectTimeout:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/NginxDuration'
+            description: Upstream connection timeout
+        NextUpstream:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProxyNextUpstream'
+            description: Upstream retry behavior
+        InterceptErrors:
+          type:
+          - boolean
+          - 'null'
+          description: Intercept upstream errors
       additionalProperties: false
+    ProxyNextUpstream:
+      type: string
+      description: Supported location-level `proxy_next_upstream` values.
+      enum:
+      - off
     ProxyRule:
       oneOf:
       - $ref: '#/components/schemas/ProxyRuleHttp'

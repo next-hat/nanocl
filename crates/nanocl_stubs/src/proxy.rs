@@ -294,7 +294,8 @@ impl NginxSize {
         .unwrap_or(value.trim().len()),
     );
     if number.is_empty()
-      || !suffix.is_empty() && !matches!(suffix, "k" | "m" | "g")
+      || !suffix.is_empty()
+        && !matches!(suffix, "k" | "K" | "m" | "M" | "g" | "G")
     {
       return Err(format!("invalid nginx size: {value}"));
     }
@@ -402,6 +403,79 @@ pub enum ProxyNextUpstream {
   Off,
 }
 
+/// A validated nginx proxy cache value: `off` or a configured cache zone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ProxyCache(String);
+
+impl ProxyCache {
+  pub fn as_str(&self) -> &str {
+    &self.0
+  }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for ProxyCache {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(&self.0)
+  }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for ProxyCache {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct CacheVisitor;
+
+    impl de::Visitor<'_> for CacheVisitor {
+      type Value = ProxyCache;
+
+      fn expecting(
+        &self,
+        formatter: &mut std::fmt::Formatter,
+      ) -> std::fmt::Result {
+        formatter.write_str("false, off, or an nginx cache-zone name")
+      }
+
+      fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+      where
+        E: de::Error,
+      {
+        if value {
+          Err(E::custom("Cache: true is not a valid nginx cache-zone"))
+        } else {
+          Ok(ProxyCache("off".to_owned()))
+        }
+      }
+
+      fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+      where
+        E: de::Error,
+      {
+        if value == "off" {
+          return Ok(ProxyCache("off".to_owned()));
+        }
+        if value.is_empty()
+          || !value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || "_-".contains(character)
+          })
+        {
+          return Err(E::custom("invalid nginx cache-zone name"));
+        }
+        Ok(ProxyCache(value.to_owned()))
+      }
+    }
+
+    deserializer.deserialize_any(CacheVisitor)
+  }
+}
+
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
@@ -420,10 +494,23 @@ mod tests {
     );
     assert_eq!(location.request_buffering, Some(false));
     assert_eq!(location.next_upstream, Some(ProxyNextUpstream::Off));
+    assert_eq!(location.cache, Some(ProxyCache("off".into())));
     assert!(serde_yaml::from_str::<ProxyHttpLocation>(
       "Path: /\nTarget: {Url: https://registry.example}\nClientBodyTimeout: invalid\n"
     )
     .is_err());
+    assert!(
+      serde_yaml::from_str::<ProxyHttpLocation>(
+        "Path: /\nTarget: {Url: https://registry.example}\nCache: true\n"
+      )
+      .is_err()
+    );
+    let location: ProxyHttpLocation = serde_yaml::from_str(
+      "Path: /\nTarget: {Url: https://registry.example}\nClientMaxBodySize: 10M\nCache: public_cache\n",
+    )
+    .unwrap();
+    assert_eq!(location.client_max_body_size, Some(NginxSize("10M".into())));
+    assert_eq!(location.cache, Some(ProxyCache("public_cache".into())));
   }
 
   #[test]
@@ -476,24 +563,64 @@ pub struct ProxyHttpLocation {
   )]
   pub version: Option<f64>,
   /// Maximum request body size for this location
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub client_max_body_size: Option<NginxSize>,
   /// Request body read timeout
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub client_body_timeout: Option<NginxDuration>,
   /// Buffer client request bodies
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub request_buffering: Option<bool>,
   /// Buffer upstream responses
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub response_buffering: Option<bool>,
   /// Enable the proxy cache
-  pub cache: Option<bool>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cache: Option<ProxyCache>,
   /// Upstream response read timeout
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub read_timeout: Option<NginxDuration>,
   /// Upstream response send timeout
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub send_timeout: Option<NginxDuration>,
   /// Upstream connection timeout
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub connect_timeout: Option<NginxDuration>,
   /// Upstream retry behavior
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub next_upstream: Option<ProxyNextUpstream>,
   /// Intercept upstream errors
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub intercept_errors: Option<bool>,
 }
 
