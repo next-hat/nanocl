@@ -30,6 +30,19 @@ impl Modify for VersionModifier {
     openapi.info.description =
       Some(include_str!("../../specs/readme.md").to_owned());
     openapi.servers = Some(vec![server]);
+    openapi
+      .components
+      .get_or_insert_with(Default::default)
+      .schemas
+      .insert(
+        "SecretEnv".to_owned(),
+        utoipa::openapi::ArrayBuilder::new()
+          .items(<String as utoipa::PartialSchema>::schema())
+          .description(Some(
+            "Data for a nanocl.io/env secret: KEY=VALUE entries.",
+          ))
+          .into(),
+      );
   }
 }
 

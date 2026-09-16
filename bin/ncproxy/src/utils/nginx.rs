@@ -6,7 +6,7 @@ use ntex::web;
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::stubs::proxy::{
-  LocationTarget, ProxyRule, ResourceProxyRule,
+  LocationTarget, ProxyHttpLocation, ProxyRule, ResourceProxyRule,
 };
 
 use crate::models::{
@@ -17,6 +17,71 @@ use crate::models::{
 use super::rule::{PreparedFile, PreparedUpstream};
 
 const NGINX_PID_PATH: &str = "/run/nginx.pid";
+
+fn apply_location_options(
+  template: &mut LocationTemplate,
+  location: &ProxyHttpLocation,
+) {
+  template.client_max_body_size =
+    location.client_max_body_size.as_ref().map(|value| {
+      serde_json::to_string(value)
+        .unwrap()
+        .trim_matches('"')
+        .to_owned()
+    });
+  template.client_body_timeout =
+    location.client_body_timeout.as_ref().map(|value| {
+      serde_json::to_string(value)
+        .unwrap()
+        .trim_matches('"')
+        .to_owned()
+    });
+  template.request_buffering = location.request_buffering.map(|value| {
+    if value {
+      "on".to_owned()
+    } else {
+      "off".to_owned()
+    }
+  });
+  template.response_buffering = location.response_buffering.map(|value| {
+    if value {
+      "on".to_owned()
+    } else {
+      "off".to_owned()
+    }
+  });
+  template.cache = location
+    .cache
+    .as_ref()
+    .map(|value| value.as_str().to_owned());
+  template.read_timeout = location.read_timeout.as_ref().map(|value| {
+    serde_json::to_string(value)
+      .unwrap()
+      .trim_matches('"')
+      .to_owned()
+  });
+  template.send_timeout = location.send_timeout.as_ref().map(|value| {
+    serde_json::to_string(value)
+      .unwrap()
+      .trim_matches('"')
+      .to_owned()
+  });
+  template.connect_timeout = location.connect_timeout.as_ref().map(|value| {
+    serde_json::to_string(value)
+      .unwrap()
+      .trim_matches('"')
+      .to_owned()
+  });
+  template.next_upstream =
+    location.next_upstream.as_ref().map(|_| "off".to_owned());
+  template.intercept_errors = location.intercept_errors.map(|value| {
+    if value {
+      "on".to_owned()
+    } else {
+      "off".to_owned()
+    }
+  });
+}
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
@@ -320,7 +385,7 @@ async fn prepare_rule(
                 }
                 None => None,
               };
-              let location = LocationTemplate {
+              let mut rendered = LocationTemplate {
                 path: location.path.clone(),
                 limit_req: location.limit_req.clone(),
                 upstream_key: if ssl.is_some() {
@@ -334,14 +399,25 @@ async fn prepare_rule(
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
                 ssl,
+                client_max_body_size: None,
+                client_body_timeout: None,
+                request_buffering: None,
+                response_buffering: None,
+                cache: None,
+                read_timeout: None,
+                send_timeout: None,
+                connect_timeout: None,
+                next_upstream: None,
+                intercept_errors: None,
               };
+              apply_location_options(&mut rendered, location);
               upstreams.push((prepared_upstream, NginxRuleKind::Site));
-              locations.push(location);
+              locations.push(rendered);
             }
             LocationTarget::Unix(unix) => {
               let prepared_upstream =
                 super::rule::gen_unix_target(unix).await?;
-              let location = LocationTemplate {
+              let mut rendered = LocationTemplate {
                 path: location.path.clone(),
                 upstream_key: format!("http://{}", prepared_upstream.key),
                 redirect: None,
@@ -351,12 +427,23 @@ async fn prepare_rule(
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
                 ssl: None,
+                client_max_body_size: None,
+                client_body_timeout: None,
+                request_buffering: None,
+                response_buffering: None,
+                cache: None,
+                read_timeout: None,
+                send_timeout: None,
+                connect_timeout: None,
+                next_upstream: None,
+                intercept_errors: None,
               };
+              apply_location_options(&mut rendered, location);
               upstreams.push((prepared_upstream, NginxRuleKind::Site));
-              locations.push(location);
+              locations.push(rendered);
             }
             LocationTarget::Http(http) => {
-              let location = LocationTemplate {
+              let mut rendered = LocationTemplate {
                 path: location.path.clone(),
                 upstream_key: http.url.clone(),
                 limit_req: location.limit_req.clone(),
@@ -366,8 +453,19 @@ async fn prepare_rule(
                 headers: location.headers.clone(),
                 redirect: http.redirect.clone().map(|r| format!("{r}")),
                 ssl: None,
+                client_max_body_size: None,
+                client_body_timeout: None,
+                request_buffering: None,
+                response_buffering: None,
+                cache: None,
+                read_timeout: None,
+                send_timeout: None,
+                connect_timeout: None,
+                next_upstream: None,
+                intercept_errors: None,
               };
-              locations.push(location);
+              apply_location_options(&mut rendered, location);
+              locations.push(rendered);
             }
           }
         }
