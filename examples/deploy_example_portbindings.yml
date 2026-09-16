@@ -1,3 +1,5 @@
+# syntax=nanocl/Statefile
+
 ApiVersion: v0.16
 
 Resources:

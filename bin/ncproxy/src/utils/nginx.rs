@@ -334,6 +334,75 @@ async fn prepare_rule(
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
                 ssl,
+                client_max_body_size: location
+                  .client_max_body_size
+                  .as_ref()
+                  .map(|value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  }),
+                client_body_timeout: location.client_body_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                request_buffering: location.request_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                response_buffering: location.response_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                cache: location.cache.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                read_timeout: location.read_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                send_timeout: location.send_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                connect_timeout: location.connect_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                next_upstream: location
+                  .next_upstream
+                  .as_ref()
+                  .map(|_| "off".to_owned()),
+                intercept_errors: location.intercept_errors.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
               };
               upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
@@ -351,6 +420,75 @@ async fn prepare_rule(
                 allowed_ips: location.allowed_ips.clone(),
                 headers: location.headers.clone(),
                 ssl: None,
+                client_max_body_size: location
+                  .client_max_body_size
+                  .as_ref()
+                  .map(|value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  }),
+                client_body_timeout: location.client_body_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                request_buffering: location.request_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                response_buffering: location.response_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                cache: location.cache.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                read_timeout: location.read_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                send_timeout: location.send_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                connect_timeout: location.connect_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                next_upstream: location
+                  .next_upstream
+                  .as_ref()
+                  .map(|_| "off".to_owned()),
+                intercept_errors: location.intercept_errors.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
               };
               upstreams.push((prepared_upstream, NginxRuleKind::Site));
               locations.push(location);
@@ -366,6 +504,75 @@ async fn prepare_rule(
                 headers: location.headers.clone(),
                 redirect: http.redirect.clone().map(|r| format!("{r}")),
                 ssl: None,
+                client_max_body_size: location
+                  .client_max_body_size
+                  .as_ref()
+                  .map(|value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  }),
+                client_body_timeout: location.client_body_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                request_buffering: location.request_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                response_buffering: location.response_buffering.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                cache: location.cache.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
+                read_timeout: location.read_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                send_timeout: location.send_timeout.as_ref().map(|value| {
+                  serde_json::to_string(value)
+                    .unwrap()
+                    .trim_matches('"')
+                    .to_owned()
+                }),
+                connect_timeout: location.connect_timeout.as_ref().map(
+                  |value| {
+                    serde_json::to_string(value)
+                      .unwrap()
+                      .trim_matches('"')
+                      .to_owned()
+                  },
+                ),
+                next_upstream: location
+                  .next_upstream
+                  .as_ref()
+                  .map(|_| "off".to_owned()),
+                intercept_errors: location.intercept_errors.map(|value| {
+                  if value {
+                    "on".to_owned()
+                  } else {
+                    "off".to_owned()
+                  }
+                }),
               };
               locations.push(location);
             }

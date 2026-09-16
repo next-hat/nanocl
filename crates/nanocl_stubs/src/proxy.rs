@@ -1,5 +1,5 @@
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::generic::NetworkKind;
 
@@ -279,6 +279,164 @@ pub struct LimitReq {
   pub delay: Option<usize>,
 }
 
+/// A validated nginx size value, such as `0`, `10m`, or `2g`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct NginxSize(String);
+
+impl NginxSize {
+  fn parse(value: &str) -> Result<Self, String> {
+    let (number, suffix) = value.trim().split_at(
+      value
+        .trim()
+        .find(|character: char| !character.is_ascii_digit())
+        .unwrap_or(value.trim().len()),
+    );
+    if number.is_empty()
+      || !suffix.is_empty() && !matches!(suffix, "k" | "m" | "g")
+    {
+      return Err(format!("invalid nginx size: {value}"));
+    }
+    Ok(Self(value.trim().to_owned()))
+  }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for NginxSize {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(&self.0)
+  }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for NginxSize {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct SizeVisitor;
+
+    impl de::Visitor<'_> for SizeVisitor {
+      type Value = NginxSize;
+
+      fn expecting(
+        &self,
+        formatter: &mut std::fmt::Formatter,
+      ) -> std::fmt::Result {
+        formatter.write_str("an nginx size such as 0, 10m, or 2g")
+      }
+
+      fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+      where
+        E: de::Error,
+      {
+        NginxSize::parse(&value.to_string()).map_err(E::custom)
+      }
+
+      fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+      where
+        E: de::Error,
+      {
+        NginxSize::parse(value).map_err(E::custom)
+      }
+    }
+
+    deserializer.deserialize_any(SizeVisitor)
+  }
+}
+
+/// A validated nginx timeout value, such as `900s` or `5m`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct NginxDuration(String);
+
+impl NginxDuration {
+  fn parse(value: &str) -> Result<Self, String> {
+    let value = value.trim();
+    let number_end = value
+      .find(|character: char| !character.is_ascii_digit())
+      .unwrap_or(value.len());
+    let (number, suffix) = value.split_at(number_end);
+    if number.is_empty()
+      || !matches!(suffix, "ms" | "s" | "m" | "h" | "d" | "w" | "M" | "y")
+    {
+      return Err(format!("invalid nginx duration: {value}"));
+    }
+    Ok(Self(value.to_owned()))
+  }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for NginxDuration {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(&self.0)
+  }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for NginxDuration {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    let value = String::deserialize(deserializer)?;
+    Self::parse(&value).map_err(de::Error::custom)
+  }
+}
+
+/// Supported location-level `proxy_next_upstream` values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ProxyNextUpstream {
+  #[cfg_attr(feature = "serde", serde(rename = "off"))]
+  Off,
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn location_options_deserialize_and_validate() {
+    let location: ProxyHttpLocation = serde_yaml::from_str(
+      "Path: /\nTarget: {Url: https://registry.example}\nClientMaxBodySize: 0\nClientBodyTimeout: 900s\nRequestBuffering: false\nResponseBuffering: false\nCache: false\nReadTimeout: 900s\nSendTimeout: 900s\nConnectTimeout: 5s\nNextUpstream: off\nInterceptErrors: false\n",
+    )
+    .unwrap();
+
+    assert_eq!(location.client_max_body_size, Some(NginxSize("0".into())));
+    assert_eq!(
+      location.client_body_timeout,
+      Some(NginxDuration("900s".into()))
+    );
+    assert_eq!(location.request_buffering, Some(false));
+    assert_eq!(location.next_upstream, Some(ProxyNextUpstream::Off));
+    assert!(serde_yaml::from_str::<ProxyHttpLocation>(
+      "Path: /\nTarget: {Url: https://registry.example}\nClientBodyTimeout: invalid\n"
+    )
+    .is_err());
+  }
+
+  #[test]
+  fn existing_location_deserializes_without_options() {
+    let location: ProxyHttpLocation = serde_yaml::from_str(
+      "Path: /\nTarget: {Url: https://registry.example}\n",
+    )
+    .unwrap();
+    assert!(location.client_max_body_size.is_none());
+    assert!(location.next_upstream.is_none());
+  }
+}
+
 /// Defines a proxy rule location
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -317,6 +475,26 @@ pub struct ProxyHttpLocation {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub version: Option<f64>,
+  /// Maximum request body size for this location
+  pub client_max_body_size: Option<NginxSize>,
+  /// Request body read timeout
+  pub client_body_timeout: Option<NginxDuration>,
+  /// Buffer client request bodies
+  pub request_buffering: Option<bool>,
+  /// Buffer upstream responses
+  pub response_buffering: Option<bool>,
+  /// Enable the proxy cache
+  pub cache: Option<bool>,
+  /// Upstream response read timeout
+  pub read_timeout: Option<NginxDuration>,
+  /// Upstream response send timeout
+  pub send_timeout: Option<NginxDuration>,
+  /// Upstream connection timeout
+  pub connect_timeout: Option<NginxDuration>,
+  /// Upstream retry behavior
+  pub next_upstream: Option<ProxyNextUpstream>,
+  /// Intercept upstream errors
+  pub intercept_errors: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
