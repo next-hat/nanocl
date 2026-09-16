@@ -7298,6 +7298,9 @@ components:
           type: string
         Stats:
           $ref: '#/components/schemas/Stats'
+    ProxyCache:
+      type: string
+      description: 'A validated nginx proxy cache value: `off` or a configured cache zone.'
     ProxyHttp3:
       oneOf:
       - type: boolean
@@ -7409,10 +7412,10 @@ components:
           - 'null'
           description: Buffer upstream responses
         Cache:
-          type:
-          - boolean
-          - 'null'
-          description: Enable the proxy cache
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProxyCache'
+            description: Enable the proxy cache
         ReadTimeout:
           oneOf:
           - type: 'null'
