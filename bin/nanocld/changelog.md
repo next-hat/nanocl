@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before persistence and crontab construction with the dependency-free parser
   in `nanocl_stubs`. Reject control characters, extra commands, and malformed
   cron expressions. Reported by [@muhammadam11n](https://github.com/muhammadam11n)
+- Fix job name path traversal that could write TLS secrets outside their
+  intended directory. Validate job names and secret path components, and
+  check directory confinement before writing secrets or changing permissions.
+  Reported by [@wsparks-vc](https://github.com/wsparks-vc)
 
 
 ## [0.18.0] - 2026-09-05
