@@ -5752,7 +5752,9 @@ components:
           type:
           - string
           - 'null'
-          description: Schedule of the job (cron)
+          description: |-
+            Five-field cron expression or supported shortcut; see
+            [`crate::cron::validate_schedule`].
         Ttl:
           type:
           - integer

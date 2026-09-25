@@ -2,7 +2,7 @@ use ntex::web;
 use tokio::{fs, io::AsyncWriteExt};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocl_stubs::job::Job;
+use nanocl_stubs::{cron::validate_schedule, job::Job};
 
 use crate::{models::SystemState, vars};
 
@@ -42,6 +42,8 @@ pub async fn add_cron_rule(
   schedule: &str,
   state: &SystemState,
 ) -> IoResult<()> {
+  validate_schedule(schedule)
+    .map_err(|err| IoError::invalid_input("Job schedule", &err))?;
   let cmd = format_cron_job_command(item, state);
   let cron_rule = format!("{} {cmd}", schedule);
   log::debug!("Creating cron rule: {cron_rule}");

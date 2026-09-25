@@ -1104,6 +1104,14 @@ async fn exec_state_apply(
   let args =
     parse_build_args(&state_file.data, ArgParseMode::Apply, &opts.args)?;
   let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
+  // Validate rendered schedules before submitting any jobs to the daemon.
+  for state in &states {
+    for job in state.data.jobs.iter().flatten() {
+      job.validate_schedule().map_err(|err| {
+        IoError::invalid_input(&format!("Job {} schedule", job.name), &err)
+      })?;
+    }
+  }
   if !opts.skip_confirm {
     print_states(&states);
     utils::dialog::confirm("Are you sure to apply this state ?")

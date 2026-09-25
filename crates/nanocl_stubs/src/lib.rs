@@ -4,6 +4,7 @@ pub mod system;
 pub mod cargo;
 pub mod cargo_spec;
 pub mod config;
+pub mod cron;
 pub mod dns;
 pub mod job;
 pub mod metric;
