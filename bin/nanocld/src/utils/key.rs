@@ -60,7 +60,22 @@ pub fn ensure_kind(kind: &str) -> IoResult<()> {
 
 pub fn validate_kind_key(kind: &ProcessKind, key: &str) -> IoResult<()> {
   match kind {
-    ProcessKind::Job => Ok(()),
+    ProcessKind::Job => {
+      if key.is_empty()
+        || matches!(key, "." | "..")
+        || key.chars().any(|ch| {
+          ch.is_whitespace()
+            || ch.is_control()
+            || matches!(ch, '/' | '?' | '#' | '%' | '\\')
+        })
+      {
+        return Err(IoError::invalid_input(
+          "Job name",
+          "must be a nonempty URL-safe path component other than '.' or '..'",
+        ));
+      }
+      Ok(())
+    }
     ProcessKind::Cargo | ProcessKind::Vm => {
       parse_resource_key(key)?;
       Ok(())
@@ -93,5 +108,49 @@ mod tests {
       gen_network_key("node-a.nanocl.io", "private.api"),
       "node-a.nanocl.io.private.api"
     );
+  }
+
+  #[test]
+  fn job_keys_reject_path_traversal_and_unsafe_components() {
+    for key in [
+      "",
+      ".",
+      "..",
+      "../../poc_escape",
+      "../../store/certs",
+      "/tmp/poc",
+      "a/b",
+      "..\\poc",
+      "a\\b",
+      "%2e%2e%2fpoc",
+      "a?b",
+      "a#b",
+      " job",
+      "job ",
+      "a b",
+      "a\n",
+      "a\0b",
+    ] {
+      assert!(
+        validate_kind_key(&ProcessKind::Job, key).is_err(),
+        "accepted unsafe job key {key:?}"
+      );
+    }
+  }
+
+  #[test]
+  fn job_keys_preserve_unnamespaced_and_dotted_names() {
+    for key in [
+      "backup",
+      "Backup-42",
+      "backup_daily",
+      "backup.daily",
+      "a..b",
+    ] {
+      assert!(
+        validate_kind_key(&ProcessKind::Job, key).is_ok(),
+        "rejected valid job key {key:?}"
+      );
+    }
   }
 }

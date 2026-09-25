@@ -12,6 +12,7 @@ use nanocl_error::{
 use nanocl_stubs::{
   generic::GenericFilter,
   job::{Job, JobPartial, JobSpec, JobSummary},
+  process::ProcessKind,
 };
 
 use crate::{
@@ -119,6 +120,7 @@ impl JobDb {
   }
 
   pub fn try_from_partial(p: &JobPartial) -> IoResult<Self> {
+    utils::key::validate_kind_key(&ProcessKind::Job, &p.name)?;
     p.validate_schedule()
       .map_err(|err| IoError::invalid_input("Job schedule", &err))?;
     let data = serde_json::to_value(p)?;
@@ -186,5 +188,27 @@ impl JobDb {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
     Ok(job_summaries)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn job_creation_rejects_traversal_before_persistence() {
+    for name in ["../../poc_escape", "../../store/certs", "/tmp/poc"] {
+      let partial = JobPartial {
+        name: name.to_owned(),
+        ..Default::default()
+      };
+      assert!(JobDb::try_from_partial(&partial).is_err());
+    }
+    let partial = JobPartial {
+      name: "backup.daily".to_owned(),
+      ..Default::default()
+    };
+    let job = JobDb::try_from_partial(&partial).unwrap();
+    assert_eq!(job.key, partial.name);
   }
 }

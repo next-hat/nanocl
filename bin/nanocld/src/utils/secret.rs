@@ -16,17 +16,57 @@ use crate::{
   repositories::generic::*,
 };
 
-fn validate_secret_file_stem(name: &str) -> IoResult<()> {
+fn validate_secret_path_component(name: &str) -> IoResult<()> {
   if name.is_empty()
     || matches!(name, "." | "..")
     || name.contains(['/', '\\', '\0'])
   {
     return Err(IoError::invalid_data(
       "Secret",
-      &format!("Secret name {name:?} is not a safe mounted filename"),
+      &format!("Secret path component {name:?} is not a safe filename"),
     ));
   }
   Ok(())
+}
+
+/// Validate before any filesystem mutation, then check each directory before
+/// descending so an existing directory symlink cannot redirect creation or chmod.
+async fn prepare_secret_directory(
+  state_dir: &str,
+  kind: &ProcessKind,
+  key: &str,
+) -> IoResult<String> {
+  validate_secret_path_component(key)?;
+  fs::create_dir_all(state_dir).await?;
+  let mut parent = fs::canonicalize(state_dir).await?;
+  let kind = kind.to_string();
+  for component in ["secrets", kind.as_str(), key] {
+    let directory = parent.join(component);
+    match fs::create_dir(&directory).await {
+      Ok(()) => {}
+      Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+      Err(error) => {
+        return Err(IoError::interrupted(
+          "CreateTlsSecrets",
+          &format!("Unable to create {}: {error}", directory.display()),
+        ));
+      }
+    }
+    let canonical = fs::canonicalize(&directory).await?;
+    if canonical != directory || !fs::metadata(&canonical).await?.is_dir() {
+      return Err(IoError::invalid_data(
+        "CreateTlsSecrets",
+        "Secret path must be a directory without symlink redirection",
+      ));
+    }
+    parent = canonical;
+  }
+  let directory = parent.into_os_string().into_string().map_err(|_| {
+    IoError::invalid_data("CreateTlsSecrets", "Secret directory is not UTF-8")
+  })?;
+  fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700))
+    .await?;
+  Ok(directory)
 }
 
 async fn write_secret_file(
@@ -110,7 +150,7 @@ async fn resolve_secrets(
         }
       }
       "nanocl.io/tls" => {
-        validate_secret_file_stem(&secret.name)?;
+        validate_secret_path_component(&secret.name)?;
         resolved.tls.push((
           secret.name,
           serde_json::from_value::<ProxySslConfig>(secret.data)?,
@@ -155,15 +195,7 @@ pub async fn create_tls_secrets(
   state: &SystemState,
 ) -> IoResult<String> {
   let secret_dir =
-    format!("{}/secrets/{}/{}", state.inner.config.state_dir, kind, key);
-  fs::create_dir_all(&secret_dir).await.map_err(|error| {
-    IoError::interrupted(
-      "CreateTlsSecrets",
-      &format!("Unable to create {secret_dir}: {error}"),
-    )
-  })?;
-  fs::set_permissions(&secret_dir, std::fs::Permissions::from_mode(0o700))
-    .await?;
+    prepare_secret_directory(&state.inner.config.state_dir, kind, key).await?;
   resolve_secrets(secrets, state)
     .await?
     .tls
@@ -201,12 +233,31 @@ mod tests {
   use super::*;
 
   #[test]
-  fn mounted_secret_names_preserve_safe_basenames_and_reject_traversal() {
+  fn secret_path_components_preserve_safe_names_and_reject_traversal() {
     for safe in ["api", "api.tls", "api-key_1"] {
-      assert!(validate_secret_file_stem(safe).is_ok());
+      assert!(validate_secret_path_component(safe).is_ok());
     }
-    for unsafe_name in ["", ".", "..", "../api", "dir/api", "dir\\api"] {
-      let error = validate_secret_file_stem(unsafe_name).unwrap_err();
+    for unsafe_name in [
+      "",
+      ".",
+      "..",
+      "../api",
+      "dir/api",
+      "dir\\api",
+      "\0",
+      "/tmp/api",
+      "../../poc_escape",
+      "../../store/certs",
+      "safe/../escape",
+    ] {
+      // No async runtime or state directory is needed: unsafe keys must fail
+      // before the first filesystem operation.
+      let error = futures::executor::block_on(prepare_secret_directory(
+        "",
+        &ProcessKind::Job,
+        unsafe_name,
+      ))
+      .unwrap_err();
       assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
       assert_eq!(error.context(), Some("Secret"));
     }
