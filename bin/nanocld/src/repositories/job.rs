@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 
 use nanocl_error::{
   http::{HttpError, HttpResult},
-  io::IoResult,
+  io::{IoError, IoResult},
 };
 use nanocl_stubs::{
   generic::GenericFilter,
@@ -119,6 +119,8 @@ impl JobDb {
   }
 
   pub fn try_from_partial(p: &JobPartial) -> IoResult<Self> {
+    p.validate_schedule()
+      .map_err(|err| IoError::invalid_input("Job schedule", &err))?;
     let data = serde_json::to_value(p)?;
     Ok(JobDb {
       key: p.name.clone(),

@@ -3,6 +3,26 @@ use serde::{Deserialize, Serialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
+pub const UPSTREAM_TEMPLATE: &Template = &Template {
+  data: include_str!("templates/upstream.conf"),
+};
+
+pub const UNIX_UPSTREAM_TEMPLATE: &Template = &Template {
+  data: include_str!("templates/unix_upstream.conf"),
+};
+
+pub const CONF_TEMPLATE: &Template = &Template {
+  data: include_str!("templates/nginx.conf"),
+};
+
+pub const STREAM_TEMPLATE: &Template = &Template {
+  data: include_str!("templates/stream.conf"),
+};
+
+pub const HTTP_TEMPLATE: &Template = &Template {
+  data: include_str!("templates/http.conf"),
+};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationTemplate {
   pub path: String,
@@ -48,18 +68,6 @@ impl Template<'_> {
     Ok(output)
   }
 }
-
-pub const CONF_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/nginx.conf"),
-};
-
-pub const STREAM_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/stream.conf"),
-};
-
-pub const HTTP_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/http.conf"),
-};
 
 #[cfg(test)]
 mod tests {
@@ -156,11 +164,3 @@ mod tests {
     );
   }
 }
-
-pub const UPSTREAM_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/upstream.conf"),
-};
-
-pub const UNIX_UPSTREAM_TEMPLATE: &Template = &Template {
-  data: include_str!("templates/unix_upstream.conf"),
-};

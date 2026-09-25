@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1] - unrelease
+
+### Fixed
+
+- Validate cron job schedules after Statefile template rendering and before
+  submitting jobs to the API, rejecting malformed expressions and injected
+  cron commands with the shared parser in `nanocl_stubs`. Reported by [@muhammadam11n](https://github.com/muhammadam11n)
+
 ## [0.18.0] - 2026-09-05
 
 ### Core
