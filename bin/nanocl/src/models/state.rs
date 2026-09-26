@@ -63,6 +63,20 @@ pub struct StateDiffOpts {
   pub args: Vec<String>,
 }
 
+/// `nanocl state status` available options
+#[derive(Parser)]
+pub struct StateStatusOpts {
+  /// Path or URL to the Statefile
+  #[clap(long, short = 's')]
+  pub source: Option<String>,
+  /// Refresh status every two seconds until Ctrl-C
+  #[clap(long)]
+  pub watch: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 /// `nanocl state logs` available options
 #[derive(Default, Parser)]
 pub struct StateLogsOpts {
@@ -139,6 +153,8 @@ pub enum StateCommand {
   Apply(StateApplyOpts),
   /// Preview Statefile changes without modifying the daemon
   Diff(StateDiffOpts),
+  /// Show running instances, health, and recent failures from a Statefile
+  Status(StateStatusOpts),
   /// Render a Statefile with args to an output file
   Render(StateRenderOpts),
   /// Logs elements from a Statefile
@@ -197,6 +213,42 @@ where
 mod tests {
   use crate::models::{Cli, Command, StateCommand};
   use clap::Parser;
+
+  #[test]
+  fn state_status_accepts_source_watch_and_template_arguments() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "state",
+      "status",
+      "-s",
+      "deploy.yml",
+      "--watch",
+      "--",
+      "--name",
+      "example",
+    ])
+    .unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Status(opts) = state.command else {
+      panic!("expected status")
+    };
+    assert_eq!(opts.source.as_deref(), Some("deploy.yml"));
+    assert!(opts.watch);
+    assert_eq!(opts.args, ["--name", "example"]);
+
+    let cli = Cli::try_parse_from(["nanocl", "state", "status"]).unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Status(opts) = state.command else {
+      panic!("expected status")
+    };
+    assert!(opts.source.is_none());
+    assert!(!opts.watch);
+    assert!(opts.args.is_empty());
+  }
 
   #[test]
   fn state_diff_accepts_json_and_apply_preview_flags_without_confirmation() {

@@ -34,6 +34,7 @@ mod logs;
 mod man;
 mod remove;
 mod render;
+mod status;
 
 use apply::exec_state_apply;
 use logs::exec_state_logs;
@@ -147,6 +148,7 @@ fn gen_client(
 pub enum ArgParseMode {
   Apply,
   Diff,
+  Status,
   Remove,
   Logs,
 }
@@ -156,6 +158,7 @@ impl std::fmt::Display for ArgParseMode {
     let data = match self {
       ArgParseMode::Apply => "apply",
       ArgParseMode::Diff => "diff",
+      ArgParseMode::Status => "status",
       ArgParseMode::Remove => "remove",
       ArgParseMode::Logs => "logs",
     };
@@ -656,6 +659,9 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
     StateCommand::Man(opts) => execute_man(&opts.source).await,
     StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,
     StateCommand::Diff(opts) => diff::exec_state_diff(cli_conf, opts).await,
+    StateCommand::Status(opts) => {
+      status::exec_state_status(cli_conf, opts).await
+    }
     StateCommand::Render(opts) => exec_state_render(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
     StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,

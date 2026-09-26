@@ -18,6 +18,7 @@ mod secret;
 mod state;
 mod state_diff;
 mod state_output;
+mod state_status;
 mod stats;
 mod uninstall;
 mod version;
@@ -39,6 +40,7 @@ pub use secret::*;
 pub use state::*;
 pub use state_diff::*;
 pub use state_output::*;
+pub use state_status::*;
 pub use stats::*;
 pub use uninstall::*;
 pub use vm::*;
@@ -118,7 +120,7 @@ pub enum Command {
   Context(ContextArg),
   /// Manage nodes (experimental)
   Node(NodeArg),
-  /// Apply or Remove a Statefile
+  /// Preview, apply, monitor or remove a Statefile
   State(StateArg),
   /// Show or watch events
   Event(EventArg),
