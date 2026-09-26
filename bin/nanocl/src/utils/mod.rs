@@ -12,6 +12,8 @@ pub mod print;
 pub mod process;
 pub mod progress;
 pub mod state;
+pub mod state_output;
+pub mod state_progress;
 
 #[cfg(test)]
 pub mod tests {

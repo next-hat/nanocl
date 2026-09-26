@@ -13,7 +13,7 @@ apply - Create or Update elements from a Statefile
 
 **apply** \[**-s**\|**--source**\] \[**-f**\|**--follow**\]
 \[**-y**\|**--yes**\] \[**-r**\|**--reload**\] \[**--remove-orphans**\]
-\[**-h**\|**--help**\] \[*ARGS*\]
+\[**--json**\] \[**-h**\|**--help**\] \[*ARGS*\]
 
 ## DESCRIPTION
 
@@ -36,8 +36,20 @@ Perform an apply even if state didnt changed
 **--remove-orphans**  
 Remove orphaned elements
 
+**--json**
+
+Emit newline-delimited JSON (NDJSON) for tools and dashboards. Requires
+**-y**/**--yes** and cannot be combined with **-f**/**--follow**.
+See [State command JSON output](../state-json.md) for the record format.
+
 **-h**, **--help**  
 Print help
 
 \[*ARGS*\]  
 Additional arguments to pass to the file
+
+## JSON EXAMPLE
+
+```sh
+nanocl state apply -s Statefile.yml -y --json
+```

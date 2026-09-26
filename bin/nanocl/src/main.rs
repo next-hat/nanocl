@@ -11,7 +11,9 @@ mod utils;
 mod version;
 
 use config::{CliConfig, UserConfig};
-use models::{Cli, Command, Context};
+use models::{
+  Cli, Command, Context, StateCommand, StateOutput, StateOutputEvent,
+};
 
 /// Create a CliConfig struct from the cli arguments
 fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
@@ -81,8 +83,36 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   })
 }
 
-/// Execute the command from the cli arguments
+fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
+  let Command::State(args) = &cli_args.command else {
+    return None;
+  };
+  let (operation, source) = match &args.command {
+    StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
+    StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
+    _ => return None,
+  };
+  Some(StateOutput {
+    operation,
+    statefile: source.clone(),
+  })
+}
+
+/// Report JSON results, including failures before state command dispatch.
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
+  let output = state_json_output(cli_args);
+  let result = execute_arg_inner(cli_args).await;
+  if let Some(output) = output {
+    let error = result.as_ref().err().map(ToString::to_string);
+    output.emit(StateOutputEvent::Result {
+      success: result.is_ok(),
+      error: error.as_deref(),
+    })?;
+  }
+  result
+}
+
+async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
   let cli_conf = create_cli_config(cli_args)?;
   match &cli_args.command {
     Command::Namespace(args) => commands::exec_namespace(&cli_conf, args).await,
@@ -143,7 +173,12 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();
   dotenv().ok();
+  let json_output = state_json_output(&args).is_some();
   ctrlc::set_handler(move || {
+    if json_output {
+      // Do not wait on stdout: a dashboard may have stopped reading its pipe.
+      std::process::exit(130);
+    }
     let term = dialoguer::console::Term::stdout();
     let _ = term.show_cursor();
     let _ = term.clear_last_lines(0);
@@ -165,6 +200,34 @@ mod tests {
   use crate::utils::tests::*;
 
   use super::*;
+
+  #[test]
+  fn json_state_output_selects_only_apply_and_remove() {
+    for (command, operation) in
+      [("apply", "apply"), ("remove", "remove"), ("rm", "remove")]
+    {
+      let args = Cli::try_parse_from([
+        "nanocl",
+        "state",
+        command,
+        "--json",
+        "-y",
+        "-s",
+        "deploy.yml",
+      ])
+      .unwrap();
+      let output = state_json_output(&args).unwrap();
+      assert_eq!(output.operation, operation);
+      assert_eq!(output.statefile.as_deref(), Some("deploy.yml"));
+    }
+    for args in [
+      vec!["nanocl", "state", "apply", "-y"],
+      vec!["nanocl", "state", "rm", "-y"],
+      vec!["nanocl", "version"],
+    ] {
+      assert!(state_json_output(&Cli::try_parse_from(args).unwrap()).is_none());
+    }
+  }
 
   /// Test version command
   #[ntex::test]
