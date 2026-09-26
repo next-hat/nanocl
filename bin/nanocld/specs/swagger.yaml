@@ -7203,6 +7203,11 @@ components:
         KindKey:
           type: string
           description: Canonical resource key for cargoes and VMs; jobs use their name
+        IpAddress:
+          type:
+          - string
+          - 'null'
+          description: Effective IP address resolved from the last observed process state
         Data:
           $ref: '#/components/schemas/ContainerInspectResponse'
           description: The data of the process a ContainerInspect

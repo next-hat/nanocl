@@ -27,7 +27,9 @@ pub async fn list_processes(
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;
-  let processes =
+  let mut processes =
     ProcessDb::transform_read_by(&filter, &state.inner.pool).await?;
+  super::network::resolve_ip_addresses(&mut processes, &state.inner.pool)
+    .await?;
   Ok(web::HttpResponse::Ok().json(&processes))
 }

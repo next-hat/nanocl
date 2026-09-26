@@ -184,6 +184,7 @@ mod tests {
       kind: ProcessKind::Cargo,
       node_name: "node-a".to_owned(),
       kind_key: "global.api".to_owned(),
+      ip_address: None,
       data: ContainerInspectResponse {
         config: Some(ContainerConfig {
           labels: Some(HashMap::from([

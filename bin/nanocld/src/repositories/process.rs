@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
@@ -110,6 +110,41 @@ impl RepositoryReadByTransform for ProcessDb {
 }
 
 impl ProcessDb {
+  /// Read network owners independently of the displayed page and its filters.
+  pub async fn read_network_owners(
+    targets: &[(String, String)],
+    pool: &Pool,
+  ) -> IoResult<Vec<Process>> {
+    if targets.is_empty() {
+      return Ok(Vec::new());
+    }
+    let targets = targets.to_vec();
+    let pool = pool.clone();
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = crate::utils::store::get_pool_conn(&pool)?;
+      let mut query = processes::table
+        .filter(false.into_sql::<diesel::sql_types::Bool>())
+        .into_boxed();
+      for (node, target) in &targets {
+        query = query.or_filter(
+          processes::node_name
+            .eq(node)
+            .and(processes::key.eq(target).or(processes::name.eq(target))),
+        );
+      }
+      query
+        .load::<ProcessDb>(&mut conn)
+        .map_err(Self::map_err)?
+        .into_iter()
+        .map(Process::try_from)
+        .collect()
+    })
+    .await
+    .map_err(|err| {
+      IoError::interrupted("Read process network owners", &err.to_string())
+    })?
+  }
+
   pub async fn read_by_kind_key(
     kind_key: &str,
     filter: Option<GenericFilter>,

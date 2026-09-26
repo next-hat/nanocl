@@ -31,8 +31,13 @@ pub async fn inspect_process(
 ) -> HttpResult<web::HttpResponse> {
   let filter =
     GenericFilter::new().r#where("name", GenericClause::Eq(path.1.clone()));
-  let process: Process = ProcessDb::read_one_by(&filter, &state.inner.pool)
+  let mut process: Process = ProcessDb::read_one_by(&filter, &state.inner.pool)
     .await?
     .try_into()?;
+  super::network::resolve_ip_addresses(
+    std::slice::from_mut(&mut process),
+    &state.inner.pool,
+  )
+  .await?;
   Ok(web::HttpResponse::Ok().json(&process))
 }

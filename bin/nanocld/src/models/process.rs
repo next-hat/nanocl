@@ -58,6 +58,7 @@ impl TryFrom<ProcessDb> for Process {
         .map_err(|err| err.map_err_context(|| "Process"))?,
       node_name: model.node_name,
       kind_key: model.kind_key,
+      ip_address: None,
     })
   }
 }

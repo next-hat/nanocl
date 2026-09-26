@@ -307,6 +307,41 @@ mod tests {
     );
   }
 
+  #[test]
+  fn generated_openapi_exposes_optional_process_ip_address() {
+    let document =
+      serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
+    let process = &document["components"]["schemas"]["Process"];
+    let properties = &process["properties"];
+
+    assert_eq!(
+      properties["IpAddress"]["type"],
+      serde_json::json!(["string", "null"])
+    );
+    assert!(
+      !process["required"]
+        .as_array()
+        .expect("Process must declare required properties")
+        .iter()
+        .any(|property| property == "IpAddress")
+    );
+    assert_eq!(
+      properties["Data"],
+      serde_json::json!({
+        "$ref": "#/components/schemas/ContainerInspectResponse",
+        "description": "The data of the process a ContainerInspect",
+      })
+    );
+
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml"))
+        .expect("checked-in OpenAPI must parse as YAML");
+    assert_eq!(
+      process, &checked_in["components"]["schemas"]["Process"],
+      "checked-in Process schema must match the generated API contract"
+    );
+  }
+
   /// Regenerate the checked-in daemon OpenAPI without starting Nanocld.
   #[test]
   #[ignore = "rewrites bin/nanocld/specs/swagger.yaml"]
