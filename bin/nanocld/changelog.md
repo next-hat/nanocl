@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - unreleased
+
+### Added
+
+- Optional `IpAddress` in process list and inspection responses, resolved from
+  stored network state, including shared container networks and IPv6.
+
+### Changed
+
+- Newly created Cargo processes use readable, sanitized application and init
+  container names, and a `sandbox` label for sandbox processes.
+
 ## [0.18.1] - 2026-09-26
 
 ### Security

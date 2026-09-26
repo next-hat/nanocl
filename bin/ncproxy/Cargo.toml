@@ -56,7 +56,7 @@ futures = "0.3"
 notify = { version = "8.0", default-features = false, features = [
   "macos_kqueue",
 ] }
-nanocld_client = { version = "0.18", features = ["tokio"] }
+nanocld_client = { version = "0.19", features = ["tokio"] }
 nanocl_utils = { version = "0.9", features = ["ntex", "logger", "versioning"] }
 utoipa = { version = "5", features = ["yaml"], optional = true }
 chrono = { version = "0.4", default-features = false, features = [

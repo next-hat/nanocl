@@ -2078,7 +2078,7 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
 name = "nanocl"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "async-recursion",
  "bollard-next",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2167,7 +2167,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2205,7 +2205,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "bollard-next",
  "futures",

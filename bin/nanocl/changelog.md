@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - unreleased
+
+### Added
+
+- `nanocl state diff` to preview Statefile changes before applying them, with
+  secret redaction, a unified YAML diff or JSON output, optional paging, and
+  previews for reloads and orphan removal.
+- `nanocl state status` to show running process counts, actual and wanted state,
+  health, and recent failures for Statefile cargoes, VMs, jobs, and resources,
+  with `--watch` for automatic refreshes.
+- Shell completion for Bash, Zsh, Fish, PowerShell, and Elvish, including
+  commands, options, local paths, contexts, and live daemon objects.
+
+### Changed
+
+- Improve `nanocl state apply` and `nanocl state remove` output with per-item
+  progress and operation summaries, including image download progress during
+  apply. Add `--json` NDJSON output for automation, requiring `--yes`;
+  `state remove --json` returns a nonzero exit code when removals fail.
+- Show a compact `nanocl ps` table with shorter image names and relative ages
+  by default. Add `--wide` for node names, full image references, and exact
+  creation timestamps.
+
+### Fixed
+
+- Display resolved process IP addresses for shared container networks, with
+  `<shared>` as a fallback when the address is unavailable.
+
 ## [0.18.1] - 2026-09-26
 
 ### Fixed
