@@ -7,7 +7,7 @@ sidebar_position: 73
 
 # NAME
 
-state - Preview, Apply or Remove a Statefile
+state - Preview, Apply, Monitor or Remove a Statefile
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ state - Preview, Apply or Remove a Statefile
 
 ## DESCRIPTION
 
-Preview, Apply or Remove a Statefile
+Preview, Apply, Monitor or Remove a Statefile
 
 ## OPTIONS
 
@@ -32,6 +32,9 @@ Create or Update elements from a Statefile
 
 state-diff(1)\
 Preview changes from a Statefile without applying them
+
+state-status(1)\
+Show running instances, health, and recent failures from a Statefile
 
 state-render(1)  
 Render a Statefile with args to an output file
