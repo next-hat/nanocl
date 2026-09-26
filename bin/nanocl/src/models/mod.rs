@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 mod backup;
 mod cargo;
+mod completion;
 mod context;
 mod event;
 mod generic;
@@ -26,6 +27,7 @@ mod vm;
 
 pub use backup::*;
 pub use cargo::*;
+pub use completion::*;
 pub use context::*;
 pub use event::*;
 pub use generic::*;
@@ -53,7 +55,13 @@ Start local on a single node and scale out when ready — simple to learn, produ
 
 /// Cli available options and commands
 #[derive(Parser)]
-#[clap(name = "nanocl", version, about, long_about = LONG_ABOUT)]
+#[clap(
+  name = "nanocl",
+  version,
+  about,
+  long_about = LONG_ABOUT,
+  after_help = "Generate shell completion setup: COMPLETE=<shell> nanocl\nSee doc/shell-completion.md for installation instructions."
+)]
 pub struct Cli {
   /// Nanocld host default: unix://run/nanocl/nanocl.sock
   #[clap(long, short = 'H')]
@@ -146,12 +154,6 @@ pub enum Command {
   Backup(BackupOpts),
   /// Stats of the process
   Stats(StatsOpts),
-  // TODO: shell completion
-  // Completion {
-  //   /// Shell to generate completion for
-  //   #[clap(arg_enum)]
-  //   shell: Shell,
-  // },
 }
 
 /// `nanocl` available display formats `yaml` by default
