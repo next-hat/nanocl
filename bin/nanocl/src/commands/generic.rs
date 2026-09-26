@@ -1,4 +1,5 @@
 use clap::Args;
+use indicatif::{MultiProgress, ProgressBar};
 use ntex::http::StatusCode;
 
 use nanocl_error::{
@@ -18,7 +19,7 @@ use crate::{
   config::CliConfig,
   models::{
     GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
-    GenericStopOpts,
+    GenericStopOpts, StateOutput,
   },
   utils,
 };
@@ -118,6 +119,17 @@ where
     client: &NanocldClient,
     opts: &GenericRemoveOpts<T>,
   ) -> IoResult<()> {
+    Self::exec_rm_with_progress(client, opts, None, None)
+      .await
+      .map(|_| ())
+  }
+
+  async fn exec_rm_with_progress(
+    client: &NanocldClient,
+    opts: &GenericRemoveOpts<T>,
+    progress: Option<(&MultiProgress, &ProgressBar)>,
+    output: Option<&StateOutput>,
+  ) -> IoResult<usize> {
     let object_name = Self::object_name();
     if !opts.skip_confirm {
       utils::dialog::confirm(&format!(
@@ -126,10 +138,42 @@ where
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
+    let mut failures = 0;
     for key in &opts.keys {
       let token = format!("{object_name}/{key}");
-      let pg_style = utils::progress::create_spinner_style(&token, "red");
-      let pg = utils::progress::create_progress("(destroying)", &pg_style);
+      let pg = match progress {
+        Some((display, summary)) => {
+          let kind = match object_name {
+            "cargoes" => "cargo",
+            "vms" => "vm",
+            "jobs" => "job",
+            "resources" => "resource",
+            "secrets" => "secret",
+            _ => object_name,
+          };
+          let token = format!("{kind}/{key}");
+          let pg = utils::progress::create_state_item(
+            display, summary, &token, output,
+          )?;
+          utils::progress::set_state_message(&pg, summary, "Removing", output)?;
+          pg
+        }
+        None => {
+          let style = utils::progress::create_spinner_style(&token, "red");
+          utils::progress::create_progress("(destroying)", &style)
+        }
+      };
+      let finish =
+        |status: &str, failed, error: Option<&str>| -> IoResult<()> {
+          if let Some((_, summary)) = progress {
+            utils::progress::finish_state_item(
+              &pg, summary, status, failed, error, output,
+            )?;
+          } else {
+            pg.finish_with_message(format!("({})", status.to_lowercase()));
+          }
+          Ok(())
+        };
       let waiter_kind = match object_name {
         "vms" => Some(EventActorKind::Vm),
         "cargoes" => Some(EventActorKind::Cargo),
@@ -144,8 +188,14 @@ where
             vec![NativeEventAction::Destroy],
             client,
           )
-          .await?;
-          Some(waiter)
+          .await;
+          match waiter {
+            Ok(waiter) => Some(waiter),
+            Err(err) => {
+              finish("Failed", true, Some(&err.to_string()))?;
+              return Err(err);
+            }
+          }
         }
         None => None,
       };
@@ -159,21 +209,33 @@ where
         if let HttpClientError::HttpError(err) = &err
           && err.status == StatusCode::NOT_FOUND
         {
-          pg.finish_with_message("(unchanged)");
+          finish("Unchanged", false, None)?;
           continue;
         }
-        pg.finish();
-        eprintln!("{key}: {err}");
+        failures += 1;
+        finish("Failed", true, Some(&err.to_string()))?;
+        if let Some((display, _)) = progress {
+          display.suspend(|| eprintln!("{key}: {err}"));
+        } else {
+          eprintln!("{key}: {err}");
+        }
         continue;
       }
       if let Some(waiter) = waiter {
-        waiter.await.map_err(|err| {
-          IoError::interrupted("wait_process_state", &err.to_string())
-        })??;
+        let result = waiter
+          .await
+          .map_err(|err| {
+            IoError::interrupted("wait_process_state", &err.to_string())
+          })
+          .and_then(|result| result);
+        if let Err(err) = result {
+          finish("Failed", true, Some(&err.to_string()))?;
+          return Err(err);
+        }
       }
-      pg.finish_with_message("(destroyed)");
+      finish("Destroyed", false, None)?;
     }
-    Ok(())
+    Ok(failures)
   }
 }
 

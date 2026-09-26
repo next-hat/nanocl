@@ -19,6 +19,9 @@ pub struct StateApplyOpts {
   /// Skip the confirmation prompt
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
+  /// Stream newline-delimited JSON to stdout (requires --yes)
+  #[clap(long, requires = "skip_confirm", conflicts_with = "follow")]
+  pub json: bool,
   /// Perform an apply even if state didn't changed
   #[clap(long, short = 'r')]
   pub reload: bool,
@@ -82,6 +85,9 @@ pub struct StateRemoveOpts {
   /// Skip the confirmation prompt
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
+  /// Stream newline-delimited JSON to stdout (requires --yes)
+  #[clap(long, requires = "skip_confirm")]
+  pub json: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
@@ -153,4 +159,36 @@ where
   pub root: StateRoot,
   /// Path to the Statefile
   pub location: String,
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::models::{Cli, Command, StateCommand};
+  use clap::Parser;
+
+  #[test]
+  fn state_json_flags_require_yes_and_reject_follow() {
+    for command in ["apply", "remove", "rm"] {
+      let cli =
+        Cli::try_parse_from(["nanocl", "state", command, "--json", "-y"])
+          .unwrap();
+      let Command::State(state) = cli.command else {
+        panic!("expected state command")
+      };
+      match state.command {
+        StateCommand::Apply(opts) => assert!(opts.json && opts.skip_confirm),
+        StateCommand::Remove(opts) => assert!(opts.json && opts.skip_confirm),
+        _ => panic!("expected apply or remove"),
+      }
+      assert!(
+        Cli::try_parse_from(["nanocl", "state", command, "--json"]).is_err()
+      );
+    }
+    assert!(
+      Cli::try_parse_from([
+        "nanocl", "state", "apply", "--json", "-y", "--follow"
+      ])
+      .is_err()
+    );
+  }
 }

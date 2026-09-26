@@ -13,6 +13,7 @@ use futures::{
   StreamExt, join,
   stream::{FuturesOrdered, FuturesUnordered},
 };
+use indicatif::{MultiProgress, ProgressBar};
 use serde_json::{Map, Value};
 use url::Url;
 
@@ -47,8 +48,8 @@ use crate::{
   models::{
     CargoArg, Context, DisplayFormat, GenericDefaultOpts,
     GenericRemoveForceOpts, GenericRemoveOpts, JobArg, ResourceArg, SecretArg,
-    StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
-    StateRemoveOpts, StateRoot, VmArg,
+    StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateOutput,
+    StateRef, StateRemoveOpts, StateRoot, VmArg,
   },
   utils::{self, cargo::cargo_spec_from_revision},
 };
@@ -305,6 +306,7 @@ fn parse_build_args(
   state_file: &Statefile,
   mode: ArgParseMode,
   args: &[String],
+  json: bool,
 ) -> IoResult<serde_json::Value> {
   let metadata = state_file.clone().metadata.unwrap_or_default();
   let about = match metadata.about {
@@ -383,7 +385,13 @@ fn parse_build_args(
     }
     cmd = cmd.arg(cmd_arg);
   }
-  let matches = cmd.get_matches_from(args);
+  let matches = if json {
+    cmd.try_get_matches_from(args).map_err(|err| {
+      IoError::invalid_input("Statefile arguments", err.to_string().as_str())
+    })?
+  } else {
+    cmd.get_matches_from(args)
+  };
   let mut args = Map::new();
   for build_arg in state_file.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
@@ -778,215 +786,296 @@ fn get_nanocl_group(state_file: &StateRef<Statefile>) -> String {
   }
 }
 
+fn state_item_count(state: &StateRef<Statefile>) -> u64 {
+  let data = &state.data;
+  (data.secrets.as_ref().map_or(0, Vec::len)
+    + data.jobs.as_ref().map_or(0, Vec::len)
+    + data.cargoes.as_ref().map_or(0, Vec::len)
+    + data.virtual_machines.as_ref().map_or(0, Vec::len)
+    + data.resources.as_ref().map_or(0, Vec::len)) as u64
+}
+
 async fn state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
   state_file: &StateRef<Statefile>,
+  progress: &MultiProgress,
+  summary: &ProgressBar,
+  output: Option<&StateOutput>,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
-  let nanocl_group = get_nanocl_group(state_file);
+  let namespace = state_file.data.namespace.as_deref().unwrap_or("global");
+  let nanocl_group = &get_nanocl_group(state_file);
   if let Some(secrets) = &state_file.data.secrets {
     for secret in secrets.iter() {
       let mut secret = secret.to_owned();
       let token = format!("secret/{}", secret.name);
-      let pg_style = utils::progress::create_spinner_style(&token, "green");
-      let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(&secret.metadata, &nanocl_group);
-      secret.metadata = Some(metadata);
-      match client.inspect_secret(&secret.name).await {
-        Err(_) => {
-          client.create_secret(&secret).await?;
-          pg.set_message("(created)");
-        }
-        Ok(inspect) => {
-          let cmp: SecretPartial = inspect.into();
-          if cmp != secret {
-            let update: SecretUpdate = secret.clone().into();
-            client.patch_secret(&secret.name, &update).await?;
-            pg.set_message("(updated)");
-          } else {
-            pg.finish_with_message("(unchanged)");
-            continue;
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        None,
+        |pg| async move {
+          let metadata = insert_nanocl_group(&secret.metadata, nanocl_group);
+          secret.metadata = Some(metadata);
+          utils::progress::set_state_message(&pg, summary, "Applying", output)?;
+          match client.inspect_secret(&secret.name).await {
+            Err(_) => {
+              client.create_secret(&secret).await?;
+              return Ok("Created");
+            }
+            Ok(inspect) => {
+              let cmp: SecretPartial = inspect.into();
+              if cmp != secret {
+                let update: SecretUpdate = secret.clone().into();
+                client.patch_secret(&secret.name, &update).await?;
+                return Ok("Updated");
+              } else {
+                return Ok("Unchanged");
+              }
+            }
           }
-        }
-      }
-      pg.finish_with_message("(done)");
+        },
+      )
+      .await?;
     }
   }
+
   if let Some(jobs) = &state_file.data.jobs {
     for job in jobs.iter() {
       let mut job = job.to_owned();
-      let token = format!("job/{}", job.name);
-      let pg_style = utils::progress::create_spinner_style(&token, "green");
-      let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(&job.metadata, &nanocl_group);
-      job.metadata = Some(metadata);
-      if client.inspect_job(&job.name).await.is_ok() {
-        pg.set_message("(clearing)");
-        let waiter = utils::process::wait_process_state(
-          &job.name,
-          EventActorKind::Job,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client.delete_job(&job.name).await?;
-        waiter.await.map_err(|err| {
-          IoError::interrupted("wait_process_state", &err.to_string())
-        })??;
-        pg.set_message("(cleared)");
-      }
-      pg.set_message("(creating)");
-      client.create_job(&job).await?;
-      let waiter = utils::process::wait_process_state(
-        &job.name,
-        EventActorKind::Job,
-        vec![NativeEventAction::Start],
-        client,
+      let key = job.name.clone();
+      let token = format!("job/{key}");
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        Some((client, &key, EventActorKind::Job)),
+        |pg| async move {
+          let metadata = insert_nanocl_group(&job.metadata, nanocl_group);
+          job.metadata = Some(metadata);
+          if client.inspect_job(&job.name).await.is_ok() {
+            utils::progress::set_state_message(
+              &pg, summary, "Clearing", output,
+            )?;
+            let waiter = utils::process::wait_process_state(
+              &job.name,
+              EventActorKind::Job,
+              vec![NativeEventAction::Destroy],
+              client,
+            )
+            .await?;
+            client.delete_job(&job.name).await?;
+            waiter.await.map_err(|err| {
+              IoError::interrupted("wait_process_state", &err.to_string())
+            })??;
+            utils::progress::set_state_message(
+              &pg, summary, "Cleared", output,
+            )?;
+          }
+          utils::progress::set_state_message(&pg, summary, "Creating", output)?;
+          client.create_job(&job).await?;
+          let waiter = utils::process::wait_process_state(
+            &job.name,
+            EventActorKind::Job,
+            vec![NativeEventAction::Start],
+            client,
+          )
+          .await?;
+          utils::progress::set_state_message(&pg, summary, "Starting", output)?;
+          client.start_process("job", &job.name).await?;
+          waiter.await.map_err(|err| {
+            IoError::interrupted("wait_process_state", &err.to_string())
+          })??;
+          Ok("Running")
+        },
       )
       .await?;
-      pg.set_message("(starting)");
-      client.start_process("job", &job.name).await?;
-      waiter.await.map_err(|err| {
-        IoError::interrupted("wait_process_state", &err.to_string())
-      })??;
-      pg.finish_with_message("(running)");
     }
   }
+
   if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes.iter() {
       let mut cargo = cargo.to_owned();
-      let token = format!("cargo/{}", cargo.name);
-      let pg_style = utils::progress::create_spinner_style(&token, "green");
-      let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(&cargo.metadata, &nanocl_group);
-      cargo.metadata = Some(metadata);
-      let key = utils::process::resource_key(&cargo.name, &namespace)?;
-      match client.inspect_cargo(&key).await {
-        Err(_) => {
-          pg.set_message("(creating)");
-          client.create_cargo(&cargo, Some(&namespace)).await?;
-          let waiter = utils::process::wait_process_state(
-            &key,
-            EventActorKind::Cargo,
-            vec![NativeEventAction::Start],
-            client,
-          )
-          .await?;
-          pg.set_message("(starting)");
-          client.start_process("cargo", &key).await?;
-          waiter.await.map_err(|err| {
-            IoError::interrupted("wait_process_state", &err.to_string())
-          })??;
-        }
-        Ok(inspect) => {
-          let cmp = cargo_spec_from_revision(&inspect.spec);
-          if (cmp != cargo) || opts.reload {
-            pg.set_message("(updating)");
-            let waiter = utils::process::wait_process_state(
-              &key,
-              EventActorKind::Cargo,
-              vec![NativeEventAction::Update],
-              client,
-            )
-            .await?;
-            client.put_cargo(&key, &cargo).await?;
-            waiter.await.map_err(|err| {
-              IoError::interrupted("wait_process_state", &err.to_string())
-            })??;
-            pg.set_message("(updated)");
-          } else if inspect.status.actual == ObjPsStatusKind::Start {
-            pg.finish_with_message("(unchanged)");
-            continue;
+      let key = utils::process::resource_key(&cargo.name, namespace)?;
+      let token = format!("cargo/{key}");
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        Some((client, &key, EventActorKind::Cargo)),
+        |pg| {
+          let key = &key;
+          async move {
+            let metadata = insert_nanocl_group(&cargo.metadata, nanocl_group);
+            cargo.metadata = Some(metadata);
+            match client.inspect_cargo(key).await {
+              Err(_) => {
+                utils::progress::set_state_message(
+                  &pg, summary, "Creating", output,
+                )?;
+                client.create_cargo(&cargo, Some(namespace)).await?;
+                let waiter = utils::process::wait_process_state(
+                  &key,
+                  EventActorKind::Cargo,
+                  vec![NativeEventAction::Start],
+                  client,
+                )
+                .await?;
+                utils::progress::set_state_message(
+                  &pg, summary, "Starting", output,
+                )?;
+                client.start_process("cargo", &key).await?;
+                waiter.await.map_err(|err| {
+                  IoError::interrupted("wait_process_state", &err.to_string())
+                })??;
+              }
+              Ok(inspect) => {
+                let cmp = cargo_spec_from_revision(&inspect.spec);
+                if (cmp != cargo) || opts.reload {
+                  utils::progress::set_state_message(
+                    &pg, summary, "Updating", output,
+                  )?;
+                  let waiter = utils::process::wait_process_state(
+                    &key,
+                    EventActorKind::Cargo,
+                    vec![NativeEventAction::Update],
+                    client,
+                  )
+                  .await?;
+                  client.put_cargo(key, &cargo).await?;
+                  waiter.await.map_err(|err| {
+                    IoError::interrupted("wait_process_state", &err.to_string())
+                  })??;
+                  utils::progress::set_state_message(
+                    &pg, summary, "Updated", output,
+                  )?;
+                } else if inspect.status.actual == ObjPsStatusKind::Start {
+                  return Ok("Unchanged");
+                }
+              }
+            }
+            Ok("Running")
           }
-        }
-      }
-      pg.finish_with_message("(running)");
+        },
+      )
+      .await?;
     }
   }
+
   if let Some(vms) = &state_file.data.virtual_machines {
     for vm in vms.iter() {
       let mut vm = vm.to_owned();
-      let token = format!("vm/{}", vm.name);
-      let pg_style = utils::progress::create_spinner_style(&token, "green");
-      let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(&vm.metadata, &nanocl_group);
-      vm.metadata = Some(metadata);
-      let key = utils::process::resource_key(&vm.name, &namespace)?;
-      match client.inspect_vm(&key).await {
-        Err(_) => {
-          pg.set_message("(creating)");
-          let image_full_path = utils::path::resolve_full_path(&vm.image)?;
-          vm.image = image_full_path;
-          client.create_vm(&vm, Some(&namespace)).await?;
-          let waiter = utils::process::wait_process_state(
-            &key,
-            EventActorKind::Vm,
-            vec![NativeEventAction::Start],
-            client,
-          )
-          .await?;
-          pg.set_message("(starting)");
-          client.start_process("vm", &key).await?;
-          waiter.await.map_err(|err| {
-            IoError::interrupted("wait_process_state", &err.to_string())
-          })??;
-        }
-        Ok(inspect) => {
-          let cmp: VmSpecPartial = inspect.spec.into();
-          if (cmp != vm) || opts.reload {
-            let update: VmSpecUpdate = vm.clone().into();
-            pg.set_message("(updating)");
-            let waiter = utils::process::wait_process_state(
-              &key,
-              EventActorKind::Vm,
-              vec![NativeEventAction::Start],
-              client,
-            )
-            .await?;
-            client.patch_vm(&key, &update).await?;
-            waiter.await.map_err(|err| {
-              IoError::interrupted("wait_process_state", &err.to_string())
-            })??;
-            pg.set_message("(updated)");
-          } else if inspect.status.actual == ObjPsStatusKind::Start {
-            pg.finish_with_message("(unchanged)");
-            continue;
+      let key = utils::process::resource_key(&vm.name, namespace)?;
+      let token = format!("vm/{key}");
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        Some((client, &key, EventActorKind::Vm)),
+        |pg| {
+          let key = &key;
+          async move {
+            let metadata = insert_nanocl_group(&vm.metadata, nanocl_group);
+            vm.metadata = Some(metadata);
+            match client.inspect_vm(key).await {
+              Err(_) => {
+                utils::progress::set_state_message(
+                  &pg, summary, "Creating", output,
+                )?;
+                let image_full_path =
+                  utils::path::resolve_full_path(&vm.image)?;
+                vm.image = image_full_path;
+                client.create_vm(&vm, Some(namespace)).await?;
+                let waiter = utils::process::wait_process_state(
+                  &key,
+                  EventActorKind::Vm,
+                  vec![NativeEventAction::Start],
+                  client,
+                )
+                .await?;
+                utils::progress::set_state_message(
+                  &pg, summary, "Starting", output,
+                )?;
+                client.start_process("vm", &key).await?;
+                waiter.await.map_err(|err| {
+                  IoError::interrupted("wait_process_state", &err.to_string())
+                })??;
+              }
+              Ok(inspect) => {
+                let cmp: VmSpecPartial = inspect.spec.into();
+                if (cmp != vm) || opts.reload {
+                  let update: VmSpecUpdate = vm.clone().into();
+                  utils::progress::set_state_message(
+                    &pg, summary, "Updating", output,
+                  )?;
+                  let waiter = utils::process::wait_process_state(
+                    &key,
+                    EventActorKind::Vm,
+                    vec![NativeEventAction::Start],
+                    client,
+                  )
+                  .await?;
+                  client.patch_vm(key, &update).await?;
+                  waiter.await.map_err(|err| {
+                    IoError::interrupted("wait_process_state", &err.to_string())
+                  })??;
+                  utils::progress::set_state_message(
+                    &pg, summary, "Updated", output,
+                  )?;
+                } else if inspect.status.actual == ObjPsStatusKind::Start {
+                  return Ok("Unchanged");
+                }
+              }
+            }
+            Ok("Running")
           }
-        }
-      }
-      pg.finish_with_message("(running)");
+        },
+      )
+      .await?;
     }
   }
+
   if let Some(resources) = &state_file.data.resources {
     for resource in resources.iter() {
       let mut resource = resource.to_owned();
       let token = format!("resource/{}", resource.name);
-      let pg_style = utils::progress::create_spinner_style(&token, "green");
-      let pg = utils::progress::create_progress("(submitting)", &pg_style);
-      let metadata = insert_nanocl_group(&resource.metadata, &nanocl_group);
-      resource.metadata = Some(metadata);
-      match client.inspect_resource(&resource.name).await {
-        Err(_) => {
-          client.create_resource(&resource).await?;
-          pg.set_message("(created)");
-        }
-        Ok(inspect) => {
-          let cmp: ResourcePartial = inspect.into();
-          if (cmp != resource) || opts.reload {
-            let update: ResourceUpdate = resource.clone().into();
-            client.put_resource(&resource.name, &update).await?;
-            pg.set_message("(updated)");
-          } else {
-            pg.finish_with_message("(unchanged)");
-            continue;
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        None,
+        |pg| async move {
+          let metadata = insert_nanocl_group(&resource.metadata, nanocl_group);
+          resource.metadata = Some(metadata);
+          utils::progress::set_state_message(&pg, summary, "Applying", output)?;
+          match client.inspect_resource(&resource.name).await {
+            Err(_) => {
+              client.create_resource(&resource).await?;
+              return Ok("Created");
+            }
+            Ok(inspect) => {
+              let cmp: ResourcePartial = inspect.into();
+              if (cmp != resource) || opts.reload {
+                let update: ResourceUpdate = resource.clone().into();
+                client.put_resource(&resource.name, &update).await?;
+                return Ok("Updated");
+              } else {
+                return Ok("Unchanged");
+              }
+            }
           }
-        }
-      }
-      pg.finish_with_message("(done)");
+        },
+      )
+      .await?;
     }
   }
+
   Ok(())
 }
 
@@ -1000,6 +1089,7 @@ fn print_states(states: &[StateRef<Statefile>]) {
 async fn remove_orphans(
   cli_conf: &CliConfig,
   state: &StateRef<Statefile>,
+  json: bool,
 ) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
     "metadata",
@@ -1090,7 +1180,7 @@ async fn remove_orphans(
     root: state.root.clone(),
     location: state.location.clone(),
   };
-  state_remove(cli_conf, &old_state).await?;
+  state_remove(cli_conf, &old_state, json).await?;
   Ok(())
 }
 
@@ -1101,8 +1191,12 @@ async fn exec_state_apply(
 ) -> IoResult<()> {
   let format = cli_conf.user_config.display_format.clone();
   let state_file = read_state_file(&opts.source, &format).await?;
-  let args =
-    parse_build_args(&state_file.data, ArgParseMode::Apply, &opts.args)?;
+  let args = parse_build_args(
+    &state_file.data,
+    ArgParseMode::Apply,
+    &opts.args,
+    opts.json,
+  )?;
   let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   // Validate rendered schedules before submitting any jobs to the daemon.
   for state in &states {
@@ -1119,9 +1213,31 @@ async fn exec_state_apply(
   }
   for state in &states {
     if opts.remove_orphans {
-      remove_orphans(cli_conf, state).await?;
+      remove_orphans(cli_conf, state, opts.json).await?;
     }
-    state_apply(cli_conf, opts, state).await?;
+    let output = opts.json.then(|| StateOutput {
+      operation: "apply",
+      statefile: Some(state.location.clone()),
+    });
+    let (progress, summary) = utils::progress::create_state_progress(
+      state_item_count(state),
+      "Applying",
+      output.as_ref(),
+    )?;
+    let result =
+      state_apply(cli_conf, opts, state, &progress, &summary, output.as_ref())
+        .await;
+    utils::progress::finish_state_progress(
+      &summary,
+      if result.is_ok() {
+        "Applied"
+      } else {
+        "Apply failed"
+      },
+      result.is_err(),
+      output.as_ref(),
+    )?;
+    result?;
   }
   if opts.follow {
     states
@@ -1183,7 +1299,7 @@ async fn exec_state_logs(
   let format = cli_conf.user_config.display_format.clone();
   let state_file = read_state_file(&opts.source, &format).await?;
   let args =
-    parse_build_args(&state_file.data, ArgParseMode::Logs, &opts.args)?;
+    parse_build_args(&state_file.data, ArgParseMode::Logs, &opts.args, false)?;
   let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   states
     .iter()
@@ -1197,60 +1313,160 @@ async fn exec_state_logs(
 async fn state_remove(
   cli_conf: &CliConfig,
   state_file: &StateRef<Statefile>,
+  json: bool,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let namespace = match &state_file.data.namespace {
-    None => "global",
-    Some(namespace) => namespace,
-  };
-  let mut gen_rm_opts = GenericRemoveOpts::<GenericDefaultOpts> {
-    keys: Vec::default(),
-    skip_confirm: true,
-    others: GenericDefaultOpts,
-  };
-  if let Some(jobs) = &state_file.data.jobs {
-    gen_rm_opts.keys = jobs.iter().map(|job| job.name.clone()).collect();
-    if let Err(err) = JobArg::exec_rm(client, &gen_rm_opts).await {
-      eprintln!("Error while removing jobs {err}");
-    }
-  }
-  if let Some(cargoes) = &state_file.data.cargoes {
-    let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
-      keys: cargoes
-        .iter()
-        .map(|cargo| utils::process::resource_key(&cargo.name, namespace))
-        .collect::<IoResult<Vec<_>>>()?,
-      skip_confirm: true,
-      others: GenericRemoveForceOpts { force: true },
+  let output = json.then(|| StateOutput {
+    operation: "remove",
+    statefile: Some(state_file.location.clone()),
+  });
+  let (progress, summary) = utils::progress::create_state_progress(
+    state_item_count(state_file),
+    "Removing",
+    output.as_ref(),
+  )?;
+  let mut failures = 0;
+  let result = async {
+    let namespace = match &state_file.data.namespace {
+      None => "global",
+      Some(namespace) => namespace,
     };
-    if let Err(err) = CargoArg::exec_rm(client, &opts).await {
-      eprintln!("Error while removing cargoes {err}");
+    let mut gen_rm_opts = GenericRemoveOpts::<GenericDefaultOpts> {
+      keys: Vec::default(),
+      skip_confirm: true,
+      others: GenericDefaultOpts,
+    };
+    if let Some(jobs) = &state_file.data.jobs {
+      gen_rm_opts.keys = jobs.iter().map(|job| job.name.clone()).collect();
+      match JobArg::exec_rm_with_progress(
+        client,
+        &gen_rm_opts,
+        Some((&progress, &summary)),
+        output.as_ref(),
+      )
+      .await
+      {
+        Ok(count) => failures += count,
+        Err(err) => {
+          if json {
+            return Err(err);
+          }
+          failures += 1;
+          progress.suspend(|| eprintln!("Error while removing jobs {err}"));
+        }
+      }
     }
+    if let Some(cargoes) = &state_file.data.cargoes {
+      let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
+        keys: cargoes
+          .iter()
+          .map(|cargo| utils::process::resource_key(&cargo.name, namespace))
+          .collect::<IoResult<Vec<_>>>()?,
+        skip_confirm: true,
+        others: GenericRemoveForceOpts { force: true },
+      };
+      match CargoArg::exec_rm_with_progress(
+        client,
+        &opts,
+        Some((&progress, &summary)),
+        output.as_ref(),
+      )
+      .await
+      {
+        Ok(count) => failures += count,
+        Err(err) => {
+          if json {
+            return Err(err);
+          }
+          failures += 1;
+          progress.suspend(|| eprintln!("Error while removing cargoes {err}"));
+        }
+      }
+    }
+    if let Some(vms) = &state_file.data.virtual_machines {
+      gen_rm_opts.keys = vms
+        .iter()
+        .map(|vm| utils::process::resource_key(&vm.name, namespace))
+        .collect::<IoResult<Vec<_>>>()?;
+      match VmArg::exec_rm_with_progress(
+        client,
+        &gen_rm_opts,
+        Some((&progress, &summary)),
+        output.as_ref(),
+      )
+      .await
+      {
+        Ok(count) => failures += count,
+        Err(err) => {
+          if json {
+            return Err(err);
+          }
+          failures += 1;
+          progress.suspend(|| eprintln!("Error while removing vms {err}"));
+        }
+      }
+    }
+    if let Some(resources) = &state_file.data.resources {
+      gen_rm_opts.keys = resources
+        .iter()
+        .map(|resource| resource.name.clone())
+        .collect();
+      match ResourceArg::exec_rm_with_progress(
+        client,
+        &gen_rm_opts,
+        Some((&progress, &summary)),
+        output.as_ref(),
+      )
+      .await
+      {
+        Ok(count) => failures += count,
+        Err(err) => {
+          if json {
+            return Err(err);
+          }
+          failures += 1;
+          progress
+            .suspend(|| eprintln!("Error while removing resources {err}"));
+        }
+      }
+    }
+    if let Some(secrets) = &state_file.data.secrets {
+      gen_rm_opts.keys =
+        secrets.iter().map(|secret| secret.name.clone()).collect();
+      match SecretArg::exec_rm_with_progress(
+        client,
+        &gen_rm_opts,
+        Some((&progress, &summary)),
+        output.as_ref(),
+      )
+      .await
+      {
+        Ok(count) => failures += count,
+        Err(err) => {
+          if json {
+            return Err(err);
+          }
+          failures += 1;
+          progress.suspend(|| eprintln!("Error while removing secrets {err}"));
+        }
+      }
+    }
+    Ok::<_, IoError>(())
   }
-  if let Some(vms) = &state_file.data.virtual_machines {
-    gen_rm_opts.keys = vms
-      .iter()
-      .map(|vm| utils::process::resource_key(&vm.name, namespace))
-      .collect::<IoResult<Vec<_>>>()?;
-    if let Err(err) = VmArg::exec_rm(client, &gen_rm_opts).await {
-      eprintln!("Error while removing vms {err}");
-    }
-  }
-  if let Some(resources) = &state_file.data.resources {
-    gen_rm_opts.keys = resources
-      .iter()
-      .map(|resource| resource.name.clone())
-      .collect();
-    if let Err(err) = ResourceArg::exec_rm(client, &gen_rm_opts).await {
-      eprintln!("Error while removing resources {err}");
-    }
-  }
-  if let Some(secrets) = &state_file.data.secrets {
-    gen_rm_opts.keys =
-      secrets.iter().map(|secret| secret.name.clone()).collect();
-    if let Err(err) = SecretArg::exec_rm(client, &gen_rm_opts).await {
-      eprintln!("Error while removing secrets {err}");
-    }
+  .await;
+  let failed = failures > 0 || result.is_err();
+  utils::progress::finish_state_progress(
+    &summary,
+    if failed { "Remove failed" } else { "Removed" },
+    failed,
+    output.as_ref(),
+  )?;
+  result?;
+  if json && failures > 0 {
+    return Err(IoError::other(
+      "StateRemove",
+      &format!("{failures} item(s) could not be removed"),
+    ));
   }
   Ok(())
 }
@@ -1262,8 +1478,12 @@ async fn exec_state_remove(
 ) -> IoResult<()> {
   let format = cli_conf.user_config.display_format.clone();
   let state_file = read_state_file(&opts.source, &format).await?;
-  let args =
-    parse_build_args(&state_file.data, ArgParseMode::Remove, &opts.args)?;
+  let args = parse_build_args(
+    &state_file.data,
+    ArgParseMode::Remove,
+    &opts.args,
+    opts.json,
+  )?;
   let state_files =
     parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   if !opts.skip_confirm {
@@ -1272,7 +1492,7 @@ async fn exec_state_remove(
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   for state in &state_files {
-    state_remove(cli_conf, state).await?;
+    state_remove(cli_conf, state, opts.json).await?;
   }
   Ok(())
 }
@@ -1399,7 +1619,7 @@ async fn exec_state_render(
   let display_format = cli_conf.user_config.display_format.clone();
   let state_ref = read_state_file(&opts.source, &display_format).await?;
   let args =
-    parse_build_args(&state_ref.data, ArgParseMode::Apply, &opts.args)?;
+    parse_build_args(&state_ref.data, ArgParseMode::Apply, &opts.args, false)?;
   let client = gen_client(cli_conf, &state_ref)?;
   let mut namespace = state_ref
     .data
@@ -1451,5 +1671,34 @@ async fn exec_state_render(
       println!("Rendered statefile written to {}", out_path.display());
       Ok(())
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{ArgParseMode, parse_build_args};
+  use nanocld_client::stubs::statefile::Statefile;
+
+  #[test]
+  fn json_state_args_return_errors_instead_of_exiting() {
+    let state: Statefile =
+      serde_json::from_value(serde_json::json!({"ApiVersion": "v0.18"}))
+        .unwrap();
+    for mode in [ArgParseMode::Apply, ArgParseMode::Remove] {
+      let error = parse_build_args(&state, mode, &["--unknown".into()], true)
+        .unwrap_err();
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    }
+    let help =
+      parse_build_args(&state, ArgParseMode::Apply, &["--help".into()], true)
+        .unwrap_err();
+    assert_eq!(help.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+      parse_build_args(&state, ArgParseMode::Apply, &[], true)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .is_empty()
+    );
   }
 }
