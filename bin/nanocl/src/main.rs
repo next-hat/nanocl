@@ -113,7 +113,14 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 }
 
 async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
-  let cli_conf = create_cli_config(cli_args)?;
+  let cli_conf = create_cli_config(cli_args).map_err(|err| {
+    if matches!(&cli_args.command, Command::State(args) if matches!(args.command, StateCommand::Diff(_))) {
+      // Context errors can include credential paths or connection URLs.
+      IoError::with_context("State diff: client configuration", std::io::Error::new(
+        err.inner.kind(), "failed; details hidden to protect secret values",
+      ))
+    } else { err }
+  })?;
   match &cli_args.command {
     Command::Namespace(args) => commands::exec_namespace(&cli_conf, args).await,
     Command::Job(args) => commands::exec_job(&cli_conf, args).await,
@@ -173,8 +180,13 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();
   dotenv().ok();
-  let json_output = state_json_output(&args).is_some();
+  let json_output = state_json_output(&args).is_some()
+    || matches!(&args.command, Command::State(args) if matches!(&args.command, StateCommand::Diff(opts) if opts.json));
   ctrlc::set_handler(move || {
+    if utils::state_diff_pager::is_active() {
+      // The foreground pager receives the signal too and restores its terminal.
+      return;
+    }
     if json_output {
       // Do not wait on stdout: a dashboard may have stopped reading its pipe.
       std::process::exit(130);
@@ -224,6 +236,7 @@ mod tests {
       vec!["nanocl", "state", "apply", "-y"],
       vec!["nanocl", "state", "rm", "-y"],
       vec!["nanocl", "version"],
+      vec!["nanocl", "state", "diff", "--json"],
     ] {
       assert!(state_json_output(&Cli::try_parse_from(args).unwrap()).is_none());
     }
