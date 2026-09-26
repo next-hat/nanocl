@@ -5,6 +5,7 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::{ConnectOpts, NanocldClient, stubs::system::SslConfig};
 
 mod commands;
+mod completion;
 mod config;
 mod models;
 mod utils;
@@ -17,12 +18,25 @@ use models::{
 
 /// Create a CliConfig struct from the cli arguments
 fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
-  Context::ensure()?;
+  load_cli_config(cli_args.host.as_deref(), false)
+}
+
+/// Completion reads the same connection settings without creating or switching contexts.
+fn load_cli_config(
+  host_override: Option<&str>,
+  read_only: bool,
+) -> IoResult<CliConfig> {
+  if !read_only {
+    Context::ensure()?;
+  }
   let user_conf = UserConfig::new();
   let mut context = Context::new();
   if user_conf.current_context != "default" {
     match Context::read_by_name(&user_conf.current_context) {
-      Err(_) => {
+      Err(err) => {
+        if read_only {
+          return Err(err);
+        }
         Context::r#use("default")?;
       }
       Ok(cur_context) => {
@@ -30,24 +44,30 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
       }
     }
   }
-  let endpoint = context.endpoints.get("Nanocl").unwrap();
-  let mut host = cli_args.host.clone().unwrap_or(endpoint.host.clone());
+  let endpoint = context.endpoints.get("Nanocl").ok_or_else(|| {
+    IoError::invalid_data("Context", "missing Nanocl endpoint")
+  })?;
+  let mut host = host_override
+    .map(str::to_owned)
+    .unwrap_or_else(|| endpoint.host.clone());
   #[cfg(any(feature = "dev", feature = "test"))]
   {
     if context.name == "default" {
-      host = cli_args
-        .host
-        .clone()
-        .unwrap_or("http://nanocl.internal:8585".into());
+      host = host_override
+        .unwrap_or("http://nanocl.internal:8585")
+        .to_owned();
     }
   }
   let mut ssl = match &endpoint.ssl {
     Some(ssl) => {
       let cert =
-        std::fs::read_to_string(ssl.cert.clone().expect("cert file unset"))?;
-      let cert_key = std::fs::read_to_string(
-        ssl.cert_key.clone().expect("cert key file unset"),
-      )?;
+        std::fs::read_to_string(ssl.cert.as_deref().ok_or_else(|| {
+          IoError::invalid_data("Context", "cert file unset")
+        })?)?;
+      let cert_key =
+        std::fs::read_to_string(ssl.cert_key.as_deref().ok_or_else(|| {
+          IoError::invalid_data("Context", "cert key file unset")
+        })?)?;
       Some(SslConfig {
         cert: Some(cert),
         cert_key: Some(cert_key),
@@ -176,8 +196,15 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
 /// Nanocl is a command line interface for the Nanocl Daemon.
 /// It will translate the corresponding commands to the Nanocl Daemon API.
 /// You can use it to manage your cargoes and virtual machines.
+fn main() -> std::io::Result<()> {
+  // clap_complete changes its environment variable, so run before starting
+  // the async runtime or registering signal handlers.
+  completion::complete_env();
+  run()
+}
+
 #[ntex::main]
-async fn main() -> std::io::Result<()> {
+async fn run() -> std::io::Result<()> {
   let args = Cli::parse();
   dotenv().ok();
   let json_output = state_json_output(&args).is_some()

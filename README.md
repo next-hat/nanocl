@@ -150,6 +150,9 @@ Next: explore [Get Started][nanocl_get_started].
 
 ## Usage
 
+Enable [shell completion](doc/shell-completion.md) for commands, options, and live
+cargo, VM, job, resource, secret, namespace, and process names.
+
 Statefiles drive everything. Here's the Statefile we use to deploy our own [documentation][documentation]:
 
 ```yaml

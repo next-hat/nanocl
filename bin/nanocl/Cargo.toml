@@ -48,6 +48,7 @@ ntex = { version = "3", features = ["tokio", "openssl"] }
 similar = "3.2"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.6", features = ["derive", "cargo"] }
+clap_complete = { version = "=4.6.11", features = ["unstable-dynamic"] }
 tokio = { version = "1.49", features = ["fs"] }
 tokio-util = "0.7"
 chrono = { version = "0.4", default-features = false, features = [
