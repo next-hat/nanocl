@@ -125,7 +125,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nanocld:0.18.0-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/nanocld:0.18.0
+    Image: ghcr.io/next-hat/nanocld:0.18.1
     # {% endif %}
     Tty: true
     Hostname: nanocl.internal
