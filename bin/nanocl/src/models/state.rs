@@ -33,6 +33,36 @@ pub struct StateApplyOpts {
   pub remove_orphans: bool,
 }
 
+/// In-memory declarations observed or previewed in Statefile apply order.
+pub type StateDiffSnapshot =
+  std::collections::BTreeMap<(String, String), Option<serde_json::Value>>;
+
+/// `nanocl state diff` available options
+#[derive(Parser)]
+pub struct StateDiffOpts {
+  /// Path or URL to the Statefile
+  #[clap(long, short = 's')]
+  pub source: Option<String>,
+  /// Output a single JSON document with secret values hidden
+  #[clap(long)]
+  pub json: bool,
+  /// Keep the diff open in a pager (default in interactive terminals)
+  #[clap(long, conflicts_with_all = ["no_pager", "json"])]
+  pub pager: bool,
+  /// Print directly to the terminal without a pager
+  #[clap(long)]
+  pub no_pager: bool,
+  /// Preview the orphan removals performed by apply --remove-orphans
+  #[clap(long)]
+  pub remove_orphans: bool,
+  /// Preview an apply with --reload
+  #[clap(long, short = 'r')]
+  pub reload: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 /// `nanocl state logs` available options
 #[derive(Default, Parser)]
 pub struct StateLogsOpts {
@@ -107,6 +137,8 @@ pub enum StateCommand {
   Man(StateManOpts),
   /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
+  /// Preview Statefile changes without modifying the daemon
+  Diff(StateDiffOpts),
   /// Render a Statefile with args to an output file
   Render(StateRenderOpts),
   /// Logs elements from a Statefile
@@ -165,6 +197,67 @@ where
 mod tests {
   use crate::models::{Cli, Command, StateCommand};
   use clap::Parser;
+
+  #[test]
+  fn state_diff_accepts_json_and_apply_preview_flags_without_confirmation() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "state",
+      "diff",
+      "--json",
+      "--remove-orphans",
+      "--reload",
+      "-s",
+      "deploy.yml",
+      "--",
+      "--image",
+      "alpine:latest",
+    ])
+    .unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Diff(opts) = state.command else {
+      panic!("expected diff")
+    };
+    assert!(opts.json && opts.remove_orphans && opts.reload);
+    assert!(!opts.pager && !opts.no_pager);
+    assert_eq!(opts.source.as_deref(), Some("deploy.yml"));
+    assert_eq!(opts.args, ["--image", "alpine:latest"]);
+    assert!(Cli::try_parse_from(["nanocl", "state", "diff"]).is_ok());
+  }
+
+  #[test]
+  fn state_diff_pager_flags_accept_modes_and_reject_conflicts() {
+    for (flags, pager, no_pager, json) in [
+      (vec![], false, false, false),
+      (vec!["--pager"], true, false, false),
+      (vec!["--no-pager"], false, true, false),
+      (vec!["--json", "--no-pager"], false, true, true),
+    ] {
+      let cli = Cli::try_parse_from(
+        ["nanocl", "state", "diff"].into_iter().chain(flags),
+      )
+      .unwrap();
+      let Command::State(state) = cli.command else {
+        panic!("expected state")
+      };
+      let StateCommand::Diff(opts) = state.command else {
+        panic!("expected diff")
+      };
+      assert_eq!(
+        (opts.pager, opts.no_pager, opts.json),
+        (pager, no_pager, json)
+      );
+    }
+    for conflict in ["--no-pager", "--json"] {
+      let error =
+        Cli::try_parse_from(["nanocl", "state", "diff", "--pager", conflict])
+          .err()
+          .expect("conflicting pager flags must fail");
+      assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+  }
 
   #[test]
   fn state_json_flags_require_yes_and_reject_follow() {

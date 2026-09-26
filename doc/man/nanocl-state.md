@@ -7,7 +7,7 @@ sidebar_position: 73
 
 # NAME
 
-state - Apply or Remove a Statefile
+state - Preview, Apply or Remove a Statefile
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ state - Apply or Remove a Statefile
 
 ## DESCRIPTION
 
-Apply or Remove a Statefile
+Preview, Apply or Remove a Statefile
 
 ## OPTIONS
 
@@ -29,6 +29,9 @@ Display documentation for a statefile
 
 state-apply(1)  
 Create or Update elements from a Statefile
+
+state-diff(1)\
+Preview changes from a Statefile without applying them
 
 state-render(1)  
 Render a Statefile with args to an output file
