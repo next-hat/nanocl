@@ -7,6 +7,7 @@ pub mod inspect;
 pub mod kill;
 pub mod list;
 pub mod log;
+mod network;
 pub mod restart;
 pub mod start;
 pub mod stats;

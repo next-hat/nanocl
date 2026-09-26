@@ -121,6 +121,12 @@ pub struct Process {
   pub node_name: String,
   /// Canonical resource key for cargoes and VMs; jobs use their name
   pub kind_key: String,
+  /// Effective IP address resolved from the last observed process state
+  #[cfg_attr(
+    feature = "serde",
+    serde(default, skip_serializing_if = "Option::is_none")
+  )]
+  pub ip_address: Option<String>,
   /// The data of the process a ContainerInspect
   pub data: ContainerInspectResponse,
 }
@@ -564,9 +570,39 @@ mod tests {
   use bollard_next::exec::CreateExecOptions;
 
   use super::{
-    ProcessExecCreateOptions, ProcessExecCreated, ProcessExecInputControl,
-    ProcessExecOutputControl, ProcessKillOptions,
+    Process, ProcessExecCreateOptions, ProcessExecCreated,
+    ProcessExecInputControl, ProcessExecOutputControl, ProcessKillOptions,
   };
+
+  #[test]
+  fn process_ip_address_preserves_wire_compatibility() {
+    let value = serde_json::json!({
+      "Key": "process-id",
+      "CreatedAt": "2026-09-26T00:00:00",
+      "UpdatedAt": "2026-09-26T00:00:00",
+      "Name": "process",
+      "Kind": "cargo",
+      "NodeName": "node",
+      "KindKey": "global.process.c",
+      "Data": {
+        "HostConfig": {
+          "NetworkMode": "container:network-owner"
+        }
+      }
+    });
+    let mut process: Process = serde_json::from_value(value)
+      .expect("older process responses must deserialize");
+    assert_eq!(process.ip_address, None);
+    let without_ip = serde_json::to_value(&process).unwrap();
+    assert!(without_ip.get("IpAddress").is_none());
+
+    process.ip_address = Some("10.88.0.12".to_owned());
+    let with_ip = serde_json::to_value(&process).unwrap();
+    assert_eq!(with_ip["IpAddress"], "10.88.0.12");
+    assert_eq!(with_ip["Data"], without_ip["Data"]);
+    let round_trip: Process = serde_json::from_value(with_ip).unwrap();
+    assert_eq!(round_trip.ip_address.as_deref(), Some("10.88.0.12"));
+  }
 
   #[test]
   fn process_kill_options_preserve_wire_shape() {

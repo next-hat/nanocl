@@ -1,4 +1,4 @@
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset, Utc};
 use clap::{Args, Parser};
 use std::path::PathBuf;
 use tabled::Tabled;
@@ -73,6 +73,9 @@ pub struct ProcessFilter {
   // Show all processes (default shows just running)
   #[clap(long, short)]
   pub all: bool,
+  /// Show node names, full image references, and exact creation timestamps
+  #[clap(long)]
+  pub wide: bool,
 }
 
 impl From<ProcessFilter> for GenericFilter {
@@ -126,6 +129,47 @@ pub struct ProcessRow {
   /// When the process was created
   #[tabled(rename = "CREATED AT")]
   created_at: String,
+  #[tabled(skip)]
+  age: String,
+}
+
+/// A compact row for the process table
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct ProcessCompactRow {
+  name: String,
+  image: String,
+  ip: String,
+  status: String,
+  age: String,
+}
+
+impl From<ProcessRow> for ProcessCompactRow {
+  fn from(row: ProcessRow) -> Self {
+    Self {
+      name: row.name,
+      image: row.image.rsplit('/').next().unwrap_or_default().to_owned(),
+      ip: row.ip,
+      status: row.status,
+      age: row.age,
+    }
+  }
+}
+
+fn format_process_age(
+  created_at: Option<&DateTime<FixedOffset>>,
+  now: DateTime<Utc>,
+) -> String {
+  let Some(created_at) = created_at else {
+    return "<unknown>".to_owned();
+  };
+  let seconds = now.signed_duration_since(*created_at).num_seconds().max(0);
+  match seconds {
+    0..60 => format!("{seconds}s"),
+    60..3600 => format!("{}m", seconds / 60),
+    3600..86400 => format!("{}h", seconds / 3600),
+    _ => format!("{}d", seconds / 86400),
+  }
 }
 
 /// Convert Process to ProcessRow
@@ -141,35 +185,44 @@ impl From<Process> for ProcessRow {
       .unwrap_or_default()
       .network_mode
       .unwrap_or("nanoclbr0".to_owned());
-    let ip_addr = match network_mode.as_str() {
-      "host" => "<host>".to_owned(),
-      "none" => "<none>".to_owned(),
-      "bridge" => "<bridge>".to_owned(),
-      s if s.starts_with("container:") => s.to_owned(),
-      _ => {
-        if let Some(network) = networks.get(&network_mode) {
-          let mut ip_addr = network
-            .ip_address
-            .clone()
-            .unwrap_or(network_mode.to_owned());
-          if ip_addr.is_empty() {
-            "<none>".clone_into(&mut ip_addr);
+    let ip_addr = process
+      .ip_address
+      .filter(|ip| !ip.is_empty())
+      .unwrap_or_else(|| match network_mode.as_str() {
+        "host" => "<host>".to_owned(),
+        "none" => "<none>".to_owned(),
+        "bridge" => "<bridge>".to_owned(),
+        s if s.starts_with("container:") => "<shared>".to_owned(),
+        _ => {
+          if let Some(network) = networks.get(&network_mode) {
+            let mut ip_addr = network
+              .ip_address
+              .clone()
+              .unwrap_or(network_mode.to_owned());
+            if ip_addr.is_empty() {
+              "<none>".clone_into(&mut ip_addr);
+            }
+            ip_addr
+          } else {
+            format!("<{}>", network_mode)
           }
-          ip_addr
-        } else {
-          format!("<{}>", network_mode)
         }
-      }
-    };
-    // Convert the created_at and updated_at to the current timezone
-    let created_at = container.created.unwrap_or_default();
-    let binding = chrono::Local::now();
-    let tz = binding.offset();
-    let created_at = DateTime::parse_from_rfc3339(&created_at)
-      .unwrap_or_default()
-      .with_timezone(tz)
-      .format("%Y-%m-%d %H:%M:%S")
-      .to_string();
+      });
+    let now = chrono::Local::now();
+    let created_at = container
+      .created
+      .as_deref()
+      .and_then(|created_at| DateTime::parse_from_rfc3339(created_at).ok());
+    let age = format_process_age(created_at.as_ref(), now.with_timezone(&Utc));
+    // Show exact creation timestamps in the current timezone in wide output.
+    let created_at = created_at
+      .map(|created_at| {
+        created_at
+          .with_timezone(now.offset())
+          .format("%Y-%m-%d %H:%M:%S")
+          .to_string()
+      })
+      .unwrap_or_else(|| "<unknown>".to_owned());
     let status = container
       .state
       .unwrap_or_default()
@@ -184,6 +237,7 @@ impl From<Process> for ProcessRow {
       status,
       ip: ip_addr,
       created_at,
+      age,
     }
   }
 }
@@ -293,9 +347,199 @@ impl From<ProcessStats> for ProcessStatsRow {
 mod tests {
   use std::path::PathBuf;
 
+  use chrono::{DateTime, Duration, Utc};
   use clap::Parser;
+  use tabled::Tabled;
 
+  use super::{Process, ProcessCompactRow, ProcessRow, format_process_age};
   use crate::models::{Cli, Command};
+
+  fn process_with_network(mode: &str) -> Process {
+    serde_json::from_value(serde_json::json!({
+      "Key": "process-id",
+      "CreatedAt": "2026-09-26T00:00:00",
+      "UpdatedAt": "2026-09-26T00:00:00",
+      "Name": "process",
+      "Kind": "cargo",
+      "NodeName": "node",
+      "KindKey": "global.process.c",
+      "Data": {
+        "HostConfig": { "NetworkMode": mode },
+        "NetworkSettings": {
+          "Networks": {
+            "nanoclbr0": { "IPAddress": "10.88.0.12" }
+          }
+        }
+      }
+    }))
+    .unwrap()
+  }
+
+  #[test]
+  fn process_row_uses_resolved_shared_ip() {
+    let mut process = process_with_network("container:network-owner");
+    process.ip_address = Some("10.88.0.12".to_owned());
+
+    assert_eq!(ProcessRow::from(process).ip, "10.88.0.12");
+  }
+
+  #[test]
+  fn process_row_keeps_network_fallbacks_without_resolved_ip() {
+    for (mode, expected) in [
+      ("container:network-owner", "<shared>"),
+      ("nanoclbr0", "10.88.0.12"),
+      ("host", "<host>"),
+      ("none", "<none>"),
+      ("bridge", "<bridge>"),
+    ] {
+      for ip_address in [None, Some(String::new())] {
+        let mut process = process_with_network(mode);
+        process.ip_address = ip_address;
+
+        assert_eq!(ProcessRow::from(process).ip, expected, "mode {mode}");
+      }
+    }
+  }
+
+  #[test]
+  fn ps_compact_row_preserves_process_name_and_image_tag_or_digest() {
+    for (image, expected) in [
+      ("ghcr.io/next-hat/metrsd:0.5.8", "metrsd:0.5.8"),
+      ("registry.local:5000/team/nested/app:dev", "app:dev"),
+      (
+        "docker.io/cockroachdb/cockroach:v25.4.13",
+        "cockroach:v25.4.13",
+      ),
+      ("alpine", "alpine"),
+      ("alpine:latest", "alpine:latest"),
+      (
+        "ghcr.io/next-hat/app@sha256:0123456789abcdef",
+        "app@sha256:0123456789abcdef",
+      ),
+      (
+        "ghcr.io/next-hat/app:dev@sha256:0123456789abcdef",
+        "app:dev@sha256:0123456789abcdef",
+      ),
+    ] {
+      let mut process = process_with_network("nanoclbr0");
+      let name = "global.deploy-example-r0-app-yY03yU.c";
+      process.data.name = Some(format!("/{name}"));
+      process
+        .data
+        .config
+        .get_or_insert_with(Default::default)
+        .image = Some(image.to_owned());
+      process.data.created = Some("2026-09-26T00:00:00Z".to_owned());
+      let wide = ProcessRow::from(process);
+      assert_eq!(wide.name, name);
+      assert_eq!(wide.image, image);
+      assert_eq!(wide.node, "node");
+      let age = wide.age.clone();
+      let compact = ProcessCompactRow::from(wide);
+      assert_eq!(compact.name, name);
+      assert_eq!(compact.image, expected);
+      assert_eq!(compact.ip, "10.88.0.12");
+      assert_eq!(compact.age, age);
+    }
+    assert_eq!(
+      ProcessCompactRow::headers(),
+      ["NAME", "IMAGE", "IP", "STATUS", "AGE"]
+    );
+    assert_eq!(
+      ProcessRow::headers(),
+      ["NAME", "IMAGE", "IP", "NODE", "STATUS", "CREATED AT"]
+    );
+  }
+
+  #[test]
+  fn ps_age_uses_compact_units_at_boundaries() {
+    let now = DateTime::parse_from_rfc3339("2026-09-26T12:00:00Z").unwrap();
+    for (seconds, expected) in [
+      (0, "0s"),
+      (59, "59s"),
+      (60, "1m"),
+      (3599, "59m"),
+      (3600, "1h"),
+      (86399, "23h"),
+      (86400, "1d"),
+      (172800, "2d"),
+    ] {
+      let created_at = now - Duration::seconds(seconds);
+      assert_eq!(
+        format_process_age(Some(&created_at), now.with_timezone(&Utc)),
+        expected
+      );
+    }
+  }
+
+  #[test]
+  fn ps_age_handles_timezones_and_future_creation() {
+    let now = DateTime::parse_from_rfc3339("2026-09-26T12:00:00Z")
+      .unwrap()
+      .with_timezone(&Utc);
+    for (created_at, expected) in [
+      ("2026-09-26T13:00:00+02:00", "1h"),
+      ("2026-09-26T06:30:00-05:00", "30m"),
+      ("2026-09-26T12:00:01Z", "0s"),
+    ] {
+      let created_at = DateTime::parse_from_rfc3339(created_at).unwrap();
+      assert_eq!(format_process_age(Some(&created_at), now), expected);
+    }
+  }
+
+  #[test]
+  fn ps_rows_show_unknown_for_missing_or_invalid_creation() {
+    for created_at in [None, Some(""), Some("invalid")] {
+      let mut process = process_with_network("nanoclbr0");
+      process.data.created = created_at.map(str::to_owned);
+      let wide = ProcessRow::from(process);
+      assert_eq!(wide.created_at, "<unknown>");
+      assert_eq!(wide.age, "<unknown>");
+      assert_eq!(ProcessCompactRow::from(wide).age, "<unknown>");
+    }
+  }
+
+  #[test]
+  fn ps_wide_parses_with_filters_and_quiet() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "ps",
+      "--wide",
+      "--quiet",
+      "--namespace",
+      "global",
+      "--kind",
+      "cargo",
+      "--all",
+      "--limit",
+      "5",
+      "--offset",
+      "2",
+      "--filters",
+      "name=app",
+    ])
+    .expect("wide ps command must parse with existing options");
+    let Command::Ps(options) = cli.command else {
+      panic!("expected ps command");
+    };
+    assert!(options.quiet);
+    assert_eq!(options.limit, Some(5));
+    assert_eq!(options.offset, Some(2));
+    assert_eq!(options.filters, Some(vec!["name=app".to_owned()]));
+    let filter = options.others.unwrap();
+    assert!(filter.wide);
+    assert!(filter.all);
+    assert_eq!(filter.namespace.as_deref(), Some("global"));
+    assert_eq!(filter.kind.as_deref(), Some("cargo"));
+
+    let cli = Cli::try_parse_from(["nanocl", "ps"])
+      .expect("default ps command must parse");
+    let Command::Ps(options) = cli.command else {
+      panic!("expected ps command");
+    };
+    assert!(!options.others.unwrap_or_default().wide);
+    assert!(!options.quiet);
+  }
 
   #[test]
   fn exec_command_parses_options_and_preserves_command_arguments() {

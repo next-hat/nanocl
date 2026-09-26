@@ -1008,6 +1008,7 @@ mod tests {
       kind: ProcessKind::Cargo,
       node_name: node.to_owned(),
       kind_key: "global.api.c".to_owned(),
+      ip_address: None,
       data: ContainerInspectResponse {
         host_config: Some(HostConfig {
           network_mode: Some(mode.to_owned()),

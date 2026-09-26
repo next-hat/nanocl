@@ -70,6 +70,7 @@ use restart::{CargoRestartPlan, plan_cargo_restart};
 const SANDBOX_LOGICAL_NAME: &str = "_sandbox";
 const DEFAULT_SANDBOX_IMAGE: &str = "registry.k8s.io/pause:3.10";
 const CARGO_PROCESS_SUFFIX: &str = ".c";
+const PROCESS_CONTAINER_NAME_MAX_LEN: usize = 32;
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 const READY_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const ROUTE_HANDOFF_GRACE: Duration = Duration::from_secs(4);
@@ -470,6 +471,29 @@ async fn preflight_replica(
   Ok(())
 }
 
+// Keep logical names readable without allowing arbitrary declaration text into
+// Docker names. This is separate from the hashes used for secret paths.
+fn process_container_name(value: &str) -> String {
+  let mut name = String::new();
+  for character in value.chars() {
+    if name.len() == PROCESS_CONTAINER_NAME_MAX_LEN {
+      break;
+    }
+    if character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+    {
+      name.push(character);
+    } else if !name.ends_with('-') {
+      name.push('-');
+    }
+  }
+  let name = name.trim_matches(['.', '_', '-']);
+  if name.is_empty() {
+    "container".to_owned()
+  } else {
+    name.to_owned()
+  }
+}
+
 fn process_name(
   cargo: &Cargo,
   task: &CargoReplicaTask,
@@ -479,14 +503,15 @@ fn process_name(
 ) -> String {
   let short_id = utils::key::generate_short_id(6);
   let lifecycle_suffix = if pending { ".candidate" } else { "" };
-  let (role_marker, role_suffix) = match role {
-    CargoReplicaProcessRole::Sandbox => ("sandbox-", ""),
-    CargoReplicaProcessRole::Init => ("", ".init"),
-    CargoReplicaProcessRole::App => ("", ""),
+  let (logical_name, role_suffix) = match role {
+    CargoReplicaProcessRole::Sandbox => ("sandbox".to_owned(), ""),
+    CargoReplicaProcessRole::Init => {
+      (process_container_name(logical_name), ".init")
+    }
+    CargoReplicaProcessRole::App => (process_container_name(logical_name), ""),
   };
-  let logical_name = runtime_path_component(logical_name);
   format!(
-    "{}.{}-r{}-{role_marker}{logical_name}-{short_id}{role_suffix}{lifecycle_suffix}{CARGO_PROCESS_SUFFIX}",
+    "{}.{}-r{}-{logical_name}-{short_id}{role_suffix}{lifecycle_suffix}{CARGO_PROCESS_SUFFIX}",
     cargo.namespace_name, cargo.spec.name, task.ordinal
   )
 }
@@ -2234,6 +2259,7 @@ mod tests {
       kind: ProcessKind::Cargo,
       node_name: "node-a".to_owned(),
       kind_key: "global.api".to_owned(),
+      ip_address: None,
       data: ContainerInspectResponse {
         config: Some(ContainerConfig {
           healthcheck,
@@ -2305,13 +2331,10 @@ mod tests {
     pending: bool,
   ) -> String {
     let name = process_name(cargo, task, role, logical_name, pending);
-    let logical_hash = runtime_path_component(logical_name);
-    assert_eq!(logical_hash.len(), 16);
-    assert!(logical_hash.chars().all(|value| value.is_ascii_hexdigit()));
-    let identity_prefix = format!("{prefix}{logical_hash}-");
+    let identity_prefix = prefix;
     let runtime_suffix = format!("{suffix}{CARGO_PROCESS_SUFFIX}");
     let short_id = name
-      .strip_prefix(&identity_prefix)
+      .strip_prefix(identity_prefix)
       .and_then(|value| value.strip_suffix(&runtime_suffix))
       .unwrap_or_else(|| {
         panic!(
@@ -2336,13 +2359,13 @@ mod tests {
       (
         CargoReplicaProcessRole::App,
         "api",
-        "global.deploy-example-r0-",
+        "global.deploy-example-r0-api-",
         "",
       ),
       (
         CargoReplicaProcessRole::Init,
         "migrate",
-        "global.deploy-example-r0-",
+        "global.deploy-example-r0-migrate-",
         ".init",
       ),
     ] {
@@ -2365,6 +2388,58 @@ mod tests {
         true,
       );
     }
+  }
+
+  #[test]
+  fn process_names_use_safe_bounded_container_names() {
+    let (cargo, task) = naming_fixture();
+    for (logical_name, expected) in [
+      ("web-api", "web-api"),
+      ("Worker.v2_1", "Worker.v2_1"),
+      ("../web / worker\\beta\t", "web-worker-beta"),
+      (" \t../...", "container"),
+      ("服务", "container"),
+      ("api😀worker", "api-worker"),
+      ("api.candidate.c", "api.candidate.c"),
+    ] {
+      let name = assert_process_name(
+        &cargo,
+        &task,
+        CargoReplicaProcessRole::App,
+        logical_name,
+        &format!("global.deploy-example-r0-{expected}-"),
+        "",
+        false,
+      );
+      assert!(name.chars().all(|character| {
+        character.is_ascii_alphanumeric()
+          || matches!(character, '.' | '_' | '-')
+      }));
+      assert!(!is_rollout_process_name(&name));
+    }
+
+    let logical_name = "a".repeat(128);
+    let expected = "a".repeat(32);
+    assert_process_name(
+      &cargo,
+      &task,
+      CargoReplicaProcessRole::App,
+      &logical_name,
+      &format!("global.deploy-example-r0-{expected}-"),
+      "",
+      false,
+    );
+    let logical_name = format!("{}-tail", "a".repeat(31));
+    let expected = "a".repeat(31);
+    assert_process_name(
+      &cargo,
+      &task,
+      CargoReplicaProcessRole::Init,
+      &logical_name,
+      &format!("global.deploy-example-r0-{expected}-"),
+      ".init.candidate",
+      true,
+    );
   }
 
   #[test]
@@ -2700,19 +2775,24 @@ mod tests {
   fn process_lifecycle_renames_change_only_reserved_suffixes() {
     for (active, candidate, retained) in [
       (
-        "global.foo-r0-X.c",
-        "global.foo-r0-X.candidate.c",
-        "global.foo-r0-X.tmp.c",
+        "global.foo-r0-api-a1B2c3.c",
+        "global.foo-r0-api-a1B2c3.candidate.c",
+        "global.foo-r0-api-a1B2c3.tmp.c",
       ),
       (
-        "global.foo-r0-X.init.c",
-        "global.foo-r0-X.init.candidate.c",
-        "global.foo-r0-X.init.tmp.c",
+        "global.foo-r0-migrate-d4E5f6.init.c",
+        "global.foo-r0-migrate-d4E5f6.init.candidate.c",
+        "global.foo-r0-migrate-d4E5f6.init.tmp.c",
       ),
       (
-        "global.foo-r0-sandbox-X.c",
-        "global.foo-r0-sandbox-X.candidate.c",
-        "global.foo-r0-sandbox-X.tmp.c",
+        "global.foo-r0-sandbox-g7H8i9.c",
+        "global.foo-r0-sandbox-g7H8i9.candidate.c",
+        "global.foo-r0-sandbox-g7H8i9.tmp.c",
+      ),
+      (
+        "global.foo-r0-2deaf4196297fb9d-yY03yU.c",
+        "global.foo-r0-2deaf4196297fb9d-yY03yU.candidate.c",
+        "global.foo-r0-2deaf4196297fb9d-yY03yU.tmp.c",
       ),
     ] {
       assert_eq!(with_lifecycle_suffix(active, "candidate"), candidate);
