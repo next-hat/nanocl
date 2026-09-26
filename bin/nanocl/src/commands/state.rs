@@ -823,16 +823,16 @@ async fn state_apply(
           match client.inspect_secret(&secret.name).await {
             Err(_) => {
               client.create_secret(&secret).await?;
-              return Ok("Created");
+              Ok("Created")
             }
             Ok(inspect) => {
               let cmp: SecretPartial = inspect.into();
               if cmp != secret {
                 let update: SecretUpdate = secret.clone().into();
                 client.patch_secret(&secret.name, &update).await?;
-                return Ok("Updated");
+                Ok("Updated")
               } else {
-                return Ok("Unchanged");
+                Ok("Unchanged")
               }
             }
           }
@@ -919,7 +919,7 @@ async fn state_apply(
                 )?;
                 client.create_cargo(&cargo, Some(namespace)).await?;
                 let waiter = utils::process::wait_process_state(
-                  &key,
+                  key,
                   EventActorKind::Cargo,
                   vec![NativeEventAction::Start],
                   client,
@@ -928,7 +928,7 @@ async fn state_apply(
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("cargo", &key).await?;
+                client.start_process("cargo", key).await?;
                 waiter.await.map_err(|err| {
                   IoError::interrupted("wait_process_state", &err.to_string())
                 })??;
@@ -940,7 +940,7 @@ async fn state_apply(
                     &pg, summary, "Updating", output,
                   )?;
                   let waiter = utils::process::wait_process_state(
-                    &key,
+                    key,
                     EventActorKind::Cargo,
                     vec![NativeEventAction::Update],
                     client,
@@ -992,7 +992,7 @@ async fn state_apply(
                 vm.image = image_full_path;
                 client.create_vm(&vm, Some(namespace)).await?;
                 let waiter = utils::process::wait_process_state(
-                  &key,
+                  key,
                   EventActorKind::Vm,
                   vec![NativeEventAction::Start],
                   client,
@@ -1001,7 +1001,7 @@ async fn state_apply(
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("vm", &key).await?;
+                client.start_process("vm", key).await?;
                 waiter.await.map_err(|err| {
                   IoError::interrupted("wait_process_state", &err.to_string())
                 })??;
@@ -1014,7 +1014,7 @@ async fn state_apply(
                     &pg, summary, "Updating", output,
                   )?;
                   let waiter = utils::process::wait_process_state(
-                    &key,
+                    key,
                     EventActorKind::Vm,
                     vec![NativeEventAction::Start],
                     client,
@@ -1057,16 +1057,16 @@ async fn state_apply(
           match client.inspect_resource(&resource.name).await {
             Err(_) => {
               client.create_resource(&resource).await?;
-              return Ok("Created");
+              Ok("Created")
             }
             Ok(inspect) => {
               let cmp: ResourcePartial = inspect.into();
               if (cmp != resource) || opts.reload {
                 let update: ResourceUpdate = resource.clone().into();
                 client.put_resource(&resource.name, &update).await?;
-                return Ok("Updated");
+                Ok("Updated")
               } else {
-                return Ok("Unchanged");
+                Ok("Unchanged")
               }
             }
           }
