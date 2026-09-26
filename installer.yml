@@ -68,7 +68,7 @@ Cargoes:
   Containers:
   - Name: ncproxy
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncproxy:0.15.0-nightly
+    Image: ghcr.io/next-hat/ncproxy:0.15.1-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncproxy:0.15.1
     # {% endif %}
@@ -123,7 +123,7 @@ Cargoes:
   Containers:
   - Name: ndaemon
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nanocld:0.18.0-nightly
+    Image: ghcr.io/next-hat/nanocld:0.19.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nanocld:0.18.1
     # {% endif %}
