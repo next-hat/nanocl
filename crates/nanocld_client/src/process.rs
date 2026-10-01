@@ -386,7 +386,7 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use crate::ConnectOpts;
+  use crate::{ConnectOpts, NANOCLD_DEFAULT_VERSION};
 
   use super::*;
 
@@ -402,7 +402,9 @@ mod tests {
 
     assert_eq!(
       client.process_attach_url("global.my-vm.v"),
-      "http://nanocl.internal:8585/v0.18.0/processes/global.my-vm.v/attach"
+      format!(
+        "http://nanocl.internal:8585/v{NANOCLD_DEFAULT_VERSION}/processes/global.my-vm.v/attach"
+      )
     );
   }
 
@@ -440,7 +442,9 @@ mod tests {
 
     assert_eq!(
       client.process_exec_start_url("exec-id"),
-      "http://nanocl.internal:8585/v0.18.0/exec/exec-id/start"
+      format!(
+        "http://nanocl.internal:8585/v{NANOCLD_DEFAULT_VERSION}/exec/exec-id/start"
+      )
     );
   }
 

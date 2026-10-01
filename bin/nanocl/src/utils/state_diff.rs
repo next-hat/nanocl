@@ -439,6 +439,14 @@ mod tests {
 
   use super::*;
 
+  fn without_style(output: &str) -> String {
+    // Keep text assertions independent of the test runner's terminal settings.
+    regex::Regex::new("\u{1b}\\[[0-9;]*m")
+      .unwrap()
+      .replace_all(output, "")
+      .into_owned()
+  }
+
   fn item(before: Option<&Value>, after: Option<&Value>) -> StateDiffItem {
     diff_item(
       "Statefile.yml",
@@ -647,11 +655,13 @@ mod tests {
       let mut output = Vec::new();
       report.write_to(&mut output, json).unwrap();
       let output = String::from_utf8(output).unwrap();
+      let output = if json { output } else { without_style(&output) };
       assert!(!output.contains("hidden-"), "{output}");
       assert!(!output.contains('\u{1b}'));
       assert_eq!(output.contains("registry/image?"), json);
       assert_eq!(output.contains(REDACTED), json);
       if !json {
+        assert!(output.contains("web\\n\\u{1b}[31m"), "{output}");
         assert!(!output.contains("example.com"));
         assert!(!output.contains("source "));
       }
@@ -717,7 +727,7 @@ mod tests {
         assert!(value["items"][0]["changes"][0].get("after").is_none());
         assert_eq!(value["items"][1]["changes"][0]["after"], 2);
       } else {
-        let output = String::from_utf8(first).unwrap();
+        let output = without_style(&String::from_utf8(first).unwrap());
         assert!(output.contains("--- cargo/old.global\n+++ /dev/null\n"));
         assert!(output.contains("--- /dev/null\n+++ cargo/web.global\n"));
         assert!(output.contains("-Replicas: 2\n"));
@@ -744,7 +754,7 @@ mod tests {
     )]);
     let mut output = Vec::new();
     report.write_to(&mut output, false).unwrap();
-    let output = String::from_utf8(output).unwrap();
+    let output = without_style(&String::from_utf8(output).unwrap());
     assert!(output.starts_with("--- cargo/global.web\n+++ cargo/global.web\n"));
     assert!(output.contains("-- Image: nginx:stable\n"));
     assert!(output.contains("+- Image: nginx:alpine\n"));
@@ -840,7 +850,7 @@ mod tests {
     )]);
     let mut output = Vec::new();
     report.write_to(&mut output, false).unwrap();
-    let output = String::from_utf8(output).unwrap();
+    let output = without_style(&String::from_utf8(output).unwrap());
     assert!(output.starts_with(
       "--- resource/deploy-example.com\n+++ resource/deploy-example.com\n"
     ));

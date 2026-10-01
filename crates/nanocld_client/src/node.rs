@@ -94,7 +94,7 @@ mod tests {
 
   use nanocl_stubs::node::CargoReplicaTask;
 
-  use crate::ConnectOpts;
+  use crate::{ConnectOpts, NANOCLD_DEFAULT_VERSION};
 
   use super::*;
 
@@ -112,8 +112,10 @@ mod tests {
     let server_recorded = recorded.clone();
     let server = web::test::server(async move || {
       web::App::new().state(server_recorded.clone()).service(
-        web::resource("/v0.18.0/nodes/cargoes/start")
-          .route(web::post().to(record_start_node_cargo)),
+        web::resource(format!(
+          "/v{NANOCLD_DEFAULT_VERSION}/nodes/cargoes/start"
+        ))
+        .route(web::post().to(record_start_node_cargo)),
       )
     })
     .await;

@@ -280,7 +280,7 @@ mod tests {
   use ntex::web;
   use serde_json::{Value, json};
 
-  use crate::ConnectOpts;
+  use crate::{ConnectOpts, NANOCLD_DEFAULT_VERSION};
 
   use super::*;
 
@@ -399,17 +399,19 @@ mod tests {
       web::App::new()
         .state(server_recorder.clone())
         .service(
-          web::resource("/v0.18.0/cargoes")
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/cargoes"))
             .route(web::post().to(record_create)),
         )
         .service(
-          web::resource("/v0.18.0/cargoes/{key}")
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/cargoes/{{key}}"))
             .route(web::put().to(record_put))
             .route(web::patch().to(record_patch)),
         )
         .service(
-          web::resource("/v0.18.0/cargoes/{key}/histories")
-            .route(web::get().to(serve_history)),
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/cargoes/{{key}}/histories"
+          ))
+          .route(web::get().to(serve_history)),
         )
     })
     .await;
