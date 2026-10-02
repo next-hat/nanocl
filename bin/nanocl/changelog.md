@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show a compact `nanocl ps` table with shorter image names and relative ages
   by default. Add `--wide` for node names, full image references, and exact
   creation timestamps.
+- Extend compact tables with relative ages to cargo, VM, job, namespace, node,
+  resource, secret, event, and metric list commands. Add `--wide` to restore
+  exact timestamps and additional columns, including node endpoints, VM spec
+  versions, and event/metric node names. Preserve full identifiers, status and
+  instance counts, and keys-only output with `--quiet`.
+- Show compact context lists with names, endpoints, and the current selection;
+  use `--wide` to include descriptions.
 
 ### Fixed
 

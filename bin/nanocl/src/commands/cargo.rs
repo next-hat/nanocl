@@ -17,9 +17,10 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    CargoArg, CargoCommand, CargoCreateOpts, CargoHistoryOpts, CargoLogsOpts,
-    CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow, CargoRunOpts,
-    CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
+    CargoArg, CargoCommand, CargoCompactRow, CargoCreateOpts, CargoHistoryOpts,
+    CargoLogsOpts, CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow,
+    CargoRunOpts, CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts,
+    ProcessStatsRow,
   },
   utils::{self, cargo::build_cargo_patch},
 };
@@ -37,6 +38,7 @@ impl GenericCommand for CargoArg {
 
 impl GenericCommandLs for CargoArg {
   type Item = CargoRow;
+  type CompactItem = CargoCompactRow;
   type Args = CargoArg;
   type ApiItem = CargoSummary;
 
@@ -314,6 +316,51 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::models::GenericListOpts;
+
+  #[test]
+  fn cargo_list_renders_compact_wide_and_quiet_output() {
+    let row = || CargoRow {
+      key: "system.same".to_owned(),
+      status: "running/running (healthy)".to_owned(),
+      instances: "1/1".to_owned(),
+      created_at: "2026-09-01 12:00:00".to_owned(),
+      updated_at: "2026-09-02 12:00:00".to_owned(),
+      age: "2d".to_owned(),
+    };
+    let mut opts: GenericListOpts = GenericListOpts::default();
+    let compact = CargoArg::render_list(&opts, vec![row()]);
+    assert!(compact.contains("AGE"));
+    assert!(compact.contains("2d"));
+    assert!(compact.contains("system.same"));
+    assert!(compact.contains("running/running (healthy)"));
+    assert!(!compact.contains("CREATED AT"));
+    assert!(!compact.contains("UPDATED AT"));
+    assert!(!compact.contains("2026-09"));
+    let empty = CargoArg::render_list(&opts, Vec::new());
+    assert!(empty.contains("AGE"));
+    assert!(!empty.contains("CREATED AT"));
+
+    opts.wide = true;
+    let wide = CargoArg::render_list(&opts, vec![row()]);
+    assert!(wide.contains("CREATED AT"));
+    assert!(wide.contains("UPDATED AT"));
+    assert!(wide.contains("2026-09-01 12:00:00"));
+    assert!(wide.contains("2026-09-02 12:00:00"));
+    assert!(!wide.contains("AGE"));
+    let empty = CargoArg::render_list(&opts, Vec::new());
+    assert!(empty.contains("CREATED AT"));
+    assert!(empty.contains("UPDATED AT"));
+
+    opts.quiet = true;
+    assert_eq!(CargoArg::render_list(&opts, vec![row()]), "system.same");
+    assert!(CargoArg::render_list(&opts, Vec::new()).is_empty());
+    opts.wide = false;
+    assert_eq!(
+      CargoArg::render_list(&opts, vec![row(), row()]),
+      "system.same\nsystem.same"
+    );
+  }
 
   #[test]
   fn quiet_output_uses_canonical_key() {
@@ -323,6 +370,7 @@ mod tests {
       instances: String::new(),
       created_at: String::new(),
       updated_at: String::new(),
+      age: String::new(),
     };
     assert_eq!(<CargoArg as GenericCommandLs>::get_key(&row), "system.same");
   }

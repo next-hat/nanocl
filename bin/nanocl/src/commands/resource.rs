@@ -4,8 +4,8 @@ use nanocld_client::stubs::resource::Resource;
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceHistoryOpts,
-    ResourceRevertOpts, ResourceRow,
+    GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceCompactRow,
+    ResourceHistoryOpts, ResourceRevertOpts, ResourceRow,
   },
   utils,
 };
@@ -22,6 +22,7 @@ impl GenericCommand for ResourceArg {
 
 impl GenericCommandLs for ResourceArg {
   type Item = ResourceRow;
+  type CompactItem = ResourceCompactRow;
   type Args = ResourceArg;
   type ApiItem = nanocld_client::stubs::resource::Resource;
 

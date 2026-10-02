@@ -231,6 +231,32 @@ pub struct VmRow {
   /// When the vm was last updated
   #[tabled(rename = "UPDATED AT")]
   pub(crate) updated_at: String,
+  /// Age since the VM was created, used in compact output
+  #[tabled(skip)]
+  pub(crate) age: String,
+}
+
+/// A compact row for the VM table
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct VmCompactRow {
+  pub(crate) key: String,
+  pub(crate) image: String,
+  pub(crate) status: String,
+  pub(crate) instances: String,
+  pub(crate) age: String,
+}
+
+impl From<VmRow> for VmCompactRow {
+  fn from(row: VmRow) -> Self {
+    Self {
+      key: row.key,
+      image: row.image,
+      status: row.status,
+      instances: row.instances,
+      age: row.age,
+    }
+  }
 }
 
 /// Convert VmSummary to VmRow
@@ -256,6 +282,10 @@ impl From<VmSummary> for VmRow {
       instances: format!("{}/{}", vm.instance_running, vm.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
+      age: super::format_age(
+        Some(&vm.created_at.and_utc()),
+        chrono::Utc::now(),
+      ),
     }
   }
 }
@@ -271,8 +301,57 @@ pub struct VmArg {
 #[cfg(test)]
 mod tests {
   use clap::Parser;
+  use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
 
   use super::*;
+
+  #[test]
+  fn compact_vm_row_preserves_image_status_and_age() {
+    let created_at =
+      (chrono::Utc::now() - chrono::Duration::hours(49)).naive_utc();
+    let status = ObjPsStatus::default();
+    let expected_status = format!("{}/{}", status.actual, status.wanted);
+    let row = VmRow::from(VmSummary {
+      namespace_name: "production".to_owned(),
+      status,
+      created_at,
+      instance_total: 2,
+      instance_running: 1,
+      spec: VmSpec {
+        vm_key: "production.database".to_owned(),
+        image: "/var/lib/nanocl/vm/database.qcow2".to_owned(),
+        version: "v1".to_owned(),
+        created_at: chrono::Utc::now().naive_utc(),
+        ..Default::default()
+      },
+    });
+    assert_eq!(row.age, "2d");
+    assert_eq!(row.version, "v1");
+    assert!(!row.created_at.is_empty());
+    assert!(!row.updated_at.is_empty());
+    assert_eq!(
+      VmRow::headers(),
+      [
+        "KEY",
+        "IMAGE",
+        "STATUS",
+        "INSTANCES",
+        "VERSION",
+        "CREATED AT",
+        "UPDATED AT"
+      ]
+    );
+    let compact = VmCompactRow::from(row);
+    assert_eq!(compact.key, "production.database");
+    assert_eq!(compact.image, "/var/lib/nanocl/vm/database.qcow2");
+    assert_eq!(compact.status, expected_status);
+    assert_eq!(compact.instances, "1/2");
+    assert_eq!(compact.age, "2d");
+    assert_eq!(
+      VmCompactRow::headers(),
+      ["KEY", "IMAGE", "STATUS", "INSTANCES", "AGE"]
+    );
+  }
 
   #[test]
   fn namespace_is_only_available_for_collection_and_creation_commands() {
@@ -310,6 +389,7 @@ mod tests {
         version: "v1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
+        age: String::new(),
       },
       VmRow {
         key: "production.same".to_owned(),
@@ -319,6 +399,7 @@ mod tests {
         version: "v1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
+        age: String::new(),
       },
     ])
     .to_string();

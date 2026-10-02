@@ -5,7 +5,7 @@ use nanocld_client::stubs::system::Event;
 
 use crate::{
   config::CliConfig,
-  models::{EventArg, EventCommand, EventRow},
+  models::{EventArg, EventCommand, EventCompactRow, EventRow},
   utils,
 };
 
@@ -19,6 +19,7 @@ impl GenericCommand for EventArg {
 
 impl GenericCommandLs for EventArg {
   type Item = EventRow;
+  type CompactItem = EventCompactRow;
   type Args = EventArg;
   type ApiItem = Event;
 

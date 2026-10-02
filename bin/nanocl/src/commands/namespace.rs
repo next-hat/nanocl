@@ -4,8 +4,8 @@ use nanocld_client::{NanocldClient, stubs::namespace::NamespaceInspect};
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, NamespaceArg, NamespaceCommand, NamespaceCreateOpts,
-    NamespaceRow,
+    GenericDefaultOpts, NamespaceArg, NamespaceCommand, NamespaceCompactRow,
+    NamespaceCreateOpts, NamespaceRow,
   },
 };
 use nanocld_client::stubs::namespace::NamespaceSummary;
@@ -22,6 +22,7 @@ impl GenericCommand for NamespaceArg {
 
 impl GenericCommandLs for NamespaceArg {
   type Item = NamespaceRow;
+  type CompactItem = NamespaceCompactRow;
   type Args = NamespaceArg;
   type ApiItem = NamespaceSummary;
 

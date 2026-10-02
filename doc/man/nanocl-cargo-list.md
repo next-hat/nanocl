@@ -12,11 +12,14 @@ list - List existing cargo
 ## SYNOPSIS
 
 **list** \[**-n**\|**--namespace**\] \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
-\[**-o**\|**--offset**\] \[**--filters**\] \[**-h**\|**--help**\]
+\[**-o**\|**--offset**\] \[**--filters**\] \[**--wide**\] \[**-h**\|**--help**\]
 
 ## DESCRIPTION
 
 List existing cargo
+
+By default, the compact table shows AGE in seconds (`s`), minutes (`m`),
+hours (`h`), or days (`d`). Use `--wide` to show exact creation and update timestamps.
 
 ## OPTIONS
 
@@ -34,6 +37,9 @@ Offset the results to navigate through the results
 
 **--filters** *\<FILTERS\>*  
 Filters
+
+**--wide**\
+Show all columns and exact creation timestamps
 
 **-h**, **--help**  
 Print help

@@ -13,11 +13,14 @@ ps - Show processes
 
 **ps** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
 \[**-o**\|**--offset**\] \[**--filters**\] \[**-n**\|**--namespace**\]
-\[**-k**\|**--kind**\] \[**-a**\|**--all**\] \[**-h**\|**--help**\]
+\[**-k**\|**--kind**\] \[**-a**\|**--all**\] \[**--wide**\] \[**-h**\|**--help**\]
 
 ## DESCRIPTION
 
 Show processes
+
+The compact table shows AGE and the final component of each image reference.
+Use `--wide` for node names, full image references, and exact creation timestamps.
 
 ## OPTIONS
 
@@ -40,6 +43,9 @@ Show all processes for the given namespace
 Show all processes for the given kind
 
 **-a**, **--all**  
+
+**--wide**\
+Show all columns and exact creation timestamps
 
 **-h**, **--help**  
 Print help

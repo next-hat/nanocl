@@ -2,7 +2,7 @@ use nanocl_error::io::IoResult;
 
 use crate::{
   config::CliConfig,
-  models::{NodeArg, NodeCommand, NodeRow},
+  models::{NodeArg, NodeCommand, NodeCompactRow, NodeRow},
 };
 
 use super::{GenericCommand, GenericCommandLs};
@@ -15,6 +15,7 @@ impl GenericCommand for NodeArg {
 
 impl GenericCommandLs for NodeArg {
   type Item = NodeRow;
+  type CompactItem = NodeCompactRow;
   type Args = NodeArg;
   type ApiItem = nanocld_client::stubs::node::Node;
 

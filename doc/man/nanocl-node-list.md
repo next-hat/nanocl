@@ -12,11 +12,14 @@ list - List nodes
 ## SYNOPSIS
 
 **list** \[**-q**\|**--quiet**\] \[**-l**\|**--limit**\]
-\[**-o**\|**--offset**\] \[**--filters**\] \[**-h**\|**--help**\]
+\[**-o**\|**--offset**\] \[**--filters**\] \[**--wide**\] \[**-h**\|**--help**\]
 
 ## DESCRIPTION
 
 List nodes
+
+By default, the compact table shows AGE in seconds (`s`), minutes (`m`),
+hours (`h`), or days (`d`). Use `--wide` to show the endpoint and exact creation timestamp.
 
 ## OPTIONS
 
@@ -31,6 +34,9 @@ Offset the results to navigate through the results
 
 **--filters** *\<FILTERS\>*  
 Filters
+
+**--wide**\
+Show all columns and exact creation timestamps
 
 **-h**, **--help**  
 Print help

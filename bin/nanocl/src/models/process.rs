@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use clap::{Args, Parser};
 use std::path::PathBuf;
 use tabled::Tabled;
@@ -11,6 +11,8 @@ use nanocld_client::stubs::{
   generic::{GenericClause, GenericFilter},
   process::{Process, ProcessStats},
 };
+
+use super::format_age;
 
 pub struct ProcessArg;
 
@@ -73,9 +75,6 @@ pub struct ProcessFilter {
   // Show all processes (default shows just running)
   #[clap(long, short)]
   pub all: bool,
-  /// Show node names, full image references, and exact creation timestamps
-  #[clap(long)]
-  pub wide: bool,
 }
 
 impl From<ProcessFilter> for GenericFilter {
@@ -156,22 +155,6 @@ impl From<ProcessRow> for ProcessCompactRow {
   }
 }
 
-fn format_process_age(
-  created_at: Option<&DateTime<FixedOffset>>,
-  now: DateTime<Utc>,
-) -> String {
-  let Some(created_at) = created_at else {
-    return "<unknown>".to_owned();
-  };
-  let seconds = now.signed_duration_since(*created_at).num_seconds().max(0);
-  match seconds {
-    0..60 => format!("{seconds}s"),
-    60..3600 => format!("{}m", seconds / 60),
-    3600..86400 => format!("{}h", seconds / 3600),
-    _ => format!("{}d", seconds / 86400),
-  }
-}
-
 /// Convert Process to ProcessRow
 impl From<Process> for ProcessRow {
   fn from(process: Process) -> Self {
@@ -213,7 +196,7 @@ impl From<Process> for ProcessRow {
       .created
       .as_deref()
       .and_then(|created_at| DateTime::parse_from_rfc3339(created_at).ok());
-    let age = format_process_age(created_at.as_ref(), now.with_timezone(&Utc));
+    let age = format_age(created_at.as_ref(), now.with_timezone(&Utc));
     // Show exact creation timestamps in the current timezone in wide output.
     let created_at = created_at
       .map(|created_at| {
@@ -351,7 +334,7 @@ mod tests {
   use clap::Parser;
   use tabled::Tabled;
 
-  use super::{Process, ProcessCompactRow, ProcessRow, format_process_age};
+  use super::{Process, ProcessCompactRow, ProcessRow, format_age};
   use crate::models::{Cli, Command};
 
   fn process_with_network(mode: &str) -> Process {
@@ -454,6 +437,10 @@ mod tests {
   #[test]
   fn ps_age_uses_compact_units_at_boundaries() {
     let now = DateTime::parse_from_rfc3339("2026-09-26T12:00:00Z").unwrap();
+    assert_eq!(
+      format_age::<Utc>(None, now.with_timezone(&Utc)),
+      "<unknown>"
+    );
     for (seconds, expected) in [
       (0, "0s"),
       (59, "59s"),
@@ -466,7 +453,7 @@ mod tests {
     ] {
       let created_at = now - Duration::seconds(seconds);
       assert_eq!(
-        format_process_age(Some(&created_at), now.with_timezone(&Utc)),
+        format_age(Some(&created_at), now.with_timezone(&Utc)),
         expected
       );
     }
@@ -483,7 +470,7 @@ mod tests {
       ("2026-09-26T12:00:01Z", "0s"),
     ] {
       let created_at = DateTime::parse_from_rfc3339(created_at).unwrap();
-      assert_eq!(format_process_age(Some(&created_at), now), expected);
+      assert_eq!(format_age(Some(&created_at), now), expected);
     }
   }
 
@@ -523,11 +510,11 @@ mod tests {
       panic!("expected ps command");
     };
     assert!(options.quiet);
+    assert!(options.wide);
     assert_eq!(options.limit, Some(5));
     assert_eq!(options.offset, Some(2));
     assert_eq!(options.filters, Some(vec!["name=app".to_owned()]));
     let filter = options.others.unwrap();
-    assert!(filter.wide);
     assert!(filter.all);
     assert_eq!(filter.namespace.as_deref(), Some("global"));
     assert_eq!(filter.kind.as_deref(), Some("cargo"));
@@ -537,7 +524,7 @@ mod tests {
     let Command::Ps(options) = cli.command else {
       panic!("expected ps command");
     };
-    assert!(!options.others.unwrap_or_default().wide);
+    assert!(!options.wide);
     assert!(!options.quiet);
   }
 

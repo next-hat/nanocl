@@ -30,8 +30,8 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, VmArg, VmCommand, VmCreateOpts, VmPatchOpts, VmRow,
-    VmRunOpts,
+    GenericDefaultOpts, VmArg, VmCommand, VmCompactRow, VmCreateOpts,
+    VmPatchOpts, VmRow, VmRunOpts,
   },
   utils,
 };
@@ -49,6 +49,7 @@ impl GenericCommand for VmArg {
 
 impl GenericCommandLs for VmArg {
   type Item = VmRow;
+  type CompactItem = VmCompactRow;
   type Args = VmArg;
   type ApiItem = nanocld_client::stubs::vm::VmSummary;
 

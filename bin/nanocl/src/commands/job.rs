@@ -9,7 +9,8 @@ use nanocld_client::stubs::{
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, JobArg, JobCommand, JobLogsOpts, JobRow, JobWaitOpts,
+    GenericDefaultOpts, JobArg, JobCommand, JobCompactRow, JobLogsOpts, JobRow,
+    JobWaitOpts,
   },
   utils,
 };
@@ -27,6 +28,7 @@ impl GenericCommand for JobArg {
 
 impl GenericCommandLs for JobArg {
   type Item = JobRow;
+  type CompactItem = JobCompactRow;
   type Args = JobArg;
   type ApiItem = nanocld_client::stubs::job::JobSummary;
 

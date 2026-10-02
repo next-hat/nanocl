@@ -3,7 +3,7 @@ use nanocld_client::stubs::metric::Metric;
 
 use crate::{
   config::CliConfig,
-  models::{MetricArg, MetricCommand, MetricRow},
+  models::{MetricArg, MetricCommand, MetricCompactRow, MetricRow},
 };
 
 use super::{GenericCommand, GenericCommandInspect, GenericCommandLs};
@@ -16,6 +16,7 @@ impl GenericCommand for MetricArg {
 
 impl GenericCommandLs for MetricArg {
   type Item = MetricRow;
+  type CompactItem = MetricCompactRow;
   type Args = MetricArg;
   type ApiItem = Metric;
 

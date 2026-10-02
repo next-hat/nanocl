@@ -30,6 +30,7 @@ impl GenericCommand for ProcessArg {
 
 impl GenericCommandLs for ProcessArg {
   type Item = ProcessRow;
+  type CompactItem = ProcessCompactRow;
   type Args = ProcessArg;
   type ApiItem = Process;
 
@@ -111,8 +112,7 @@ fn render_process_list(
       .collect::<Vec<_>>()
       .join("\n");
   }
-  let wide = opts.others.as_ref().is_some_and(|filter| filter.wide);
-  let mut table = if wide {
+  let mut table = if opts.wide {
     Table::new(rows)
   } else {
     Table::new(rows.into_iter().map(ProcessCompactRow::from))
@@ -172,10 +172,7 @@ mod tests {
     assert!(!compact.contains("ghcr.io/next-hat/"));
     assert!(!compact.contains("nanocl.internal"));
 
-    opts.others = Some(ProcessFilter {
-      wide: true,
-      ..Default::default()
-    });
+    opts.wide = true;
     let wide = render_process_list(vec![process_row("full-id")], &opts);
     assert_eq!(
       wide
@@ -200,10 +197,7 @@ mod tests {
     for wide in [false, true] {
       let opts = GenericListOpts {
         quiet: true,
-        others: Some(ProcessFilter {
-          wide,
-          ..Default::default()
-        }),
+        wide,
         ..Default::default()
       };
       assert_eq!(
@@ -227,10 +221,7 @@ mod tests {
       ),
     ] {
       let opts = GenericListOpts {
-        others: Some(ProcessFilter {
-          wide,
-          ..Default::default()
-        }),
+        wide,
         ..Default::default()
       };
       let rendered = render_process_list(Vec::new(), &opts);

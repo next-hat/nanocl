@@ -30,25 +30,39 @@ pub trait GenericCommand {
 
 pub trait GenericCommandLs: GenericCommand {
   type Item;
+  type CompactItem: tabled::Tabled + From<Self::Item>;
   type Args;
   type ApiItem;
 
   fn get_key(item: &Self::Item) -> String;
+
+  fn render_list<T>(opts: &GenericListOpts<T>, rows: Vec<Self::Item>) -> String
+  where
+    Self::Item: tabled::Tabled,
+    T: Args + Clone + Default,
+  {
+    if opts.quiet {
+      return rows
+        .iter()
+        .map(Self::get_key)
+        .collect::<Vec<_>>()
+        .join("\n");
+    }
+    if opts.wide {
+      utils::print::render_table(rows)
+    } else {
+      utils::print::render_table(rows.into_iter().map(Self::CompactItem::from))
+    }
+  }
 
   fn print_table<T>(opts: &GenericListOpts<T>, rows: Vec<Self::Item>)
   where
     Self::Item: tabled::Tabled,
     T: Args + Clone + Default,
   {
-    match opts.quiet {
-      true => {
-        for row in rows {
-          println!("{}", Self::get_key(&row));
-        }
-      }
-      false => {
-        utils::print::print_table(rows);
-      }
+    let output = Self::render_list(opts, rows);
+    if !output.is_empty() {
+      println!("{output}");
     }
   }
 

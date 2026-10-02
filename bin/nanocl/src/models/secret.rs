@@ -243,10 +243,33 @@ pub struct SecretRow {
   /// When the secret have been updated
   #[tabled(rename = "UPDATED AT")]
   pub updated_at: String,
+  #[tabled(skip)]
+  pub age: String,
+}
+
+/// A compact row of the secret table
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct SecretCompactRow {
+  pub name: String,
+  pub kind: String,
+  pub age: String,
+}
+
+impl From<SecretRow> for SecretCompactRow {
+  fn from(row: SecretRow) -> Self {
+    Self {
+      name: row.name,
+      kind: row.kind,
+      age: row.age,
+    }
+  }
 }
 
 impl From<Secret> for SecretRow {
   fn from(secret: Secret) -> Self {
+    let age =
+      super::format_age(Some(&secret.created_at.and_utc()), chrono::Utc::now());
     // Get the current timezone
     let binding = chrono::Local::now();
     let tz = binding.offset();
@@ -264,6 +287,56 @@ impl From<Secret> for SecretRow {
       kind: secret.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
+      age,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::commands::GenericCommandLs;
+
+  #[test]
+  fn secret_list_compact_wide_and_quiet() {
+    let created_at =
+      (chrono::Utc::now() - chrono::Duration::days(3)).naive_utc();
+    let updated_at =
+      (chrono::Utc::now() - chrono::Duration::hours(1)).naive_utc();
+    let fixture = || Secret {
+      name: "registry-credentials".to_owned(),
+      created_at,
+      updated_at,
+      kind: "nanocl.io/container-registry".to_owned(),
+      immutable: false,
+      metadata: None,
+      data: serde_json::json!({}),
+    };
+    let row = SecretRow::from(fixture());
+    assert_eq!(row.age, "3d");
+    let exact_created_at = row.created_at.clone();
+    let exact_updated_at = row.updated_at.clone();
+    let mut opts =
+      GenericListOpts::<super::super::GenericDefaultOpts>::default();
+    let compact = SecretArg::render_list(&opts, vec![row]);
+    assert_eq!(SecretCompactRow::headers(), ["NAME", "KIND", "AGE"]);
+    assert!(compact.contains("registry-credentials"));
+    assert!(compact.contains("nanocl.io/container-registry"));
+    assert!(compact.contains("3d"));
+    assert!(!compact.contains("CREATED AT"));
+    assert!(!compact.contains("UPDATED AT"));
+
+    opts.wide = true;
+    let wide = SecretArg::render_list(&opts, vec![SecretRow::from(fixture())]);
+    assert!(wide.contains("CREATED AT"));
+    assert!(wide.contains("UPDATED AT"));
+    assert!(wide.contains(&exact_created_at));
+    assert!(wide.contains(&exact_updated_at));
+
+    opts.quiet = true;
+    assert_eq!(
+      SecretArg::render_list(&opts, vec![SecretRow::from(fixture())]),
+      "registry-credentials"
+    );
   }
 }

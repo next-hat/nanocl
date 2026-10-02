@@ -4,8 +4,8 @@ use nanocld_client::stubs::secret::Secret;
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts,
-    SecretPatchOpts, SecretRow,
+    GenericDefaultOpts, SecretArg, SecretCommand, SecretCompactRow,
+    SecretCreateOpts, SecretPatchOpts, SecretRow,
   },
 };
 
@@ -21,6 +21,7 @@ impl GenericCommand for SecretArg {
 
 impl GenericCommandLs for SecretArg {
   type Item = SecretRow;
+  type CompactItem = SecretCompactRow;
   type Args = SecretArg;
   type ApiItem = nanocld_client::stubs::secret::Secret;
 

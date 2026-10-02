@@ -17,15 +17,22 @@ pub(crate) fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
   T: tabled::Tabled,
 {
-  let table = Table::new(iter)
+  println!("{}", render_table(iter));
+}
+
+/// Render a table without writing to stdout.
+pub(crate) fn render_table<T>(iter: impl IntoIterator<Item = T>) -> String
+where
+  T: tabled::Tabled,
+{
+  Table::new(iter)
     .with(Style::empty())
     .with(
       Modify::new(Segment::all())
         .with(Padding::new(0, 4, 0, 0))
         .with(Alignment::left()),
     )
-    .to_string();
-  println!("{table}");
+    .to_string()
 }
 
 /// Print yaml from a serializable data

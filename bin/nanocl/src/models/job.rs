@@ -88,6 +88,36 @@ pub struct JobRow {
   /// When the job was last updated
   #[tabled(rename = "UPDATED AT")]
   pub updated_at: String,
+  /// Age since the job was created, used in compact output
+  #[tabled(skip)]
+  pub age: String,
+}
+
+/// A compact row of the job table
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct JobCompactRow {
+  pub name: String,
+  pub status: String,
+  pub total: usize,
+  pub running: usize,
+  pub succeeded: usize,
+  pub failed: usize,
+  pub age: String,
+}
+
+impl From<JobRow> for JobCompactRow {
+  fn from(row: JobRow) -> Self {
+    Self {
+      name: row.name,
+      status: row.status,
+      total: row.total,
+      running: row.running,
+      succeeded: row.succeeded,
+      failed: row.failed,
+      age: row.age,
+    }
+  }
 }
 
 /// Convert [JobSummary](JobSummary) to [JobRow](JobRow)
@@ -113,6 +143,74 @@ impl From<JobSummary> for JobRow {
       failed: job.instance_failed,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
+      age: super::format_age(
+        Some(&job.created_at.and_utc()),
+        chrono::Utc::now(),
+      ),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocld_client::stubs::{job::JobSpec, system::ObjPsStatus};
+
+  use super::*;
+
+  #[test]
+  fn compact_job_row_preserves_outcome_counts_and_age() {
+    let created_at =
+      (chrono::Utc::now() - chrono::Duration::hours(49)).naive_utc();
+    let status = ObjPsStatus::default();
+    let expected_status = format!("{}/{}", status.actual, status.wanted);
+    let row = JobRow::from(JobSummary {
+      created_at,
+      updated_at: chrono::Utc::now().naive_utc(),
+      status,
+      instance_total: 4,
+      instance_success: 2,
+      instance_running: 1,
+      instance_failed: 1,
+      spec: JobSpec {
+        name: "backup".to_owned(),
+        ..Default::default()
+      },
+    });
+    assert_eq!(row.age, "2d");
+    assert!(!row.created_at.is_empty());
+    assert!(!row.updated_at.is_empty());
+    assert_eq!(
+      JobRow::headers(),
+      [
+        "NAME",
+        "STATUS",
+        "TOTAL",
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "CREATED AT",
+        "UPDATED AT"
+      ]
+    );
+    let compact = JobCompactRow::from(row);
+    assert_eq!(compact.name, "backup");
+    assert_eq!(compact.status, expected_status);
+    assert_eq!(compact.total, 4);
+    assert_eq!(compact.running, 1);
+    assert_eq!(compact.succeeded, 2);
+    assert_eq!(compact.failed, 1);
+    assert_eq!(compact.age, "2d");
+    assert_eq!(
+      JobCompactRow::headers(),
+      [
+        "NAME",
+        "STATUS",
+        "TOTAL",
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "AGE"
+      ]
+    );
   }
 }
