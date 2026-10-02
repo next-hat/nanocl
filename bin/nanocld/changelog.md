@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Newly created Cargo processes use readable, sanitized application and init
   container names, and a `sandbox` label for sandbox processes.
 
+### Fixed
+
+- Scope process statistics by workload kind as well as resource key,
+  preventing cargoes and VMs with the same key from sharing stats results.
+
 ## [0.18.1] - 2026-09-26
 
 ### Security

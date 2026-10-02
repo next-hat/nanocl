@@ -36,6 +36,9 @@ Preview changes from a Statefile without applying them
 state-status(1)\
 Show running instances, health, and recent failures from a Statefile
 
+state-stats(1)\
+Show process statistics for workloads from a Statefile
+
 state-render(1)  
 Render a Statefile with args to an output file
 

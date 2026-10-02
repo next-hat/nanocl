@@ -3,7 +3,10 @@ use ntex::web;
 
 use bollard_next::container::StatsOptions;
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::process::{ProcessStats, ProcessStatsQuery};
+use nanocl_stubs::{
+  generic::{GenericClause, GenericFilter},
+  process::{ProcessStats, ProcessStatsQuery},
+};
 
 use crate::{
   models::{ProcessDb, SystemState},
@@ -36,8 +39,10 @@ pub async fn stats_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let opts: StatsOptions = qs.clone().into();
+  let filter =
+    GenericFilter::new().r#where("kind", GenericClause::Eq(kind.to_string()));
   let processes =
-    ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
+    ProcessDb::read_by_kind_key(&key, Some(filter), &state.inner.pool).await?;
   let streams =
     processes
       .into_iter()

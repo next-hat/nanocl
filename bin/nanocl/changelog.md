@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nanocl state status` to show running process counts, actual and wanted state,
   health, and recent failures for Statefile cargoes, VMs, jobs, and resources,
   with `--watch` for automatic refreshes.
+- `nanocl state stats` to show CPU and memory usage, network and block I/O,
+  and PID counts for Statefile cargoes, VMs, and jobs, including recursive
+  SubStates, streaming by default or using `--no-stream` for a single snapshot.
 - Shell completion for Bash, Zsh, Fish, PowerShell, and Elvish, including
   commands, options, local paths, contexts, and live daemon objects.
 

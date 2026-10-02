@@ -34,6 +34,7 @@ mod logs;
 mod man;
 mod remove;
 mod render;
+mod stats;
 mod status;
 
 use apply::exec_state_apply;
@@ -149,6 +150,7 @@ pub enum ArgParseMode {
   Apply,
   Diff,
   Status,
+  Stats,
   Remove,
   Logs,
 }
@@ -159,6 +161,7 @@ impl std::fmt::Display for ArgParseMode {
       ArgParseMode::Apply => "apply",
       ArgParseMode::Diff => "diff",
       ArgParseMode::Status => "status",
+      ArgParseMode::Stats => "stats",
       ArgParseMode::Remove => "remove",
       ArgParseMode::Logs => "logs",
     };
@@ -662,6 +665,7 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
     StateCommand::Status(opts) => {
       status::exec_state_status(cli_conf, opts).await
     }
+    StateCommand::Stats(opts) => stats::exec_state_stats(cli_conf, opts).await,
     StateCommand::Render(opts) => exec_state_render(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
     StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,

@@ -77,6 +77,20 @@ pub struct StateStatusOpts {
   pub args: Vec<String>,
 }
 
+/// `nanocl state stats` available options
+#[derive(Parser)]
+pub struct StateStatsOpts {
+  /// Path or URL to the Statefile
+  #[clap(long, short = 's')]
+  pub source: Option<String>,
+  /// Disable streaming stats and print a single snapshot
+  #[clap(long)]
+  pub no_stream: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 /// `nanocl state logs` available options
 #[derive(Default, Parser)]
 pub struct StateLogsOpts {
@@ -155,6 +169,8 @@ pub enum StateCommand {
   Diff(StateDiffOpts),
   /// Show running instances, health, and recent failures from a Statefile
   Status(StateStatusOpts),
+  /// Show process resource usage from a Statefile
+  Stats(StateStatsOpts),
   /// Render a Statefile with args to an output file
   Render(StateRenderOpts),
   /// Logs elements from a Statefile
@@ -213,6 +229,42 @@ where
 mod tests {
   use crate::models::{Cli, Command, StateCommand};
   use clap::Parser;
+
+  #[test]
+  fn state_stats_accepts_source_snapshot_and_template_arguments() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "state",
+      "stats",
+      "-s",
+      "deploy.yml",
+      "--no-stream",
+      "--",
+      "--name",
+      "example",
+    ])
+    .unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Stats(opts) = state.command else {
+      panic!("expected stats")
+    };
+    assert_eq!(opts.source.as_deref(), Some("deploy.yml"));
+    assert!(opts.no_stream);
+    assert_eq!(opts.args, ["--name", "example"]);
+
+    let cli = Cli::try_parse_from(["nanocl", "state", "stats"]).unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Stats(opts) = state.command else {
+      panic!("expected stats")
+    };
+    assert!(opts.source.is_none());
+    assert!(!opts.no_stream);
+    assert!(opts.args.is_empty());
+  }
 
   #[test]
   fn state_status_accepts_source_watch_and_template_arguments() {
