@@ -1275,6 +1275,8 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -2317,12 +2319,12 @@ dependencies = [
  "log",
  "mime",
  "nanorand",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
  "ntex-codec 1.2.1",
- "ntex-dispatcher",
- "ntex-error",
+ "ntex-dispatcher 3.2.1",
+ "ntex-error 2.6.0",
  "ntex-h2 3.13.0",
- "ntex-http 1.2.0",
+ "ntex-http 1.3.0",
  "ntex-httparse",
  "ntex-io 3.13.1",
  "ntex-macros 3.5.0",
@@ -2334,6 +2336,50 @@ dependencies = [
  "ntex-tls 3.8.0",
  "ntex-util 3.6.1",
  "openssl",
+ "percent-encoding",
+ "pin-project-lite",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror 2.0.21",
+ "uuid",
+ "variadics_please",
+]
+
+[[package]]
+name = "ntex"
+version = "4.0.0-beta.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cbee52e21ec9bb3440f163fe22a14a1763d0ff75632827e9379c48d8cd67c08"
+dependencies = [
+ "atoi_simd",
+ "base64 0.22.1",
+ "bitflags 2.13.2",
+ "derive_more",
+ "encoding_rs",
+ "env_logger",
+ "httparse",
+ "httpdate",
+ "log",
+ "mime",
+ "nanorand",
+ "ntex-bytes 1.10.0",
+ "ntex-codec 2.0.0",
+ "ntex-dispatcher 4.1.0",
+ "ntex-error 3.0.0",
+ "ntex-h2 4.1.0",
+ "ntex-http 1.3.0",
+ "ntex-httparse",
+ "ntex-io 4.1.0",
+ "ntex-macros 4.0.0",
+ "ntex-net 4.1.1",
+ "ntex-router 2.0.0",
+ "ntex-rt 4.1.0",
+ "ntex-server 4.2.0",
+ "ntex-service 5.1.0",
+ "ntex-tls 4.1.0",
+ "ntex-util 4.2.1",
  "percent-encoding",
  "pin-project-lite",
  "regex",
@@ -2359,9 +2405,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-bytes"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a926235646aee003de6b410c56efbfe3f8f5f6bbf8a69f1837b64f667dc03df9"
+checksum = "3938cb7ef3e7be9f2b816de6c2d456232414267804edce7ffe174c28f8141389"
 dependencies = [
  "bytes",
  "serde",
@@ -2382,18 +2428,28 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80fb7929b59c6161a43f66e1c9ef94f87475b301bd6587a6647f9ba928df31db"
 dependencies = [
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
+]
+
+[[package]]
+name = "ntex-codec"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a78aa758a08eccd9df4aa088b15ebc3ba4dfc37591943fdca5206546572b80c9"
+dependencies = [
+ "ntex-bytes 1.10.0",
 ]
 
 [[package]]
 name = "ntex-cors"
-version = "3.2.1"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a2e19080630fe84dc0edad10fc678f78d61dd410dc2206302c2d13860930a5"
+checksum = "d41d2a0037fbfdb97dd68105633a4201589e37e760c603ccd389bf4ed0c0c497"
 dependencies = [
  "derive_more",
  "futures",
- "ntex 3.12.3",
+ "ntex 4.0.0-beta.15",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2412,6 +2468,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntex-dispatcher"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5174a3ae38ef9de4842e472c7305404e5bdb211ca68cb462cb5d9186e67c0a12"
+dependencies = [
+ "log",
+ "ntex-codec 2.0.0",
+ "ntex-io 4.1.0",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
+]
+
+[[package]]
 name = "ntex-error"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2419,7 +2488,19 @@ checksum = "63b828e74404cb353aa0f6713d40881ef16b9ffa29e21d286b032ca500791fc8"
 dependencies = [
  "backtrace",
  "foldhash",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "ntex-error"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aea69f05f257fcdfc16ebc4b0586387887e64f9809f05ca211e14cffdbe10b3e"
+dependencies = [
+ "backtrace",
+ "foldhash",
+ "ntex-bytes 1.10.0",
  "thiserror 2.0.21",
 ]
 
@@ -2454,16 +2535,40 @@ dependencies = [
  "foldhash",
  "log",
  "nanorand",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
  "ntex-codec 1.2.1",
- "ntex-dispatcher",
- "ntex-error",
- "ntex-http 1.2.0",
+ "ntex-dispatcher 3.2.1",
+ "ntex-error 2.6.0",
+ "ntex-http 1.3.0",
  "ntex-io 3.13.1",
  "ntex-net 3.15.0",
  "ntex-server 3.11.2",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
+ "pin-project-lite",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "ntex-h2"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a9aa6cbd756bdf9adf483a8aff0b77079bf74bd57e9abec7bb80152ac3259b1"
+dependencies = [
+ "bitflags 2.13.2",
+ "foldhash",
+ "log",
+ "nanorand",
+ "ntex-bytes 1.10.0",
+ "ntex-codec 2.0.0",
+ "ntex-dispatcher 4.1.0",
+ "ntex-error 3.0.0",
+ "ntex-http 1.3.0",
+ "ntex-io 4.1.0",
+ "ntex-net 4.1.1",
+ "ntex-server 4.2.0",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
  "pin-project-lite",
  "thiserror 2.0.21",
 ]
@@ -2486,25 +2591,25 @@ dependencies = [
 
 [[package]]
 name = "ntex-http"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "034998dc254ad3283a6eee76fe89706c85e16b1e9a877e794951e75568dbc15c"
+checksum = "469e7dfa5d9865fdecd5712c11affa5e33e14bc110b8c6ec54f28e6be905e18c"
 dependencies = [
  "foldhash",
  "futures-core",
  "http",
  "itoa",
  "log",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
  "serde",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "ntex-httparse"
-version = "2.1.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cd04f3587bb190f11af135f652edff77f368d0940db134fa5a48c1f12c60b07"
+checksum = "5598889c5ca1343390da8d5a53ea04a3d2b65a21939989742e383f3666221f24"
 dependencies = [
  "simdutf8",
 ]
@@ -2533,7 +2638,7 @@ dependencies = [
  "backtrace",
  "bitflags 2.13.2",
  "log",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
  "ntex-codec 1.2.1",
  "ntex-rt 3.17.3",
  "ntex-service 4.6.0",
@@ -2543,10 +2648,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntex-io"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a229b1893da20413e0358f2fb84786da62bd5abd0b2d078dcfcb0ef5ee05dc1"
+dependencies = [
+ "bitflags 2.13.2",
+ "log",
+ "ntex-bytes 1.10.0",
+ "ntex-codec 2.0.0",
+ "ntex-rt 4.1.0",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
+ "pin-project-lite",
+ "slab",
+]
+
+[[package]]
 name = "ntex-io-uring"
 version = "0.7.120"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81e60f4a52aae6b07b8a4c560f05802be74c10c2924838f1007f48684233aaaa"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "libc",
+ "sc",
+]
+
+[[package]]
+name = "ntex-io-uring"
+version = "0.8.7150"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35745daff6ef1a3578b6b2e56ca0305120f193b84a5644a6396de1bad75f13a9"
 dependencies = [
  "bitflags 2.13.2",
  "cfg-if",
@@ -2570,6 +2704,17 @@ name = "ntex-macros"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94b2cc43bf60ff32e9d28f9b3d9bae28faa5ea5e0953a9113a8158f1e6f8dfcc"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+]
+
+[[package]]
+name = "ntex-macros"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a865ce536bc4225a15510c1a09f28244f47a9d6eb6b971044f2a4aada91c65f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2606,12 +2751,12 @@ dependencies = [
  "cfg-if",
  "libc",
  "log",
- "ntex-bytes 1.9.0",
- "ntex-error",
- "ntex-http 1.2.0",
+ "ntex-bytes 1.10.0",
+ "ntex-error 2.6.0",
+ "ntex-http 1.3.0",
  "ntex-io 3.13.1",
- "ntex-io-uring",
- "ntex-polling",
+ "ntex-io-uring 0.7.120",
+ "ntex-polling 3.11.1",
  "ntex-rt 3.17.3",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
@@ -2624,10 +2769,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntex-net"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b656cbd2a0c3585a20eabba7fb000ef18f2ae0e5ef609a74aab486bbfd71a872"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "libc",
+ "log",
+ "ntex-bytes 1.10.0",
+ "ntex-error 3.0.0",
+ "ntex-http 1.3.0",
+ "ntex-io 4.1.0",
+ "ntex-io-uring 0.8.7150",
+ "ntex-polling 4.0.0",
+ "ntex-rt 4.1.0",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
+ "scoped-tls",
+ "slab",
+ "socket2 0.6.5",
+ "thiserror 2.0.21",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "ntex-polling"
 version = "3.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acd5875a48069d7955d669bc5b862cbd3a069b83c0255de9dfc4178d9201a4a9"
+dependencies = [
+ "cfg-if",
+ "concurrent-queue",
+ "hermit-abi",
+ "pin-project-lite",
+ "rustix",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "ntex-polling"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a6f8f06886df6f78dc5e269d176f6ddad5a2da249eedb2dd618814cb029ff74"
 dependencies = [
  "cfg-if",
  "concurrent-queue",
@@ -2658,7 +2843,20 @@ checksum = "10ee67c4ff2f6cd5251c11ef50c90207b9f0ecbaa9a7dcaf699a8e75cd28fbb0"
 dependencies = [
  "http",
  "log",
- "ntex-bytes 1.9.0",
+ "ntex-bytes 1.10.0",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "ntex-router"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f8c011f878f24d92ecd51f4256939ef3d81daf84b112a021bfa02f5da8f62ea"
+dependencies = [
+ "http",
+ "log",
+ "ntex-bytes 1.10.0",
  "regex",
  "serde",
 ]
@@ -2694,13 +2892,39 @@ dependencies = [
  "libc",
  "log",
  "nix",
- "ntex-error",
+ "ntex-error 2.6.0",
  "oneshot 0.2.1",
  "parking_lot",
  "scoped-tls",
  "signal-hook 0.4.4",
  "swap-buffer-queue",
  "tokio",
+]
+
+[[package]]
+name = "ntex-rt"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6ef3ff00e8875caba59d1327c4bbcd6d82406552e9dad73d0f48c9b7a03b6e5"
+dependencies = [
+ "async-channel",
+ "async-task",
+ "atomic-waker",
+ "backtrace",
+ "crossbeam-channel",
+ "crossbeam-queue",
+ "ctrlc",
+ "foldhash",
+ "futures-timer",
+ "libc",
+ "log",
+ "nix",
+ "ntex-error 3.0.0",
+ "oneshot 0.2.1",
+ "parking_lot",
+ "scoped-tls",
+ "signal-hook 0.4.4",
+ "swap-buffer-queue",
 ]
 
 [[package]]
@@ -2738,11 +2962,33 @@ dependencies = [
  "log",
  "ntex-io 3.13.1",
  "ntex-net 3.15.0",
- "ntex-polling",
+ "ntex-polling 3.11.1",
  "ntex-rt 3.17.3",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
  "oneshot 0.2.1",
+ "socket2 0.6.5",
+ "uuid",
+]
+
+[[package]]
+name = "ntex-server"
+version = "4.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65f94bc23d24b558c53093d1a05832d3025e620ec36a36f4aac4459aaf770f38"
+dependencies = [
+ "async-channel",
+ "atomic-waker",
+ "core_affinity",
+ "libc",
+ "log",
+ "ntex-io 4.1.0",
+ "ntex-net 4.1.1",
+ "ntex-rt 4.1.0",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
+ "oneshot 0.2.1",
+ "polling",
  "socket2 0.6.5",
  "uuid",
 ]
@@ -2770,6 +3016,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntex-service"
+version = "5.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c19ad4393a74c8d15c885dd62a6f47192e9cab3611d0ea11b0b5d19651b3ee51"
+dependencies = [
+ "foldhash",
+ "log",
+ "slab",
+]
+
+[[package]]
 name = "ntex-tls"
 version = "2.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2790,13 +3047,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba8873e946975d18c561f700a410f4ac6739871a085341ff77f7f6469b8f0dc0"
 dependencies = [
  "log",
- "ntex-bytes 1.9.0",
- "ntex-error",
+ "ntex-bytes 1.10.0",
+ "ntex-error 2.6.0",
  "ntex-io 3.13.1",
  "ntex-net 3.15.0",
  "ntex-service 4.6.0",
  "ntex-util 3.6.1",
  "openssl",
+]
+
+[[package]]
+name = "ntex-tls"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e839465bc7106907d4c72e2a2545d1881753b572d30857b46b1e917c0bdd6cf"
+dependencies = [
+ "log",
+ "ntex-bytes 1.10.0",
+ "ntex-error 3.0.0",
+ "ntex-io 4.1.0",
+ "ntex-net 4.1.1",
+ "ntex-service 5.1.0",
+ "ntex-util 4.2.1",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2842,10 +3115,31 @@ dependencies = [
  "futures-core",
  "futures-timer",
  "log",
- "ntex-bytes 1.9.0",
- "ntex-error",
+ "ntex-bytes 1.10.0",
+ "ntex-error 2.6.0",
  "ntex-rt 3.17.3",
  "ntex-service 4.6.0",
+ "pin-project-lite",
+ "slab",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "ntex-util"
+version = "4.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a068c9b0b3049bec32d309870a93b815d422d445bcde6f4803e3aa9e9c67f81c"
+dependencies = [
+ "bitflags 2.13.2",
+ "foldhash",
+ "futures-core",
+ "futures-timer",
+ "hashbrown 0.17.1",
+ "log",
+ "ntex-bytes 1.10.0",
+ "ntex-error 3.0.0",
+ "ntex-rt 4.1.0",
+ "ntex-service 5.1.0",
  "pin-project-lite",
  "slab",
  "thiserror 2.0.21",
