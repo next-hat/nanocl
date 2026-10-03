@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar};
 
 use bollard_next::container::CreateContainerOptions;
 use bollard_next::image::CreateImageOptions;
@@ -18,7 +17,7 @@ use nanocld_client::stubs::cargo_spec::{
   CARGO_CONTAINER_POSITION_LABEL, CargoSpec, Config, ContainerSpec,
 };
 
-use crate::models::{DockerContextMeta, StateOutput};
+use crate::models::{DockerContextMeta, ImagePullProgress};
 use crate::utils::hash;
 use crate::utils::state_progress::{
   clear_layers, image_output_record, render_image_progress,
@@ -39,12 +38,15 @@ pub async fn install_image(
   from_image: &str,
   tag: &str,
   docker_api: &Docker,
-  progress: &MultiProgress,
-  summary: &ProgressBar,
-  resource: &str,
-  node: &str,
-  output: Option<&StateOutput>,
+  image_progress: &ImagePullProgress<'_>,
 ) -> IoResult<()> {
+  let ImagePullProgress {
+    progress,
+    summary,
+    resource,
+    node,
+    output,
+  } = *image_progress;
   let options = Some(CreateImageOptions {
     from_image,
     tag,

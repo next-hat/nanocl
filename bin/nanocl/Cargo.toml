@@ -22,6 +22,7 @@ vendored = ["openssl/vendored"]
 test = []
 
 [build-dependencies]
+indicatif = "0.18"
 liquid = "0.26"
 tabled = "0.22"
 clap_mangen = { version = "0.3" }

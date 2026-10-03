@@ -14,8 +14,8 @@ use nanocld_client::stubs::statefile::Statefile;
 
 use crate::{
   models::{
-    Context, ContextEndpoint, ContextMetaData, InstallOpts, NanocldArg,
-    StateOutput, StateRoot,
+    Context, ContextEndpoint, ContextMetaData, ImagePullProgress, InstallOpts,
+    NanocldArg, StateOutput, StateRoot,
   },
   utils,
 };
@@ -217,8 +217,16 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
               &pg, summary, "Pulling", output,
             )?;
             utils::docker::install_image(
-              image_name, image_tag, docker, progress, summary, resource, node,
-              output,
+              image_name,
+              image_tag,
+              docker,
+              &ImagePullProgress {
+                progress,
+                summary,
+                resource,
+                node,
+                output,
+              },
             )
             .await?;
           }
