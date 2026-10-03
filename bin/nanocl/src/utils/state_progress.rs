@@ -55,42 +55,67 @@ fn image_output<'a>(
     return None;
   }
   let error = state.and_then(|state| state.error.as_deref());
-  let (layer, status, bytes, error) =
-    if event.kind == EventKind::Error || error.is_some() {
-      (
-        state.and_then(|state| state.id.as_deref()),
-        "failed",
-        None,
-        error.or(event.note.as_deref()),
-      )
-    } else if event.action == "download" {
-      (None, "downloaded", None, None)
-    } else {
-      let state = state?;
-      (
-        state.id.as_deref(),
-        state.status.as_deref().unwrap_or("Pulling image"),
-        state
-          .progress_detail
-          .as_ref()
-          .filter(|detail| detail.current.is_some_and(|current| current >= 0))
-          .and_then(|_| byte_progress(state)),
-        None,
-      )
-    };
-  Some(StateOutputEvent::Image {
+  let (status, error) = if event.kind == EventKind::Error || error.is_some() {
+    (Some("failed"), error.or(event.note.as_deref()))
+  } else if event.action == "download" {
+    (Some("downloaded"), None)
+  } else {
+    state?;
+    (None, None)
+  };
+  Some(image_output_record(
     resource,
     image,
-    node: &event.reporting_node,
+    &event.reporting_node,
+    state,
+    status,
+    error,
+  ))
+}
+
+/// Format both direct Docker pulls and daemon image events consistently.
+pub(crate) fn image_output_record<'a>(
+  resource: &'a str,
+  image: &'a str,
+  node: &'a str,
+  state: Option<&'a CreateImageInfo>,
+  status: Option<&'a str>,
+  error: Option<&'a str>,
+) -> StateOutputEvent<'a> {
+  let error = error.or_else(|| state.and_then(|state| state.error.as_deref()));
+  let status = if error.is_some() {
+    "failed"
+  } else {
+    status
+      .or_else(|| state.and_then(|state| state.status.as_deref()))
+      .unwrap_or("Pulling image")
+  };
+  let layer = if status == "downloaded" {
+    None
+  } else {
+    state.and_then(|state| state.id.as_deref())
+  };
+  let bytes = state
+    .filter(|_| !matches!(status, "failed" | "downloaded"))
+    .filter(|state| {
+      state.progress_detail.as_ref().is_some_and(|detail| {
+        detail.current.is_some_and(|current| current >= 0)
+      })
+    })
+    .and_then(byte_progress);
+  StateOutputEvent::Image {
+    resource,
+    image,
+    node,
     layer,
     status,
     current: bytes.map(|(current, _)| current),
     total: bytes.map(|(_, total)| total),
     error,
-  })
+  }
 }
 
-fn clear_layers(
+pub(crate) fn clear_layers(
   progress: &MultiProgress,
   layers: &mut HashMap<(String, String, String), ProgressBar>,
   image: Option<(&str, &str)>,
@@ -127,13 +152,28 @@ fn update_image_progress(
   let Some(state) = image_state(event) else {
     return;
   };
+  render_image_progress(
+    &event.reporting_node,
+    image,
+    &state,
+    progress,
+    summary,
+    layers,
+  );
+}
+
+/// Render a pull layer using the same layout for every command.
+pub(crate) fn render_image_progress(
+  node: &str,
+  image: &str,
+  state: &CreateImageInfo,
+  progress: &MultiProgress,
+  summary: &ProgressBar,
+  layers: &mut HashMap<(String, String, String), ProgressBar>,
+) {
   let layer = state.id.as_deref().unwrap_or_default();
   let bar = layers
-    .entry((
-      event.reporting_node.clone(),
-      image.to_owned(),
-      layer.to_owned(),
-    ))
+    .entry((node.to_owned(), image.to_owned(), layer.to_owned()))
     .or_insert_with(|| {
       let bar = progress.insert_before(summary, ProgressBar::new_spinner());
       bar.set_prefix(format!("{image} {layer}"));
@@ -144,8 +184,8 @@ fn update_image_progress(
     .as_deref()
     .or(state.status.as_deref())
     .unwrap_or("Pulling image");
-  bar.set_message(format!("{status} ({})", event.reporting_node));
-  let template = if let Some((current, total)) = byte_progress(&state) {
+  bar.set_message(format!("{status} ({node})"));
+  let template = if let Some((current, total)) = byte_progress(state) {
     bar.disable_steady_tick();
     bar.set_length(total);
     bar.set_position(current);
@@ -399,6 +439,101 @@ mod tests {
   }
 
   #[test]
+  fn image_progress_direct_pull_records_match_state_events() {
+    let mut event = event();
+    for (metadata, expected) in [
+      (
+        json!({"state": {
+          "id": "layer-a", "status": "Downloading",
+          "progressDetail": {"current": 25, "total": 100}
+        }}),
+        json!({
+          "type": "image", "resource": "cargo/global.app",
+          "image": "alpine:latest", "node": "node-a", "layer": "layer-a",
+          "status": "Downloading", "current": 25, "total": 100
+        }),
+      ),
+      (
+        json!({"state": {"id": "layer-a", "status": "Already exists"}}),
+        json!({
+          "type": "image", "resource": "cargo/global.app",
+          "image": "alpine:latest", "node": "node-a", "layer": "layer-a",
+          "status": "Already exists"
+        }),
+      ),
+      (
+        json!({"state": {"id": "layer-a", "error": "pull failed"}}),
+        json!({
+          "type": "image", "resource": "cargo/global.app",
+          "image": "alpine:latest", "node": "node-a", "layer": "layer-a",
+          "status": "failed", "error": "pull failed"
+        }),
+      ),
+    ] {
+      event.metadata = Some(metadata);
+      let state = image_state(&event).unwrap();
+      let direct = image_output_record(
+        "cargo/global.app",
+        "alpine:latest",
+        "node-a",
+        Some(&state),
+        None,
+        None,
+      );
+      assert_eq!(serde_json::to_value(direct).unwrap(), expected);
+      assert_eq!(
+        image_json(&event, "global.app", &EventActorKind::Cargo).unwrap(),
+        expected,
+      );
+    }
+    event.action = "download".to_owned();
+    event.metadata = None;
+    let completed = image_output_record(
+      "cargo/global.app",
+      "alpine:latest",
+      "node-a",
+      None,
+      Some("downloaded"),
+      None,
+    );
+    let completed = serde_json::to_value(completed).unwrap();
+    assert_eq!(
+      completed,
+      json!({
+        "type": "image", "resource": "cargo/global.app",
+        "image": "alpine:latest", "node": "node-a", "status": "downloaded"
+      }),
+    );
+    assert_eq!(
+      completed,
+      image_json(&event, "global.app", &EventActorKind::Cargo).unwrap(),
+    );
+    event.kind = EventKind::Error;
+    event.note = Some("stream failed".to_owned());
+    let failed = image_output_record(
+      "cargo/global.app",
+      "alpine:latest",
+      "node-a",
+      None,
+      Some("failed"),
+      Some("stream failed"),
+    );
+    let failed = serde_json::to_value(failed).unwrap();
+    assert_eq!(
+      failed,
+      json!({
+        "type": "image", "resource": "cargo/global.app",
+        "image": "alpine:latest", "node": "node-a",
+        "status": "failed", "error": "stream failed"
+      }),
+    );
+    assert_eq!(
+      failed,
+      image_json(&event, "global.app", &EventActorKind::Cargo).unwrap(),
+    );
+  }
+
+  #[test]
   fn image_progress_decodes_split_and_coalesced_events() {
     let mut record = serde_json::to_vec(&event()).unwrap();
     record.push(b'\n');
@@ -546,5 +681,20 @@ mod tests {
     assert_eq!(layers.len(), 1);
     clear_layers(&progress, &mut layers, None);
     assert!(layers.is_empty());
+    let state = image_state(&other_image).unwrap();
+    render_image_progress(
+      "node-a",
+      "busybox:latest",
+      &state,
+      &progress,
+      &summary,
+      &mut layers,
+    );
+    assert_eq!(layers.len(), 1);
+    let bar = layers.values().next().unwrap().clone();
+    assert!(bar.message().starts_with("Already exists"));
+    clear_layers(&progress, &mut layers, None);
+    assert!(layers.is_empty());
+    assert!(bar.is_finished());
   }
 }

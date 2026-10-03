@@ -15,11 +15,16 @@ install - Install components
 \[**--state-dir**\] \[**--conf-dir**\] \[**--gateway**\]
 \[**--advertise-addr**\] \[**--daemon-hosts**\] \[**--group**\]
 \[**--hostname**\] \[**-t**\|**--template**\]
-\[**-p**\|**--force-pull**\] \[**-f **\] \[**-h**\|**--help**\]
+\[**-p**\|**--force-pull**\] \[**-f **\] \[**--json**\]
+\[**-h**\|**--help**\]
 
 ## DESCRIPTION
 
 Install components
+
+Show per-cargo progress, image download progress, and a counted operation
+summary with elapsed times, using the same display as `nanocl state apply`.
+When output is redirected, print completed items and the summary to stderr.
 
 ## OPTIONS
 
@@ -61,6 +66,14 @@ Force re pull of the nanocl components
 
 **-f**  
 Attach to the container logs after installation
+
+**--json**
+
+Emit newline-delimited JSON (NDJSON) to stdout for tools and dashboards.
+Records use `schema_version: 1` and `operation: "install"`, with `state`,
+`item`, `image`, and final `result` events matching Statefile apply output.
+The `statefile` field contains the template when **--template** is supplied.
+Cannot be combined with **-f**.
 
 **-h**, **--help**  
 Print help

@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Align `nanocl install` and `nanocl uninstall` with Statefile apply/remove
+  output, including per-item progress, elapsed times, operation summaries,
+  install image download progress, and `--json` NDJSON output for automation.
 - Improve `nanocl state apply` and `nanocl state remove` output with per-item
   progress and operation summaries, including image download progress during
   apply. Add `--json` NDJSON output for automation, requiring `--yes`;

@@ -104,14 +104,16 @@ fn load_cli_config(
 }
 
 fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
-  let Command::State(args) = &cli_args.command else {
-    return None;
-  };
-  let (operation, source) = match &args.command {
-    StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
-    StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
-    StateCommand::Start(opts) if opts.json => ("start", &opts.source),
-    StateCommand::Stop(opts) if opts.json => ("stop", &opts.source),
+  let (operation, source) = match &cli_args.command {
+    Command::Install(opts) if opts.json => ("install", &opts.template),
+    Command::Uninstall(opts) if opts.json => ("uninstall", &opts.template),
+    Command::State(args) => match &args.command {
+      StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
+      StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
+      StateCommand::Start(opts) if opts.json => ("start", &opts.source),
+      StateCommand::Stop(opts) if opts.json => ("stop", &opts.source),
+      _ => return None,
+    },
     _ => return None,
   };
   Some(StateOutput {
@@ -120,7 +122,7 @@ fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
   })
 }
 
-/// Report JSON results, including failures before state command dispatch.
+/// Report JSON results, including failures before command dispatch.
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let output = state_json_output(cli_args);
   let result = execute_arg_inner(cli_args).await;
@@ -172,6 +174,12 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
       }
       #[cfg(target_os = "windows")]
       {
+        if args.json {
+          return Err(IoError::other(
+            "Install",
+            "Install is not supported on windows yet",
+          ));
+        }
         println!("Install is not supported on windows yet");
         Ok(())
       }
@@ -183,6 +191,12 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
       }
       #[cfg(target_os = "windows")]
       {
+        if args.json {
+          return Err(IoError::other(
+            "Uninstall",
+            "Uninstall is not supported on windows yet",
+          ));
+        }
         println!("Uninstall is not supported on windows yet");
         Ok(())
       }
@@ -272,9 +286,37 @@ mod tests {
       vec!["nanocl", "state", "stop", "-y"],
       vec!["nanocl", "version"],
       vec!["nanocl", "state", "diff", "--json"],
+      vec!["nanocl", "install"],
+      vec!["nanocl", "uninstall"],
     ] {
       assert!(state_json_output(&Cli::try_parse_from(args).unwrap()).is_none());
     }
+  }
+
+  #[test]
+  fn json_installer_output_selects_install_and_uninstall() {
+    for command in ["install", "uninstall"] {
+      let args = Cli::try_parse_from(["nanocl", command, "--json"]).unwrap();
+      let output = state_json_output(&args).unwrap();
+      assert_eq!(output.operation, command);
+      assert!(output.statefile.is_none());
+
+      let args = Cli::try_parse_from([
+        "nanocl",
+        command,
+        "--json",
+        "--template",
+        "installer.yml",
+      ])
+      .unwrap();
+      let output = state_json_output(&args).unwrap();
+      assert_eq!(output.operation, command);
+      assert_eq!(output.statefile.as_deref(), Some("installer.yml"));
+    }
+    let err = Cli::try_parse_from(["nanocl", "install", "--json", "-f"])
+      .err()
+      .expect("JSON progress cannot be mixed with raw container logs");
+    assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
   }
 
   /// Test version command

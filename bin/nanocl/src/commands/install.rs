@@ -15,7 +15,7 @@ use nanocld_client::stubs::statefile::Statefile;
 use crate::{
   models::{
     Context, ContextEndpoint, ContextMetaData, InstallOpts, NanocldArg,
-    StateRoot,
+    StateOutput, StateRoot,
   },
   utils,
 };
@@ -172,52 +172,95 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
         err.map_err_context(|| "Unable to create nanoclbr0 network")
       })?;
   }
-  for cargo in &cargoes {
-    let token = format!("cargo/{}", cargo.name);
-    let pg_style = utils::progress::create_spinner_style(&token, "green");
-    let pg = utils::progress::create_progress("(submitting)", &pg_style);
-    let container = utils::docker::single_application_container(cargo)?;
-    let image =
-      container
-        .container_config
-        .image
-        .clone()
-        .ok_or(IoError::invalid_data(
-          format!("Cargo {} image", cargo.name),
-          "is not specified".to_owned(),
-        ))?;
-    let image_details = image.split(':').collect::<Vec<_>>();
-    let [image_name, image_tag] = image_details[..] else {
-      return Err(IoError::invalid_data(
-        format!("Cargo {} image", cargo.name),
-        "invalid format expect image:tag".into(),
-      ));
-    };
-    if docker.inspect_image(&image).await.is_err() || args.force_pull {
-      pg.set_message("(pulling)");
-      utils::docker::install_image(image_name, image_tag, &docker, true)
-        .await?;
+  let namespace = deployment.namespace.as_deref().unwrap_or("system");
+  let output = args.json.then(|| StateOutput {
+    operation: "install",
+    statefile: args.template.clone(),
+  });
+  let (progress, summary) = utils::progress::create_state_progress(
+    cargoes.len() as u64,
+    "Installing",
+    output.as_ref(),
+  )?;
+  let result = async {
+    let progress = &progress;
+    let summary = &summary;
+    let output = output.as_ref();
+    let docker = &docker;
+    let node = &nanocld_args.hostname;
+    for cargo in &cargoes {
+      let token = format!("cargo/{namespace}.{}", cargo.name);
+      let resource = token.as_str();
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        None,
+        |pg| async move {
+          let container = utils::docker::single_application_container(cargo)?;
+          let image = container.container_config.image.as_deref().ok_or(
+            IoError::invalid_data(
+              format!("Cargo {} image", cargo.name),
+              "is not specified".to_owned(),
+            ),
+          )?;
+          let image_details = image.split(':').collect::<Vec<_>>();
+          let [image_name, image_tag] = image_details[..] else {
+            return Err(IoError::invalid_data(
+              format!("Cargo {} image", cargo.name),
+              "invalid format expect image:tag".into(),
+            ));
+          };
+          if docker.inspect_image(image).await.is_err() || args.force_pull {
+            utils::progress::set_state_message(
+              &pg, summary, "Pulling", output,
+            )?;
+            utils::docker::install_image(
+              image_name, image_tag, docker, progress, summary, resource, node,
+              output,
+            )
+            .await?;
+          }
+          utils::progress::set_state_message(&pg, summary, "Creating", output)?;
+          let container =
+            utils::docker::create_cargo_container(cargo, namespace, docker)
+              .await?;
+          utils::progress::set_state_message(&pg, summary, "Starting", output)?;
+          docker
+            .start_container(
+              &container.id,
+              None::<StartContainerOptions<String>>,
+            )
+            .await
+            .map_err(|err| {
+              err.map_err_context(|| {
+                format!("Unable to start cargo {}", cargo.name)
+              })
+            })?;
+          ntex::time::sleep(Duration::from_secs(2)).await;
+          Ok("Running")
+        },
+      )
+      .await?;
     }
-    pg.set_message("(creating)");
-    let container = utils::docker::create_cargo_container(
-      cargo,
-      &deployment.namespace.clone().unwrap_or("system".into()),
-      &docker,
-    )
-    .await?;
-    pg.set_message("(starting)");
-    docker
-      .start_container(&container.id, None::<StartContainerOptions<String>>)
-      .await
-      .map_err(|err| {
-        err.map_err_context(|| format!("Unable to start cargo {}", cargo.name))
-      })?;
-    ntex::time::sleep(Duration::from_secs(2)).await;
-    pg.finish_with_message("(running)");
+    Ok::<_, IoError>(())
   }
+  .await;
+  utils::progress::finish_state_progress(
+    &summary,
+    if result.is_ok() {
+      "Installed"
+    } else {
+      "Install failed"
+    },
+    result.is_err(),
+    output.as_ref(),
+  )?;
+  result?;
   if is_docker_desktop {
-    println!("Docker desktop detected");
-    println!("Setting up context for docker desktop");
+    eprintln!("Docker desktop detected");
+    eprintln!("Setting up context for docker desktop");
     let context = Context {
       name: "desktop-linux".into(),
       meta_data: ContextMetaData {
@@ -242,7 +285,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       eprintln!("WARN: Unable to use context for docker desktop: {err}");
     }
   }
-  println!("Nanocl system installed");
   if args.follow {
     cargoes
       .into_iter()

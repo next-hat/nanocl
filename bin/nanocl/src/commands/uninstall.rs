@@ -1,4 +1,4 @@
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::stubs::statefile::Statefile;
 
 use bollard_next::container::{
@@ -6,7 +6,7 @@ use bollard_next::container::{
 };
 
 use crate::{
-  models::{StateRoot, UninstallOpts},
+  models::{StateOutput, StateRoot, UninstallOpts},
   utils, version,
 };
 
@@ -41,36 +41,70 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();
-  for cargo in cargoes {
-    let token = format!("cargo/{}", cargo.name);
-    let pg_style = utils::progress::create_spinner_style(&token, "red");
-    let pg = utils::progress::create_progress("(submitting)", &pg_style);
-    let key = format!("system.{}.c", &cargo.name);
-    if docker
-      .inspect_container(&key, None::<InspectContainerOptions>)
-      .await
-      .is_err()
-    {
-      pg.finish_with_message("(not found)");
-      continue;
-    };
-    pg.set_message("(destroying)");
-    docker
-      .remove_container(
-        &key,
-        Some(RemoveContainerOptions {
-          force: true,
-          ..Default::default()
-        }),
+  let output = args.json.then(|| StateOutput {
+    operation: "uninstall",
+    statefile: args.template.clone(),
+  });
+  let (progress, summary) = utils::progress::create_state_progress(
+    cargoes.len() as u64,
+    "Uninstalling",
+    output.as_ref(),
+  )?;
+  let result = async {
+    let progress = &progress;
+    let summary = &summary;
+    let output = output.as_ref();
+    let docker = &docker;
+    for cargo in cargoes {
+      let token = format!("cargo/system.{}", cargo.name);
+      utils::progress::run_state_step(
+        progress,
+        summary,
+        &token,
+        output,
+        None,
+        |pg| async move {
+          let key = format!("system.{}.c", &cargo.name);
+          if docker
+            .inspect_container(&key, None::<InspectContainerOptions>)
+            .await
+            .is_err()
+          {
+            return Ok("Unchanged");
+          }
+          utils::progress::set_state_message(&pg, summary, "Removing", output)?;
+          docker
+            .remove_container(
+              &key,
+              Some(RemoveContainerOptions {
+                force: true,
+                ..Default::default()
+              }),
+            )
+            .await
+            .map_err(|err| {
+              err.map_err_context(|| {
+                format!("Unable to remove container {}", &cargo.name)
+              })
+            })?;
+          Ok("Destroyed")
+        },
       )
-      .await
-      .map_err(|err| {
-        err.map_err_context(|| {
-          format!("Unable to remove container {}", &cargo.name)
-        })
-      })?;
-    pg.finish_with_message("(destroyed)");
+      .await?;
+    }
+    Ok::<_, IoError>(())
   }
-  println!("Nanocl system uninstalled");
+  .await;
+  utils::progress::finish_state_progress(
+    &summary,
+    if result.is_ok() {
+      "Uninstalled"
+    } else {
+      "Uninstall failed"
+    },
+    result.is_err(),
+    output.as_ref(),
+  )?;
+  result?;
   Ok(())
 }

@@ -39,6 +39,9 @@ pub struct InstallOpts {
   /// Attach to the container logs after installation
   #[clap(short = 'f')]
   pub(crate) follow: bool,
+  /// Stream newline-delimited JSON to stdout
+  #[clap(long, conflicts_with = "follow")]
+  pub(crate) json: bool,
 }
 
 /// Arguments for the nanocl daemon used by the install template

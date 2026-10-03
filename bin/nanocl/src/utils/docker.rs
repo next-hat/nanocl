@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar};
 
 use bollard_next::container::CreateContainerOptions;
 use bollard_next::image::CreateImageOptions;
 #[cfg(test)]
 use bollard_next::models::EmptyObject;
 use bollard_next::service::{
-  ContainerCreateResponse, HostConfig, ProgressDetail, RestartPolicy,
-  RestartPolicyNameEnum,
+  ContainerCreateResponse, HostConfig, RestartPolicy, RestartPolicyNameEnum,
 };
 use bollard_next::{API_DEFAULT_VERSION, Docker};
 
@@ -19,9 +18,11 @@ use nanocld_client::stubs::cargo_spec::{
   CARGO_CONTAINER_POSITION_LABEL, CargoSpec, Config, ContainerSpec,
 };
 
-use crate::models::DockerContextMeta;
+use crate::models::{DockerContextMeta, StateOutput};
 use crate::utils::hash;
-use crate::utils::math::calculate_percentage;
+use crate::utils::state_progress::{
+  clear_layers, image_output_record, render_image_progress,
+};
 
 const LABEL_CARGO_NETWORK_MODE: &str = "io.nanocl.cargo.network-mode";
 const DEFAULT_CARGO_NETWORK_MODE: &str = "nanoclbr0";
@@ -33,47 +34,16 @@ fn cargo_network_mode(cargo: &CargoSpec) -> &str {
     .map_or(DEFAULT_CARGO_NETWORK_MODE, |mode| mode.as_str())
 }
 
-/// Update progress bar for install image
-fn update_image_progress(
-  multi_progress: &MultiProgress,
-  layers: &mut HashMap<String, ProgressBar>,
-  id: &str,
-  progress: &ProgressDetail,
-) {
-  let total: u64 = progress
-    .total
-    .unwrap_or_default()
-    .try_into()
-    .unwrap_or_default();
-  let current: u64 = progress
-    .current
-    .unwrap_or_default()
-    .try_into()
-    .unwrap_or_default();
-  if let Some(pg) = layers.get(id) {
-    let percent = calculate_percentage(current, total);
-    pg.set_position(percent);
-  } else {
-    let pg = ProgressBar::new(100);
-    let style = ProgressStyle::with_template(
-      "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
-    )
-    .unwrap()
-    .progress_chars("=> ");
-    pg.set_style(style);
-    multi_progress.add(pg.to_owned());
-    let percent = calculate_percentage(current, total);
-    pg.set_position(percent);
-    layers.insert(id.to_owned(), pg);
-  }
-}
-
 /// Install image directly with docker and output progress
 pub async fn install_image(
   from_image: &str,
   tag: &str,
   docker_api: &Docker,
-  disable_progress: bool,
+  progress: &MultiProgress,
+  summary: &ProgressBar,
+  resource: &str,
+  node: &str,
+  output: Option<&StateOutput>,
 ) -> IoResult<()> {
   let options = Some(CreateImageOptions {
     from_image,
@@ -81,44 +51,66 @@ pub async fn install_image(
     ..Default::default()
   });
   let mut stream = docker_api.create_image(options, None, None);
-  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  let multi_progress = MultiProgress::new();
-  multi_progress.set_move_cursor(false);
-  while let Some(res) = stream.next().await {
-    let data = res
-      .map_err(|err| err.map_err_context(|| "Install image stream failed"))?;
-    if disable_progress {
-      continue;
-    }
-    let status = data.status.unwrap_or_default();
-    let id = data.id.unwrap_or_default();
-    let progress = data.progress_detail.unwrap_or_default();
-    match status.as_str() {
-      "Pulling fs layer" => {
-        update_image_progress(&multi_progress, &mut layers, &id, &progress);
-      }
-      "Downloading" => {
-        update_image_progress(&multi_progress, &mut layers, &id, &progress);
-      }
-      "Download complete" => {
-        if let Some(pg) = layers.get(&id) {
-          pg.set_position(100);
+  let mut layers = HashMap::new();
+  let image = format!("{from_image}:{tag}");
+  let result = async {
+    while let Some(res) = stream.next().await {
+      let data = match res {
+        Ok(data) => data,
+        Err(err) => {
+          let err: IoError =
+            err.map_err_context(|| "Install image stream failed").into();
+          if let Some(output) = output {
+            output.emit(image_output_record(
+              resource,
+              &image,
+              node,
+              None,
+              Some("failed"),
+              Some(&err.to_string()),
+            ))?;
+          }
+          return Err(err);
         }
+      };
+      if let Some(output) = output {
+        output.emit(image_output_record(
+          resource,
+          &image,
+          node,
+          Some(&data),
+          None,
+          None,
+        ))?;
+      } else if !progress.is_hidden() {
+        render_image_progress(
+          node,
+          &image,
+          &data,
+          progress,
+          summary,
+          &mut layers,
+        );
       }
-      "Extracting" => {
-        update_image_progress(&multi_progress, &mut layers, &id, &progress);
+      if let Some(error) = data.error.as_deref() {
+        return Err(IoError::other("Install image", error));
       }
-      _ => {
-        if !layers.contains_key(&id) {
-          let _ = multi_progress.println(&status);
-        }
-      }
-    };
-    if let Some(pg) = layers.get(&id) {
-      pg.set_message(format!("[{}] {}", &id, &status));
     }
+    if let Some(output) = output {
+      output.emit(image_output_record(
+        resource,
+        &image,
+        node,
+        None,
+        Some("downloaded"),
+        None,
+      ))?;
+    }
+    Ok(())
   }
-  Ok(())
+  .await;
+  clear_layers(progress, &mut layers, None);
+  result
 }
 
 /// Generate a docker client from the docker host
