@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nanocl state stats` to show CPU and memory usage, network and block I/O,
   and PID counts for Statefile cargoes, VMs, and jobs, including recursive
   SubStates, streaming by default or using `--no-stream` for a single snapshot.
+- `nanocl state stop` to stop Statefile cargoes, VMs, and jobs, including
+  recursive SubStates, with the same per-item progress and summaries as
+  apply/remove and `--json` NDJSON output requiring `--yes`.
 - Shell completion for Bash, Zsh, Fish, PowerShell, and Elvish, including
   commands, options, local paths, contexts, and live daemon objects.
 

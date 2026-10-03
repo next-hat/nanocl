@@ -7,7 +7,7 @@ sidebar_position: 73
 
 # NAME
 
-state - Preview, Apply, Monitor or Remove a Statefile
+state - Preview, Apply, Monitor, Stop or Remove a Statefile
 
 ## SYNOPSIS
 
@@ -15,7 +15,7 @@ state - Preview, Apply, Monitor or Remove a Statefile
 
 ## DESCRIPTION
 
-Preview, Apply, Monitor or Remove a Statefile
+Preview, Apply, Monitor, Stop or Remove a Statefile
 
 ## OPTIONS
 
@@ -38,6 +38,9 @@ Show running instances, health, and recent failures from a Statefile
 
 state-stats(1)\
 Show process statistics for workloads from a Statefile
+
+state-stop(1)\
+Stop cargoes, VMs, and jobs from a Statefile
 
 state-render(1)  
 Render a Statefile with args to an output file

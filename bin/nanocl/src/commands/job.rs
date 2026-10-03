@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
-  GenericCommandStart,
+  GenericCommandStart, GenericCommandStop,
 };
 
 impl GenericCommand for JobArg {
@@ -40,6 +40,8 @@ impl GenericCommandLs for JobArg {
 impl GenericCommandRm<GenericDefaultOpts, String> for JobArg {}
 
 impl GenericCommandStart for JobArg {}
+
+impl GenericCommandStop for JobArg {}
 
 impl GenericCommandInspect for JobArg {
   type ApiItem = JobInspect;

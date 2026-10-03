@@ -151,6 +151,23 @@ pub struct StateRemoveOpts {
   pub args: Vec<String>,
 }
 
+/// `nanocl state stop` available options
+#[derive(Parser)]
+pub struct StateStopOpts {
+  /// Path or URL to the Statefile
+  #[clap(long, short = 's')]
+  pub source: Option<String>,
+  /// Skip the confirmation prompt
+  #[clap(long = "yes", short = 'y')]
+  pub skip_confirm: bool,
+  /// Stream newline-delimited JSON to stdout (requires --yes)
+  #[clap(long, requires = "skip_confirm")]
+  pub json: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 #[derive(Parser)]
 pub struct StateManOpts {
   /// Path or URL to the statefile
@@ -171,6 +188,8 @@ pub enum StateCommand {
   Status(StateStatusOpts),
   /// Show process resource usage from a Statefile
   Stats(StateStatsOpts),
+  /// Stop cargoes, VMs, and jobs from a Statefile
+  Stop(StateStopOpts),
   /// Render a Statefile with args to an output file
   Render(StateRenderOpts),
   /// Logs elements from a Statefile
@@ -229,6 +248,42 @@ where
 mod tests {
   use crate::models::{Cli, Command, StateCommand};
   use clap::Parser;
+
+  #[test]
+  fn state_stop_accepts_source_confirmation_and_template_arguments() {
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "state",
+      "stop",
+      "-ys",
+      "deploy.yml",
+      "--",
+      "--name",
+      "example",
+    ])
+    .unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Stop(opts) = state.command else {
+      panic!("expected stop")
+    };
+    assert_eq!(opts.source.as_deref(), Some("deploy.yml"));
+    assert!(opts.skip_confirm);
+    assert!(!opts.json);
+    assert_eq!(opts.args, ["--name", "example"]);
+
+    let cli = Cli::try_parse_from(["nanocl", "state", "stop"]).unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state")
+    };
+    let StateCommand::Stop(opts) = state.command else {
+      panic!("expected stop")
+    };
+    assert!(opts.source.is_none());
+    assert!(!opts.skip_confirm && !opts.json);
+    assert!(opts.args.is_empty());
+  }
 
   #[test]
   fn state_stats_accepts_source_snapshot_and_template_arguments() {
@@ -365,7 +420,7 @@ mod tests {
 
   #[test]
   fn state_json_flags_require_yes_and_reject_follow() {
-    for command in ["apply", "remove", "rm"] {
+    for command in ["apply", "remove", "rm", "stop"] {
       let cli =
         Cli::try_parse_from(["nanocl", "state", command, "--json", "-y"])
           .unwrap();
@@ -375,7 +430,8 @@ mod tests {
       match state.command {
         StateCommand::Apply(opts) => assert!(opts.json && opts.skip_confirm),
         StateCommand::Remove(opts) => assert!(opts.json && opts.skip_confirm),
-        _ => panic!("expected apply or remove"),
+        StateCommand::Stop(opts) => assert!(opts.json && opts.skip_confirm),
+        _ => panic!("expected apply, remove, or stop"),
       }
       assert!(
         Cli::try_parse_from(["nanocl", "state", command, "--json"]).is_err()

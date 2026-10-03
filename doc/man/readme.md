@@ -78,6 +78,7 @@ With `scripts/generate_man.sh` script.
 * [Nanocl state man](./nanocl-state-man.md)
 * [Nanocl state remove](./nanocl-state-remove.md)
 * [Nanocl state render](./nanocl-state-render.md)
+* [Nanocl state stop](./nanocl-state-stop.md)
 * [Nanocl state](./nanocl-state.md)
 * [Nanocl stats](./nanocl-stats.md)
 * [Nanocl uninstall](./nanocl-uninstall.md)
