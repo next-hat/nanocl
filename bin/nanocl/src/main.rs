@@ -110,6 +110,7 @@ fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
   let (operation, source) = match &args.command {
     StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
     StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
+    StateCommand::Start(opts) if opts.json => ("start", &opts.source),
     StateCommand::Stop(opts) if opts.json => ("stop", &opts.source),
     _ => return None,
   };
@@ -242,11 +243,12 @@ mod tests {
   use super::*;
 
   #[test]
-  fn json_state_output_selects_apply_remove_and_stop() {
+  fn json_state_output_selects_apply_remove_start_and_stop() {
     for (command, operation) in [
       ("apply", "apply"),
       ("remove", "remove"),
       ("rm", "remove"),
+      ("start", "start"),
       ("stop", "stop"),
     ] {
       let args = Cli::try_parse_from([
@@ -266,6 +268,7 @@ mod tests {
     for args in [
       vec!["nanocl", "state", "apply", "-y"],
       vec!["nanocl", "state", "rm", "-y"],
+      vec!["nanocl", "state", "start", "-y"],
       vec!["nanocl", "state", "stop", "-y"],
       vec!["nanocl", "version"],
       vec!["nanocl", "state", "diff", "--json"],

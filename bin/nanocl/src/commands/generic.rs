@@ -289,6 +289,99 @@ pub trait GenericCommandStart: GenericCommand {
     }
     Ok(())
   }
+
+  async fn exec_start_with_progress(
+    client: &NanocldClient,
+    opts: &GenericStartOpts,
+    progress: Option<(&MultiProgress, &ProgressBar)>,
+    output: Option<&StateOutput>,
+  ) -> IoResult<usize> {
+    let object_name = Self::object_name();
+    let process_kind = utils::process::get_actor_kind(object_name);
+    let kind = process_kind.to_string().to_lowercase();
+    let mut failures = 0;
+    for key in &opts.keys {
+      let pg = match progress {
+        Some((display, summary)) => {
+          let token = format!("{kind}/{key}");
+          let pg = utils::progress::create_state_item(
+            display, summary, &token, output,
+          )?;
+          utils::progress::set_state_message(&pg, summary, "Starting", output)?;
+          pg
+        }
+        None => {
+          let token = format!("{object_name}/{key}");
+          let style = utils::progress::create_spinner_style(&token, "cyan");
+          utils::progress::create_progress("(starting)", &style)
+        }
+      };
+      let finish =
+        |status: &str, failed, error: Option<&str>| -> IoResult<()> {
+          if let Some((_, summary)) = progress {
+            utils::progress::finish_state_item(
+              &pg, summary, status, failed, error, output,
+            )?;
+          } else {
+            pg.finish_with_message(format!("({})", status.to_lowercase()));
+          }
+          Ok(())
+        };
+      let status = match utils::process::get_process_status(
+        object_name,
+        key,
+        client,
+      )
+      .await
+      {
+        Ok(status) => status,
+        Err(err) => {
+          finish("Failed", true, Some(&err.to_string()))?;
+          return Err(err);
+        }
+      };
+      if status.actual == ObjPsStatusKind::Start {
+        finish("Unchanged", false, None)?;
+        continue;
+      }
+      let waiter = match utils::process::wait_process_state(
+        key,
+        process_kind.clone(),
+        vec![NativeEventAction::Start],
+        client,
+      )
+      .await
+      {
+        Ok(waiter) => waiter,
+        Err(err) => {
+          finish("Failed", true, Some(&err.to_string()))?;
+          return Err(err);
+        }
+      };
+      if let Err(err) = client.start_process(&kind, key).await {
+        failures += 1;
+        finish("Failed", true, Some(&err.to_string()))?;
+        if let Some((display, _)) = progress {
+          display.suspend(|| eprintln!("{key}: {err}"));
+        } else {
+          eprintln!("{key}: {err}");
+        }
+        continue;
+      }
+      let result = waiter
+        .await
+        .map_err(|err| {
+          IoError::interrupted("wait_process_state", &err.to_string())
+        })
+        .and_then(|result| result);
+      if let Err(err) = result {
+        finish("Failed", true, Some(&err.to_string()))?;
+        return Err(err);
+      }
+      finish("Started", false, None)?;
+    }
+    Ok(failures)
+  }
 }
 
 pub trait GenericCommandStop: GenericCommand {

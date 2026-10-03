@@ -34,6 +34,7 @@ mod logs;
 mod man;
 mod remove;
 mod render;
+mod start;
 mod stats;
 mod status;
 mod stop;
@@ -152,6 +153,7 @@ pub enum ArgParseMode {
   Diff,
   Status,
   Stats,
+  Start,
   Stop,
   Remove,
   Logs,
@@ -164,6 +166,7 @@ impl std::fmt::Display for ArgParseMode {
       ArgParseMode::Diff => "diff",
       ArgParseMode::Status => "status",
       ArgParseMode::Stats => "stats",
+      ArgParseMode::Start => "start",
       ArgParseMode::Stop => "stop",
       ArgParseMode::Remove => "remove",
       ArgParseMode::Logs => "logs",
@@ -669,6 +672,7 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
       status::exec_state_status(cli_conf, opts).await
     }
     StateCommand::Stats(opts) => stats::exec_state_stats(cli_conf, opts).await,
+    StateCommand::Start(opts) => start::exec_state_start(cli_conf, opts).await,
     StateCommand::Stop(opts) => stop::exec_state_stop(cli_conf, opts).await,
     StateCommand::Render(opts) => exec_state_render(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
@@ -689,6 +693,7 @@ mod tests {
     for mode in [
       ArgParseMode::Apply,
       ArgParseMode::Remove,
+      ArgParseMode::Start,
       ArgParseMode::Stop,
     ] {
       let error = parse_build_args(&state, mode, &["--unknown".into()], true)
