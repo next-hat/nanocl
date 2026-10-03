@@ -22,7 +22,7 @@ jobs:
 
     steps:
       # Clone project
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions-rust-lang/setup-rust-toolchain@v2
       # Install buildx
       - name: Set up Docker Buildx
