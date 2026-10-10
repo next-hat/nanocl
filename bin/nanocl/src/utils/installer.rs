@@ -6,7 +6,7 @@ use crate::version::{CHANNEL, VERSION};
 
 /// Get template from our GitHub repo for installation
 async fn get() -> HttpClientResult<String> {
-  let client = ntex::client::Client::new().await;
+  let client = ntex::client::Client::new();
   let url = format!(
     "https://raw.githubusercontent.com/next-hat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml"
   );

@@ -24,9 +24,9 @@ use crate::{
     (status = 404, description = "Resource is not existing", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/resources/{name}/histories")]
 pub async fn list_resource_history(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let filter =

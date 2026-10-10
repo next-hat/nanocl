@@ -18,16 +18,16 @@ use crate::{models::SystemState, utils};
     (status = 202, description = "Process instances stopped"),
   ),
 ))]
-#[web::post("/processes/{kind}/{key}/stop")]
 pub async fn stop_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   utils::container::generic::emit_stopping(&key, &kind, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }
 
 /// Stop a single process by its name or id
@@ -42,9 +42,9 @@ pub async fn stop_processes(
     (status = 202, description = "Process stopped"),
   ),
 ))]
-#[web::post("/processes/{name}/stop")]
 pub async fn stop_process(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
@@ -53,5 +53,5 @@ pub async fn stop_process(
     .docker_api
     .stop_container(&name, None::<StopContainerOptions>)
     .await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }

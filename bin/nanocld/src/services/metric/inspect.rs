@@ -20,9 +20,9 @@ use crate::{
     (status = 404, description = "Metric not found", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/metrics/{key}/inspect")]
 pub async fn inspect_metric(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let metric = MetricDb::read_by_pk(&path.1, &state.inner.pool).await?;

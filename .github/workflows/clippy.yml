@@ -48,7 +48,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.96.0
+          toolchain: 1.99.0
           components: rustfmt
           override: true
       - uses: actions-rs/cargo@v1

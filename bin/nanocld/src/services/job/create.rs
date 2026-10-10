@@ -19,9 +19,9 @@ use crate::{
     (status = 409, description = "Job already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/jobs")]
 pub async fn create_job(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   _version: web::types::Path<String>,
   payload: web::types::Json<JobPartial>,
 ) -> HttpResult<web::HttpResponse> {

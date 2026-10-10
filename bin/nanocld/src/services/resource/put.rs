@@ -23,9 +23,9 @@ use crate::{
     (status = 404, description = "Resource does not exit", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::put("/resources/{name}")]
 pub async fn put_resource(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceUpdate>,
 ) -> HttpResult<web::HttpResponse> {

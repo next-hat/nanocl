@@ -18,9 +18,9 @@ use crate::models::SystemState;
     (status = 200, description = "Process killed"),
   ),
 ))]
-#[web::post("/processes/{name}/kill")]
 pub async fn kill_process(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ProcessKillOptions>,
 ) -> HttpResult<web::HttpResponse> {
@@ -30,5 +30,5 @@ pub async fn kill_process(
     .docker_api
     .kill_container(&name, Some(payload.into_inner().into()))
     .await?;
-  Ok(web::HttpResponse::Ok().finish())
+  Ok(web::HttpResponse::Ok().build())
 }

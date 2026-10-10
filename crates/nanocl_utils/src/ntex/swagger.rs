@@ -25,10 +25,11 @@ impl<'a> SwaggerConfig<'a> {
   }
 }
 
-#[web::get("/swagger.json")]
-async fn get_specs(
-  openapi_conf: web::types::State<SwaggerConfig<'static>>,
-) -> HttpResult<web::HttpResponse> {
+async fn get_specs(req: web::HttpRequest) -> HttpResult<web::HttpResponse> {
+  let openapi_conf =
+    req.app_state::<SwaggerConfig<'static>>().ok_or_else(|| {
+      HttpError::internal_server_error("Swagger is not configured")
+    })?;
   let spec = openapi_conf.definition.to_json().map_err(|err| {
     HttpError::internal_server_error(format!(
       "Error generating OpenAPI spec: {err}",
@@ -41,11 +42,14 @@ async fn get_specs(
   )
 }
 
-#[web::get("/{tail}*")]
 async fn get_swagger(
   tail: web::types::Path<String>,
-  openapi_conf: web::types::State<SwaggerConfig<'static>>,
+  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
+  let openapi_conf =
+    req.app_state::<SwaggerConfig<'static>>().ok_or_else(|| {
+      HttpError::internal_server_error("Swagger is not configured")
+    })?;
   match utoipa_swagger_ui::serve(&tail, openapi_conf.config.clone())
     .map_err(|err| HttpError::internal_server_error(err.to_string()))?
   {
@@ -59,7 +63,9 @@ async fn get_swagger(
   }
 }
 
-pub fn register(config: &mut web::ServiceConfig) {
-  config.service(get_specs);
-  config.service(get_swagger);
+pub fn register<St: web::State<Error = web::DefaultError>>(
+  config: &mut web::ServiceConfig<St>,
+) {
+  config.route("/swagger.json", web::get().to(get_specs));
+  config.route("/{tail}*", web::get().to(get_swagger));
 }

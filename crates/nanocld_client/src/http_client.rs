@@ -103,27 +103,22 @@ impl NanocldClient {
   }
 
   async fn gen_client(&self) -> IoResult<ntex::client::Client> {
-    let client = ntex::client::Client::builder()
-      .response_payload_timeout(Millis::from_secs(20))
-      .response_timeout(Millis::from_secs(20));
+    let cfg = ntex::SharedCfg::new("nanocld-client").add(
+      ntex::client::ClientConfig::new()
+        .set_response_payload_timeout(Millis::from_secs(20))
+        .set_response_timeout(Millis::from_secs(20)),
+    );
+    let client = ntex::client::Client::builder();
     #[cfg(not(target_os = "windows"))]
     let client = if let Some(unix_socket) = &self.unix_socket {
-      use ntex::ServiceFactory;
       let unix_socket = unix_socket.clone();
-      client.connector::<&str>(
-        ntex::client::Connector::default().connector(
-          ntex::service::fn_service(move |_| {
-            let unix_socket = unix_socket.clone();
-            async {
-              Ok(
-                rt::unix_connect(unix_socket, ntex::SharedCfg::default())
-                  .await?,
-              )
-            }
-          })
-          .map_init_err(|_| unreachable!()),
-        ),
-      )
+      client.connector(async move |cfg: &ntex::SharedCfg, _| {
+        Ok(
+          rt::unix_connect(&unix_socket, cfg.clone())
+            .await
+            .map_err(ntex::connect::ConnectError::from)?,
+        )
+      })
     } else {
       client
     };
@@ -172,27 +167,17 @@ impl NanocldClient {
       builder.set_private_key(&cert_key).map_err(|err| {
         IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
       })?;
-      ntex::client::Client::builder().connector::<&str>(
-        ntex::client::Connector::default().openssl(builder.build()),
-      )
+      client.openssl(builder.build())
     } else {
       client
     };
 
-    client
-      .build(ntex::SharedCfg::default())
-      .await
-      .map_err(|err| {
-        IoError::invalid_data(
-          "Unable to build http client",
-          err.to_string().as_str(),
-        )
-      })
+    Ok(client.build(cfg))
   }
 
   fn send_error(
     &self,
-    err: ntex::client::error::ClientError,
+    err: ntex::error::Error<ntex::client::error::ClientError>,
   ) -> HttpClientError {
     let url = if let Some(url) = &self.unix_socket {
       url
@@ -276,9 +261,7 @@ impl NanocldClient {
   {
     let mut req = self.get(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -315,9 +298,7 @@ impl NanocldClient {
   {
     let mut req = self.post(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,
@@ -344,9 +325,7 @@ impl NanocldClient {
   {
     let mut req = self.post(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req
       .send_stream(stream)
@@ -367,9 +346,7 @@ impl NanocldClient {
   {
     let mut req = self.delete(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -389,9 +366,7 @@ impl NanocldClient {
   {
     let mut req = self.patch(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,
@@ -415,9 +390,7 @@ impl NanocldClient {
   {
     let mut req = self.head(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -437,9 +410,7 @@ impl NanocldClient {
   {
     let mut req = self.put(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,

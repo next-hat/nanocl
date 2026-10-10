@@ -20,9 +20,9 @@ use crate::{
     (status = 404, description = "Resource doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/resources/{name}/inspect")]
 pub async fn inspect_resource(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let resource =

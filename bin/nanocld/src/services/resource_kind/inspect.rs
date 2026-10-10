@@ -19,9 +19,9 @@ use crate::models::{ResourceKindDb, SpecDb, SystemState};
     (status = 404, description = "Resource kind doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/resource/kinds/{domain}/{name}/inspect")]
 pub async fn inspect_resource_kind(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key: String = format!("{}/{}", path.1, path.2);
@@ -44,9 +44,9 @@ pub async fn inspect_resource_kind(
     (status = 404, description = "Resource kind doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/resource/kinds/{domain}/{name}/version/{version}/inspect")]
 pub async fn inspect_resource_kind_version(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);

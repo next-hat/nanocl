@@ -19,9 +19,9 @@ use crate::{
     (status = 200, description = "Detailed information about the event", body = nanocl_stubs::system::Event),
   ),
 ))]
-#[web::get("/events/{key}/inspect")]
 pub async fn inspect_event(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let event = EventDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;

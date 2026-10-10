@@ -27,9 +27,9 @@ use crate::{
     (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
   ),
 ))]
-#[web::get("/processes/{name}/logs")]
-async fn logs_process(
-  state: web::types::State<SystemState>,
+pub async fn logs_process(
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -83,9 +83,9 @@ async fn logs_process(
     (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
   ),
 ))]
-#[web::get("/processes/{kind}/{key}/logs")]
-async fn logs_processes(
-  state: web::types::State<SystemState>,
+pub async fn logs_processes(
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {

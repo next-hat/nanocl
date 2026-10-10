@@ -26,9 +26,9 @@ use crate::{
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::put("/cargoes/{key}")]
 pub async fn put_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpec>,
 ) -> HttpResult<web::HttpResponse> {

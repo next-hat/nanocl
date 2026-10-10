@@ -21,9 +21,9 @@ use crate::{
     (status = 404, description = "Resource kind doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/resource/kinds/{domain}/{name}")]
 pub async fn delete_resource_kind(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);

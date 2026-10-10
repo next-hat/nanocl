@@ -30,9 +30,9 @@ fn is_cargo_history_for(stored: &SpecDb, cargo_key: &str) -> bool {
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/cargoes/{cargo_key}/histories/{history_key}/revert")]
 pub async fn revert_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
   let cargo_key = utils::key::parse_resource_key(&path.1)?;

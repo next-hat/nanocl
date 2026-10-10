@@ -20,11 +20,11 @@ use crate::{
     (status = 404, description = "Job does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/jobs/{name}")]
 pub async fn delete_job(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   JobDb::del_obj_by_pk(&path.1, &(), &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }

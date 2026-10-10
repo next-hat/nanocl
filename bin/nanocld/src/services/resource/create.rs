@@ -19,9 +19,9 @@ use crate::{
     (status = 409, description = "Resource already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/resources")]
 pub async fn create_resource(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   payload: web::types::Json<ResourcePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let resource = ResourceDb::create_obj(&payload, &state).await?;

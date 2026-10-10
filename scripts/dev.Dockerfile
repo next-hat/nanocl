@@ -1,5 +1,5 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.96.0-alpine3.23
+FROM --platform=$BUILDPLATFORM rust:1.99.0-alpine3.23
 
 ENV TZ=UTC
 

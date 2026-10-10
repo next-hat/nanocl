@@ -111,9 +111,9 @@ async fn enqueue_cargo_restart(
     (status = 202, description = "Process instances restarted"),
   ),
 ))]
-#[web::post("/processes/{kind}/{key}/restart")]
 pub async fn restart_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
@@ -124,7 +124,7 @@ pub async fn restart_processes(
   } else {
     utils::container::process::restart_instances(&key, &kind, &state).await?;
   }
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }
 
 /// Restart a single process by its name or id
@@ -139,9 +139,9 @@ pub async fn restart_processes(
     (status = 202, description = "Process restarted"),
   ),
 ))]
-#[web::post("/processes/{name}/restart")]
 pub async fn restart_process(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
@@ -150,5 +150,5 @@ pub async fn restart_process(
     .docker_api
     .restart_container(&name, None)
     .await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }

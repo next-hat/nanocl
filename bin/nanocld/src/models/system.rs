@@ -31,3 +31,7 @@ pub struct SystemStateInner {
 pub struct SystemState {
   pub inner: Arc<SystemStateInner>,
 }
+
+impl ntex::web::State for SystemState {
+  type Error = ntex::web::DefaultError;
+}

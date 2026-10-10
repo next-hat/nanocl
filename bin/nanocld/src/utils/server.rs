@@ -16,22 +16,20 @@ pub async fn generate(
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("server::gen: start");
   let daemon_state_ptr = daemon_state.clone();
-  let mut server = web::HttpServer::new(async move || {
-    web::App::new()
-      // bind config state
-      .state(daemon_state_ptr.clone())
-      .state(
-        web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
-      )
-      .state(web::types::JsonConfig::default().limit(20_000_000_000)) // <- limit size of the json payload
-      .middleware(Cors::new().finish())
-      .middleware(middlewares::Versioning::new(vars::VERSION).finish())
-      .middleware(middlewares::SerializeError)
-      // Default logger middleware
-      .middleware(web::middleware::Logger::default())
-      .configure(services::ntex_config)
-      .default_service(web::route().to(services::unhandled))
-  });
+  let mut server = web::server_with_config(
+    async move || Ok::<_, std::io::Error>(daemon_state_ptr.clone()),
+    async |_| {
+      web::App::<SystemState>::new()
+        .with_config(services::app_config())
+        // ntex 4 runs middleware in registration order.
+        .middleware(web::middleware::Logger::default())
+        .middleware(middlewares::SerializeError)
+        .middleware(middlewares::Versioning::new(vars::VERSION).finish())
+        .middleware(Cors::new().build())
+        .configure(services::ntex_config)
+        .default_service(web::route().to(services::unhandled))
+    },
+  );
   let config = daemon_state.inner.config.clone();
   let mut count = 0;
   let hosts = config.hosts.clone();
@@ -40,7 +38,7 @@ pub async fn generate(
     let host = &hosts[count];
     if host.starts_with("unix://") {
       let addr = host.replace("unix://", "");
-      server = match server.bind_uds(&addr) {
+      server = match server.bind_uds(&addr, ntex::SharedCfg::default()) {
         Err(err) => {
           log::error!("server::gen: {addr}: {err}");
           return Err(err);
@@ -54,20 +52,24 @@ pub async fn generate(
         let cert = ssl.cert.clone().unwrap();
         let cert_key = ssl.cert_key.clone().unwrap();
         let cert_ca = ssl.cert_ca.clone().unwrap();
-        server = match server.bind_openssl(&addr, {
-          let mut builder =
-            SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-          builder
-            .set_private_key_file(cert_key, SslFiletype::PEM)
-            .unwrap();
-          builder.set_certificate_chain_file(cert).unwrap();
-          builder.set_ca_file(cert_ca).expect("Failed to set ca file");
-          builder.check_private_key().unwrap();
-          builder.set_verify(
-            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
-          );
-          builder
-        }) {
+        server = match server.bind_openssl(
+          &addr,
+          {
+            let mut builder =
+              SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+            builder
+              .set_private_key_file(cert_key, SslFiletype::PEM)
+              .unwrap();
+            builder.set_certificate_chain_file(cert).unwrap();
+            builder.set_ca_file(cert_ca).expect("Failed to set ca file");
+            builder.check_private_key().unwrap();
+            builder.set_verify(
+              SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+            );
+            builder
+          },
+          ntex::SharedCfg::default(),
+        ) {
           Err(err) => {
             log::error!("server::gen: {addr}: {err}");
             return Err(err);
@@ -75,7 +77,7 @@ pub async fn generate(
           Ok(server) => server,
         };
       } else {
-        server = match server.bind(&addr) {
+        server = match server.bind(&addr, ntex::SharedCfg::default()) {
           Err(err) => {
             log::error!("server::gen: {addr}: {err}");
             return Err(err);
@@ -97,7 +99,7 @@ pub async fn generate(
   }
   #[cfg(feature = "dev")]
   {
-    server = server.bind("0.0.0.0:8585")?;
+    server = server.bind("0.0.0.0:8585", ntex::SharedCfg::default())?;
     log::debug!("server::gen: dev mode http://0.0.0.0:8585");
     log::debug!(
       "server::gen: swagger available at http://0.0.0.0:8585/explorer/"
@@ -116,7 +118,7 @@ mod tests {
 
   use clap::Parser;
   use nanocl_stubs::system::BinaryInfo;
-  use ntex::{client::Connector, http::StatusCode};
+  use ntex::http::StatusCode;
   use openssl::ssl::SslConnector;
 
   use super::*;
@@ -217,10 +219,8 @@ mod tests {
       .set_private_key_file("../../tests/client.key", SslFiletype::PEM)
       .unwrap();
     let client = ntex::client::Client::builder()
-      .connector::<&str>(Connector::default().openssl(builder.build()))
-      .build(ntex::SharedCfg::default())
-      .await
-      .unwrap();
+      .openssl(builder.build())
+      .build(ntex::SharedCfg::default());
     let res = client
       .get("https://0.0.0.0:6443/v0.16/version")
       .timeout(Duration::from_secs(10))
@@ -250,10 +250,8 @@ mod tests {
     let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
     builder.set_verify(SslVerifyMode::NONE);
     let client = ntex::client::Client::builder()
-      .connector::<&str>(Connector::default().openssl(builder.build()))
-      .build(ntex::SharedCfg::default())
-      .await
-      .unwrap();
+      .openssl(builder.build())
+      .build(ntex::SharedCfg::default());
     let res = client
       .get("https://0.0.0.0:4443/v0.16/version")
       .send()

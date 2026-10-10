@@ -23,9 +23,9 @@ use crate::{
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/cargoes/{key}")]
 pub async fn patch_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecPatch>,
 ) -> HttpResult<web::HttpResponse> {

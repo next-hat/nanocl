@@ -350,9 +350,10 @@ mod tests {
   }
 
   async fn record_create(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     let body = body.into_inner();
     recorder.record("POST", body.clone());
     web::HttpResponse::Created().json(&json!({
@@ -371,19 +372,21 @@ mod tests {
   }
 
   async fn record_put(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     recorder.record("PUT", body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   async fn record_patch(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     recorder.record("PATCH", body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   async fn serve_history() -> web::HttpResponse {
@@ -395,9 +398,11 @@ mod tests {
   -> (NanocldClient, RequestRecorder, web::test::TestServer) {
     let recorder = RequestRecorder::default();
     let server_recorder = recorder.clone();
-    let server = web::test::server(async move || {
+    let server = web::test::server(async move |_| {
       web::App::new()
-        .state(server_recorder.clone())
+        .with_config(
+          web::WebAppConfig::new().set_state(server_recorder.clone()),
+        )
         .service(
           web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/cargoes"))
             .route(web::post().to(record_create)),
@@ -413,8 +418,7 @@ mod tests {
           ))
           .route(web::get().to(serve_history)),
         )
-    })
-    .await;
+    });
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: format!("http://localhost:{}", server.addr().port()),
       ..Default::default()

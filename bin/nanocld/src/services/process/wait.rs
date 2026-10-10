@@ -26,9 +26,9 @@ use crate::{
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/processes/{kind}/{key}/wait")]
 pub async fn wait_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessWaitQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -98,9 +98,9 @@ pub async fn wait_processes(
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/processes/{name}/wait")]
 pub async fn wait_process(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<ProcessWaitQuery>,
 ) -> HttpResult<web::HttpResponse> {

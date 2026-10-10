@@ -2,17 +2,16 @@ use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
 use futures::{StreamExt, future::ready};
 use ntex::{
-  Service, chain,
+  Service,
   channel::{mpsc, oneshot},
   fn_service, rt,
-  service::{fn_factory_with_config, fn_shutdown, map_config},
   util::Bytes,
   web, ws,
 };
 use tokio::io::AsyncWriteExt;
 
 use bollard_next::container::AttachContainerOptions;
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::process::OutputLog;
 
 use crate::{
@@ -20,74 +19,16 @@ use crate::{
   utils,
 };
 
-async fn ws_attach_service(
-  (name, sink, state): (String, ws::WsSink, web::types::State<SystemState>),
-) -> Result<
-  impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
-  web::Error,
-> {
-  // start heartbeat task
+fn ws_attach_service(
+  name: String,
+  state: SystemState,
+) -> impl Service<ws::WsSink, ws::Frame, Res = Option<ws::Message>, Error = io::Error>
+{
   let con_state = Rc::new(RefCell::new(WsConState::new()));
+  let heartbeat_state = con_state.clone();
   let (tx, rx) = oneshot::channel();
-  rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
-  let (s_cmd, mut r_cmd) = mpsc::channel::<Result<Bytes, web::Error>>();
-  let stream = state
-    .inner
-    .docker_api
-    .attach_container(
-      &name,
-      Some(AttachContainerOptions::<String> {
-        stdin: Some(true),
-        stdout: Some(true),
-        stderr: Some(true),
-        stream: Some(true),
-        logs: Some(false),
-        detach_keys: Some("ctrl-c".to_owned()),
-      }),
-    )
-    .await
-    .map_err(HttpError::internal_server_error)?;
-  rt::spawn(async move {
-    let mut output = stream.output;
-    while let Some(output) = output.next().await {
-      let output = match output {
-        Ok(output) => output,
-        Err(e) => {
-          log::error!("Error reading output from process: {e}");
-          break;
-        }
-      };
-      let output_log: OutputLog = output.into();
-      let output = serde_json::to_vec(&output_log);
-      let mut output = match output {
-        Ok(output) => output,
-        Err(e) => {
-          log::error!("Error serializing output: {e}");
-          break;
-        }
-      };
-      output.push(b'\n');
-      let msg = ws::Message::Binary(Bytes::from(output));
-      if sink.send(msg).await.is_err() {
-        break;
-      }
-    }
-  });
-  rt::spawn(async move {
-    let mut stdin = stream.input;
-    while let Some(cmd) = r_cmd.next().await {
-      let cmd = match cmd {
-        Ok(cmd) => cmd,
-        Err(e) => {
-          log::error!("Error input for process: {e}");
-          break;
-        }
-      };
-      if stdin.write_all(&cmd).await.is_err() {
-        break;
-      }
-    }
-  });
+  let (s_cmd, r_cmd) = mpsc::channel::<Result<Bytes, io::Error>>();
+  let startup = Rc::new(RefCell::new(Some((name, rx, r_cmd))));
   // handler service for incoming websocket frames
   let service = fn_service(move |frame| {
     let item = match frame {
@@ -110,12 +51,79 @@ async fn ws_attach_service(
     };
     ready(Ok(item))
   });
-  // handler service for shutdown notification that stop heartbeat task
-  let on_shutdown = fn_shutdown(async move || {
-    let _ = tx.send(());
-  });
-  // pipe our service with on_shutdown callback
-  Ok(chain(service).and_then(on_shutdown))
+  ntex::service(service)
+    .readiness(async move |sink: &ws::WsSink| {
+      let startup = startup.borrow_mut().take();
+      if let Some((name, rx, mut r_cmd)) = startup {
+        rt::spawn(utils::ws::heartbeat(
+          heartbeat_state.clone(),
+          sink.clone(),
+          rx,
+        ));
+        let sink = sink.clone();
+        let stream = state
+          .inner
+          .docker_api
+          .attach_container(
+            &name,
+            Some(AttachContainerOptions::<String> {
+              stdin: Some(true),
+              stdout: Some(true),
+              stderr: Some(true),
+              stream: Some(true),
+              logs: Some(false),
+              detach_keys: Some("ctrl-c".to_owned()),
+            }),
+          )
+          .await
+          .map_err(io::Error::other)?;
+        rt::spawn(async move {
+          let mut output = stream.output;
+          while let Some(output) = output.next().await {
+            let output = match output {
+              Ok(output) => output,
+              Err(e) => {
+                log::error!("Error reading output from process: {e}");
+                break;
+              }
+            };
+            let output_log: OutputLog = output.into();
+            let output = serde_json::to_vec(&output_log);
+            let mut output = match output {
+              Ok(output) => output,
+              Err(e) => {
+                log::error!("Error serializing output: {e}");
+                break;
+              }
+            };
+            output.push(b'\n');
+            let msg = ws::Message::Binary(Bytes::from(output));
+            if sink.send(msg).await.is_err() {
+              break;
+            }
+          }
+        });
+        rt::spawn(async move {
+          let mut stdin = stream.input;
+          while let Some(cmd) = r_cmd.next().await {
+            let cmd = match cmd {
+              Ok(cmd) => cmd,
+              Err(e) => {
+                log::error!("Error input for process: {e}");
+                break;
+              }
+            };
+            if stdin.write_all(&cmd).await.is_err() {
+              break;
+            }
+          }
+        });
+      }
+      Ok(())
+    })
+    .shutdown(async move |_| {
+      let _ = tx.send(());
+    })
 }
 
 /// Attach to a process via websocket
@@ -131,18 +139,13 @@ async fn ws_attach_service(
   ),
 ))]
 pub async fn attach_process(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
-) -> Result<web::HttpResponse, web::Error> {
+) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
-  web::ws::start(
-    req,
-    None::<&str>,
-    // inject chat server send to a ws_service factory
-    map_config(fn_factory_with_config(ws_attach_service), move |cfg| {
-      (name.clone(), cfg, state.clone())
-    }),
+  utils::ws::response(
+    web::ws::start(&req, None, ws_attach_service(name, state.clone())).await,
   )
-  .await
 }

@@ -18,9 +18,9 @@ use crate::{models::SystemStateRef, utils};
     (status = 200, description = "The created rule", body = ResourceProxyRule),
   ),
 ))]
-#[web::put("/rules/{name}")]
 pub async fn apply_rule(
-  state: web::types::State<SystemStateRef>,
+  state: &web::AppState<SystemStateRef>,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -42,20 +42,32 @@ pub async fn apply_rule(
     (status = 200, description = "Rule has been deleted"),
   ),
 ))]
-#[web::delete("/rules/{name}")]
 pub async fn remove_rule(
-  state: web::types::State<SystemStateRef>,
+  state: &web::AppState<SystemStateRef>,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::info!("remove_rule: {}", path.1);
   utils::nginx::del_rule(&path.1, &state).await?;
   state.event_emitter.emit_reload().await;
-  Ok(web::HttpResponse::Ok().finish())
+  Ok(web::HttpResponse::Ok().build())
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(apply_rule);
-  config.service(remove_rule);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<web::AppState<crate::models::SystemStateRef>>,
+) {
+  config.service(
+    web::resource("/rules/{name}")
+      .name("apply_rule")
+      .guard(web::guard::Put())
+      .to_with_state(apply_rule),
+  );
+  config.service(
+    web::resource("/rules/{name}")
+      .name("remove_rule")
+      .guard(web::guard::Delete())
+      .to_with_state(remove_rule),
+  );
 }
 
 #[cfg(test)]

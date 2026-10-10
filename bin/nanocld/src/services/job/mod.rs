@@ -12,12 +12,39 @@ pub use delete::*;
 pub use inspect::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_job);
-  config.service(create_job);
-  config.service(delete_job);
-  config.service(inspect_job);
-  config.service(count_job);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/jobs")
+      .name("list_job")
+      .guard(web::guard::Get())
+      .to_with_state(list_job),
+  );
+  config.service(
+    web::resource("/jobs")
+      .name("create_job")
+      .guard(web::guard::Post())
+      .to_with_state(create_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}")
+      .name("delete_job")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}/inspect")
+      .name("inspect_job")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job),
+  );
+  config.service(
+    web::resource("/jobs/count")
+      .name("count_job")
+      .guard(web::guard::Get())
+      .to_with_state(count_job),
+  );
 }
 
 #[cfg(test)]

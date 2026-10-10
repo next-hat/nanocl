@@ -19,9 +19,9 @@ use crate::{
     (status = 200, description = "Job details", body = nanocl_stubs::job::JobInspect),
   ),
 ))]
-#[web::get("/jobs/{name}/inspect")]
 pub async fn inspect_job(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let job = JobDb::inspect_obj_by_pk(&path.1, &state).await?;
