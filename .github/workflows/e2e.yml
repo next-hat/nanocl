@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: ["nightly"]
   workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      runner:
+        description: Host image for the compatibility probe
+        type: string
+        default: ubuntu-24.04
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/nightly' }}
 
 env:
@@ -18,7 +24,9 @@ jobs:
   ubuntu_e2e_test:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    # Keep normal CI stable until the 26.04 migration is validated.
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 90
 
     steps:
       # Clone project
@@ -27,12 +35,21 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v4
+      - name: Runner diagnostics
+        run: |
+          cat /etc/os-release
+          uname -r
+          printf 'Runner image: %s (%s)\n' "$ImageOS" "$ImageVersion"
+          docker version
+          docker buildx version
+          docker compose version
+          ls -ld /run/nanocl /dev/kvm 2>/dev/null || true
       # Set buildx cache
       - name: Cache register
         uses: actions/cache@v6
         with:
           path: ~/buildx-cache
-          key: buildx-cache
+          key: buildx-${{ inputs.runner || 'ubuntu-24.04' }}-e2e-${{ hashFiles('scripts/dev.Dockerfile', 'bin/**/Dockerfile') }}
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
       - name: Install bats
