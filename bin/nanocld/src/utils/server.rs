@@ -16,10 +16,14 @@ pub async fn generate(
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("server::gen: start");
   let daemon_state_ptr = daemon_state.clone();
+  #[cfg(test)]
+  let (ready_tx, ready_rx) = futures::channel::oneshot::channel();
+  #[cfg(test)]
+  let ready_tx = std::sync::Arc::new(std::sync::Mutex::new(Some(ready_tx)));
   let mut server = web::server_with_config(
     async move || Ok::<_, std::io::Error>(daemon_state_ptr.clone()),
-    async |_| {
-      web::App::<SystemState>::new()
+    async move |_| {
+      let app = web::App::<SystemState>::new()
         .with_config(services::app_config())
         // ntex 4 runs middleware in registration order.
         .middleware(web::middleware::Logger::default())
@@ -27,7 +31,21 @@ pub async fn generate(
         .middleware(middlewares::Versioning::new(vars::VERSION).finish())
         .middleware(Cors::new().build())
         .configure(services::ntex_config)
-        .default_service(web::route().to(services::unhandled))
+        .default_service(web::route().to(services::unhandled));
+      #[cfg(not(test))]
+      {
+        app
+      }
+      #[cfg(test)]
+      {
+        // Routing is built during worker startup. ServiceFactory::create is
+        // deferred until an accepted connection, so it cannot signal startup.
+        let app = app.build();
+        if let Some(ready_tx) = ready_tx.lock().unwrap().take() {
+          let _ = ready_tx.send(());
+        }
+        app
+      }
     },
   );
   let config = daemon_state.inner.config.clone();
@@ -107,8 +125,21 @@ pub async fn generate(
   }
   server = server.workers(num_cpus::get());
   server = server.disable_signals();
+  let server = server.run();
+  // Tests wait for a worker to construct the application routing before
+  // starting a TLS handshake; binding the listener alone does not prove this.
+  #[cfg(test)]
+  ntex::time::timeout(std::time::Duration::from_secs(10), ready_rx)
+    .await
+    .map_err(|_| {
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "HTTP server application construction timed out",
+      )
+    })?
+    .map_err(std::io::Error::other)?;
   log::info!("server::gen: ready");
-  Ok(server.run())
+  Ok(server)
 }
 
 /// Server init test

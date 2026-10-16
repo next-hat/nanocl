@@ -448,7 +448,7 @@ impl NanocldClient {
     let (tx, rx) = ntex::channel::mpsc::channel();
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
-      while let Some(item) = stream.next().await {
+      'stream: while let Some(item) = stream.next().await {
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {
@@ -458,26 +458,90 @@ impl NanocldClient {
             break;
           }
         };
-        payload.extend(bytes.to_vec());
-        if bytes.last() != Some(&b'\n') {
-          continue;
-        }
-        let t = match serde_json::from_slice::<R>(&payload) {
-          Ok(t) => t,
-          Err(e) => {
-            let _ = tx.send(Err(HttpError::internal_server_error(format!(
-              "Unable to parse stream: {e}"
-            ))));
-            break;
+        payload.extend_from_slice(&bytes);
+        let mut start = 0;
+        for (end, byte) in payload.iter().enumerate() {
+          if *byte != b'\n' {
+            continue;
           }
-        };
-        payload.clear();
-        if tx.send(Ok(t)).is_err() {
-          break;
+          let t = match serde_json::from_slice::<R>(&payload[start..=end]) {
+            Ok(t) => t,
+            Err(e) => {
+              let _ = tx.send(Err(HttpError::internal_server_error(format!(
+                "Unable to parse stream: {e}"
+              ))));
+              break 'stream;
+            }
+          };
+          start = end + 1;
+          if tx.send(Ok(t)).is_err() {
+            break 'stream;
+          }
         }
+        payload.drain(..start);
       }
       tx.close();
     });
     rx
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::{client::TestResponse, http::Payload};
+  use serde_json::{Value, json};
+
+  use super::*;
+
+  fn response_with_chunks(
+    chunks: &[&'static [u8]],
+  ) -> ntex::client::ClientResponse {
+    let chunks: Vec<_> = chunks
+      .iter()
+      .map(|chunk| Ok(Bytes::from_static(chunk)))
+      .collect();
+    let res = TestResponse::builder().build();
+    res.set_payload(Payload::from_stream(futures::stream::iter(chunks)));
+    res
+  }
+
+  #[ntex::test]
+  async fn res_stream_decodes_coalesced_records() {
+    let res = response_with_chunks(&[b"{\"value\":1}\n{\"value\":2}\n"]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 2}));
+    assert!(stream.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn res_stream_retains_fragmented_records_and_partial_suffix() {
+    let res = response_with_chunks(&[
+      b"{\"value\":",
+      b"1}\n{\"value\":2}\n{\"value\":",
+      b"3}\n{\"value\":4",
+    ]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    for value in 1..=3 {
+      assert_eq!(
+        stream.next().await.unwrap().unwrap(),
+        json!({"value": value})
+      );
+    }
+    assert!(stream.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn res_stream_stops_after_malformed_record() {
+    let res =
+      response_with_chunks(&[b"{\"value\":1}\ninvalid\n{\"value\":2}\n"]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
+    let error = stream.next().await.unwrap().unwrap_err();
+    assert!(error.to_string().contains("Unable to parse stream:"));
+    assert!(stream.next().await.is_none());
   }
 }
