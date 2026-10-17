@@ -32,7 +32,7 @@ It gives developers a frictionless **local to production** workflow while hiding
 
 > You could rebuild a K8s inside Nanocl… but you probably won't want to.
 
-Built in 🦀 **Rust** for efficiency & security, Nanocl targets **platform engineers** who need strong isolation, predictable performance, and simpler operations—without the cognitive overhead of a full Kubernetes distribution.
+Built in 🦀 **Rust** for efficiency & security, Nanocl targets **platform engineers** who need strong isolation, predictable performance, and simpler operations without the cognitive overhead of a full Kubernetes distribution.
 
 ## Table of Contents
 
@@ -54,13 +54,13 @@ Built in 🦀 **Rust** for efficiency & security, Nanocl targets **platform engi
 
 ## Why Nanocl
 
-Modern teams need faster iteration loops, secure multi‑tenant isolation, and a production‑grade transition path—without operating a heavyweight control plane on day one. Nanocl focuses on:
+Modern teams need faster iteration loops, secure multi‑tenant isolation, and a production‑grade transition path without operating a heavyweight control plane on day one. Nanocl focuses on:
 
 - Dev→Prod symmetry: declarative Statefiles (YAML/TOML/JSON) stay identical across environments.
 - Low operational overhead: minimal moving parts; opinionated defaults.
 - Security & efficiency: memory‑safe implementation, reduced footprint versus scripting stacks.
 - Extensibility: resources & rules let you model networking, routes, TLS, jobs, and more.
-- Pragmatic scope: not a Kubernetes clone—lean where K8s is heavy, expressive where docker‑compose is limiting.
+- Pragmatic scope: not a Kubernetes clone lean where K8s is heavy, expressive where docker‑compose is limiting.
 
 ## Key Features
 
@@ -99,11 +99,11 @@ If you're just evaluating, a single-node install usually takes under two minutes
 Create a minimal Statefile and apply it:
 
 ```yaml
-ApiVersion: v0.16
+ApiVersion: v0.18
 Cargoes:
-  - Name: hello
+  - Name: example
     Containers:
-      - Name: hello
+      - Name: wepapp
         Image: ghcr.io/next-hat/documentation:0.16.0
 ```
 
@@ -112,11 +112,11 @@ Apply & inspect:
 ```bash
 nanocl state apply -s ./state.yml
 nanocl cargo ls
-nanocl cargo logs global.hello
+nanocl cargo logs global.example
 ```
 
 Cargoes and virtual machines use canonical keys in
-`{namespace}.{name}` order, such as `global.hello` or `system.ncproxy`.
+`{namespace}.{name}` order, such as `global.example` or `system.ncproxy`.
 Collection commands return every namespace unless `--namespace` is provided:
 
 ```bash
@@ -137,11 +137,11 @@ nanocl state rm -s ./state.yml
 
 Next: explore [Get Started][nanocl_get_started].
 
-> Nanocl is evolving fast. Feedback & early adopters shape the roadmap—see below.
+> Nanocl is evolving fast. Feedback & early adopters shape the roadmap see below.
 
 ## Latest news
 
-- **Release**: [Nanocl 0.18.0](./doc/releases/nanocl-0.18.0.md)
+- **Release**: [Nanocl 0.18.0](https://docs.next-hat.com/blog/nanocl-0.18)
 - **Blog**: [Automating deployment with GitHub Actions](https://docs.next-hat.com/blog/automating-deployment-with-github-actions-and-nanocl) on 24.11.2024
 - **Release**: [End to End TLS encryption and first step for network meshing](https://docs.next-hat.com/blog/nanocl-0.16) on 01.11.2024
 - **Release**: [Man page, Backup, Remove Orphans and more](https://docs.next-hat.com/blog/nanocl-0.15) on 11.06.2024
@@ -156,12 +156,13 @@ cargo, VM, job, resource, secret, namespace, and process names.
 Statefiles drive everything. Here's the Statefile we use to deploy our own [documentation][documentation]:
 
 ```yaml
-ApiVersion: v0.16
+ApiVersion: v0.19
 Cargoes:
-  - Name: doc
+  - Name: documentation
     Containers:
-      - Name: doc
+      - Name: webapp
         Image: ghcr.io/next-hat/documentation:0.16.0
+
 Resources:
   - Name: docs.next-hat.com
     Kind: ncproxy.io/rule
@@ -172,7 +173,7 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Key: global.doc.c
+                Key: global.documentation.c
                 Port: 80
 ```
 
@@ -202,30 +203,10 @@ Resources:
 - [CLI References][nanocl_cli_ref]
 - [Daemon References][nanocl_daemon_ref]
 
-Single‑node simplified architecture:
+Single‑node architecture:
 
 <div align="center">
-  <img src="./doc/architecture.png" />
-</div>
-
-## Demo
-
-#### Cargo & Resource
-
-<div align="center">
-  <img src="./doc/cargo_resource_example.gif" />
-</div>
-
-#### Job
-
-<div align="center">
-  <img src="./doc/job_example.gif" />
-</div>
-
-#### VM
-
-<div align="center">
-  <img src="./doc/vm_example.gif" />
+  <img src="./doc/architecture_diagram.png" />
 </div>
 
 ## Roadmap
@@ -282,7 +263,7 @@ If you want to **become a sponsor**, please use the GitHub Sponsor button.<br/>
 
 People that sponsor us will have their **name** or **logo displayed here**, and will have access to a **special role** on our *[Discord][discord]*.
 
-**Our very kind sponsors:**
+<!-- **Our very kind sponsors:**
 
 <table>
   <tr>
@@ -298,7 +279,7 @@ People that sponsor us will have their **name** or **logo displayed here**, and 
       </a>
     </td>
   </tr>
-</table>
+</table> -->
 
 ## License
 
