@@ -93,12 +93,12 @@ pub(crate) mod tests {
     };
     let system_state = crate::subsystem::init(&options).await.unwrap();
     // Create test server
-    let srv = ntex::web::test::server(async move || {
+    let srv = ntex::web::test::server(async move |_| {
       ntex::web::App::new()
-        .state(Arc::clone(&system_state))
+        .with_config(services::app_config())
         .configure(services::ntex_config)
-    })
-    .await;
+        .build_with(ntex::web::AppState::new(Arc::clone(&system_state)))
+    });
     TestClient::new(srv, vars::VERSION)
   }
 }

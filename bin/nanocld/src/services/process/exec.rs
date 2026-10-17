@@ -6,10 +6,9 @@ use bollard_next::{
 };
 use futures::{StreamExt, future::ready};
 use ntex::{
-  Service, chain,
+  Service,
   channel::{mpsc, oneshot},
   fn_service, rt,
-  service::{fn_factory_with_config, fn_shutdown, map_config},
   util::Bytes,
   web, ws,
 };
@@ -271,35 +270,18 @@ async fn bridge_process_exec(
   }
 }
 
-async fn ws_exec_service(
-  (id, tty, stdin_open, sink, state): (
-    String,
-    bool,
-    bool,
-    ws::WsSink,
-    web::types::State<SystemState>,
-  ),
-) -> Result<
-  impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
-  web::Error,
-> {
+fn ws_exec_service(
+  id: String,
+  tty: bool,
+  stdin_open: bool,
+  state: SystemState,
+) -> impl Service<ws::WsSink, ws::Frame, Res = Option<ws::Message>, Error = io::Error>
+{
   let con_state = Rc::new(RefCell::new(WsConState::new()));
+  let heartbeat_state = con_state.clone();
   let (heartbeat_tx, heartbeat_rx) = oneshot::channel();
-  rt::spawn(utils::ws::heartbeat(
-    con_state.clone(),
-    sink.clone(),
-    heartbeat_rx,
-  ));
   let (command_tx, command_rx) = mpsc::channel();
-  rt::spawn(bridge_process_exec(
-    state.inner.docker_api.clone(),
-    id,
-    tty,
-    stdin_open,
-    sink,
-    command_rx,
-  ));
-
+  let startup = Rc::new(RefCell::new(Some((id, heartbeat_rx, command_rx))));
   let service = fn_service(move |frame| {
     let response = match frame {
       ws::Frame::Ping(message) => {
@@ -329,10 +311,29 @@ async fn ws_exec_service(
     };
     ready(Ok(response))
   });
-  let on_shutdown = fn_shutdown(async move || {
-    let _ = heartbeat_tx.send(());
-  });
-  Ok(chain(service).and_then(on_shutdown))
+  ntex::service(service)
+    .readiness(async move |sink: &ws::WsSink| {
+      let startup = startup.borrow_mut().take();
+      if let Some((id, heartbeat_rx, command_rx)) = startup {
+        rt::spawn(utils::ws::heartbeat(
+          heartbeat_state.clone(),
+          sink.clone(),
+          heartbeat_rx,
+        ));
+        rt::spawn(bridge_process_exec(
+          state.inner.docker_api.clone(),
+          id,
+          tty,
+          stdin_open,
+          sink.clone(),
+          command_rx,
+        ));
+      }
+      Ok(())
+    })
+    .shutdown(async move |_| {
+      let _ = heartbeat_tx.send(());
+    })
 }
 
 /// Create an exec instance for a concrete process name or ID
@@ -349,9 +350,9 @@ async fn ws_exec_service(
     (status = 404, description = "Process doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/processes/{name}/exec")]
 pub async fn create_process_exec(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ProcessExecCreateOptions>,
 ) -> HttpResult<web::HttpResponse> {
@@ -378,7 +379,8 @@ pub async fn create_process_exec(
   ),
 ))]
 pub async fn start_process_exec_detached(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, id) = path.into_inner();
@@ -400,7 +402,7 @@ pub async fn start_process_exec_detached(
     )
     .await?;
   match result {
-    StartExecResults::Detached => Ok(web::HttpResponse::Ok().finish()),
+    StartExecResults::Detached => Ok(web::HttpResponse::Ok().build()),
     StartExecResults::Attached { .. } => Err(HttpError::internal_server_error(
       "Docker returned an attached stream for a detached exec",
     )),
@@ -422,10 +424,11 @@ pub async fn start_process_exec_detached(
   ),
 ))]
 pub async fn start_process_exec_attached(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
-) -> Result<web::HttpResponse, web::Error> {
+) -> HttpResult<web::HttpResponse> {
   let (_, id) = path.into_inner();
   let inspect = state
     .inner
@@ -439,14 +442,14 @@ pub async fn start_process_exec_attached(
     .unwrap_or(false);
   let stdin_open = inspect.open_stdin.unwrap_or(false);
 
-  web::ws::start(
-    req,
-    None::<&str>,
-    map_config(fn_factory_with_config(ws_exec_service), move |sink| {
-      (id.clone(), tty, stdin_open, sink, state.clone())
-    }),
+  utils::ws::response(
+    web::ws::start(
+      &req,
+      None,
+      ws_exec_service(id, tty, stdin_open, state.clone()),
+    )
+    .await,
   )
-  .await
 }
 
 #[cfg(test)]

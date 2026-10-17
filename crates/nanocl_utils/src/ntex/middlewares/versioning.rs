@@ -2,7 +2,7 @@
 use std::rc::Rc;
 
 use ntex::{
-  Middleware, Service, ServiceCtx,
+  Ctx, Middleware, Service,
   http::header::{HeaderName, HeaderValue},
   web,
 };
@@ -47,10 +47,10 @@ pub struct VersioningFactory {
   inner: Rc<Inner>,
 }
 
-impl<S, Cfg> Middleware<S, Cfg> for VersioningFactory {
+impl<S, St> Middleware<S, St> for VersioningFactory {
   type Service = VersioningMiddleware<S>;
 
-  fn create(&self, service: S, _: Cfg) -> Self::Service {
+  fn create(&self, _: &St, service: S) -> Self::Service {
     VersioningMiddleware {
       service,
       inner: self.inner.clone(),
@@ -63,25 +63,20 @@ pub struct VersioningMiddleware<S> {
   inner: Rc<Inner>,
 }
 
-impl<S, Err> Service<web::WebRequest<Err>> for VersioningMiddleware<S>
+impl<S, St, In> Service<St, web::WebRequest<In>> for VersioningMiddleware<S>
 where
-  S: Service<
-      web::WebRequest<Err>,
-      Response = web::WebResponse,
-      Error = web::Error,
-    >,
-  Err: web::ErrorRenderer,
+  S: Service<St, web::WebRequest<In>, Res = web::WebResponse>,
 {
-  type Response = web::WebResponse;
-  type Error = web::Error;
+  type Res = web::WebResponse;
+  type Error = S::Error;
 
-  ntex::forward_ready!(service);
+  ntex::forward_ready!(St, service);
 
   async fn call(
     &self,
-    mut req: web::WebRequest<Err>,
-    ctx: ServiceCtx<'_, Self>,
-  ) -> Result<Self::Response, Self::Error> {
+    mut req: web::WebRequest<In>,
+    ctx: Ctx<'_, Self, St>,
+  ) -> Result<Self::Res, Self::Error> {
     let version = req.match_info_mut().get("version");
     let header_name = HeaderName::from_static("x-api-version");
     let header_value = HeaderValue::from_str(&self.inner.version)
@@ -154,5 +149,52 @@ where
     let mut res = ctx.call(&self.service, req).await?;
     res.headers_mut().insert(header_name, header_value);
     Ok(res)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn ntex4_versioning_preserves_status_and_version_header() {
+    futures::executor::block_on(async {
+      let app = web::test::init_service(
+        web::App::default()
+          .service(
+            web::scope("/{version}")
+              .middleware(Versioning::new("1.2").finish())
+              .route(
+                "/test",
+                web::get().to(async || web::HttpResponse::Ok().build()),
+              ),
+          )
+          .build(),
+      )
+      .await;
+
+      for (version, error) in [
+        ("v1.2", None),
+        ("v1.1", None),
+        ("v1.3", Some("v1.3 is not supported")),
+        ("v2.0", Some("v2.0 is not supported")),
+        ("v1", Some("v1 is invalid")),
+        ("v1.x", Some("v1.x is not a number")),
+      ] {
+        let request =
+          web::test::TestRequest::with_uri(&format!("/{version}/test"))
+            .to_request();
+        let response = app.call(request).await.unwrap();
+        assert_eq!(response.headers().get("x-api-version").unwrap(), "1.2");
+        if let Some(error) = error {
+          assert_eq!(response.status(), ntex::http::StatusCode::NOT_FOUND);
+          let body = web::test::read_body(response).await;
+          let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+          assert_eq!(body, serde_json::json!({ "msg": error }));
+        } else {
+          assert_eq!(response.status(), ntex::http::StatusCode::OK);
+        }
+      }
+    });
   }
 }

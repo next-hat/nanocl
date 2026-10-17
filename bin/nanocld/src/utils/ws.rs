@@ -5,7 +5,9 @@ use std::time::Instant;
 use ntex::channel::oneshot;
 use ntex::time;
 use ntex::util;
-use ntex::ws;
+use ntex::{web, ws};
+
+use nanocl_error::http::{HttpError, HttpResult};
 
 use crate::models::{CLIENT_TIMEOUT, HEARTBEAT_INTERVAL, WsConState};
 
@@ -52,5 +54,47 @@ pub async fn heartbeat(
         return;
       }
     }
+  }
+}
+
+/// Preserve handshake status codes for HTTP requests that were not upgraded.
+/// Once upgraded, ntex has already sent the handshake and ignores this response.
+pub fn response(
+  result: Result<(), ws::error::WsError<std::io::Error>>,
+) -> HttpResult<web::HttpResponse> {
+  match result {
+    Ok(()) => Ok(web::HttpResponse::Ok().build()),
+    Err(ws::error::WsError::Handshake(error)) => {
+      Ok(ntex::http::error::ResponseError::error_response(&error))
+    }
+    Err(error) => Err(HttpError::internal_server_error(error)),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use ntex::http::StatusCode;
+  use ntex::web::test::{TestRequest, init_service};
+
+  #[ntex::test]
+  async fn websocket_request_without_upgrade_is_bad_request() {
+    let app = init_service(web::App::default().route(
+      "/attach",
+      web::get().to(async |req: web::HttpRequest| {
+        response(
+          web::ws::start(&req, None, async |_frame| {
+            Ok::<_, std::io::Error>(None)
+          })
+          .await,
+        )
+      }),
+    ))
+    .await;
+    let result = app
+      .call(TestRequest::with_uri("/attach").to_request())
+      .await
+      .unwrap();
+    assert_eq!(result.status(), StatusCode::BAD_REQUEST);
   }
 }

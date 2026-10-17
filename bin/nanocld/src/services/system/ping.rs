@@ -11,7 +11,6 @@ use nanocl_error::http::HttpResult;
     (status = 202, description = "Server is up"),
   ),
 ))]
-#[web::head("/_ping")]
 pub async fn get_ping() -> HttpResult<web::HttpResponse> {
   Ok(web::HttpResponse::Accepted().into())
 }

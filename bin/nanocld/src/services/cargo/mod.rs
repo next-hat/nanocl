@@ -20,16 +20,63 @@ pub use patch::*;
 pub use put::*;
 pub use revert::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(create_cargo);
-  config.service(delete_cargo);
-  config.service(patch_cargo);
-  config.service(put_cargo);
-  config.service(list_cargo);
-  config.service(inspect_cargo);
-  config.service(list_cargo_history);
-  config.service(revert_cargo);
-  config.service(count_cargo);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/cargoes")
+      .name("create_cargo")
+      .guard(web::guard::Post())
+      .to_with_state(create_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("delete_cargo")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("patch_cargo")
+      .guard(web::guard::Patch())
+      .to_with_state(patch_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("put_cargo")
+      .guard(web::guard::Put())
+      .to_with_state(put_cargo),
+  );
+  config.service(
+    web::resource("/cargoes")
+      .name("list_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(list_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}/inspect")
+      .name("inspect_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}/histories")
+      .name("list_cargo_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_cargo_history),
+  );
+  config.service(
+    web::resource("/cargoes/{cargo_key}/histories/{history_key}/revert")
+      .name("revert_cargo")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/count")
+      .name("count_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(count_cargo),
+  );
 }
 
 #[cfg(test)]

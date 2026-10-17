@@ -6,6 +6,7 @@ use nanocl_utils::logger;
 mod cli;
 mod dnsmasq;
 mod event;
+mod models;
 mod server;
 mod services;
 mod utils;

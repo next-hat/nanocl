@@ -21,12 +21,12 @@ use crate::{
     (status = 404, description = "The virtual machine does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/vms/{key}")]
 pub async fn delete_vm(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
   VmDb::del_obj_by_pk(key.as_str(), &(), &state).await?;
-  Ok(web::HttpResponse::Ok().finish())
+  Ok(web::HttpResponse::Ok().build())
 }

@@ -21,9 +21,9 @@ use crate::{
     (status = 202, description = "Process instances started"),
   ),
 ))]
-#[web::post("/processes/{pk}/start")]
 pub async fn start_process_by_pk(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, pk) = path.into_inner();
@@ -33,7 +33,7 @@ pub async fn start_process_by_pk(
     .docker_api
     .start_container(&process.key, None::<StartContainerOptions<String>>)
     .await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }
 
 /// Start all processes for a kind and canonical resource key
@@ -49,14 +49,14 @@ pub async fn start_process_by_pk(
     (status = 202, description = "Process instances started"),
   ),
 ))]
-#[web::post("/processes/{kind}/{key}/start")]
 pub async fn start_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   utils::container::generic::emit_starting(&key, &kind, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  Ok(web::HttpResponse::Accepted().build())
 }

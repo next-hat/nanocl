@@ -632,7 +632,7 @@ mod tests {
     .await
   }
 
-  fn no_routes(_: &mut ntex::web::ServiceConfig) {}
+  fn no_routes(_: &mut ntex::web::ServiceConfig<crate::models::SystemState>) {}
 
   struct Fixture {
     system: TestSystem,

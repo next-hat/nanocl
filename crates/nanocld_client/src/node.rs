@@ -99,26 +99,30 @@ mod tests {
   use super::*;
 
   async fn record_start_node_cargo(
-    recorder: web::types::State<Arc<Mutex<Option<Value>>>>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<Arc<Mutex<Option<Value>>>>().unwrap();
     *recorder.lock().unwrap() = Some(body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   #[ntex::test]
   async fn start_node_cargo_posts_the_exact_replica_vector_as_json() {
     let recorded = Arc::new(Mutex::new(None::<Value>));
     let server_recorded = recorded.clone();
-    let server = web::test::server(async move || {
-      web::App::new().state(server_recorded.clone()).service(
-        web::resource(format!(
-          "/v{NANOCLD_DEFAULT_VERSION}/nodes/cargoes/start"
-        ))
-        .route(web::post().to(record_start_node_cargo)),
-      )
-    })
-    .await;
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(
+          web::WebAppConfig::new().set_state(server_recorded.clone()),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/nodes/cargoes/start"
+          ))
+          .route(web::post().to(record_start_node_cargo)),
+        )
+    });
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: format!("http://localhost:{}", server.addr().port()),
       ..Default::default()

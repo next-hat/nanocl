@@ -23,9 +23,9 @@ use crate::{
     (status = 404, description = "Virtual machine not found", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/vms/{key}")]
 pub async fn patch_vm(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmSpecUpdate>,
 ) -> HttpResult<web::HttpResponse> {

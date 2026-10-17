@@ -16,14 +16,51 @@ pub use list::*;
 pub use list_history::*;
 pub use patch::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_vm);
-  config.service(create_vm);
-  config.service(delete_vm);
-  config.service(inspect_vm);
-  config.service(count_vm);
-  config.service(list_vm_history);
-  config.service(patch_vm);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/vms")
+      .name("list_vm")
+      .guard(web::guard::Get())
+      .to_with_state(list_vm),
+  );
+  config.service(
+    web::resource("/vms")
+      .name("create_vm")
+      .guard(web::guard::Post())
+      .to_with_state(create_vm),
+  );
+  config.service(
+    web::resource("/vms/{key}")
+      .name("delete_vm")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_vm),
+  );
+  config.service(
+    web::resource("/vms/{key}/inspect")
+      .name("inspect_vm")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_vm),
+  );
+  config.service(
+    web::resource("/vms/count")
+      .name("count_vm")
+      .guard(web::guard::Get())
+      .to_with_state(count_vm),
+  );
+  config.service(
+    web::resource("/vms/{key}/histories")
+      .name("list_vm_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_vm_history),
+  );
+  config.service(
+    web::resource("/vms/{key}")
+      .name("patch_vm")
+      .guard(web::guard::Patch())
+      .to_with_state(patch_vm),
+  );
 }
 
 #[cfg(test)]

@@ -20,9 +20,9 @@ use crate::{
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/cargoes/{key}/histories")]
 pub async fn list_cargo_history(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;

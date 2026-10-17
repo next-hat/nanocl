@@ -103,27 +103,22 @@ impl NanocldClient {
   }
 
   async fn gen_client(&self) -> IoResult<ntex::client::Client> {
-    let client = ntex::client::Client::builder()
-      .response_payload_timeout(Millis::from_secs(20))
-      .response_timeout(Millis::from_secs(20));
+    let cfg = ntex::SharedCfg::new("nanocld-client").add(
+      ntex::client::ClientConfig::new()
+        .set_response_payload_timeout(Millis::from_secs(20))
+        .set_response_timeout(Millis::from_secs(20)),
+    );
+    let client = ntex::client::Client::builder();
     #[cfg(not(target_os = "windows"))]
     let client = if let Some(unix_socket) = &self.unix_socket {
-      use ntex::ServiceFactory;
       let unix_socket = unix_socket.clone();
-      client.connector::<&str>(
-        ntex::client::Connector::default().connector(
-          ntex::service::fn_service(move |_| {
-            let unix_socket = unix_socket.clone();
-            async {
-              Ok(
-                rt::unix_connect(unix_socket, ntex::SharedCfg::default())
-                  .await?,
-              )
-            }
-          })
-          .map_init_err(|_| unreachable!()),
-        ),
-      )
+      client.connector(async move |cfg: &ntex::SharedCfg, _| {
+        Ok(
+          rt::unix_connect(&unix_socket, cfg.clone())
+            .await
+            .map_err(ntex::connect::ConnectError::from)?,
+        )
+      })
     } else {
       client
     };
@@ -172,27 +167,17 @@ impl NanocldClient {
       builder.set_private_key(&cert_key).map_err(|err| {
         IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
       })?;
-      ntex::client::Client::builder().connector::<&str>(
-        ntex::client::Connector::default().openssl(builder.build()),
-      )
+      client.openssl(builder.build())
     } else {
       client
     };
 
-    client
-      .build(ntex::SharedCfg::default())
-      .await
-      .map_err(|err| {
-        IoError::invalid_data(
-          "Unable to build http client",
-          err.to_string().as_str(),
-        )
-      })
+    Ok(client.build(cfg))
   }
 
   fn send_error(
     &self,
-    err: ntex::client::error::ClientError,
+    err: ntex::error::Error<ntex::client::error::ClientError>,
   ) -> HttpClientError {
     let url = if let Some(url) = &self.unix_socket {
       url
@@ -276,9 +261,7 @@ impl NanocldClient {
   {
     let mut req = self.get(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -315,9 +298,7 @@ impl NanocldClient {
   {
     let mut req = self.post(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,
@@ -344,9 +325,7 @@ impl NanocldClient {
   {
     let mut req = self.post(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req
       .send_stream(stream)
@@ -367,9 +346,7 @@ impl NanocldClient {
   {
     let mut req = self.delete(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -389,9 +366,7 @@ impl NanocldClient {
   {
     let mut req = self.patch(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,
@@ -415,9 +390,7 @@ impl NanocldClient {
   {
     let mut req = self.head(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
     let status = res.status();
@@ -437,9 +410,7 @@ impl NanocldClient {
   {
     let mut req = self.put(url).await?;
     if let Some(query) = query {
-      req = req
-        .query(&query)
-        .map_err(|err| err.map_err_context(|| "Query"))?;
+      req = req.query(&query);
     }
     let mut res = match body {
       None => req.send().await.map_err(|err| self.send_error(err))?,
@@ -477,7 +448,7 @@ impl NanocldClient {
     let (tx, rx) = ntex::channel::mpsc::channel();
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
-      while let Some(item) = stream.next().await {
+      'stream: while let Some(item) = stream.next().await {
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {
@@ -487,26 +458,98 @@ impl NanocldClient {
             break;
           }
         };
-        payload.extend(bytes.to_vec());
-        if bytes.last() != Some(&b'\n') {
-          continue;
-        }
-        let t = match serde_json::from_slice::<R>(&payload) {
-          Ok(t) => t,
-          Err(e) => {
-            let _ = tx.send(Err(HttpError::internal_server_error(format!(
-              "Unable to parse stream: {e}"
-            ))));
-            break;
+        let buffered_len = payload.len();
+        payload.extend_from_slice(&bytes);
+        let mut start = 0;
+        // Retained bytes have already been scanned for record boundaries.
+        for (offset, byte) in bytes.iter().enumerate() {
+          if *byte != b'\n' {
+            continue;
           }
-        };
-        payload.clear();
-        if tx.send(Ok(t)).is_err() {
-          break;
+          let end = buffered_len + offset;
+          let t = match serde_json::from_slice::<R>(&payload[start..=end]) {
+            Ok(t) => t,
+            Err(e) => {
+              let _ = tx.send(Err(HttpError::internal_server_error(format!(
+                "Unable to parse stream: {e}"
+              ))));
+              break 'stream;
+            }
+          };
+          start = end + 1;
+          if tx.send(Ok(t)).is_err() {
+            break 'stream;
+          }
         }
+        payload.drain(..start);
       }
       tx.close();
     });
     rx
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::{client::TestResponse, http::Payload};
+  use serde_json::{Value, json};
+
+  use super::*;
+
+  fn response_with_chunks(
+    chunks: &[&'static [u8]],
+  ) -> ntex::client::ClientResponse {
+    let chunks: Vec<_> = chunks
+      .iter()
+      .map(|chunk| Ok(Bytes::from_static(chunk)))
+      .collect();
+    let res = TestResponse::builder().build();
+    res.set_payload(Payload::from_stream(futures::stream::iter(chunks)));
+    res
+  }
+
+  #[ntex::test]
+  async fn res_stream_decodes_coalesced_records() {
+    let res = response_with_chunks(&[b"{\"value\":1}\n{\"value\":2}\n"]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 2}));
+    assert!(stream.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn res_stream_retains_fragmented_records_and_partial_suffix() {
+    let res = response_with_chunks(&[
+      b"{",
+      b"\"value\":",
+      b"",
+      b"1}",
+      b"\n{\"value\":2}\n{\"value\":",
+      b"",
+      b"3}",
+      b"\n{\"value\":4",
+    ]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    for value in 1..=3 {
+      assert_eq!(
+        stream.next().await.unwrap().unwrap(),
+        json!({"value": value})
+      );
+    }
+    assert!(stream.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn res_stream_stops_after_malformed_record() {
+    let res =
+      response_with_chunks(&[b"{\"value\":1}\ninvalid\n{\"value\":2}\n"]);
+    let mut stream = NanocldClient::res_stream::<Value>(res).await;
+
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
+    let error = stream.next().await.unwrap().unwrap_err();
+    assert!(error.to_string().contains("Unable to parse stream:"));
+    assert!(stream.next().await.is_none());
   }
 }

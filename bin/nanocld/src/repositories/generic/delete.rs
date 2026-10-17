@@ -21,7 +21,7 @@ pub trait RepositoryDelByPk: super::RepositoryBase {
       <diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned> as HasTable>::Table,
       <diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned> as query_builder::IntoUpdateTarget>::WhereClause,
     >: query_builder::QueryFragment<diesel::pg::Pg> + query_builder::QueryId,
-  {
+{
     log::trace!("{}::delete_by_pk: {pk}", Self::get_name());
     let pool = pool.clone();
     let pk = pk.to_owned();
@@ -61,7 +61,7 @@ pub trait RepositoryDelBy: super::RepositoryBase {
     Self: Sized + diesel::associations::HasTable,
     <Self as diesel::associations::HasTable>::Table: diesel::query_builder::QueryId + 'static,
     <<Self as diesel::associations::HasTable>::Table as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
-  {
+{
     log::trace!("{}::delete_by: {filter:?}", Self::get_name());
     let pool = pool.clone();
     let filter = filter.clone();

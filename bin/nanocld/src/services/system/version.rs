@@ -11,7 +11,6 @@ use crate::vars;
     (status = 200, description = "Version information", body = nanocl_stubs::system::BinaryInfo),
   ),
 ))]
-#[web::get("/version")]
 pub async fn get_version() -> web::HttpResponse {
   web::HttpResponse::Ok().json(&serde_json::json!({
     "Arch": vars::ARCH,

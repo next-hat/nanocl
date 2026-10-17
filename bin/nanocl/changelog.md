@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Migrate the networking stack to ntex 4.2 and require Rust 1.99.0 for builds.
+- Refresh Rust dependencies to their latest compatible stable releases.
 - Align `nanocl install` and `nanocl uninstall` with Statefile apply/remove
   output, including per-item progress, elapsed times, operation summaries,
   install image download progress, and `--json` NDJSON output for automation.

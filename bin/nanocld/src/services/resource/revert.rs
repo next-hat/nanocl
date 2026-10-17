@@ -23,9 +23,9 @@ use crate::{
     (status = 404, description = "Resource doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/resources/{name}/histories/{id}/revert")]
 pub async fn revert_resource(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
   let history = SpecDb::read_by_pk(&path.2, &state.inner.pool).await?;

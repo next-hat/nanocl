@@ -29,13 +29,13 @@ test = ["nanocl_utils/ntex_test_client", "nanocl_stubs/test"]
 release = []
 
 [build-dependencies]
-clap = { version = "4.6", features = ["derive"] }
-clap_mangen = { version = "0.3" }
+clap = { version = "4.6.7", features = ["derive"] }
+clap_mangen = { version = "0.3.3" }
 nanocl_utils = { version = "0.9", features = ["build_tools"] }
 nanocl_stubs = { version = "0.19", features = ["clap"] }
 
 [dev-dependencies]
-serde_yaml = "0.9"
+serde_yaml = "0.9.34"
 
 [dependencies]
 nanocl_error = { version = "0.7", features = [
@@ -49,18 +49,18 @@ nanocl_error = { version = "0.7", features = [
   "tokio",
 ] }
 bollard-next = { version = "0.18.1" }
-log = "0.4"
-futures = "0.3"
-serde_yaml = "0.9"
-env_logger = { version = "0.11" }
-serde_json = "1.0"
-diesel_migrations = "2.3"
-clap = { version = "4.6", features = ["derive"] }
-url = { version = "2", features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
-uuid = { version = "1.23", features = ["serde", "v4"] }
-ntex = { version = "3", features = ["tokio", "openssl"] }
-diesel = { version = "2.3", features = [
+log = "0.4.34"
+futures = "0.3.34"
+serde_yaml = "0.9.34"
+env_logger = { version = "0.11.11" }
+serde_json = "1.0.151"
+diesel_migrations = "2.3.2"
+clap = { version = "4.6.7", features = ["derive"] }
+url = { version = "2.5.8", features = ["serde"] }
+serde = { version = "1.0.229", features = ["derive"] }
+uuid = { version = "1.28.0", features = ["serde", "v4"] }
+ntex = { version = "4.2.0", features = ["tokio", "openssl"] }
+diesel = { version = "2.3.14", features = [
   "postgres",
   "r2d2",
   "chrono",
@@ -69,24 +69,24 @@ diesel = { version = "2.3", features = [
   "ipnet-address",
   "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
-tokio = { version = "1.49", features = ["fs", "process", "io-std"] }
-tokio-util = "0.7"
-futures-util = "0.3"
-libc = "0.2"
-chrono = { version = "0.4", default-features = false, features = [
+tokio = { version = "1.53.2", features = ["fs", "process", "io-std"] }
+tokio-util = "0.7.20"
+futures-util = "0.3.34"
+libc = "0.2.190"
+chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
   "serde",
 ] }
-jsonschema = { version = "0.58", default-features = false }
+jsonschema = { version = "0.58.6", default-features = false }
 nanocld_client = { version = "0.19", features = ["tokio"] }
-metrsd_client = "0.5.8"
+metrsd_client = "0.6.0"
 nanocl_stubs = { version = "0.19", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.9", features = ["unix", "ntex", "logger"] }
-utoipa = { version = "5", features = ["yaml"], optional = true }
-notify = "8.0"
-ntex-cors = "3"
-rand = "0.10"
-openssl = { version = "0.10" }
-ipnet = { version = "2.10.0", features = ["serde"] }
-num_cpus = "1.16.0"
+utoipa = { version = "5.5.0", features = ["yaml"], optional = true }
+notify = "8.2.0"
+ntex-cors = "4.1.1"
+rand = "0.10.3"
+openssl = { version = "0.10.81" }
+ipnet = { version = "2.12.2", features = ["serde"] }
+num_cpus = "1.17.0"

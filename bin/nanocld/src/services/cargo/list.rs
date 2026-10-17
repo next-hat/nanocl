@@ -21,9 +21,9 @@ use crate::{
     (status = 200, description = "List of cargoes", body = [nanocl_stubs::cargo::CargoSummary]),
   ),
 ))]
-#[web::get("/cargoes")]
 pub async fn list_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   qs: web::types::Query<GenericListQueryNsp>,
 ) -> HttpResult<web::HttpResponse> {
   let query = utils::query_string::parse_qs_nsp_filter(&qs)?;

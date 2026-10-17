@@ -16,9 +16,9 @@ use crate::models::{ResourceKindDb, SystemState};
     (status = 409, description = "Resource kind already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/resource/kinds")]
 pub async fn create_resource_kind(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   _version: web::types::Path<String>,
   payload: web::types::Json<ResourceKindPartial>,
 ) -> HttpResult<web::HttpResponse> {

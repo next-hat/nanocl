@@ -10,11 +10,33 @@ pub use inspect::*;
 pub use list::*;
 pub use watch::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_event);
-  config.service(watch_event);
-  config.service(inspect_event);
-  config.service(count_event);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/events")
+      .name("list_event")
+      .guard(web::guard::Get())
+      .to_with_state(list_event),
+  );
+  config.service(
+    web::resource("/events/watch")
+      .name("watch_event")
+      .guard(web::guard::Post())
+      .to_with_state(watch_event),
+  );
+  config.service(
+    web::resource("/events/{key}/inspect")
+      .name("inspect_event")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_event),
+  );
+  config.service(
+    web::resource("/events/count")
+      .name("count_event")
+      .guard(web::guard::Get())
+      .to_with_state(count_event),
+  );
 }
 
 #[cfg(test)]

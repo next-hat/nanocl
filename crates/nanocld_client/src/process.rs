@@ -47,33 +47,22 @@ impl NanocldClient {
   ) -> HttpClientResult<ws::WsConnection<io::Base>> {
     #[cfg(not(target_os = "windows"))]
     {
-      use nanocl_error::io::IoError;
-
       let con = match &self.unix_socket {
-        Some(path) => ws::WsClient::builder(url)
-          .connector::<_, _>(ntex::service::fn_service(|_| async move {
-            Ok(rt::unix_connect(&path, ntex::SharedCfg::default()).await?)
-          }))
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::interrupted(
-              "Unable to build websocket client",
-              &format!("{err:?}"),
-            )
-          })?
-          .connect()
-          .await
-          .map_err(|err| err.map_err_context(|| path))?,
-        None => ws::WsClient::builder(url)
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::interrupted(
-              "Unable to build websocket client",
-              &format!("{err:?}"),
-            )
-          })?
+        Some(path) => {
+          let socket_path = path.clone();
+          ws::WsClient::new(url, ntex::SharedCfg::default())
+            .connector(async move |cfg: &ntex::SharedCfg, _| {
+              Ok(
+                rt::unix_connect(&socket_path, cfg.clone())
+                  .await
+                  .map_err(ntex::connect::ConnectError::from)?,
+              )
+            })
+            .connect()
+            .await
+            .map_err(|err| err.map_err_context(|| path))?
+        }
+        None => ws::WsClient::new(url, ntex::SharedCfg::default())
           .connect()
           .await
           .map_err(|err| err.map_err_context(|| &self.url))?,
@@ -82,17 +71,7 @@ impl NanocldClient {
     }
     #[cfg(target_os = "windows")]
     {
-      use nanocl_error::io::IoError;
-
-      let con = ws::WsClient::builder(url)
-        .build(ntex::SharedCfg::default())
-        .await
-        .map_err(|err| {
-          IoError::interrupted(
-            "Unable to build websocket client",
-            &format!("{err:?}"),
-          )
-        })?
+      let con = ws::WsClient::new(url, ntex::SharedCfg::default())
         .connect()
         .await
         .map_err(|err| err.map_err_context(|| &self.url))?;

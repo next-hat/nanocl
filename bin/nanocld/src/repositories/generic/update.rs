@@ -29,7 +29,7 @@ pub trait RepositoryUpdate: super::RepositoryBase {
       <Self::UpdateItem as diesel::AsChangeset>::Changeset,
     >:
       diesel::query_builder::AsQuery + diesel::query_dsl::LoadQuery<'static, diesel::pg::PgConnection, Self>,
-  {
+{
     log::trace!("{}::update_by_pk: {pk}", Self::get_name());
     let pool = pool.clone();
     let pk = pk.to_owned();

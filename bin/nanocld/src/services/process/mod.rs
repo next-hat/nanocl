@@ -27,32 +27,114 @@ pub use stats::*;
 pub use stop::*;
 pub use wait::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
   config.service(
     web::resource("/processes/{name}/attach")
-      .route(web::get().to(attach_process)),
+      .route(web::get().to_with_state(attach_process)),
   );
-  config.service(logs_process);
-  config.service(create_process_exec);
+  config.service(
+    web::resource("/processes/{name}/logs")
+      .name("logs_process")
+      .guard(web::guard::Get())
+      .to_with_state(logs_process),
+  );
+  config.service(
+    web::resource("/processes/{name}/exec")
+      .name("create_process_exec")
+      .guard(web::guard::Post())
+      .to_with_state(create_process_exec),
+  );
   config.service(
     web::resource("/exec/{id}/start")
-      .route(web::post().to(start_process_exec_detached))
-      .route(web::get().to(start_process_exec_attached)),
+      .route(web::post().to_with_state(start_process_exec_detached))
+      .route(web::get().to_with_state(start_process_exec_attached)),
   );
-  config.service(inspect_process);
-  config.service(list_processes);
-  config.service(logs_processes);
-  config.service(kill_process);
-  config.service(stop_process);
-  config.service(restart_process);
-  config.service(wait_process);
-  config.service(restart_processes);
-  config.service(start_processes);
-  config.service(stop_processes);
-  config.service(wait_processes);
-  config.service(stats_processes);
-  config.service(count_processes);
-  config.service(process_stats_by_name);
+  config.service(
+    web::resource("/processes/{name}/inspect")
+      .name("inspect_process")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_process),
+  );
+  config.service(
+    web::resource("/processes")
+      .name("list_processes")
+      .guard(web::guard::Get())
+      .to_with_state(list_processes),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/logs")
+      .name("logs_processes")
+      .guard(web::guard::Get())
+      .to_with_state(logs_processes),
+  );
+  config.service(
+    web::resource("/processes/{name}/kill")
+      .name("kill_process")
+      .guard(web::guard::Post())
+      .to_with_state(kill_process),
+  );
+  config.service(
+    web::resource("/processes/{name}/stop")
+      .name("stop_process")
+      .guard(web::guard::Post())
+      .to_with_state(stop_process),
+  );
+  config.service(
+    web::resource("/processes/{name}/restart")
+      .name("restart_process")
+      .guard(web::guard::Post())
+      .to_with_state(restart_process),
+  );
+  config.service(
+    web::resource("/processes/{name}/wait")
+      .name("wait_process")
+      .guard(web::guard::Get())
+      .to_with_state(wait_process),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/restart")
+      .name("restart_processes")
+      .guard(web::guard::Post())
+      .to_with_state(restart_processes),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/start")
+      .name("start_processes")
+      .guard(web::guard::Post())
+      .to_with_state(start_processes),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/stop")
+      .name("stop_processes")
+      .guard(web::guard::Post())
+      .to_with_state(stop_processes),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/wait")
+      .name("wait_processes")
+      .guard(web::guard::Get())
+      .to_with_state(wait_processes),
+  );
+  config.service(
+    web::resource("/processes/{kind}/{key}/stats")
+      .name("stats_processes")
+      .guard(web::guard::Get())
+      .to_with_state(stats_processes),
+  );
+  config.service(
+    web::resource("/processes/count")
+      .name("count_processes")
+      .guard(web::guard::Get())
+      .to_with_state(count_processes),
+  );
+  config.service(
+    web::resource("/process/{name}/stats")
+      .name("process_stats_by_name")
+      .guard(web::guard::Get())
+      .to_with_state(process_stats_by_name),
+  );
 }
 
 #[cfg(test)]

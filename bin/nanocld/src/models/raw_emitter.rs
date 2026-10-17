@@ -19,7 +19,7 @@ use nanocl_stubs::system::{Event, EventCondition};
 pub struct RawEventReceiver(pub Receiver<Bytes>);
 
 impl Stream for RawEventReceiver {
-  type Item = Result<Bytes, web::Error>;
+  type Item = Result<Bytes, std::io::Error>;
 
   fn poll_next(
     mut self: Pin<&mut Self>,

@@ -21,7 +21,7 @@ pub mod tests {
 
   pub use nanocl_utils::ntex::test_client::*;
 
-  type Config = fn(&mut ServiceConfig);
+  type Config = fn(&mut ServiceConfig<SystemState>);
 
   pub struct TestSystem {
     pub state: SystemState,
@@ -55,13 +55,13 @@ pub mod tests {
     let state = SystemState::new(&config).await.unwrap();
     let state_ptr = state.clone();
     // Create test server
-    let srv = test::server(async move || {
-      App::new()
-        .state(state_ptr.clone())
+    let srv = test::server(async move |_| {
+      App::<SystemState>::new()
+        .with_config(services::app_config())
         .configure(routes)
         .default_service(web::route().to(services::unhandled))
-    })
-    .await;
+        .build_with(state_ptr.clone())
+    });
     let client = TestClient::new(srv, version);
     TestSystem { state, client }
   }

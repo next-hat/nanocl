@@ -29,9 +29,9 @@ use crate::{
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/processes/{kind}/{key}/stats")]
 pub async fn stats_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -83,9 +83,9 @@ pub async fn stats_processes(
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   )
 ))]
-#[web::get("/process/{name}/stats")]
 pub async fn process_stats_by_name(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<ProcessStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
