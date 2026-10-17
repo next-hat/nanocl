@@ -74,6 +74,60 @@ mod tests {
   use super::*;
 
   #[test]
+  fn default_config_enables_tls_and_keeps_sensitive_values_out_of_access_logs()
+  {
+    let output = CONF_TEMPLATE
+      .compile(&liquid::object!({
+        "nginx_dir": "/etc/nginx",
+        "state_dir": "/tmp/ncproxy",
+        "health_generation": "test-generation",
+      }))
+      .unwrap();
+
+    assert!(output.contains("listen 443 ssl default_server reuseport;"));
+    assert!(output.contains("listen [::]:443 ssl default_server reuseport;"));
+    assert!(output.contains("ssl_reject_handshake on;"));
+    for sensitive in [
+      "$query_string",
+      "$request_body",
+      "$http_referer",
+      "$request_uri",
+      "$args",
+    ] {
+      assert!(!output.contains(sensitive), "logs contain {sensitive}");
+    }
+    assert!(!output.contains("\"$request\""));
+    assert!(
+      output.contains("access_log /tmp/ncproxy/log/access.log http_basic;")
+    );
+    assert!(output.contains("\"$request_method $uri $server_protocol\""));
+    assert!(output.contains("\"query_string\": \"\""));
+    assert!(output.contains("\"request_body\": \"\""));
+    assert!(output.contains("\"http_referrer\": \"\""));
+  }
+
+  #[test]
+  fn default_config_exposes_worker_probe_only_on_private_socket() {
+    let output = CONF_TEMPLATE
+      .compile(&liquid::object!({
+        "nginx_dir": "/etc/nginx",
+        "state_dir": "/tmp/ncproxy",
+        "health_generation": "test-generation",
+      }))
+      .unwrap();
+    let probe_start = output
+      .find("listen unix:/tmp/ncproxy/nginx-health.sock;")
+      .unwrap();
+    let probe = &output
+      [probe_start..output[probe_start..].find("  ##").unwrap() + probe_start];
+    assert!(probe.contains("access_log off;"));
+    assert!(
+      probe.contains("return 200 \"ncproxy-health $pid test-generation\\n\";")
+    );
+    assert_eq!(probe.matches("listen ").count(), 1);
+  }
+
+  #[test]
   fn renders_location_proxy_options_and_preserves_omissions() {
     let location = LocationTemplate {
       path: "/v2/".into(),
