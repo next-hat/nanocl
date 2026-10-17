@@ -9083,11 +9083,11 @@ components:
           - string
           - 'null'
           description: The http path to target when using http
-        DisableLogging:
+        EnableLogging:
           type:
           - boolean
           - 'null'
-          description: Disable logging for this target
+          description: Enable Nginx file access logging for this target (disabled by default).
         Ssl:
           oneOf:
           - type: 'null'
