@@ -35,7 +35,7 @@ env_logger = { version = "0.11.11", optional = true }
 serde = { version = "1.0.229", features = ["derive"], optional = true }
 serde_json = { version = "1.0.151", optional = true }
 futures = { version = "0.3.34", optional = true }
-utoipa = { version = "5.5.0", features = ["yaml"], optional = true }
+utoipa = { version = "6.0.0", features = ["yaml"], optional = true }
 utoipa-swagger-ui = { version = "10.0.1", optional = true }
 clap = { version = "4.6.7", features = ["derive", "cargo"], optional = true }
 clap_mangen = { version = "0.3.3", optional = true }
