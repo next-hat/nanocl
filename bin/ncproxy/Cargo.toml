@@ -55,7 +55,7 @@ serde_json = "1.0.151"
 futures = "0.3.34"
 nanocld_client = { version = "0.19", features = ["tokio"] }
 nanocl_utils = { version = "0.9", features = ["ntex", "logger", "versioning"] }
-utoipa = { version = "5.5.0", features = ["yaml"], optional = true }
+utoipa = { version = "6.0.0", features = ["yaml"], optional = true }
 chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
