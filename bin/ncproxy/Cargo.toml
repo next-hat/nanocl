@@ -53,9 +53,6 @@ tokio = { version = "1.53.2", features = ["fs", "io-util", "net", "process", "ti
 serde = "1.0.229"
 serde_json = "1.0.151"
 futures = "0.3.34"
-notify = { version = "8.2.0", default-features = false, features = [
-  "macos_kqueue",
-] }
 nanocld_client = { version = "0.19", features = ["tokio"] }
 nanocl_utils = { version = "0.9", features = ["ntex", "logger", "versioning"] }
 utoipa = { version = "5.5.0", features = ["yaml"], optional = true }

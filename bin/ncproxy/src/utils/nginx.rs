@@ -12,7 +12,7 @@ use tokio::{
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::stubs::proxy::{
-  LocationTarget, ProxyHttpLocation, ProxyRule, ResourceProxyRule,
+  LocationTarget, ProxyHttpLocation, ProxyRule, ResourceProxyRule, StreamTarget,
 };
 
 use crate::models::{
@@ -32,6 +32,8 @@ fn apply_location_options(
   template: &mut LocationTemplate,
   location: &ProxyHttpLocation,
 ) {
+  template.enable_logging = matches!(&location.target,
+    LocationTarget::Upstream(target) if target.enable_logging == Some(true));
   template.client_max_body_size =
     location.client_max_body_size.as_ref().map(|value| {
       serde_json::to_string(value)
@@ -599,6 +601,9 @@ async fn prepare_rule(
           continue;
         }
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
+          "state_dir": state.store.dir,
+          "enable_logging": matches!(&stream_rule.target,
+            StreamTarget::Upstream(target) if target.enable_logging == Some(true)),
           "listen": listen,
           "key": name,
           "upstream_key": upstream.key,
@@ -664,6 +669,7 @@ async fn prepare_rule(
               };
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 limit_req: location.limit_req.clone(),
                 upstream_key: if ssl.is_some() {
                   format!("https://{}", prepared_upstream.key)
@@ -696,6 +702,7 @@ async fn prepare_rule(
                 super::rule::gen_unix_target(unix).await?;
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 upstream_key: format!("http://{}", prepared_upstream.key),
                 redirect: None,
                 limit_req: location.limit_req.clone(),
@@ -722,6 +729,7 @@ async fn prepare_rule(
             LocationTarget::Http(http) => {
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 upstream_key: http.url.clone(),
                 limit_req: location.limit_req.clone(),
                 version: location.version,
@@ -747,6 +755,7 @@ async fn prepare_rule(
           }
         }
         let data = HTTP_TEMPLATE.compile(&liquid::object!({
+          "state_dir": state.store.dir,
           "key": name,
           "limit_req_zone": http_rule.limit_req_zone,
           "listen": listen,
@@ -833,6 +842,74 @@ mod tests {
 
   const GENERATION: &str = "0123456789abcdef0123456789abcdef";
   const NEXT_GENERATION: &str = "abcdef0123456789abcdef0123456789";
+
+  #[test]
+  fn http_access_logging_requires_target_opt_in() {
+    let cases = [
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80}),
+        false,
+      ),
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80, "EnableLogging": false}),
+        false,
+      ),
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80, "EnableLogging": true}),
+        true,
+      ),
+      (serde_json::json!({"Url": "http://example.test"}), false),
+      (serde_json::json!({"UnixPath": "/run/app.sock"}), false),
+    ];
+    let locations = cases
+      .iter()
+      .enumerate()
+      .map(|(index, (target, _))| {
+        let location: ProxyHttpLocation =
+          serde_json::from_value(serde_json::json!({
+            "Path": format!("/route-{index}/"),
+            "Target": target,
+          }))
+          .unwrap();
+        let mut rendered: LocationTemplate =
+          serde_json::from_value(serde_json::json!({
+            "path": location.path,
+            "enable_logging": false,
+            "upstream_key": "http://upstream",
+            "upstream_path": "/",
+          }))
+          .unwrap();
+        apply_location_options(&mut rendered, &location);
+        rendered
+      })
+      .collect::<Vec<_>>();
+    let output = HTTP_TEMPLATE
+      .compile(&liquid::object!({
+        "key": "logging-test",
+        "listen": "127.0.0.1:80",
+        "state_dir": "/tmp/ncproxy",
+        "locations": locations,
+        "hide_upstream": false,
+      }))
+      .unwrap();
+    for (index, (_, enabled)) in cases.iter().enumerate() {
+      let marker = format!("location /route-{index}/ {{");
+      let block = output
+        .split_once(&marker)
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+      let directive = if *enabled {
+        "access_log /tmp/ncproxy/log/access.log http_basic;"
+      } else {
+        "access_log off;"
+      };
+      assert!(block.contains(directive), "{block}");
+      assert_eq!(block.matches("access_log ").count(), 1);
+    }
+  }
 
   #[test]
   fn supervision_rejects_invalid_pids_and_unrelated_master_titles() {

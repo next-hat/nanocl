@@ -79,12 +79,12 @@ pub struct UpstreamTarget {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub path: Option<String>,
-  /// Disable logging for this target
+  /// Enable Nginx file access logging for this target (disabled by default).
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub disable_logging: Option<bool>,
+  pub enable_logging: Option<bool>,
   /// SSL configuration for this target
   #[cfg_attr(
     feature = "serde",
@@ -479,6 +479,36 @@ impl<'de> Deserialize<'de> for ProxyCache {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
+
+  #[test]
+  fn upstream_logging_requires_opt_in_and_rejects_legacy_field() {
+    for enabled in [None, Some(false), Some(true)] {
+      let mut input = serde_json::json!({
+        "Key": "global.example.c", "Port": 9000,
+      });
+      if let Some(enabled) = enabled {
+        input["EnableLogging"] = serde_json::json!(enabled);
+      }
+      let target: UpstreamTarget = serde_json::from_value(input).unwrap();
+      assert_eq!(target.enable_logging, enabled);
+      assert_eq!(
+        target.enable_logging.unwrap_or(false),
+        enabled == Some(true)
+      );
+      let output = serde_json::to_value(target).unwrap();
+      assert_eq!(
+        output.get("EnableLogging"),
+        enabled.map(serde_json::Value::Bool).as_ref()
+      );
+      assert!(output.get("DisableLogging").is_none());
+    }
+    assert!(
+      serde_json::from_value::<UpstreamTarget>(serde_json::json!({
+        "Key": "global.example.c", "Port": 9000, "DisableLogging": false,
+      }))
+      .is_err()
+    );
+  }
 
   #[test]
   fn location_options_deserialize_and_validate() {
