@@ -1,314 +1,168 @@
 <div align="center">
-  <img width="142" height="142" src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h2>Nanocl</h2>
-  <h4>Just Develop, Deploy.</h4>
-  <h6>Orchestrate like never before. K8s reimagined.</h6>
-  <p align="center">
-    <a href="https://next-hat.com/nanocl"><b>Why</b></a> •
-    <a href="https://docs.next-hat.com/manuals/nanocl/install/overview"><b>Install</b></a> •
-    <a href="https://discord.gg/WV4Aac8uZg" target="_blank"><b>Discord</b></a> •
-    <a href="https://x.com/next_hat" target="_blank"><b>𝕏</b></a>
-  </p>
+  <img src="https://download.next-hat.com/ressources/images/logo.png" width="112" height="112" alt="Nanocl logo" />
+  <h1>Nanocl</h1>
+  <p><strong>Containers and virtual machines. One declarative workflow.</strong></p>
+  <p>Define your workloads, networking, and secrets in a Statefile.<br />Deploy and manage them on infrastructure you control.</p>
   <p>
+    <a href="#quick-start"><strong>Quick start</strong></a> ·
+    <a href="https://docs.next-hat.com/guides/nanocl/overview">Documentation</a> ·
+    <a href="https://nr.next-hat.com">Registry</a> ·
+    <a href="./examples">Examples</a> ·
+    <a href="https://discord.gg/WV4Aac8uZg">Discord</a>
+  </p>
 
 [![Tests](https://github.com/next-hat/nanocl/actions/workflows/tests.yml/badge.svg)](https://github.com/next-hat/nanocl/actions/workflows/tests.yml)
 [![Clippy](https://github.com/next-hat/nanocl/actions/workflows/clippy.yml/badge.svg)](https://github.com/next-hat/nanocl/actions/workflows/clippy.yml)
 [![codecov](https://codecov.io/gh/next-hat/nanocl/branch/nightly/graph/badge.svg?token=4I60HOW6HM)](https://codecov.io/gh/next-hat/nanocl)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 
-  </p>
 </div>
 
-> Quick install (requires Docker)
+**Nanocl is an open-source container and virtual machine orchestrator written in Rust.** It brings application containers, VMs, jobs, routing, and secrets into one CLI and a declarative configuration format, with Docker as its container runtime.
 
-```bash
+Use it for self-hosted applications, homelab services, or development environments where you want to keep deployment configuration in Git and operate your own infrastructure.
+
+## Why Nanocl?
+
+- **Describe the whole deployment.** Keep workloads, proxy rules, and secrets together in YAML, TOML, or JSON Statefiles. Apply changes with `nanocl state apply`.
+- **Bring your container images.** Group named application containers into a Cargo, with ordered init containers and a replica count.
+- **Go beyond containers.** Manage virtual machines, one-off jobs, and scheduled tasks through the same CLI.
+- **Connect your services.** Configure HTTP/TCP routing, TLS, and service DNS through the `ncproxy` and `ncdns` controllers.
+- **Reuse your configuration.** Statefile arguments, templates, and SubStates let you adapt deployments across environments and compose larger applications.
+
+Nanocl uses its own API and Statefile format. Start with the single-node workflow below, then explore the [concepts and architecture][overview].
+
+**Like the direction? Give Nanocl a ⭐ to bookmark it and help others discover the project.**
+
+## Quick start
+
+Deploy an NGINX web server and open it in your browser. This example targets the **v0.18 API** and uses a local Nanocl installation with Docker running and port **8080** available.
+
+### 1. Install Nanocl
+
+On **Linux or macOS**, install the CLI:
+
+```sh
 curl -fsSL https://download.next-hat.com/scripts/get-nanocl.sh | sh
 ```
 
-Then complete the required [Post‑installation steps][post_install].
+Open a new terminal and complete the socket-access setup in the [post-installation guide][post_install]. Then install the Nanocl components:
 
-**Nanocl** is an open‑source distributed system that reimagines **cloud‑native orchestration** from the ground up.
-
-It gives developers a frictionless **local to production** workflow while hiding multi‑service complexity (no more ad‑hoc scripts, CORS hacks, or brittle docker‑compose sprawl). The same declarative model powers both dev and prod.
-
-> You could rebuild a K8s inside Nanocl… but you probably won't want to.
-
-Built in 🦀 **Rust** for efficiency & security, Nanocl targets **platform engineers** who need strong isolation, predictable performance, and simpler operations without the cognitive overhead of a full Kubernetes distribution.
-
-## Table of Contents
-
-1. [Why Nanocl](#why-nanocl)
-2. [Key Features](#key-features)
-3. [Installation](#installation)
-4. [Quick Start](#quick-start)
-5. [Latest news](#latest-news)
-6. [Usage](#usage)
-7. [Architecture](#architecture)
-8. [Demo](#demo)
-9. [Roadmap](#roadmap)
-10. [Security](#security)
-11. [Contribute](#contribute)
-12. [Support & Community](#support--community)
-13. [Sponsors](#sponsors)
-14. [License](#license)
-15. [Star History](#star-history)
-
-## Why Nanocl
-
-Modern teams need faster iteration loops, secure multi‑tenant isolation, and a production‑grade transition path without operating a heavyweight control plane on day one. Nanocl focuses on:
-
-- Dev→Prod symmetry: declarative Statefiles (YAML/TOML/JSON) stay identical across environments.
-- Low operational overhead: minimal moving parts; opinionated defaults.
-- Security & efficiency: memory‑safe implementation, reduced footprint versus scripting stacks.
-- Extensibility: resources & rules let you model networking, routes, TLS, jobs, and more.
-- Pragmatic scope: not a Kubernetes clone lean where K8s is heavy, expressive where docker‑compose is limiting.
-
-## Key Features
-
-- Declarative Statefiles for cargoes (containers), resources, jobs & virtual machines.
-- End‑to‑end TLS (including internal mesh primitives in progress).
-- Dynamic routing & DNS propagation (`ncproxy`, `ncdns`).
-- Resource abstraction layer for pluggable kinds (e.g. proxy rules).
-- Jobs & cron style automation.
-- Backup & orphan cleanup tooling.
-- Multi-format config: YAML / TOML / JSON.
-- Batteries included CLI & daemon.
-- Minimal host footprint; modular optional services.
-
-See the [health-check documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/health-checks)
-for rolling update readiness behavior and [TLS secret documentation](https://docs.next-hat.com/docs/guides/nanocl/advanced-usage/secret-tls)
-for certificate persistence.
-
-## Installation
-
-Nanocl supports **Linux**, **macOS**, and **Windows**. See the [Installation guide][nanocl_install_guide].
-
-### Quick install
-
-Run the installer (requires Docker):
-
-```bash
-curl -fsSL https://download.next-hat.com/scripts/get-nanocl.sh | sh
+```sh
+nanocl install
 ```
 
-Then complete the required [Post‑installation steps][post_install].
+For platform requirements and other installation methods, see the [installation guide][install]. Windows users should follow the [Windows guide][windows_install]; native Windows support is experimental and WSL is recommended.
 
-If you're just evaluating, a single-node install usually takes under two minutes.
+### 2. Describe your application
 
-## Quick Start
-
-Create a minimal Statefile and apply it:
+Save this as `Statefile.yml`:
 
 ```yaml
 ApiVersion: v0.18
+Namespace: global
+
 Cargoes:
-  - Name: example
+  - Name: hello-nanocl
+    PortBindings:
+      "80/tcp":
+        - HostIp: "127.0.0.1"
+          HostPort: "8080"
     Containers:
-      - Name: wepapp
-        Image: ghcr.io/next-hat/documentation:0.16.0
+      - Name: web
+        Image: docker.io/library/nginx:alpine
 ```
 
-Apply & inspect:
+A **Cargo** describes a group of application containers. This one runs NGINX and publishes its HTTP port on your machine's loopback address.
 
-```bash
-nanocl state apply -s ./state.yml
-nanocl cargo ls
-nanocl cargo logs global.example
+### 3. Deploy and open it
+
+```sh
+nanocl state apply -s Statefile.yml
+nanocl cargo ls --namespace global
 ```
 
-Cargoes and virtual machines use canonical keys in
-`{namespace}.{name}` order, such as `global.example` or `system.ncproxy`.
-Collection commands return every namespace unless `--namespace` is provided:
+Once the container is running, open **[http://127.0.0.1:8080](http://127.0.0.1:8080)**. You should see the NGINX welcome page. You can also check the response and view the logs:
 
-```bash
-nanocl cargo ls
-nanocl cargo ls --namespace system
-nanocl vm ls
+```sh
+curl http://127.0.0.1:8080
+nanocl cargo logs global.hello-nanocl
 ```
 
-Commands targeting an existing Cargo or VM take that key directly and do not
-accept a namespace option. Creation commands still default to `global` when
-`--namespace` is omitted.
+Existing Cargoes and VMs are addressed as `namespace.name`, such as `global.hello-nanocl`. To change this deployment, edit the Statefile and run `nanocl state apply` again.
 
-Remove it:
+### 4. Clean up
 
-```bash
-nanocl state rm -s ./state.yml
+```sh
+nanocl state rm -s Statefile.yml
 ```
 
-Next: explore [Get Started][nanocl_get_started].
+**Next:** follow the [getting-started guide][get_started] or explore the examples below.
 
-> Nanocl is evolving fast. Feedback & early adopters shape the roadmap see below.
+## Build something useful
 
-## Latest news
+**Start with a real application.** The [Nanocl Registry][registry] is a collection of ready-to-use Statefiles and real-world deployment examples. Browse the catalog, choose a deployment, and follow its instructions to adapt it to your infrastructure.
 
-- **Release**: [Nanocl 0.18.0](https://docs.next-hat.com/blog/nanocl-0.18)
-- **Blog**: [Automating deployment with GitHub Actions](https://docs.next-hat.com/blog/automating-deployment-with-github-actions-and-nanocl) on 24.11.2024
-- **Release**: [End to End TLS encryption and first step for network meshing](https://docs.next-hat.com/blog/nanocl-0.16) on 01.11.2024
-- **Release**: [Man page, Backup, Remove Orphans and more](https://docs.next-hat.com/blog/nanocl-0.15) on 11.06.2024
-- **Event**: [We are invited to the Merge Berlin 2024](https://www.linkedin.com/feed/update/urn:li:activity:7201921660289998850) on 01.06.2024
-- **Release**: [Context, SubState and more](https://docs.next-hat.com/blog/nanocl-0.14) on 07.05.2024
+Try [Uptime Kuma](https://nr.next-hat.com/v0.18/uptime-kuma) for monitoring, [Jellyfin](https://nr.next-hat.com/v0.18/jellyfin) for a media server, or [Vaultwarden](https://nr.next-hat.com/v0.18/vaultwarden) for password management.
 
-## Usage
+| You want to… | Start here |
+| --- | --- |
+| Route a domain to your application | [Proxy rule example](./examples/deploy_example.yml) |
+| Configure HTTPS | [TLS deployment example](./examples/deploy_ssl.yml) |
+| Run a scheduled task | [Cron job example](./examples/cron_job_example.yml) |
+| Run a virtual machine | [VM Statefile](./examples/vm_example.yml) · [VM command reference](./doc/man/nanocl-vm-create.md) |
+| Pass environment secrets to containers | [Deployment with environment secrets](./examples/deploy_secrets.yml) |
+| Reuse deployment configuration | [Statefile arguments](./examples/deploy_args_example.yml) · [SubStates](./examples/sub_state.yml) |
 
-Enable [shell completion](doc/shell-completion.md) for commands, options, and live
-cargo, VM, job, resource, secret, namespace, and process names.
+Examples declare their own `ApiVersion`; check it against your installed version and supply any required domain, certificate, or VM image.
 
-Statefiles drive everything. Here's the Statefile we use to deploy our own [documentation][documentation]:
+Browse [all examples](./examples), the [CLI reference][cli_reference], or the [daemon API reference][api_reference].
 
-```yaml
-ApiVersion: v0.19
-Cargoes:
-  - Name: documentation
-    Containers:
-      - Name: webapp
-        Image: ghcr.io/next-hat/documentation:0.16.0
+## How it works
 
-Resources:
-  - Name: docs.next-hat.com
-    Kind: ncproxy.io/rule
-    Data:
-      Rules:
-        - Domain: docs.next-hat.com
-          Network: Public
-          Locations:
-            - Path: /
-              Target:
-                Key: global.documentation.c
-                Port: 80
-```
+The `nanocl` CLI sends requests to `nanocld`, which manages workloads through Docker and stores their configuration in `nstore`. Networking controllers provide proxy and DNS configuration.
 
-Actions:
+![Nanocl single-node architecture: CLI and Statefile, orchestration daemon, state store, metrics, Docker workloads, and networking controllers](./doc/architecture_diagram.png)
 
-- Apply: `nanocl state apply -s ./state.yml`
-- Remove: `nanocl state rm -s ./state.yml`
+| Component | Role |
+| --- | --- |
+| `nanocl` | CLI for deploying and managing workloads |
+| `nanocld` (`ndaemon`) | REST API and orchestration daemon |
+| `nstore` | Persistent cluster state in CockroachDB |
+| `nmetrics` | Resource usage collection |
+| `ncproxy` | Proxy controller with an embedded NGINX data plane |
+| `ncdns` | DNS controller with an embedded dnsmasq data plane |
 
-More object options in the [References][nanocl_daemon_ref].
+## Project status
 
-## Architecture
+Nanocl is actively developed. This repository's `nightly` branch includes work for **v0.19**; the quick start above uses the **v0.18** configuration format. Check the [releases][releases] and [changelog](./bin/nanocl/changelog.md) for version-specific changes.
 
-Nanocl is composed of modular containerized services:
+Have a use case, a rough edge, or a feature idea? [Open an issue][issues] or [join Discord][discord] and help shape what comes next.
 
-| Component | Purpose |
-|-----------|---------|
-| nstore | Persist cluster state |
-| ndaemon | REST API & control surface |
-| nmetrics | Resource usage collection |
-| ncproxy | Proxy controller with embedded nginx data plane (optional) |
-| ncdns | DNS controller with embedded dnsmasq data plane (optional) |
+## Contribute and support
 
-Resources:
+Bug reports, documentation improvements, examples, and code contributions are all welcome. The [contribution guide](./CONTRIBUTING.md) explains how to set up a development environment; the [Code of Conduct](./CODE_OF_CONDUCT.md) applies to our community.
 
-- [Overview][nanocl_overview]
-- [Get Started][nanocl_get_started]
-- [CLI References][nanocl_cli_ref]
-- [Daemon References][nanocl_daemon_ref]
+- **Build with us:** [report a bug or suggest a feature][issues], or contribute to the [documentation][docs_repository].
+- **Talk with us:** get help and share what you are building on [Discord][discord].
+- **Fund development:** support the project through [GitHub Sponsors](https://github.com/sponsors/next-hat).
+- **Help people find Nanocl:** star the repository or share it with someone building their own infrastructure.
 
-Single‑node architecture:
-
-<div align="center">
-  <img src="./doc/architecture_diagram.png" />
-</div>
-
-## Roadmap
-
-High‑level focus (non‑exhaustive):
-
-- Service mesh primitives (progressive rollout of secure networking).
-- Extended resource kinds (cert management, quotas).
-- Multi‑node clustering UX refinements.
-- Improved observability (tracing & richer metrics).
-- Provider abstraction layer (future pluggable runtimes).
-
-Track changes & releases in the [blog](https://docs.next-hat.com/blog/).
-
-## Security
-
-Please report vulnerabilities via our [Security Policy](./SECURITY.md). Responsible disclosure helps everyone.
-
-## Contribute
-
-<blockquote>
- <span>
-  Little by little, a little becomes a lot.
- </span>
-</blockquote>
-
-Join our *[Discord][discord]* the be part of *[NextHat][next_hat]*'s journey to **shape** the **future** of **planet-scale infrastructure management**.
-
-**Every contribution is welcomed**.<br/>
-➡️ Bug reports, feature requests, and pull requests are the most common ways to contribute.<br/>
-For example if you're not a developer yourself you could help us by improving the [Documentation][documentation_repository], too.
-
-Learn how to **setup** a **development environment** via the [Contribution Guide][contributing_guide].<br/>
-Please don't hesitate to **join our team** on [Discord][discord] if you have any questions! 🤗
-
-## Support & Community
-
-- Chat: [Discord][discord]
-- Issues: GitHub Issues & Discussions
-- Questions: Open a discussion or join Discord
-- Updates: Follow us on 𝕏
-
-## Sponsors
-
-<blockquote>
- <span>
-    GitHub ⭐️ helps us a lot to further grow our open-source ecosystem for & with our community.
- </span>
-</blockquote>
-
-Sponsors are **the ones who make this project possible**.<br/>
-They help us to have the necessary resources for Nanocl to keep it alive and to improve it further.<br/>
-If you want to **become a sponsor**, please use the GitHub Sponsor button.<br/>
-
-People that sponsor us will have their **name** or **logo displayed here**, and will have access to a **special role** on our *[Discord][discord]*.
-
-<!-- **Our very kind sponsors:**
-
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/daemonfire300">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/u/135746?v=4&h=300&w=300&fit=cover&mask=circle&maxage=7d" width="100" alt="daemonfire300" />
-        <br/>
-        <sub>
-          <b>
-            daemonfire300
-          </b>
-        </sub>
-      </a>
-    </td>
-  </tr>
-</table> -->
+Report vulnerabilities privately using the [security policy](./SECURITY.md).
 
 ## License
 
-Dual licensed under either:
+Dual licensed under [MIT](./LICENSE-MIT) or [Apache 2.0](./LICENSE-APACHE), at your option.
 
-- [Apache License, Version 2.0](./LICENSE-APACHE)
-- [MIT License](./LICENSE-MIT)
-
-You may use either license at your discretion.
-
-## Star History
-
-<blockquote>
- <span>
-    We are just at the beginning of a new paradigm shift..
- </span>
-</blockquote>
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=next-hat/nanocl&type=Date)](https://star-history.dera.page/#next-hat/nanocl&type=date)
-
-[contributing_guide]: ./CONTRIBUTING.md
-[next_hat]: https://next-hat.com
-[documentation]: https://docs.next-hat.com
-[nanocl_overview]: https://docs.next-hat.com/guides/nanocl/overview
-[nanocl_install_guide]: https://docs.next-hat.com/manuals/nanocl/install/overview
-[nanocl_get_started]: https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup
-[nanocl_cli_ref]: https://docs.next-hat.com/references/nanocl/cli
-[nanocl_daemon_ref]: https://docs.next-hat.com/references/nanocl/daemon/overview
-[docker]: https://www.docker.com
-[discord]: https://discord.gg/WV4Aac8uZg
-[documentation_repository]: https://github.com/next-hat/documentation
+[registry]: https://nr.next-hat.com
+[overview]: https://docs.next-hat.com/guides/nanocl/overview
+[install]: https://docs.next-hat.com/manuals/nanocl/install/overview
+[windows_install]: https://docs.next-hat.com/manuals/nanocl/install/windows
 [post_install]: https://docs.next-hat.com/manuals/nanocl/install/post-installation
+[get_started]: https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup
+[cli_reference]: https://docs.next-hat.com/references/nanocl/cli
+[api_reference]: https://docs.next-hat.com/references/nanocl/daemon/overview
+[releases]: https://github.com/next-hat/nanocl/releases
+[issues]: https://github.com/next-hat/nanocl/issues
+[discord]: https://discord.gg/WV4Aac8uZg
+[docs_repository]: https://github.com/next-hat/documentation
