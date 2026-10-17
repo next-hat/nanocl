@@ -10,8 +10,8 @@ use ntex::{
 };
 use tokio::io::AsyncWriteExt;
 
-use bollard_next::container::AttachContainerOptions;
-use nanocl_error::http::HttpResult;
+use bollard_next::container::{AttachContainerOptions, AttachContainerResults};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::OutputLog;
 
 use crate::{
@@ -20,15 +20,14 @@ use crate::{
 };
 
 fn ws_attach_service(
-  name: String,
-  state: SystemState,
+  stream: AttachContainerResults,
 ) -> impl Service<ws::WsSink, ws::Frame, Res = Option<ws::Message>, Error = io::Error>
 {
   let con_state = Rc::new(RefCell::new(WsConState::new()));
   let heartbeat_state = con_state.clone();
   let (tx, rx) = oneshot::channel();
   let (s_cmd, r_cmd) = mpsc::channel::<Result<Bytes, io::Error>>();
-  let startup = Rc::new(RefCell::new(Some((name, rx, r_cmd))));
+  let startup = Rc::new(RefCell::new(Some((stream, rx, r_cmd))));
   // handler service for incoming websocket frames
   let service = fn_service(move |frame| {
     let item = match frame {
@@ -54,29 +53,13 @@ fn ws_attach_service(
   ntex::service(service)
     .readiness(async move |sink: &ws::WsSink| {
       let startup = startup.borrow_mut().take();
-      if let Some((name, rx, mut r_cmd)) = startup {
+      if let Some((stream, rx, mut r_cmd)) = startup {
         rt::spawn(utils::ws::heartbeat(
           heartbeat_state.clone(),
           sink.clone(),
           rx,
         ));
         let sink = sink.clone();
-        let stream = state
-          .inner
-          .docker_api
-          .attach_container(
-            &name,
-            Some(AttachContainerOptions::<String> {
-              stdin: Some(true),
-              stdout: Some(true),
-              stderr: Some(true),
-              stream: Some(true),
-              logs: Some(false),
-              detach_keys: Some("ctrl-c".to_owned()),
-            }),
-          )
-          .await
-          .map_err(io::Error::other)?;
         rt::spawn(async move {
           let mut output = stream.output;
           while let Some(output) = output.next().await {
@@ -144,8 +127,66 @@ pub async fn attach_process(
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
+  if let Err(error) = ws::verify_handshake(req.head()) {
+    return utils::ws::response(Err(error.into()));
+  }
   let (_, name) = path.into_inner();
+  // Docker must accept the attachment before we send the WebSocket upgrade.
+  let stream = state
+    .inner
+    .docker_api
+    .attach_container(
+      &name,
+      Some(AttachContainerOptions::<String> {
+        stdin: Some(true),
+        stdout: Some(true),
+        stderr: Some(true),
+        stream: Some(true),
+        logs: Some(false),
+        detach_keys: Some("ctrl-c".to_owned()),
+      }),
+    )
+    .await
+    .map_err(HttpError::internal_server_error)?;
   utils::ws::response(
-    web::ws::start(&req, None, ws_attach_service(name, state.clone())).await,
+    web::ws::start(&req, None, ws_attach_service(stream)).await,
   )
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::ws::error::WsClientError;
+  use ntex::{SharedCfg, http::StatusCode, ws::WsClient};
+
+  use crate::utils::tests::gen_default_test_system;
+
+  #[ntex::test]
+  async fn missing_process_rejects_websocket_upgrade() {
+    let system = gen_default_test_system().await;
+    let path = format!(
+      "/processes/nanocl-attach-missing-{}/attach",
+      uuid::Uuid::new_v4()
+    );
+
+    // Protocol validation must still happen before Docker attachment.
+    let response = system.client.send_get(&path, None::<String>).await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // Use a real upgrade request: a test-only handler call cannot prove that
+    // the HTTP error is sent before ntex takes ownership of the connection.
+    let request = system.client.get(&path);
+    let error =
+      WsClient::new(request.get_uri().to_string(), SharedCfg::default())
+        .connect()
+        .await
+        .err()
+        .expect("a missing process must reject the WebSocket upgrade");
+    assert!(
+      matches!(
+        *error,
+        WsClientError::InvalidResponseStatus(StatusCode::INTERNAL_SERVER_ERROR)
+      ),
+      "{error}"
+    );
+  }
 }

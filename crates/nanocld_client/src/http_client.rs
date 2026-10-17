@@ -458,12 +458,15 @@ impl NanocldClient {
             break;
           }
         };
+        let buffered_len = payload.len();
         payload.extend_from_slice(&bytes);
         let mut start = 0;
-        for (end, byte) in payload.iter().enumerate() {
+        // Retained bytes have already been scanned for record boundaries.
+        for (offset, byte) in bytes.iter().enumerate() {
           if *byte != b'\n' {
             continue;
           }
+          let end = buffered_len + offset;
           let t = match serde_json::from_slice::<R>(&payload[start..=end]) {
             Ok(t) => t,
             Err(e) => {
@@ -518,9 +521,14 @@ mod tests {
   #[ntex::test]
   async fn res_stream_retains_fragmented_records_and_partial_suffix() {
     let res = response_with_chunks(&[
-      b"{\"value\":",
-      b"1}\n{\"value\":2}\n{\"value\":",
-      b"3}\n{\"value\":4",
+      b"{",
+      b"\"value\":",
+      b"",
+      b"1}",
+      b"\n{\"value\":2}\n{\"value\":",
+      b"",
+      b"3}",
+      b"\n{\"value\":4",
     ]);
     let mut stream = NanocldClient::res_stream::<Value>(res).await;
 
