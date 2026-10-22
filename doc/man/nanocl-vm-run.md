@@ -11,7 +11,7 @@ run - Run a vm
 
 ## SYNOPSIS
 
-**run** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\]
+**run** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--max-cpu**\] \[**--max-memory**\]
 \[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
 \[**--kvm**\] \[**-a**\|**--attach**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
@@ -42,6 +42,12 @@ Cpu of the vm default to 1
 
 **--mem** *\<MEMORY\>*
 Memory of the vm in MB default to 512
+
+**--max-cpu** *COUNT*
+Reserve a maximum vCPU count for live growth. Omitted uses the initial CPU count.
+
+**--max-memory** *MIB*
+Reserve maximum memory in MiB for live growth. Omitted uses the initial memory allocation. See [live resource growth](../vm-runtime.md#live-resource-growth).
 
 **--net-iface** *\<NET_IFACE\>*
 network interface of the vm

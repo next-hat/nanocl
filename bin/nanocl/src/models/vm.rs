@@ -37,6 +37,13 @@ pub enum VmCommand {
     /// Canonical key of the VM
     key: String,
   },
+  /// Grow CPU, memory, or boot disk without restarting the VM
+  Resize(VmResizeOpts),
+  /// Query QEMU resources and whether CPU/memory persist across restart
+  Resources {
+    /// Canonical key of the VM
+    key: String,
+  },
   /// Attach to a vm
   Attach {
     /// Canonical key of the VM
@@ -65,6 +72,33 @@ impl From<&VmLifecycleOpts> for nanocld_client::stubs::vm::VmLifecycleOptions {
     Self {
       timeout: value.timeout,
       force: value.force,
+    }
+  }
+}
+
+/// Requested resource totals for a live VM resize.
+#[derive(Clone, Parser)]
+#[clap(group(clap::ArgGroup::new("resources").required(true).multiple(true).args(["cpu", "memory", "disk_size"])))]
+pub struct VmResizeOpts {
+  /// Canonical key of the VM
+  pub key: String,
+  /// Total vCPU count, up to the boot-time MaxCpu
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub cpu: Option<u64>,
+  /// Total memory in MiB, up to the boot-time MaxMemory
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub memory: Option<u64>,
+  /// Total boot disk size in bytes; does not grow guest partitions/filesystems
+  #[clap(long, value_name = "BYTES", value_parser = clap::value_parser!(u64).range(1..))]
+  pub disk_size: Option<u64>,
+}
+
+impl From<&VmResizeOpts> for nanocld_client::stubs::vm::VmResizeOptions {
+  fn from(value: &VmResizeOpts) -> Self {
+    Self {
+      cpu: value.cpu,
+      memory: value.memory,
+      disk_size: value.disk_size,
     }
   }
 }
@@ -101,6 +135,12 @@ pub struct VmPatchOpts {
   /// Memory in MB; omitted preserves the current setting
   #[clap(long = "mem")]
   pub memory: Option<u64>,
+  /// Maximum vCPU count reserved at boot; changing it replaces the runtime
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_cpu: Option<u64>,
+  /// Maximum memory in MiB reserved at boot; changing it replaces the runtime
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_memory: Option<u64>,
   /// Enable KVM
   #[clap(long)]
   pub kvm: bool,
@@ -118,6 +158,8 @@ impl VmPatchOpts {
   ) -> Option<VmHostConfig> {
     if self.cpu.is_none()
       && self.memory.is_none()
+      && self.max_cpu.is_none()
+      && self.max_memory.is_none()
       && self.net_iface.is_none()
       && !self.kvm
     {
@@ -129,6 +171,12 @@ impl VmPatchOpts {
     }
     if let Some(memory) = self.memory {
       config.memory = memory;
+    }
+    if let Some(max_cpu) = self.max_cpu {
+      config.max_cpu = Some(max_cpu);
+    }
+    if let Some(max_memory) = self.max_memory {
+      config.max_memory = Some(max_memory);
     }
     if let Some(interface) = &self.net_iface {
       config.net_iface = Some(interface.clone());
@@ -182,6 +230,12 @@ pub struct VmRunOpts {
   /// Memory of the vm in MB default to 512
   #[clap(long = "mem")]
   pub memory: Option<u64>,
+  /// Maximum vCPU count reserved at boot; defaults to the initial CPU count
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_cpu: Option<u64>,
+  /// Maximum memory in MiB reserved at boot; defaults to the initial memory
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_memory: Option<u64>,
   /// network interface of the vm
   #[clap(long)]
   pub net_iface: Option<String>,
@@ -221,6 +275,8 @@ impl From<VmRunOpts> for VmSpecPartial {
       host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
+        max_cpu: val.max_cpu,
+        max_memory: val.max_memory,
         net_iface: val.net_iface,
         kvm: Some(val.kvm),
         ..Default::default()
@@ -254,6 +310,12 @@ pub struct VmCreateOpts {
   /// Memory of the vm in MB default to 512
   #[clap(long = "mem")]
   pub memory: Option<u64>,
+  /// Maximum vCPU count reserved at boot; defaults to the initial CPU count
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_cpu: Option<u64>,
+  /// Maximum memory in MiB reserved at boot; defaults to the initial memory
+  #[clap(long, value_parser = clap::value_parser!(u64).range(1..))]
+  pub max_memory: Option<u64>,
   /// network interface of the vm
   #[clap(long)]
   pub net_iface: Option<String>,
@@ -289,6 +351,8 @@ impl From<VmCreateOpts> for VmSpecPartial {
       host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
+        max_cpu: val.max_cpu,
+        max_memory: val.max_memory,
         net_iface: val.net_iface,
         kvm: Some(val.kvm),
         ..Default::default()
@@ -390,6 +454,86 @@ pub struct VmArg {
 mod tests {
   use clap::Parser;
   use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
+
+  #[test]
+  fn vm_cli_resize_requires_positive_totals_and_accepts_multiple_resources() {
+    assert!(VmArg::try_parse_from(["vm", "resize", "global.guest"]).is_err());
+    for flag in ["--cpu", "--memory", "--disk-size"] {
+      assert!(
+        VmArg::try_parse_from(["vm", "resize", "global.guest", flag, "0"])
+          .is_err()
+      );
+    }
+    let args = VmArg::try_parse_from([
+      "vm",
+      "resize",
+      "global.guest",
+      "--cpu",
+      "4",
+      "--memory",
+      "2048",
+      "--disk-size",
+      "8589934592",
+    ])
+    .unwrap();
+    let VmCommand::Resize(options) = args.command else {
+      panic!("resize");
+    };
+    let request = nanocld_client::stubs::vm::VmResizeOptions::from(&options);
+    assert_eq!(request.cpu, Some(4));
+    assert_eq!(request.memory, Some(2048));
+    assert_eq!(request.disk_size, Some(8589934592));
+    assert!(
+      matches!(VmArg::try_parse_from(["vm", "resources", "global.guest"]).unwrap().command, VmCommand::Resources { key } if key == "global.guest")
+    );
+  }
+
+  #[test]
+  fn vm_cli_boot_limits_round_trip_and_patch_preserves_omitted_limits() {
+    for action in ["create", "run"] {
+      let args = VmArg::try_parse_from([
+        "vm",
+        action,
+        "guest",
+        "/vm.qcow2",
+        "--max-cpu",
+        "8",
+        "--max-memory",
+        "8192",
+      ])
+      .unwrap();
+      let spec = match args.command {
+        VmCommand::Create(options) => VmSpecPartial::from(options),
+        VmCommand::Run(options) => VmSpecPartial::from(options),
+        _ => panic!("create or run"),
+      };
+      let host = spec.host_config.unwrap();
+      assert_eq!(host.max_cpu, Some(8));
+      assert_eq!(host.max_memory, Some(8192));
+    }
+    let current = VmHostConfig {
+      cpu: 2,
+      memory: 1024,
+      max_cpu: Some(8),
+      max_memory: Some(8192),
+      ..Default::default()
+    };
+    let options =
+      VmPatchOpts::try_parse_from(["patch", "global.guest", "--max-cpu", "16"])
+        .unwrap();
+    let updated = options.patch_host_config(&current).unwrap();
+    assert_eq!(updated.max_cpu, Some(16));
+    assert_eq!(updated.max_memory, current.max_memory);
+    assert_eq!(updated.cpu, current.cpu);
+    assert_eq!(updated.memory, current.memory);
+    let options =
+      VmPatchOpts::try_parse_from(["patch", "global.guest", "--cpu", "4"])
+        .unwrap();
+    assert_eq!(
+      options.patch_host_config(&current).unwrap().max_cpu,
+      current.max_cpu
+    );
+  }
 
   #[test]
   fn vm_cli_lifecycle_defaults_force_and_timeout_bounds() {

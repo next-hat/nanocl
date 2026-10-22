@@ -53,9 +53,46 @@ nanocl vm restart global.desktop --force
 
 The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restart`, and `GET /v0.19.0/vms/{key}/status`. POST requests require a JSON body; `{}` uses defaults, and `{"Timeout":120,"Force":false}` sets an explicit grace period. Shutdown timeout returns HTTP 504. These endpoints accept the daemon Unix socket or verified mutual TLS; plaintext TCP is denied, and a browser Origin must exactly match the HTTPS endpoint. They use the same daemon-wide operator privileges as the console.
 
-Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. This increment does not expose pause/resume or live CPU, RAM, or disk resizing.
+Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. Pause/resume is not exposed.
 
 Generic process stop/restart, VM replacement, and VM deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
+
+## Live resource growth
+
+Reserve CPU and memory ceilings when creating the VM. `HostConfig.MaxCpu` and `HostConfig.MaxMemory` are optional; omitted values use the initial `Cpu` and `Memory`, leaving no capacity for live growth of that resource. Memory values are MiB. The ceilings cannot be changed by a live resize: changing them through PATCH replaces the runtime and requires guest shutdown.
+
+```yaml
+HostConfig:
+  Cpu: 2
+  Memory: 1024
+  MaxCpu: 8
+  MaxMemory: 8192
+  Kvm: true
+```
+
+The equivalent CLI flags are `--max-cpu` and `--max-memory` on `vm create`, `vm run`, and `vm patch`. Existing containers need replacement with the updated runtime and desired ceilings before they can use CPU or memory hot-add. The image must advertise `io.nanocl.vm-resize=1`; selecting a new image tag does not modify an already-created container.
+
+```sh
+nanocl vm resources global.desktop
+nanocl vm resize global.desktop --cpu 4 --memory 2048
+nanocl vm resize global.desktop --disk-size 34359738368
+```
+
+Each value is the requested total, not an increment. `--disk-size` is bytes (the example requests 32 GiB). The VM must be running. Live resize only grows resources; requests below current QEMU capacity are rejected. A request equal to current capacity is accepted so that a previous persistence failure can be repaired.
+
+| Resource | Requirements and effect |
+| --- | --- |
+| CPU | At most the boot-time `MaxCpu`, up to 255 vCPUs. QEMU adds CPU devices; the guest must support and online them. |
+| Memory | At most the boot-time `MaxMemory`. Each increase must be a multiple of 128 MiB. The runtime reserves 32 DIMM slots per boot; restarting folds the new allocation into base memory and makes those slots available again. Memory and ceiling values must be positive and at most 8,796,093,022,207 MiB. The guest must support and online added memory. |
+| Boot disk | New size must be aligned to 512 bytes. Supported disks are unencrypted raw or qcow2 images without backing files or internal snapshots. QEMU enlarges the block device; the guest's partition table and filesystems must be grown separately. |
+
+NanoCL does not execute guest commands or install a guest agent for resizing. A successful API response confirms QEMU capacity, not guest CPU/memory online state or usable filesystem space. Host memory and storage capacity must still support the requested allocation.
+
+The API exposes `POST /v0.19.0/vms/{key}/resize` with a JSON body such as `{"Cpu":4,"Memory":2048,"DiskSize":34359738368}`, and `GET /v0.19.0/vms/{key}/resources`. Both use the same trusted operator transport and Origin checks as lifecycle operations. At least one resource must be supplied. The response contains `Cpu`, `Memory`, `DiskSize`, `MaxCpu`, `MaxMemory`, and `Persistent`.
+
+`Persistent: true` means observed CPU and memory match both the saved VM specification and the runtime's restart configuration. Successful growth survives a same-container restart; CPU and memory changes also create specification history without replacing the running VM. Disk growth is stored in the disk image itself. Keep desired Statefiles consistent with the new allocation before applying them again.
+
+Resize is not atomic. NanoCL preflights the requested resources, but a later QMP command or persistence write can fail after earlier changes succeeded. A timeout or error does not undo those changes and must not be treated as proof that nothing happened. Query `vm resources` before retrying. If `Persistent` is false, retry the desired CPU/memory totals to reconcile the observed allocation with the saved specification and restart configuration; avoid restarting until persistence is confirmed. The client does not retry resize requests automatically.
 
 ## Provisioning and console options
 
@@ -184,5 +221,7 @@ Use disposable guest disk copies and a development NanoCL daemon. Record the Nan
 6. Enable `Console`, start the [noVNC example](../examples/vm-console/README.md), and use a real browser to observe display output and send keyboard input. Test disconnect/reconnect, runtime restart, and replacement. Verify the old connection closes when its backend exits.
 7. Attempt the console from plaintext TCP, with a foreign/null Origin, with no trusted client certificate, with `Console: false`, against a missing VM, and against a stopped runtime. Record the actual rejection status. An operator trusted by the daemon can access enabled consoles across namespaces by design.
 8. Delete the VMs. Verify their runtime containers, TAP devices, dnsmasq/QEMU processes, and console sockets disappear. Delete only test-owned images/networks after checking that no unrelated workloads use them.
+
+For live resizing, start a guest with explicit CPU/memory ceilings and the resize-capable runtime. Record QEMU resources, guest online CPU/memory, and disk/filesystem sizes separately. Grow each resource and a combined request, verify shrink/ceiling/alignment rejection before mutation, then verify persistence across a same-container restart. Exercise a partial failure, inspect `Persistent`, and retry the same totals. Confirm stale generation and foreign container identities are rejected and console access still works after a resource-only specification revision.
 
 The unit tests cover parsing, identity rules, configuration propagation, and console checks. Real guest boot, DHCP renewal, DNS, ingress, simultaneous VMs, and browser interaction require the above runtime evidence. A namespace probe or a successful image build alone does not establish them.

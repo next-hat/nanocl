@@ -102,6 +102,8 @@ impl Modify for VersionModifier {
     vm::stop_vm,
     vm::restart_vm,
     vm::vm_status,
+    vm::resize_vm,
+    vm::vm_resources,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,
@@ -185,6 +187,48 @@ mod tests {
         .and_then(serde_json::Value::as_str)
         .or_else(|| object.values().find_map(find_schema_reference)),
       _ => None,
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_resize_and_limits() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/resize", "/vms/{key}/resources"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in ["VmResizeOptions", "VmResources", "VmHostConfig"] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    assert_eq!(
+      generated["paths"]["/vms/{key}/resize"]["post"]["requestBody"]["required"],
+      true
+    );
+    assert_eq!(
+      generated["components"]["schemas"]["VmResources"]["properties"]["Persistent"]
+        ["type"],
+      "boolean"
+    );
+    for field in ["MaxCpu", "MaxMemory"] {
+      assert!(
+        generated["components"]["schemas"]["VmHostConfig"]["properties"][field]
+          .is_object()
+      );
+      assert!(
+        !generated["components"]["schemas"]["VmHostConfig"]["required"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|item| item == field)
+      );
     }
   }
 

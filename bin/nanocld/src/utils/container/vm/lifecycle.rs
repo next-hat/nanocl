@@ -92,7 +92,7 @@ fn validate_process_owner(
   Ok(())
 }
 
-async fn inspect_runtime(
+pub(super) async fn inspect_runtime(
   vm: &Vm,
   state: &SystemState,
 ) -> IoResult<Option<ContainerInspectResponse>> {
@@ -121,7 +121,7 @@ async fn inspect_runtime(
   Ok(Some(runtime))
 }
 
-fn socket_directory(
+pub(crate) fn socket_directory(
   vm: &Vm,
   runtime: &ContainerInspectResponse,
   state_dir: &str,
@@ -179,7 +179,7 @@ fn socket_directory(
   Ok(directory)
 }
 
-async fn connect(
+pub(super) async fn connect(
   vm: &Vm,
   runtime: &ContainerInspectResponse,
   state: &SystemState,

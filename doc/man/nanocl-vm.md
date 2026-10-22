@@ -53,6 +53,12 @@ Shut down and start VMs by canonical keys
 vm-status(1)
 Query actual QEMU execution state
 
+vm-resize(1)
+Grow running CPU, memory, or boot disk resources
+
+vm-resources(1)
+Query QEMU capacity, boot ceilings, and CPU/memory persistence
+
 vm-attach(1)
 Attach to a vm
 

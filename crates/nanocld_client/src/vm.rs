@@ -4,7 +4,8 @@ use ntex::{io, ws};
 
 use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
 use nanocl_stubs::vm::{
-  Vm, VmInspect, VmLifecycleOptions, VmRuntimeStatus, VmSummary,
+  Vm, VmInspect, VmLifecycleOptions, VmResizeOptions, VmResources,
+  VmRuntimeStatus, VmSummary,
 };
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
@@ -70,6 +71,36 @@ impl NanocldClient {
     key: &str,
   ) -> HttpClientResult<VmRuntimeStatus> {
     let path = Self::vm_lifecycle_path(key, "status")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
+
+  /// Grow running QEMU resources. Errors may follow partially applied changes;
+  /// query resources before retrying. No automatic retry is performed.
+  pub async fn resize_vm(
+    &self,
+    key: &str,
+    options: &VmResizeOptions,
+  ) -> HttpClientResult<VmResources> {
+    options
+      .validate()
+      .map_err(|err| IoError::invalid_input("VM resize", &err))?;
+    let path = Self::vm_lifecycle_path(key, "resize")?;
+    let mut response = self
+      .post(&path)
+      .await?
+      .timeout(ntex::time::Millis::from_secs(120))
+      .send_json(options)
+      .await
+      .map_err(|err| self.send_error(err))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status).await?;
+    Self::res_json(response).await
+  }
+
+  /// Query QEMU capacity and CPU/memory persistence, independently of guest online state.
+  pub async fn vm_resources(&self, key: &str) -> HttpClientResult<VmResources> {
+    let path = Self::vm_lifecycle_path(key, "resources")?;
     let response = self.send_get(&path, None::<String>).await?;
     Self::res_json(response).await
   }
@@ -298,7 +329,7 @@ mod console_tests {
 
   #[test]
   fn vm_lifecycle_paths_require_canonical_keys() {
-    for action in ["stop", "restart", "status"] {
+    for action in ["stop", "restart", "status", "resize", "resources"] {
       assert_eq!(
         NanocldClient::vm_lifecycle_path("team.database", action).unwrap(),
         format!("/vms/team.database/{action}")

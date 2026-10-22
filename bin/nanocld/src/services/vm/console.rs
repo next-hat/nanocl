@@ -1,4 +1,4 @@
-use std::{cell::RefCell, io, path::PathBuf, rc::Rc, time::Instant};
+use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
 use bollard_next::service::ContainerInspectResponse;
 use futures::future::{Either, select};
@@ -359,12 +359,18 @@ pub async fn console_vm(
     .docker_api
     .inspect_container(&process.key, None)
     .await?;
-  validate_runtime(&vm, process, &runtime, &state.inner.config.hostname)?;
-  let socket = PathBuf::from(&state.inner.config.state_dir)
-    .join("run/vms")
-    .join(&vm.spec.vm_key)
-    .join(vm.spec.key.to_string())
-    .join("console.sock");
+  let mut boot_vm = vm.clone();
+  boot_vm.spec = utils::container::vm::validate_boot_spec(&vm, &runtime, state)
+    .await
+    .map_err(super::lifecycle::lifecycle_error)?;
+  validate_runtime(&boot_vm, process, &runtime, &state.inner.config.hostname)?;
+  let socket = utils::container::vm::socket_directory(
+    &vm,
+    &runtime,
+    &state.inner.config.state_dir,
+  )
+  .map_err(super::lifecycle::lifecycle_error)?
+  .join("console.sock");
   let stream = UnixStream::connect(socket)
     .await
     .map_err(|_| HttpError::conflict("VM console is not ready"))?;

@@ -67,3 +67,13 @@ pub struct VmObjPatchIn {
 pub(crate) type VmLifecycleLocks = std::sync::Mutex<
   std::collections::HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>,
 >;
+
+/// Private restart projection for the QEMU generation mounted by Docker.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "PascalCase", deny_unknown_fields)]
+pub(crate) struct VmRuntimeResources {
+  pub cpu: u64,
+  pub memory: u64,
+  pub max_cpu: u64,
+  pub max_memory: u64,
+}

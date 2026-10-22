@@ -25,10 +25,12 @@ use crate::{
 };
 
 mod lifecycle;
+mod resize;
 pub(crate) use lifecycle::{
   control_process, lifecycle_lock, restart_with_options, runtime_status,
-  stop_with_options,
+  socket_directory, stop_with_options,
 };
+pub(crate) use resize::{resize, runtime_resources, validate_boot_spec};
 
 fn network_modes(vm: &Vm) -> Vec<String> {
   let mut modes = vec![super::network::resolve_network_mode(
@@ -165,6 +167,7 @@ fn validate_cloud_init_user(enabled: bool, user: Option<&str>) -> IoResult<()> {
 fn validate_host_config(
   config: &nanocl_stubs::vm_spec::VmHostConfig,
 ) -> IoResult<()> {
+  resize::configured_resources(config)?;
   validate_network_mode(&super::network::resolve_network_mode(
     config.runtime_network.clone(),
   ))?;
@@ -254,6 +257,16 @@ fn validate_runtime_labels(
   vm: &Vm,
   labels: Option<&HashMap<String, String>>,
 ) -> IoResult<()> {
+  if labels
+    .and_then(|labels| labels.get("io.nanocl.vm-resize"))
+    .map(String::as_str)
+    != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "The image must implement io.nanocl.vm-resize=1; select the matching nanocl-qemu runtime",
+    ));
+  }
   let supported = labels
     .and_then(|labels| labels.get("io.nanocl.vm-runtime-api"))
     .map(String::as_str)
@@ -300,6 +313,7 @@ fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
     IoError::invalid_input("VM MAC", "A persisted MAC address is required")
   })?;
   let mut envs = vec![
+    "NANOCL_MANAGED_RESOURCES=true".to_owned(),
     format!("MAC={mac}"),
     "NANOCL_NETWORK_MODE=bridge".to_owned(),
     format!("CLOUD_INIT={}", vm.spec.cloud_init.unwrap_or(true)),
@@ -407,11 +421,26 @@ async fn remove_console_directory(
     }
     Ok(_) => {}
   }
-  for socket in ["console.sock", "qmp.sock"] {
+  for socket in ["console.sock", "qmp.sock", "resources.json"] {
     match tokio::fs::remove_file(path.join(socket)).await {
       Ok(()) => {}
       Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
       Err(err) => return Err(err.into()),
+    }
+  }
+  // Atomic resource writes can leave an owned temporary file after a daemon
+  // crash. Remove only that exact generated filename shape, never recurse.
+  let mut entries = tokio::fs::read_dir(&path).await?;
+  while let Some(entry) = entries.next_entry().await? {
+    let name = entry.file_name();
+    if name
+      .to_str()
+      .and_then(|name| name.strip_prefix("resources-"))
+      .and_then(|name| name.strip_suffix(".tmp"))
+      .and_then(|name| uuid::Uuid::parse_str(name).ok())
+      .is_some()
+    {
+      tokio::fs::remove_file(entry.path()).await?;
     }
   }
   tokio::fs::remove_dir(&path).await?;
@@ -688,6 +717,7 @@ pub async fn create_instance(
   labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
   labels.insert("io.nanocl.vm-spec".to_owned(), vm.spec.key.to_string());
   labels.insert("io.nanocl.vm-qmp".to_owned(), "1".to_owned());
+  labels.insert("io.nanocl.vm-resize".to_owned(), "1".to_owned());
   labels.insert(
     "io.nanocl.vm-console".to_owned(),
     vm.spec.console.unwrap_or(false).to_string(),
@@ -710,19 +740,6 @@ pub async fn create_instance(
     });
     log::debug!("KVM enabled /dev/kvm mapped");
   }
-  let cpu = host_config.cpu;
-  let cpu = if cpu > 0 { cpu.to_string() } else { "1".into() };
-  let cpu = cpu.clone();
-  args.push("-smp".into());
-  args.push(cpu.clone());
-  let memory = host_config.memory;
-  let memory = if memory > 0 {
-    format!("{memory}M")
-  } else {
-    "512M".into()
-  };
-  args.push("-m".into());
-  args.push(memory);
   if let Some(init_container) = &vm.spec.init_container {
     let process = create_init_container(vm, init_container, state).await?;
     if let Err(err) = start_init_container(&process, state).await {
@@ -735,7 +752,23 @@ pub async fn create_instance(
     }
   }
   let mut binds = vec![format!("{}:{}", vm.spec.image, vm.spec.image)];
+  // A lost process row must not let a failed create rewrite a live runtime's
+  // restart projection before Docker rejects the duplicate container name.
+  if inspect_runtime_id(vm, state).await?.is_some() {
+    return Err(IoError::with_context(
+      "VM create",
+      std::io::Error::new(
+        std::io::ErrorKind::WouldBlock,
+        "VM runtime already exists",
+      ),
+    ));
+  }
   let directory = prepare_console_directory(vm, state).await?;
+  resize::write_resources(
+    &directory,
+    &resize::configured_resources(&host_config)?,
+  )
+  .await?;
   binds.push(format!("{}:/run/nanocl-vm", directory.display()));
   let spec = bollard_next::container::Config {
     image: Some(image),
@@ -779,9 +812,7 @@ pub async fn create_instance(
         ..
       })
     ) {
-      if let Ok(path) = console_directory(vm, state) {
-        let _ = tokio::fs::remove_dir(path).await;
-      }
+      let _ = remove_console_directory(vm, state).await;
     }
   }
   result
@@ -1002,11 +1033,15 @@ mod tests {
     let mut labels = HashMap::from([
       ("io.nanocl.vm-runtime-api".into(), "0.19".into()),
       ("io.nanocl.vm-qmp".into(), "1".into()),
+      ("io.nanocl.vm-resize".into(), "1".into()),
     ]);
     assert!(validate_runtime_labels(&vm, None).is_err());
     assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
     labels.insert("io.nanocl.vm-cloud-init-user-data".into(), "1".into());
     assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+    labels.remove("io.nanocl.vm-resize");
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
+    labels.insert("io.nanocl.vm-resize".into(), "1".into());
     labels.remove("io.nanocl.vm-cloud-init-user-data");
     vm.spec.cloud_init = Some(false);
     assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());

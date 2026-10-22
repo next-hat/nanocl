@@ -87,6 +87,18 @@ pub struct VmHostConfig {
   pub cpu: u64,
   /// Memory of the vm in MB (default: 512)
   pub memory: u64,
+  /// Maximum vCPU count reserved at boot; omitted uses Cpu and disables CPU growth.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub max_cpu: Option<u64>,
+  /// Maximum memory in MiB reserved at boot; omitted uses Memory and disables memory growth.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub max_memory: Option<u64>,
   /// Network interface of the vm to setup (default: ens3)
   #[cfg_attr(
     feature = "serde",
@@ -141,6 +153,8 @@ impl Default for VmHostConfig {
     Self {
       cpu: 1,
       memory: 512,
+      max_cpu: None,
+      max_memory: None,
       net_iface: None,
       kvm: None,
       dns: None,
@@ -506,6 +520,24 @@ impl From<VmSpec> for VmSpecPartial {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vm_host_config_resize_limits_preserve_legacy_defaults_and_wire_values() {
+    let legacy: VmHostConfig =
+      serde_json::from_value(serde_json::json!({"Cpu": 2, "Memory": 1024}))
+        .unwrap();
+    assert_eq!(legacy.max_cpu, None);
+    assert_eq!(legacy.max_memory, None);
+    let configured: VmHostConfig = serde_json::from_value(serde_json::json!({"Cpu": 2, "Memory": 1024, "MaxCpu": 8, "MaxMemory": 8192})).unwrap();
+    assert_eq!(configured.max_cpu, Some(8));
+    assert_eq!(configured.max_memory, Some(8192));
+    assert_eq!(
+      serde_json::to_value(&configured).unwrap()["MaxMemory"],
+      8192
+    );
+    let yaml: VmSpecPartial = serde_yaml::from_str("Name: guest\nImage: /vm.qcow2\nHostConfig:\n  Cpu: 2\n  Memory: 1024\n  MaxCpu: 8\n  MaxMemory: 8192\n").unwrap();
+    assert_eq!(yaml.host_config.unwrap(), configured);
+  }
 
   #[test]
   fn vm_optional_provisioning_and_console_preserve_wire_values() {

@@ -12,7 +12,7 @@ patch - Patch a vm
 ## SYNOPSIS
 
 **patch** \[**--user**\] \[**--password**\] \[**--ssh-key**\]
-\[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--kvm**\]
+\[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--max-cpu**\] \[**--max-memory**\] \[**--kvm**\]
 \[**--net-iface**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
@@ -50,6 +50,12 @@ Memory in MB; omitted preserves the current setting
 
 **--kvm**  
 Enable KVM
+
+**--max-cpu** *COUNT*
+Set the maximum vCPU count reserved at boot. Omitted preserves the existing ceiling. Changing it replaces the runtime; use `vm resize` for live growth within the current ceiling.
+
+**--max-memory** *MIB*
+Set maximum memory in MiB reserved at boot. Omitted preserves the existing ceiling. Changing it replaces the runtime.
 
 **--net-iface** *\<NET_IFACE\>*  
 network interface of the vm

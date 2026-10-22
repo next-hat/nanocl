@@ -359,6 +359,24 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
       );
       Ok(())
     }
+    VmCommand::Resize(options) => {
+      let resources = client.resize_vm(&options.key, &options.into()).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&resources)
+          .map_err(|err| err.map_err_context(|| "VM resources"))?
+      );
+      Ok(())
+    }
+    VmCommand::Resources { key } => {
+      let resources = client.vm_resources(key).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&resources)
+          .map_err(|err| err.map_err_context(|| "VM resources"))?
+      );
+      Ok(())
+    }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
     VmCommand::Attach { key } => {

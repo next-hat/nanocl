@@ -9,6 +9,7 @@ pub mod lifecycle;
 pub mod list;
 pub mod list_history;
 pub mod patch;
+pub mod resize;
 
 pub use console::*;
 pub use count::*;
@@ -19,10 +20,19 @@ pub use lifecycle::*;
 pub use list::*;
 pub use list_history::*;
 pub use patch::*;
+pub use resize::*;
 
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
 ) {
+  config.service(
+    web::resource("/vms/{key}/resize")
+      .route(web::post().to_with_state(resize_vm)),
+  );
+  config.service(
+    web::resource("/vms/{key}/resources")
+      .route(web::get().to_with_state(vm_resources)),
+  );
   config.service(
     web::resource("/vms/{key}/stop").route(web::post().to_with_state(stop_vm)),
   );

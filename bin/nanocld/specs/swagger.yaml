@@ -2087,6 +2087,121 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /vms/{key}/resize:
+    post:
+      tags:
+      - Vms
+      summary: Grow running QEMU resources without restarting the VM.
+      description: |-
+        Changes are not atomic. After an error, query resources before retrying;
+        QEMU capacity does not confirm guest CPU/memory online state or filesystem growth.
+      operationId: resize_vm
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmResizeOptions'
+        required: true
+      responses:
+        '200':
+          description: Observed QEMU resources and CPU/memory persistence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmResources'
+        '400':
+          description: Invalid resource totals, shrink request, or boot ceiling exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Trusted operator transport and matching Origin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: VM does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Runtime is unavailable, incompatible, or another VM operation is active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Resize or persistence failed; changes may be partially applied, query resources before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: Resize timed out; changes may be partially applied, query resources before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms/{key}/resources:
+    get:
+      tags:
+      - Vms
+      summary: Query QEMU resource totals, boot ceilings, and CPU/memory persistence.
+      operationId: vm_resources
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Observed QEMU resources and CPU/memory persistence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmResources'
+        '400':
+          description: Invalid canonical VM key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Trusted operator transport and matching Origin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: VM does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Runtime is unavailable or incompatible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: QMP did not respond in time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /vms/{key}/restart:
     post:
       tags:
@@ -9333,6 +9448,20 @@ components:
           format: int64
           description: 'Memory of the vm in MB (default: 512)'
           minimum: 0
+        MaxCpu:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Maximum vCPU count reserved at boot; omitted uses Cpu and disables CPU growth.
+          minimum: 0
+        MaxMemory:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Maximum memory in MiB reserved at boot; omitted uses Memory and disables memory growth.
+          minimum: 0
         NetIface:
           type:
           - string
@@ -9342,7 +9471,9 @@ components:
           type:
           - string
           - 'null'
-          description: 'Network interface to link the vm (default: eth0)'
+          description: |-
+            Docker uplink interface (default: discovered by the runtime).
+            If supplied, it must match the network's container interface prefix plus 0.
         Kvm:
           type:
           - boolean
@@ -9428,6 +9559,71 @@ components:
           type: boolean
           description: Explicitly power off the VM without waiting for guest shutdown.
           default: false
+    VmResizeOptions:
+      type: object
+      description: Grow QEMU resources without restarting the VM. Multiple changes are not atomic.
+      properties:
+        Cpu:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Requested total vCPU count; must not decrease the current count.
+          minimum: 1
+        Memory:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Requested total QEMU memory in MiB; must not decrease current memory.
+          minimum: 1
+        DiskSize:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Requested total boot disk size in bytes; guest partitions and filesystems are unchanged.
+          minimum: 1
+      additionalProperties: false
+    VmResources:
+      type: object
+      description: Resources observed in QEMU, not guest-online CPUs, memory, or filesystem capacity.
+      required:
+      - Cpu
+      - Memory
+      - DiskSize
+      - MaxCpu
+      - MaxMemory
+      - Persistent
+      properties:
+        Cpu:
+          type: integer
+          format: int64
+          description: Current QEMU vCPU count.
+          minimum: 0
+        Memory:
+          type: integer
+          format: int64
+          description: Current QEMU memory in MiB.
+          minimum: 0
+        DiskSize:
+          type: integer
+          format: int64
+          description: Current boot disk size in bytes.
+          minimum: 0
+        MaxCpu:
+          type: integer
+          format: int64
+          description: Maximum vCPU count reserved when this runtime was created.
+          minimum: 0
+        MaxMemory:
+          type: integer
+          format: int64
+          description: Maximum memory in MiB reserved when this runtime was created.
+          minimum: 0
+        Persistent:
+          type: boolean
+          description: Whether observed CPU and memory match both the saved specification and restart configuration.
     VmRuntimeStatus:
       type: object
       description: Current QEMU execution state, distinct from the runtime container state.
