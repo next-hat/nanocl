@@ -99,6 +99,9 @@ impl Modify for VersionModifier {
     vm::list_vm_history,
     vm::patch_vm,
     vm::console_vm,
+    vm::stop_vm,
+    vm::restart_vm,
+    vm::vm_status,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,
@@ -182,6 +185,36 @@ mod tests {
         .and_then(serde_json::Value::as_str)
         .or_else(|| object.values().find_map(find_schema_reference)),
       _ => None,
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_lifecycle() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart", "/vms/{key}/status"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in ["VmLifecycleOptions", "VmRuntimeStatus"] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart"] {
+      let operation = &generated["paths"][path]["post"];
+      assert_eq!(
+        operation["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/VmLifecycleOptions"
+      );
+      assert_eq!(operation["requestBody"]["required"], true);
+      assert!(operation["responses"]["504"].is_object());
+      assert!(operation["responses"]["403"].is_object());
     }
   }
 

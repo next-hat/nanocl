@@ -258,6 +258,9 @@ impl ObjDelByPk for VmDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
+    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
+      .try_lock_owned()
+      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
     let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     let new_status = ObjPsStatusUpdate {
@@ -281,6 +284,9 @@ impl ObjPutByPk for VmDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
+    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
+      .try_lock_owned()
+      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
     let _guard = mac_allocation_lock().lock().await;
     Self::put_spec_unlocked(pk, obj, state).await
   }
@@ -295,6 +301,9 @@ impl ObjPatchByPk for VmDb {
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
+    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
+      .try_lock_owned()
+      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
     let _guard = mac_allocation_lock().lock().await;
     let spec = &obj.spec;
     let version = &obj.version;

@@ -173,6 +173,10 @@ pub async fn restart_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
+  if *kind == ProcessKind::Vm {
+    return super::vm::restart_with_options(pk, &Default::default(), state)
+      .await;
+  }
   let processes =
     ProcessDb::read_by_kind_key(pk, None, &state.inner.pool).await?;
   for process in processes {
@@ -195,6 +199,10 @@ pub async fn stop_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
+  if *kind == ProcessKind::Vm {
+    return super::vm::stop_with_options(kind_pk, &Default::default(), state)
+      .await;
+  }
   let processes =
     ProcessDb::read_by_kind_key(kind_pk, None, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");

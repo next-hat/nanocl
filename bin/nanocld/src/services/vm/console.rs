@@ -35,7 +35,7 @@ fn authorize_transport(
     Some(CONSOLE_UNIX_TRANSPORT) => Ok(()),
     Some(CONSOLE_MTLS_TRANSPORT) if peer_certificate => Ok(()),
     _ => Err(HttpError::forbidden(
-      "VM consoles require the daemon Unix socket or mutual TLS",
+      "VM control requires the daemon Unix socket or mutual TLS",
     )),
   }
 }
@@ -51,14 +51,39 @@ fn validate_origin(
   // Browsers use mutual TLS directly, or a local authenticated example bridge.
   // Forwarded headers deliberately do not establish trust or an allowed origin.
   let Some(host) = host else {
-    return Err(HttpError::forbidden("Console Origin has no matching Host"));
+    return Err(HttpError::forbidden(
+      "VM control Origin has no matching Host",
+    ));
   };
   if !tls || origin != format!("https://{host}") {
     return Err(HttpError::forbidden(
-      "Console Origin must match the mutual TLS endpoint",
+      "VM control Origin must match the mutual TLS endpoint",
     ));
   }
   Ok(())
+}
+
+/// Apply the same daemon-operator boundary to console and lifecycle requests.
+pub(crate) fn authorize_request(req: &web::HttpRequest) -> HttpResult<()> {
+  let io = req.io();
+  let tag = io.map(|io| io.tag());
+  let certificate = io.is_some_and(|io| {
+    io.query::<ntex::tls::openssl::PeerCert>()
+      .as_ref()
+      .is_some()
+  });
+  authorize_transport(tag, certificate)?;
+  let origin = req
+    .headers()
+    .get(header::ORIGIN)
+    .map(|value| value.to_str())
+    .transpose()
+    .map_err(HttpError::bad_request)?;
+  let host = req
+    .headers()
+    .get(header::HOST)
+    .and_then(|value| value.to_str().ok());
+  validate_origin(origin, host, tag == Some(CONSOLE_MTLS_TRANSPORT))
 }
 
 fn validate_runtime(
@@ -308,25 +333,7 @@ pub async fn console_vm(
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  let io = req.io();
-  let tag = io.map(|io| io.tag());
-  let certificate = io.is_some_and(|io| {
-    io.query::<ntex::tls::openssl::PeerCert>()
-      .as_ref()
-      .is_some()
-  });
-  authorize_transport(tag, certificate)?;
-  let origin = req
-    .headers()
-    .get(header::ORIGIN)
-    .map(|value| value.to_str())
-    .transpose()
-    .map_err(HttpError::bad_request)?;
-  let host = req
-    .headers()
-    .get(header::HOST)
-    .and_then(|value| value.to_str().ok());
-  validate_origin(origin, host, tag == Some(CONSOLE_MTLS_TRANSPORT))?;
+  authorize_request(&req)?;
   if let Err(error) = ws::verify_handshake(req.head()) {
     return utils::ws::response(Err(error.into()));
   }
@@ -373,17 +380,20 @@ mod tests {
   use super::*;
 
   #[test]
-  fn console_trust_requires_listener_identity_and_verified_tls() {
+  fn vm_control_trust_requires_listener_identity_and_verified_tls() {
     assert!(authorize_transport(Some(CONSOLE_UNIX_TRANSPORT), false).is_ok());
     assert!(authorize_transport(Some(CONSOLE_MTLS_TRANSPORT), true).is_ok());
     for tag in [None, Some("--"), Some("http"), Some(CONSOLE_MTLS_TRANSPORT)] {
       assert!(authorize_transport(tag, false).is_err());
     }
-    assert!(authorize_transport(Some("--"), true).is_err());
+    for tag in [None, Some("--"), Some("http")] {
+      let error = authorize_transport(tag, true).unwrap_err();
+      assert_eq!(error.status, ntex::http::StatusCode::FORBIDDEN);
+    }
   }
 
   #[test]
-  fn console_origin_rejects_cross_site_null_and_plaintext() {
+  fn vm_control_origin_rejects_cross_site_null_and_plaintext() {
     assert!(validate_origin(None, None, false).is_ok());
     assert!(
       validate_origin(Some("https://host:8443"), Some("host:8443"), true)
@@ -401,6 +411,7 @@ mod tests {
     assert!(
       validate_origin(Some("https://host"), Some("host"), false).is_err()
     );
+    assert!(validate_origin(Some("https://host"), None, true).is_err());
   }
 
   #[test]

@@ -27,6 +27,43 @@ pub use stats::*;
 pub use stop::*;
 pub use wait::*;
 
+/// Identify a managed VM before choosing a raw Docker lifecycle operation.
+/// Ambiguous VM metadata must never fall back to a Docker power cut.
+fn managed_vm_runtime_key(
+  runtime: &bollard_next::service::ContainerInspectResponse,
+  known_vm: bool,
+) -> nanocl_error::http::HttpResult<Option<String>> {
+  use nanocl_error::http::HttpError;
+  let labels = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref());
+  let label = |name: &str| {
+    labels
+      .and_then(|labels| labels.get(name))
+      .map(String::as_str)
+  };
+  if label("io.nanocl.init-v").is_some() {
+    return Ok(None);
+  }
+  let key = label("io.nanocl.v");
+  if !known_vm && key.is_none() && label("io.nanocl.kind") != Some("vm") {
+    return Ok(None);
+  }
+  let key = key.ok_or_else(|| {
+    HttpError::conflict("VM runtime has no canonical owner key")
+  })?;
+  let parsed = key
+    .parse::<nanocl_stubs::resource_key::ResourceKey>()
+    .map_err(|_| HttpError::conflict("VM runtime has an invalid owner key"))?;
+  if runtime.name.as_deref() != Some(format!("/{parsed}.v").as_str()) {
+    return Err(HttpError::conflict(
+      "VM runtime name does not match its owner key",
+    ));
+  }
+  Ok(Some(parsed.to_string()))
+}
+
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
 ) {
@@ -147,6 +184,58 @@ mod tests {
     generic::{GenericClause, GenericFilter, GenericListQuery},
     process::{Process, ProcessStatsQuery},
   };
+
+  #[test]
+  fn managed_vm_lifecycle_classification_rejects_ambiguous_runtime() {
+    let runtime = |name: &str, labels: serde_json::Value| {
+      serde_json::from_value::<bollard_next::service::ContainerInspectResponse>(
+        serde_json::json!({"Name": name, "Config": {"Labels": labels}}),
+      )
+      .unwrap()
+    };
+    let vm = runtime(
+      "/global.guest.v",
+      serde_json::json!({"io.nanocl.v":"global.guest", "io.nanocl.kind":"vm"}),
+    );
+    assert_eq!(
+      super::managed_vm_runtime_key(&vm, false)
+        .unwrap()
+        .as_deref(),
+      Some("global.guest")
+    );
+    let init = runtime(
+      "/global.guest-123.init.v",
+      serde_json::json!({"io.nanocl.v":"global.guest", "io.nanocl.kind":"vm", "io.nanocl.init-v":"true"}),
+    );
+    assert!(
+      super::managed_vm_runtime_key(&init, true)
+        .unwrap()
+        .is_none()
+    );
+    let cargo = runtime(
+      "/global.web.c",
+      serde_json::json!({"io.nanocl.kind":"cargo"}),
+    );
+    assert!(
+      super::managed_vm_runtime_key(&cargo, false)
+        .unwrap()
+        .is_none()
+    );
+    assert!(super::managed_vm_runtime_key(&cargo, true).is_err());
+    for labels in [
+      serde_json::json!({"io.nanocl.kind":"vm"}),
+      serde_json::json!({"io.nanocl.v":"guest"}),
+      serde_json::json!({"io.nanocl.v":"other.guest"}),
+    ] {
+      assert!(
+        super::managed_vm_runtime_key(
+          &runtime("/global.guest.v", labels),
+          false
+        )
+        .is_err()
+      );
+    }
+  }
 
   #[ntex::test]
   async fn basic_list() {

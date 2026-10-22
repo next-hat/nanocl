@@ -61,3 +61,9 @@ pub struct VmObjPatchIn {
   pub spec: VmSpecUpdate,
   pub version: String,
 }
+
+/// Local serialization of a VM's sockets, runtime and desired specification.
+/// Weak entries are pruned so deleted VM names do not accumulate forever.
+pub(crate) type VmLifecycleLocks = std::sync::Mutex<
+  std::collections::HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>,
+>;

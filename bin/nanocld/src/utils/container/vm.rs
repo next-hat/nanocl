@@ -13,15 +13,21 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   generic::ImagePullPolicy,
   process::{Process, ProcessKind},
-  system::NativeEventAction,
+  system::{NativeEventAction, ObjPsStatusKind},
   vm::Vm,
   vm_spec::VmCloudInitUserData,
 };
 
 use crate::{
-  models::{ProcessDb, SystemState, VmDb},
+  models::{ObjPsStatusDb, ProcessDb, SystemState, VmDb},
   repositories::generic::*,
   utils, vars,
+};
+
+mod lifecycle;
+pub(crate) use lifecycle::{
+  control_process, lifecycle_lock, restart_with_options, runtime_status,
+  stop_with_options,
 };
 
 fn network_modes(vm: &Vm) -> Vec<String> {
@@ -258,6 +264,16 @@ fn validate_runtime_labels(
       "The image must implement io.nanocl.vm-runtime-api=0.19; build or select the matching nanocl-qemu runtime",
     ));
   }
+  if labels
+    .and_then(|labels| labels.get("io.nanocl.vm-qmp"))
+    .map(String::as_str)
+    != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "The image must implement io.nanocl.vm-qmp=1; pull and select the matching nanocl-qemu runtime",
+    ));
+  }
   if vm.spec.cloud_init.unwrap_or(true)
     && vm.spec.cloud_init_user_data.is_some()
     && labels
@@ -323,7 +339,7 @@ fn console_directory(vm: &Vm, state: &SystemState) -> IoResult<PathBuf> {
     || key == ".."
     || key.contains(['/', '\\', '\0'])
   {
-    return Err(IoError::invalid_input("VM console", "Invalid VM key"));
+    return Err(IoError::invalid_input("VM runtime", "Invalid VM key"));
   }
   let path = PathBuf::from(&state.inner.config.state_dir)
     .join("run/vms")
@@ -331,8 +347,8 @@ fn console_directory(vm: &Vm, state: &SystemState) -> IoResult<PathBuf> {
     .join(vm.spec.key.to_string());
   if path.join("console.sock").as_os_str().len() >= 108 {
     return Err(IoError::invalid_input(
-      "VM console",
-      "Console socket path exceeds the Unix socket limit; use a shorter state directory or VM name",
+      "VM runtime",
+      "VM socket path exceeds the Unix socket limit; use a shorter state directory or VM name",
     ));
   }
   Ok(path)
@@ -391,10 +407,12 @@ async fn remove_console_directory(
     }
     Ok(_) => {}
   }
-  match tokio::fs::remove_file(path.join("console.sock")).await {
-    Ok(()) => {}
-    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-    Err(err) => return Err(err.into()),
+  for socket in ["console.sock", "qmp.sock"] {
+    match tokio::fs::remove_file(path.join(socket)).await {
+      Ok(()) => {}
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+      Err(err) => return Err(err.into()),
+    }
   }
   tokio::fs::remove_dir(&path).await?;
   // Other generations can still exist. Only remove an empty VM directory.
@@ -421,7 +439,6 @@ async fn cleanup_process_consoles(
     if process.kind != ProcessKind::Vm
       || process.kind_key != vm.spec.vm_key
       || labels.get("io.nanocl.v") != Some(&vm.spec.vm_key)
-      || labels.get("io.nanocl.vm-console").map(String::as_str) != Some("true")
     {
       continue;
     }
@@ -670,6 +687,7 @@ pub async fn create_instance(
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
   labels.insert("io.nanocl.vm-spec".to_owned(), vm.spec.key.to_string());
+  labels.insert("io.nanocl.vm-qmp".to_owned(), "1".to_owned());
   labels.insert(
     "io.nanocl.vm-console".to_owned(),
     vm.spec.console.unwrap_or(false).to_string(),
@@ -717,10 +735,8 @@ pub async fn create_instance(
     }
   }
   let mut binds = vec![format!("{}:{}", vm.spec.image, vm.spec.image)];
-  if vm.spec.console.unwrap_or(false) {
-    let directory = prepare_console_directory(vm, state).await?;
-    binds.push(format!("{}:/run/nanocl-console", directory.display()));
-  }
+  let directory = prepare_console_directory(vm, state).await?;
+  binds.push(format!("{}:/run/nanocl-vm", directory.display()));
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -753,7 +769,7 @@ pub async fn create_instance(
     state,
   )
   .await;
-  if result.is_err() && vm.spec.console.unwrap_or(false) {
+  if result.is_err() {
     // A name-conflict can mean a live runtime exists without its process row.
     // Never unlink its socket (or its mounted directory) on a create error.
     if matches!(
@@ -774,6 +790,30 @@ pub async fn create_instance(
 /// Start VM instance
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = start_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+// Call while holding the operation's lifecycle guard. The asynchronous task
+// error callback runs after release and must not overwrite a newer operation.
+async fn record_task_failure(
+  key: &str,
+  result: IoResult<()>,
+  state: &SystemState,
+) -> IoResult<()> {
+  if result.is_err() {
+    ObjPsStatusDb::update_actual_status(
+      key,
+      &ObjPsStatusKind::Fail,
+      &state.inner.pool,
+    )
+    .await?;
+  }
+  result
+}
+
+async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   ensure_networks(&vm, state).await?;
   let processes =
@@ -796,6 +836,12 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete VM instance and the VM itself from the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = delete_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
@@ -807,6 +853,7 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
       targets.push(id);
     }
   }
+  lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
   super::process::delete_instances(&targets, state).await?;
   if inspect_runtime_id(&vm, state).await?.is_some() {
     return Err(IoError::interrupted(
@@ -825,6 +872,12 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
 /// Update the VM
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = update_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::ensure_mac_address(key, state)
     .await
     .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
@@ -832,9 +885,7 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   ensure_networks(&vm, state).await?;
   validate_spec(&vm.spec.clone().into())?;
   ensure_runtime_image(&vm, state).await?;
-  if vm.spec.console.unwrap_or(false) {
-    prepare_console_directory(&vm, state).await?;
-  }
+  prepare_console_directory(&vm, state).await?;
   let runtime_name = format!("{}.v", &vm.spec.vm_key);
   let old_processes =
     ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
@@ -858,6 +909,7 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
       old_runtime_keys.push(id);
     }
   }
+  lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
   super::process::delete_instances(&old_runtime_keys, state).await?;
   if let Err(err) = cleanup_process_consoles(&vm, &old_processes, state).await {
     log::warn!("Unable to clean previous VM console directory: {err}");
@@ -947,8 +999,10 @@ mod tests {
     for key in ["USER=", "PASSWORD=", "SSH_KEY="] {
       assert!(!env.iter().any(|value| value.starts_with(key)));
     }
-    let mut labels =
-      HashMap::from([("io.nanocl.vm-runtime-api".into(), "0.19".into())]);
+    let mut labels = HashMap::from([
+      ("io.nanocl.vm-runtime-api".into(), "0.19".into()),
+      ("io.nanocl.vm-qmp".into(), "1".into()),
+    ]);
     assert!(validate_runtime_labels(&vm, None).is_err());
     assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
     labels.insert("io.nanocl.vm-cloud-init-user-data".into(), "1".into());

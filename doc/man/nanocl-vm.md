@@ -45,7 +45,13 @@ vm-start(1)
 Start VMs by canonical keys
 
 vm-stop(1)
-Stop VMs by canonical keys
+Shut down VMs by canonical keys
+
+vm-restart(1)
+Shut down and start VMs by canonical keys
+
+vm-status(1)
+Query actual QEMU execution state
 
 vm-attach(1)
 Attach to a vm

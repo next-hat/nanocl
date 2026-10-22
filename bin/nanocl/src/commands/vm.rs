@@ -31,7 +31,7 @@ use crate::{
   config::CliConfig,
   models::{
     GenericDefaultOpts, VmArg, VmCommand, VmCompactRow, VmCreateOpts,
-    VmPatchOpts, VmRow, VmRunOpts,
+    VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
   },
   utils,
 };
@@ -219,6 +219,23 @@ fn vm_process_name(key: &str) -> IoResult<String> {
   Ok(format!("{key}.v"))
 }
 
+async fn exec_vm_lifecycle(
+  client: &NanocldClient,
+  options: &VmLifecycleOpts,
+  restart: bool,
+) -> IoResult<()> {
+  let request = options.into();
+  for key in &options.keys {
+    if restart {
+      client.restart_vm(key, &request).await?;
+    } else {
+      client.stop_vm(key, &request).await?;
+    }
+    println!("{key}");
+  }
+  Ok(())
+}
+
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
 #[cfg(not(target_os = "windows"))]
@@ -331,7 +348,17 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
     VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
     VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
-    VmCommand::Stop(opts) => VmArg::exec_stop(client, opts).await,
+    VmCommand::Stop(opts) => exec_vm_lifecycle(client, opts, false).await,
+    VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,
+    VmCommand::Status { key } => {
+      let status = client.vm_status(key).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&status)
+          .map_err(|err| err.map_err_context(|| "VM runtime status"))?
+      );
+      Ok(())
+    }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
     VmCommand::Attach { key } => {

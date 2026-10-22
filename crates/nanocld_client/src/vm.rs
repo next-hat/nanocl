@@ -3,7 +3,9 @@ use nanocl_error::io::{FromIo, IoError};
 use ntex::{io, ws};
 
 use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
-use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
+use nanocl_stubs::vm::{
+  Vm, VmInspect, VmLifecycleOptions, VmRuntimeStatus, VmSummary,
+};
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
@@ -11,6 +13,66 @@ use crate::NanocldClient;
 impl NanocldClient {
   /// ## Default path for vms
   const VM_PATH: &'static str = "/vms";
+
+  fn vm_lifecycle_path(key: &str, action: &str) -> HttpClientResult<String> {
+    let key = key
+      .parse::<nanocl_stubs::resource_key::ResourceKey>()
+      .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
+    Ok(format!("{}/{key}/{action}", Self::VM_PATH))
+  }
+
+  async fn send_vm_lifecycle(
+    &self,
+    key: &str,
+    action: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<()> {
+    options
+      .validate()
+      .map_err(|err| IoError::invalid_input("VM lifecycle", &err))?;
+    let path = Self::vm_lifecycle_path(key, action)?;
+    // Include bounded protocol/cleanup time beyond the guest's grace period.
+    // Do not retry: a lost response cannot prove the action did not happen.
+    let mut response = self
+      .post(&path)
+      .await?
+      .timeout(ntex::time::Millis::from_secs((options.timeout + 60) as u32))
+      .send_json(options)
+      .await
+      .map_err(|err| self.send_error(err))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status).await?;
+    Ok(())
+  }
+
+  /// Stop a VM, waiting for guest shutdown unless force is explicitly requested.
+  /// A timeout never forces power-off; inspect its status before retrying.
+  pub async fn stop_vm(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<()> {
+    self.send_vm_lifecycle(key, "stop", options).await
+  }
+
+  /// Shut down and start a VM. A shutdown timeout prevents the start operation.
+  pub async fn restart_vm(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<()> {
+    self.send_vm_lifecycle(key, "restart", options).await
+  }
+
+  /// Query actual QEMU execution state through the trusted operator transport.
+  pub async fn vm_status(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<VmRuntimeStatus> {
+    let path = Self::vm_lifecycle_path(key, "status")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
 
   fn vm_console_url(&self, key: &str) -> HttpClientResult<String> {
     let key = key
@@ -233,6 +295,24 @@ fn console_tls_connector(
 #[cfg(test)]
 mod console_tests {
   use super::*;
+
+  #[test]
+  fn vm_lifecycle_paths_require_canonical_keys() {
+    for action in ["stop", "restart", "status"] {
+      assert_eq!(
+        NanocldClient::vm_lifecycle_path("team.database", action).unwrap(),
+        format!("/vms/team.database/{action}")
+      );
+      for key in [
+        "database",
+        "../vm",
+        "global.vm?force=true",
+        "global.vm/status",
+      ] {
+        assert!(NanocldClient::vm_lifecycle_path(key, action).is_err());
+      }
+    }
+  }
 
   #[test]
   fn vm_console_url_requires_a_canonical_key() {

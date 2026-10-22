@@ -28,7 +28,34 @@ The MAC is generated once as a locally administered unicast address and saved in
 
 Stop/start and restart preserve the VM MAC. A container replacement can receive a different address from Docker IPAM; the new runtime offers that newly allocated address. A stable MAC does not reserve a permanent Docker IP across deletion or replacement.
 
-Docker stop/restart currently terminates QEMU as a guest power cut. Shut down from inside the guest before a planned stop when filesystem durability matters. The restart acceptance test explicitly flushes completed provisioning writes with guest `sync`; it proves networking and identity persistence, not safe termination of arbitrary in-flight writes.
+Use NanoCL's VM stop and restart commands for guest-aware shutdown. Direct Docker stop/restart still terminates QEMU as a guest power cut and bypasses NanoCL's lifecycle checks.
+
+## QMP lifecycle control
+
+NanoCL mounts `${state_dir}/run/vms/{namespace.name}/{specification_uuid}` into the runtime at `/run/nanocl-vm`. QEMU creates `qmp.sock` there and, when `Console: true`, `console.sock`. The per-VM generation directory is private to the daemon and runtime. A containerized daemon must bind its state directory at the same absolute host path. The full Unix-socket path must fit the Linux path limit; overly long paths are rejected before replacing a runtime.
+
+QMP stays on this private Unix socket. NanoCL exposes specific lifecycle operations through the existing daemon operator boundary; it does not provide a public raw-QMP endpoint. The daemon verifies the current VM key, namespace, local container ID, and specification generation before using the socket. Concurrent lifecycle operations for the same VM are serialized.
+
+```sh
+nanocl vm status global.desktop
+nanocl vm stop global.desktop --timeout 120
+nanocl vm restart global.desktop --timeout 120
+```
+
+Stop asks the guest to shut down through QMP's ACPI power button operation and waits for confirmed runtime exit. Restart starts the runtime only after that shutdown completes. Guest shutdown requires the guest OS to handle the ACPI request. The default grace period is 60 seconds; `--timeout` accepts 1 through 3600 seconds. A timeout reports failure and never silently kills or restarts the guest. The guest may still complete shutdown after the timeout, so query status before deciding what to do next.
+
+`--force` explicitly requests immediate power-off and bypasses the guest grace period. It can lose guest writes. Use it only when that outcome is intended:
+
+```sh
+nanocl vm stop global.desktop --force
+nanocl vm restart global.desktop --force
+```
+
+The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restart`, and `GET /v0.19.0/vms/{key}/status`. POST requests require a JSON body; `{}` uses defaults, and `{"Timeout":120,"Force":false}` sets an explicit grace period. Shutdown timeout returns HTTP 504. These endpoints accept the daemon Unix socket or verified mutual TLS; plaintext TCP is denied, and a browser Origin must exactly match the HTTPS endpoint. They use the same daemon-wide operator privileges as the console.
+
+Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. This increment does not expose pause/resume or live CPU, RAM, or disk resizing.
+
+Generic process stop/restart, VM replacement, and VM deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
 
 ## Provisioning and console options
 
@@ -115,7 +142,7 @@ Custom user-data requires a runtime image with `io.nanocl.vm-cloud-init-user-dat
 
 The endpoint accepts the daemon Unix socket or verified mutual TLS. Plaintext daemon TCP, including development TCP, is rejected. A browser's Origin must exactly match the HTTPS endpoint. Access grants the same daemon-wide operator privileges as the underlying authenticated transport; there is no per-user VM ownership model. The daemon verifies the VM key, namespace, local runtime identity, running state, and specification generation before opening its socket.
 
-A containerized daemon must bind its state directory at the same absolute path on the Docker host, as the standard installer already does. Console socket directories are private to the daemon/runtime. The full socket path must fit the Linux Unix-socket limit; an overly long state path or VM key is rejected before runtime replacement.
+A containerized daemon must bind its state directory at the same absolute path on the Docker host, as the standard installer already does. Console and QMP sockets share the private per-VM generation directory described above.
 
 Use the [noVNC example](../examples/vm-console/README.md) for a local browser connection. Its loopback bridge holds operator credentials server-side and fixes the target VM. The WebSocket sends raw binary RFB frames, with an optional `binary` subprotocol and a maximum 64 KiB client frame.
 
@@ -137,12 +164,12 @@ CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data 
    docker build -t ghcr.io/next-hat/nanocl-qemu:8.0.5.0 /path/to/nanocl-qemu
    ```
 
-   This is the new default runtime tag, validated locally with Linux x86_64 KVM and Ubuntu 24.04 guests. The image must be built locally or published through the release process before another installation can use it; this change does not publish an image. `HostConfig.Runtime` can select an explicit candidate. NanoCL requires the image label `io.nanocl.vm-runtime-api=0.19`; an older runtime without that contract is rejected before replacement.
+   This is the new default runtime tag. The image must be built locally or published through the release process before another installation can use it; this change does not publish an image. `HostConfig.Runtime` can select an explicit candidate. NanoCL requires the image labels `io.nanocl.vm-runtime-api=0.19` and `io.nanocl.vm-qmp=1`; an older runtime without those contracts is rejected before replacement.
 
 2. Move `NetworkMode: host`, legacy `RuntimeNetwork: host`, and physical `LinkNetIface` configurations onto a named Docker bridge. `RuntimeNetwork` remains a spelling alias for `NetworkMode`.
 3. Existing VM images that retain cloud-init static network configuration need guest-side migration to DHCP. Disabling future seed generation does not remove guest state already written by an earlier seed. Back up the image and use its distribution's network tools to enable DHCP before replacing the runtime.
 4. Legacy VM specs without a MAC receive a persisted address before their next runtime creation. Their former runtime-generated MAC was not a durable identity. Check guest network rules that match the old MAC. A legacy VM may supply an explicit `MacAddress` before identity is assigned.
-5. Replace a legacy runtime to use the new DHCP and console behavior. Stop/start alone can reuse an existing old container configuration. Retain `CloudInit: true` when existing guest provisioning is needed; set it to `false` for a prepared non-cloud-init image.
+5. Shut down a legacy guest from inside the guest OS, or explicitly use `nanocl vm stop <key> --force` if a power cut is acceptable. Replace its runtime to use the new DHCP, QMP, and console behavior. Stop/start alone can reuse an existing old container configuration. Retain `CloudInit: true` when existing guest provisioning is needed; set it to `false` for a prepared non-cloud-init image.
 6. Enable `Console` only for the VMs that need it, and use the authenticated endpoint or the loopback example. Do not restore the old public websockify port mapping.
 
 ## Reproducible release validation
@@ -152,7 +179,7 @@ Use disposable guest disk copies and a development NanoCL daemon. Record the Nan
 1. Build the local runtime and prepare two separate writable guest images: a cloud-init image and an ordinary installed image with DHCP enabled and no cloud-init dependency. Use `CloudInit: true` and `false`, respectively, with the explicit candidate runtime. The ordinary guest must have independently configured login credentials.
 2. Start both VMs on the same named Docker bridge. Inspect each runtime with `docker inspect <namespace.name>.v` and each VM with `nanocl vm inspect <namespace.name>`. Save the allocated endpoint IPv4 and the persisted MAC. Inside each guest, inspect `ip -4 address`, `ip -4 route`, and resolver configuration. Verify matching endpoint address/prefix, expected gateway, and distinct addresses.
 3. Test a DNS lookup, outbound HTTP, gateway reachability, and intended ingress from another container or the configured NanoCL proxy. Use controlled reachable endpoints in the test environment. Capture UDP ports 67/68 on the Docker bridge while renewing guest leases: guest DHCP must stay on the private TAP.
-4. Stop and start each VM, restart the runtime container, and restart the development daemon. Recheck MAC, lease, gateway, DNS, egress, and ingress. Force a spec replacement separately and record any Docker IP change. Do not confuse replacement behavior with same-container restart.
+4. Stop and start each VM through NanoCL, use `nanocl vm restart`, and restart the development daemon. Recheck MAC, lease, gateway, DNS, egress, and ingress. Verify graceful shutdown while the guest writes data and separately test a guest that ignores ACPI: a short timeout must report failure without power-off or restart. Verify explicit `--force` separately. Query QMP status after daemon reconnection, and reject a stale VM generation or wrong container identity. Replace a spec separately and record any Docker IP change. Do not confuse replacement behavior with same-container restart.
 5. Confirm the no-cloud-init VM receives DHCP with no seed attached. Check the runtime's QEMU arguments and guest devices. Confirm cloud-init provisioning and SSH keys work on the enabled image.
 6. Enable `Console`, start the [noVNC example](../examples/vm-console/README.md), and use a real browser to observe display output and send keyboard input. Test disconnect/reconnect, runtime restart, and replacement. Verify the old connection closes when its backend exits.
 7. Attempt the console from plaintext TCP, with a foreign/null Origin, with no trusted client certificate, with `Console: false`, against a missing VM, and against a stopped runtime. Record the actual rejection status. An operator trusted by the daemon can access enabled consoles across namespaces by design.

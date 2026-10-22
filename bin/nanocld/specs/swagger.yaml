@@ -2087,6 +2087,160 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /vms/{key}/restart:
+    post:
+      tags:
+      - Vms
+      summary: Shut down a VM, then start the same runtime after confirmed exit.
+      operationId: restart_vm
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmLifecycleOptions'
+        required: true
+      responses:
+        '200':
+          description: VM runtime has restarted
+        '400':
+          description: Invalid canonical key or shutdown timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Trusted operator transport and matching Origin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: VM does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Runtime is stale or a lifecycle operation is already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: VM operation timed out; check runtime status before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms/{key}/status:
+    get:
+      tags:
+      - Vms
+      summary: Query QEMU execution state independently of container running state.
+      operationId: vm_status
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Actual QEMU execution state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmRuntimeStatus'
+        '400':
+          description: Invalid canonical VM key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Trusted operator transport and matching Origin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: VM does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: VM runtime identity is stale or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: QMP did not respond in time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms/{key}/stop:
+    post:
+      tags:
+      - Vms
+      summary: Shut down a VM and wait for confirmed runtime exit.
+      operationId: stop_vm
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmLifecycleOptions'
+        required: true
+      responses:
+        '200':
+          description: VM runtime has stopped
+        '400':
+          description: Invalid canonical key or shutdown timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Trusted operator transport and matching Origin required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: VM does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Runtime is stale or a lifecycle operation is already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: VM operation timed out; check runtime status before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     Address:
@@ -9259,6 +9413,34 @@ components:
           items:
             $ref: '#/components/schemas/Process'
           description: List of instances
+    VmLifecycleOptions:
+      type: object
+      description: Options for stopping or restarting a VM through its private QMP socket.
+      properties:
+        Timeout:
+          type: integer
+          format: int64
+          description: Seconds to wait for the guest to shut down cleanly (1 through 3600).
+          default: 60
+          maximum: 3600
+          minimum: 1
+        Force:
+          type: boolean
+          description: Explicitly power off the VM without waiting for guest shutdown.
+          default: false
+    VmRuntimeStatus:
+      type: object
+      description: Current QEMU execution state, distinct from the runtime container state.
+      required:
+      - Running
+      - Status
+      properties:
+        Running:
+          type: boolean
+          description: Whether QEMU is executing guest CPUs.
+        Status:
+          type: string
+          description: QEMU run state, or `exited` when the runtime container is stopped.
     VmSpec:
       type: object
       description: |-

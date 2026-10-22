@@ -103,6 +103,23 @@ pub async fn emit_starting(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
+  let _vm_guard = if *kind == ProcessKind::Vm {
+    Some(
+      super::vm::lifecycle_lock(kind_key)
+        .try_lock_owned()
+        .map_err(|_| {
+          IoError::with_context(
+            "VM lifecycle",
+            std::io::Error::new(
+              std::io::ErrorKind::WouldBlock,
+              "A VM lifecycle operation is active",
+            ),
+          )
+        })?,
+    )
+  } else {
+    None
+  };
   log::debug!("starting {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;

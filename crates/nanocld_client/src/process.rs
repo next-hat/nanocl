@@ -245,6 +245,11 @@ impl NanocldClient {
     kind: &str,
     key: &str,
   ) -> HttpClientResult<()> {
+    if kind == "vm" {
+      return self
+        .restart_vm(key, &nanocl_stubs::vm::VmLifecycleOptions::default())
+        .await;
+    }
     self
       .send_post(
         &format!("{}/{kind}/{key}/restart", Self::PROCESS_PATH),
@@ -271,6 +276,11 @@ impl NanocldClient {
     kind: &str,
     key: &str,
   ) -> HttpClientResult<()> {
+    if kind == "vm" {
+      return self
+        .stop_vm(key, &nanocl_stubs::vm::VmLifecycleOptions::default())
+        .await;
+    }
     self
       .send_post(
         &format!("{}/{kind}/{key}/stop", Self::PROCESS_PATH),

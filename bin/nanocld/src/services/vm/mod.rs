@@ -5,6 +5,7 @@ pub mod count;
 pub mod create;
 pub mod delete;
 pub mod inspect;
+pub mod lifecycle;
 pub mod list;
 pub mod list_history;
 pub mod patch;
@@ -14,6 +15,7 @@ pub use count::*;
 pub use create::*;
 pub use delete::*;
 pub use inspect::*;
+pub use lifecycle::*;
 pub use list::*;
 pub use list_history::*;
 pub use patch::*;
@@ -21,6 +23,17 @@ pub use patch::*;
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
 ) {
+  config.service(
+    web::resource("/vms/{key}/stop").route(web::post().to_with_state(stop_vm)),
+  );
+  config.service(
+    web::resource("/vms/{key}/restart")
+      .route(web::post().to_with_state(restart_vm)),
+  );
+  config.service(
+    web::resource("/vms/{key}/status")
+      .route(web::get().to_with_state(vm_status)),
+  );
   config.service(
     web::resource("/vms/{key}/console")
       .route(web::get().to_with_state(console_vm)),

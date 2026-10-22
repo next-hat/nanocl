@@ -8,8 +8,7 @@ use nanocld_client::stubs::vm_spec::{
 };
 
 use super::{
-  GenericInspectOpts, GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
-  NamespacedListOpts,
+  GenericInspectOpts, GenericRemoveOpts, GenericStartOpts, NamespacedListOpts,
 };
 
 /// `nanocl vm` available commands
@@ -29,8 +28,15 @@ pub enum VmCommand {
   Inspect(GenericInspectOpts),
   /// Start VMs by canonical keys
   Start(GenericStartOpts),
-  /// Stop VMs by canonical keys
-  Stop(GenericStopOpts),
+  /// Shut down VMs by canonical keys
+  Stop(VmLifecycleOpts),
+  /// Shut down and start VMs by canonical keys
+  Restart(VmLifecycleOpts),
+  /// Query actual QEMU execution state
+  Status {
+    /// Canonical key of the VM
+    key: String,
+  },
   /// Attach to a vm
   Attach {
     /// Canonical key of the VM
@@ -38,6 +44,29 @@ pub enum VmCommand {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+/// Options for VM shutdown and restart.
+#[derive(Clone, Parser)]
+pub struct VmLifecycleOpts {
+  /// Canonical keys of the VMs
+  #[clap(required = true)]
+  pub keys: Vec<String>,
+  /// Seconds to wait for guest shutdown; a timeout never forces power-off
+  #[clap(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(1..=3600))]
+  pub timeout: u64,
+  /// Immediately power off instead of asking the guest to shut down
+  #[clap(short, long)]
+  pub force: bool,
+}
+
+impl From<&VmLifecycleOpts> for nanocld_client::stubs::vm::VmLifecycleOptions {
+  fn from(value: &VmLifecycleOpts) -> Self {
+    Self {
+      timeout: value.timeout,
+      force: value.force,
+    }
+  }
 }
 
 /// `nanocl vm patch` available options
@@ -361,6 +390,53 @@ pub struct VmArg {
 mod tests {
   use clap::Parser;
   use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
+
+  #[test]
+  fn vm_cli_lifecycle_defaults_force_and_timeout_bounds() {
+    for action in ["stop", "restart"] {
+      let parsed =
+        VmArg::try_parse_from(["vm", action, "global.guest"]).unwrap();
+      let options = match parsed.command {
+        VmCommand::Stop(options) | VmCommand::Restart(options) => options,
+        _ => panic!("expected lifecycle command"),
+      };
+      assert_eq!(options.timeout, 60);
+      assert!(!options.force);
+      let parsed = VmArg::try_parse_from([
+        "vm",
+        action,
+        "global.guest",
+        "team.other",
+        "--timeout",
+        "3600",
+        "--force",
+      ])
+      .unwrap();
+      let options = match parsed.command {
+        VmCommand::Stop(options) | VmCommand::Restart(options) => options,
+        _ => panic!("expected lifecycle command"),
+      };
+      assert_eq!(options.keys, ["global.guest", "team.other"]);
+      assert_eq!(options.timeout, 3600);
+      assert!(options.force);
+      for timeout in ["0", "3601", "-1"] {
+        assert!(
+          VmArg::try_parse_from([
+            "vm",
+            action,
+            "global.guest",
+            "--timeout",
+            timeout
+          ])
+          .is_err()
+        );
+      }
+      assert!(VmArg::try_parse_from(["vm", action]).is_err());
+    }
+    assert!(
+      matches!(VmArg::try_parse_from(["vm", "status", "global.guest"]).unwrap().command, VmCommand::Status { key } if key == "global.guest")
+    );
+  }
 
   #[test]
   fn vm_cli_custom_cloud_init_accepts_file_for_create_run_and_patch() {

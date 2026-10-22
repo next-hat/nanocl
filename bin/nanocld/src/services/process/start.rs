@@ -2,6 +2,7 @@ use ntex::web;
 
 use bollard_next::container::StartContainerOptions;
 use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_stubs::process::ProcessKind;
 
 use crate::{
   models::{ProcessDb, SystemState},
@@ -53,10 +54,14 @@ pub async fn start_processes(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String, String)>,
+  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
+  if kind == ProcessKind::Vm {
+    crate::services::vm::console::authorize_request(&req)?;
+  }
   utils::container::generic::emit_starting(&key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().build())
 }

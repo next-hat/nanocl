@@ -1,4 +1,3 @@
-use nanocl_error::io::IoError;
 use nanocl_stubs::{process::ProcessKind, system::EventActorKind};
 
 use crate::{
@@ -20,9 +19,9 @@ impl ObjTaskStart for VmDb {
     let state = state.clone();
     Box::pin(async move {
       let mutex = VmDb::create_mutex(&key, "start", &state).await?;
-      utils::container::vm::start(&key, &state).await?;
-      VmDb::delete_mutex(&mutex.key, &state).await?;
-      Ok::<_, IoError>(())
+      let result = utils::container::vm::start(&key, &state).await;
+      let cleanup = VmDb::delete_mutex(&mutex.key, &state).await;
+      result.and(cleanup)
     })
   }
 }
@@ -33,10 +32,14 @@ impl ObjTaskStop for VmDb {
     let state = state.clone();
     Box::pin(async move {
       let mutex = VmDb::create_mutex(&key, "stop", &state).await?;
-      utils::container::process::stop_instances(&key, &ProcessKind::Vm, &state)
-        .await?;
-      VmDb::delete_mutex(&mutex.key, &state).await?;
-      Ok::<_, IoError>(())
+      let result = utils::container::process::stop_instances(
+        &key,
+        &ProcessKind::Vm,
+        &state,
+      )
+      .await;
+      let cleanup = VmDb::delete_mutex(&mutex.key, &state).await;
+      result.and(cleanup)
     })
   }
 }
@@ -47,9 +50,9 @@ impl ObjTaskDelete for VmDb {
     let state = state.clone();
     Box::pin(async move {
       let mutex = VmDb::create_mutex(&key, "delete", &state).await?;
-      utils::container::vm::delete(&key, &state).await?;
-      VmDb::delete_mutex(&mutex.key, &state).await?;
-      Ok::<_, IoError>(())
+      let result = utils::container::vm::delete(&key, &state).await;
+      let cleanup = VmDb::delete_mutex(&mutex.key, &state).await;
+      result.and(cleanup)
     })
   }
 }
@@ -60,9 +63,9 @@ impl ObjTaskUpdate for VmDb {
     let state = state.clone();
     Box::pin(async move {
       let mutex = VmDb::create_mutex(&key, "update", &state).await?;
-      utils::container::vm::update(&key, &state).await?;
-      VmDb::delete_mutex(&mutex.key, &state).await?;
-      Ok::<_, IoError>(())
+      let result = utils::container::vm::update(&key, &state).await;
+      let cleanup = VmDb::delete_mutex(&mutex.key, &state).await;
+      result.and(cleanup)
     })
   }
 }

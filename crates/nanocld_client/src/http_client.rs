@@ -175,7 +175,7 @@ impl NanocldClient {
     Ok(client.build(cfg))
   }
 
-  fn send_error(
+  pub(crate) fn send_error(
     &self,
     err: ntex::error::Error<ntex::client::error::ClientError>,
   ) -> HttpClientError {
@@ -211,7 +211,10 @@ impl NanocldClient {
     )
   }
 
-  async fn post(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
+  pub(crate) async fn post(
+    &self,
+    url: &str,
+  ) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
         .gen_client()

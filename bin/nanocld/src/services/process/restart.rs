@@ -8,6 +8,7 @@ use nanocl_stubs::{
   system::{
     EventActorKind, NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
   },
+  vm::VmLifecycleOptions,
 };
 
 use crate::{
@@ -115,11 +116,21 @@ pub async fn restart_processes(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String, String)>,
+  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
-  if kind == ProcessKind::Cargo {
+  if kind == ProcessKind::Vm {
+    crate::services::vm::console::authorize_request(&req)?;
+    utils::container::vm::restart_with_options(
+      &key,
+      &VmLifecycleOptions::default(),
+      state,
+    )
+    .await
+    .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+  } else if kind == ProcessKind::Cargo {
     enqueue_cargo_restart(&key, &state).await?;
   } else {
     utils::container::process::restart_instances(&key, &kind, &state).await?;
@@ -143,8 +154,25 @@ pub async fn restart_process(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String)>,
+  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
+  let runtime = state
+    .inner
+    .docker_api
+    .inspect_container(&name, None)
+    .await?;
+  if let Some(key) = super::managed_vm_runtime_key(&runtime, false)? {
+    crate::services::vm::console::authorize_request(&req)?;
+    let id = runtime
+      .id
+      .as_deref()
+      .ok_or_else(|| HttpError::conflict("VM runtime has no container ID"))?;
+    utils::container::vm::control_process(&key, id, true, state)
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+    return Ok(web::HttpResponse::Accepted().build());
+  }
   state
     .inner
     .docker_api
