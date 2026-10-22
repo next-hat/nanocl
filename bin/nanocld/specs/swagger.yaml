@@ -9156,6 +9156,12 @@ components:
         Spec:
           $ref: '#/components/schemas/VmSpec'
           description: Specification of the vm
+    VmCloudInitUserData:
+      oneOf:
+      - type: string
+        description: Verbatim user-data, including an empty string
+      - $ref: https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/schemas/schema-cloud-config-v1.json
+      description: 'Complete cloud-init user-data: raw text or a cloud-config object. Replaces generated user setup; rendered UTF-8 is limited to 64 KiB. The upstream schema documents the object format; NanoCL does not validate guest module semantics.'
     VmHostConfig:
       type: object
       description: A vm's resources (cpu, memory, network)
@@ -9268,16 +9274,6 @@ components:
       - Image
       - HostConfig
       properties:
-        CloudInit:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
-        Console:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
         Key:
           type: string
           format: uuid
@@ -9322,6 +9318,25 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the VM runtime container
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable cloud-init provisioning (default: true for compatibility).'
+        CloudInitUserData:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/VmCloudInitUserData'
+            description: |-
+              Complete cloud-init user-data as raw text or a cloud-config object.
+              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+              NanoCL retains its instance ID and DHCP network configuration.
+              Stored but ignored when CloudInit is false.
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable the authenticated browser console (default: false).'
         User:
           type:
           - string
@@ -9354,16 +9369,6 @@ components:
       - Name
       - Image
       properties:
-        CloudInit:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
-        Console:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
         Name:
           type: string
           description: Name of the vm
@@ -9383,7 +9388,10 @@ components:
           type:
           - string
           - 'null'
-          description: 'Default user of the vm (default: cloud)'
+          description: |-
+            Default user of the vm (default: cloud).
+            With CloudInit enabled, use lowercase ASCII letters, digits, underscores
+            or hyphens, starting with a letter or underscore.
         Password:
           type:
           - string
@@ -9399,6 +9407,27 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the VM runtime container
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: |-
+            Enable cloud-init provisioning (default: true for compatibility).
+            Guest networking uses DHCP independently of this setting.
+        CloudInitUserData:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/VmCloudInitUserData'
+            description: |-
+              Complete cloud-init user-data as raw text or a cloud-config object.
+              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+              NanoCL retains its instance ID and DHCP network configuration.
+              Stored but ignored when CloudInit is false.
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable the authenticated browser console (default: false).'
         Image:
           type: string
           description: 'The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)'
@@ -9431,21 +9460,6 @@ components:
         It will create a new [VmSpec](VmSpec) with the new values
         and keep the old values in the history
       properties:
-        CloudInit:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
-        Console:
-          type:
-          - boolean
-          - 'null'
-          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
-        MacAddress:
-          type:
-          - string
-          - 'null'
-          description: 'Stable MAC identity. An existing address cannot change; this can assign an address to a legacy VM without one. Omitted preserves the saved address.'
         Name:
           type:
           - string
@@ -9483,6 +9497,32 @@ components:
           - type: 'null'
           - $ref: '#/components/schemas/Config'
             description: Action to run before the VM runtime container
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: Enable cloud-init provisioning; omitted preserves the current setting.
+        CloudInitUserData:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/VmCloudInitUserData'
+            description: |-
+              Complete cloud-init user-data as raw text or a cloud-config object.
+              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+              Omitted or null preserves the current data; an empty string replaces it.
+              Stored but ignored when CloudInit is false.
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: Enable the authenticated browser console; omitted preserves the setting.
+        MacAddress:
+          type:
+          - string
+          - 'null'
+          description: |-
+            Stable MAC identity. An existing address cannot be changed; this may
+            supply an address for a legacy VM that does not have one yet.
         Labels:
           type:
           - object

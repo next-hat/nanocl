@@ -47,9 +47,69 @@ VirtualMachines:
     NetworkMode: vm-private
 ```
 
-`CloudInit` defaults to `true` for existing configurations. When enabled, it provisions users, SSH keys, passwords, and hostname. Its DHCP configuration matches the persisted MAC and gives the interface the stable name `nanocl0`, so early boot readiness does not retain a name that udev later changes. `CloudInit: false` generates and attaches no seed; the guest must already have a DHCP client and usable login credentials. Its interface naming remains guest-managed. Provisioning fields do not create guest accounts when cloud-init is disabled.
+`CloudInit` defaults to `true` for existing configurations. When enabled without `CloudInitUserData`, it provisions users, SSH keys, passwords, and hostname from NanoCL's fields. Its DHCP configuration matches the persisted MAC and gives the interface the stable name `nanocl0`, so early boot readiness does not retain a name that udev later changes. `CloudInit: false` generates and attaches no seed; the guest must already have a DHCP client and usable login credentials. Its interface naming remains guest-managed. Provisioning fields do not create guest accounts when cloud-init is disabled.
 
-When cloud-init is enabled, `User` must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores, or hyphens. An omitted or empty value uses `cloud`. NanoCL rejects unsupported usernames before accepting a create or update. With `CloudInit: false`, provisioning fields are ignored.
+When generated provisioning is enabled, `User` must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores, or hyphens. An omitted or empty value uses `cloud`. NanoCL rejects unsupported usernames before accepting a create or update. With `CloudInit: false` or custom `CloudInitUserData`, these generated provisioning fields are ignored.
+
+### Custom cloud-init user-data
+
+Supply `CloudInitUserData` as a cloud-config object in the API or Statefile. Keep cloud-init's own lowercase property names:
+
+```yaml
+ApiVersion: v0.19
+Namespace: global
+VirtualMachines:
+- Name: provisioned
+  Image: /var/lib/nanocl/vm/provisioned.qcow2
+  CloudInit: true
+  CloudInitUserData:
+    hostname: provisioned
+    users:
+    - default
+    package_update: true
+    packages:
+    - curl
+    write_files:
+    - path: /etc/nanocl-provisioned
+      permissions: '0644'
+      content: "Provisioned by user configuration\n"
+    runcmd:
+    - [sh, -c, 'date -u > /var/log/nanocl-provisioned-at']
+  HostConfig:
+    Cpu: 2
+    Memory: 2048
+    Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
+```
+
+NanoCL writes the object as `#cloud-config` followed by JSON, which cloud-init accepts as YAML. OpenAPI and Statefile schemas describe the object through the [official cloud-init 26.2 cloud-config schema](https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/schemas/schema-cloud-config-v1.json). Editors and schema tools that resolve external references can use it for completion and validation. NanoCL does not run that upstream schema validator; the guest's installed cloud-init version determines which settings it supports.
+
+For an existing complete user-data document, use a raw string instead:
+
+```yaml
+  CloudInitUserData: |
+    #cloud-config
+    write_files:
+    - path: /etc/custom-provisioning
+      content: "Hello from cloud-init\n"
+```
+
+Raw text may contain cloud-config YAML, a shell script with a shebang, or MIME multipart user-data. Statefiles pass through NanoCL's existing Liquid template compiler first; the resulting user-data is then passed unchanged. For literal cloud-init Jinja syntax, use a CLI file or direct API string, or wrap the Jinja content in Liquid's `{% raw %}` and `{% endraw %}` tags in the Statefile. The CLI loads raw UTF-8 text from a local file without Statefile templating:
+
+```sh
+nanocl vm create guest /var/lib/nanocl/vm/guest.qcow2 --cloud-init-user-data ./user-data.yaml
+nanocl vm run guest /var/lib/nanocl/vm/guest.qcow2 --cloud-init-user-data ./user-data.yaml
+nanocl vm patch global.guest --cloud-init-user-data ./replacement.yaml
+```
+
+Custom user-data replaces the entire generated user-data document; it is not merged with `User`, `Password`, `SshKey`, or the generated hostname. Include the accounts, SSH keys, hostname, and other provisioning you need in the custom document. An empty raw string or empty object still selects custom provisioning and creates no NanoCL-generated accounts. NanoCL continues to supply the stable VM instance ID and the managed DHCP network-config separately.
+
+User-data must contain no NUL bytes and must fit in 64 KiB after rendering. CLI files must be UTF-8. These limits also apply while `CloudInit: false`; the configuration is retained but unused until cloud-init is enabled. User-data is saved in the VM specification and its history and passed through the Docker runtime environment, so authorized operators who can inspect them can read it. The `state apply` confirmation preview (without `-y`) also prints the full rendered user-data. `state diff` redacts custom user-data in its change display.
+
+PATCH and Statefile apply preserve existing user-data when the field is omitted or `null`. Use `CloudInit: false` to disable seed attachment; an explicit empty string selects blank custom user-data, rather than restoring generated accounts. Updating the specification or restarting a VM does not force first-boot cloud-init modules to rerun: the instance ID stays stable and the guest keeps its cloud-init state on disk. Test new provisioning with a fresh guest disk, or explicitly manage reprovisioning from inside the guest.
+
+Custom user-data requires a runtime image with `io.nanocl.vm-cloud-init-user-data=1` in addition to the runtime API label. Pull the updated nightly image with `docker pull ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly`, then select that tag through `HostConfig.Runtime` as above. NanoCL uses an `IfNotPresent` pull policy, so a cached older nightly without the capability is rejected when custom user-data is enabled; pull the updated image explicitly before creating or replacing the runtime. A matching locally built runtime can also be selected through `HostConfig.Runtime`.
+
+### Browser console
 
 `Console` defaults to `false`. When enabled, QEMU serves VNC through a Unix socket owned by the runtime. NanoCL relays binary RFB frames through `GET /v0.19.0/vms/{namespace.name}/console`. The runtime does not expose an unauthenticated VNC or WebSocket TCP port. QEMU's native WebSocket listener and a separate websockify process are unnecessary for this Unix-socket relay.
 
@@ -67,7 +127,7 @@ Use the [noVNC example](../examples/vm-console/README.md) for a local browser co
 | 404 | VM does not exist. |
 | 409 | Runtime is absent, stopped, ambiguous, stale, or its console is not ready. |
 
-CLI create/run/patch accepts `--cloud-init true|false` and `--console true|false`. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
+CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data FILE`, and `--console true|false`. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
 
 ## Migration
 

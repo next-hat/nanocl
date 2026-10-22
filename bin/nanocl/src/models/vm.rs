@@ -60,6 +60,9 @@ pub struct VmPatchOpts {
   /// Enable cloud-init provisioning (true or false)
   #[clap(long, action = clap::ArgAction::Set)]
   pub cloud_init: Option<bool>,
+  /// Read complete cloud-init user-data from a UTF-8 file (maximum 64 KiB)
+  #[clap(long, value_name = "FILE")]
+  pub cloud_init_user_data: Option<String>,
   /// Enable the authenticated browser console (true or false)
   #[clap(long, action = clap::ArgAction::Set)]
   pub console: Option<bool>,
@@ -138,6 +141,9 @@ pub struct VmRunOpts {
   /// Enable cloud-init provisioning (default: true)
   #[clap(long, action = clap::ArgAction::Set)]
   pub cloud_init: Option<bool>,
+  /// Read complete cloud-init user-data from a UTF-8 file (maximum 64 KiB)
+  #[clap(long, value_name = "FILE")]
+  pub cloud_init_user_data: Option<String>,
   /// Enable the authenticated browser console (default: false)
   #[clap(long, action = clap::ArgAction::Set)]
   pub console: Option<bool>,
@@ -207,6 +213,9 @@ pub struct VmCreateOpts {
   /// Enable cloud-init provisioning (default: true)
   #[clap(long, action = clap::ArgAction::Set)]
   pub cloud_init: Option<bool>,
+  /// Read complete cloud-init user-data from a UTF-8 file (maximum 64 KiB)
+  #[clap(long, value_name = "FILE")]
+  pub cloud_init_user_data: Option<String>,
   /// Enable the authenticated browser console (default: false)
   #[clap(long, action = clap::ArgAction::Set)]
   pub console: Option<bool>,
@@ -352,6 +361,54 @@ pub struct VmArg {
 mod tests {
   use clap::Parser;
   use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
+
+  #[test]
+  fn vm_cli_custom_cloud_init_accepts_file_for_create_run_and_patch() {
+    for action in ["create", "run"] {
+      let args = VmArg::try_parse_from([
+        "vm",
+        action,
+        "guest",
+        "/vm.qcow2",
+        "--cloud-init-user-data",
+        "./user data.yaml",
+      ])
+      .unwrap();
+      let file = match args.command {
+        VmCommand::Create(opts) => opts.cloud_init_user_data,
+        VmCommand::Run(opts) => opts.cloud_init_user_data,
+        _ => panic!("expected create or run"),
+      };
+      assert_eq!(file.as_deref(), Some("./user data.yaml"));
+    }
+    let args = VmArg::try_parse_from([
+      "vm",
+      "patch",
+      "global.guest",
+      "--cloud-init-user-data",
+      "./replacement.yaml",
+    ])
+    .unwrap();
+    let VmCommand::Patch(opts) = args.command else {
+      panic!("expected patch");
+    };
+    assert_eq!(
+      opts.cloud_init_user_data.as_deref(),
+      Some("./replacement.yaml")
+    );
+    assert!(opts.patch_host_config(&VmHostConfig::default()).is_none());
+    let omitted =
+      VmPatchOpts::try_parse_from(["patch", "global.guest"]).unwrap();
+    assert!(omitted.cloud_init_user_data.is_none());
+    assert!(
+      VmPatchOpts::try_parse_from([
+        "patch",
+        "global.guest",
+        "--cloud-init-user-data"
+      ])
+      .is_err()
+    );
+  }
 
   #[test]
   fn vm_cli_optional_provisioning_and_console_accept_explicit_booleans() {

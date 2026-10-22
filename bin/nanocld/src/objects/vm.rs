@@ -335,6 +335,10 @@ impl ObjPatchByPk for VmDb {
       },
       mac_address: spec.mac_address.clone().or(old_spec.mac_address),
       cloud_init: spec.cloud_init.or(old_spec.cloud_init),
+      cloud_init_user_data: spec
+        .cloud_init_user_data
+        .clone()
+        .or(old_spec.cloud_init_user_data),
       console: spec.console.or(old_spec.console),
       labels: if spec.labels.is_some() {
         spec.labels.clone()

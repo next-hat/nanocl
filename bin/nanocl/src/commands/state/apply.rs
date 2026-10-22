@@ -60,6 +60,10 @@ fn preserve_vm_identity(
   desired.mac_address =
     current.mac_address.clone().or(desired.mac_address.clone());
   desired.cloud_init = desired.cloud_init.or(current.cloud_init);
+  desired.cloud_init_user_data = desired
+    .cloud_init_user_data
+    .clone()
+    .or_else(|| current.cloud_init_user_data.clone());
   desired.console = desired.console.or(current.console);
   Ok(())
 }
@@ -75,6 +79,10 @@ mod tests {
       image: "/vm.qcow2".to_owned(),
       mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
       cloud_init: Some(false),
+      cloud_init_user_data: Some(
+        serde_json::from_value(serde_json::json!({"packages": ["curl"]}))
+          .unwrap(),
+      ),
       console: Some(true),
       ..Default::default()
     };
@@ -86,8 +94,10 @@ mod tests {
     preserve_vm_identity(&mut desired, &current).unwrap();
     assert_eq!(desired, current);
     desired.console = Some(false);
+    desired.cloud_init_user_data = Some(String::new().into());
     preserve_vm_identity(&mut desired, &current).unwrap();
     assert_eq!(desired.console, Some(false));
+    assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
     desired.mac_address = Some("02:00:00:00:00:02".to_owned());
     assert!(preserve_vm_identity(&mut desired, &current).is_err());
     let mut legacy = current.clone();

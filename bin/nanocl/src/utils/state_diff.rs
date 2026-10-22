@@ -28,7 +28,7 @@ pub(crate) fn diff_item(
   if let (Some(before), Some(after)) =
     (vm_before.as_mut().and_then(Value::as_object_mut), after)
   {
-    for field in ["MacAddress", "CloudInit", "Console"] {
+    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
       if after.get(field).is_none_or(Value::is_null) {
         before.remove(field);
       }
@@ -457,7 +457,8 @@ mod tests {
   #[test]
   fn vm_state_diff_ignores_omitted_allocated_identity_and_preserved_options() {
     let current = json!({"Name": "guest", "MacAddress": "02:00:00:00:00:01",
-      "CloudInit": false, "Console": true});
+      "CloudInit": false, "CloudInitUserData": "#cloud-config\nruncmd: [true]\n",
+      "Console": true});
     let desired = json!({"Name": "guest"});
     let diff = diff_item(
       "vm.yml",
@@ -484,6 +485,42 @@ mod tests {
     );
     assert!(matches!(diff.action, StateDiffAction::Update));
     assert_eq!(diff.after.as_ref().unwrap()["Console"], false);
+  }
+
+  #[test]
+  fn vm_state_diff_reports_user_data_changes_without_exposing_contents() {
+    let before = json!({"Name": "guest", "CloudInitUserData": "#cloud-config\npassword: hidden-before\n"});
+    for data in [
+      json!(""),
+      json!("#cloud-config\npassword: hidden-after\n"),
+      json!({"hidden-module": {"password": "hidden-after"}}),
+    ] {
+      let after = json!({"Name": "guest", "CloudInitUserData": data});
+      let diff = diff_item(
+        "vm.yml",
+        "vm",
+        "global.guest",
+        Some(&before),
+        Some(&after),
+        false,
+        false,
+        None,
+      );
+      assert_eq!(diff.action, StateDiffAction::Update);
+      assert_eq!(diff.changes.len(), 1);
+      assert_eq!(diff.changes[0].path, "CloudInitUserData");
+      assert!(diff.changes[0].redacted);
+      assert_eq!(diff.changes[0].before, Some(json!(REDACTED)));
+      assert_eq!(diff.changes[0].after, Some(json!(REDACTED)));
+      let report = StateDiff::new(vec![diff]);
+      for json in [false, true] {
+        let mut output = Vec::new();
+        report.write_to(&mut output, json).unwrap();
+        let output = String::from_utf8(output).unwrap();
+        assert!(!output.contains("hidden-"), "{output}");
+        assert!(!output.contains("#cloud-config"), "{output}");
+      }
+    }
   }
 
   fn without_style(output: &str) -> String {

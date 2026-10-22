@@ -23,6 +23,14 @@ VirtualMachines:
   Image: ./tests/ubuntu-24.04-minimal-cloudimg-amd64.img
   # Build this candidate locally; see doc/vm-runtime.md.
   CloudInit: true
+  # Optional: replace generated provisioning with your own cloud-config object.
+  # Define your accounts/SSH keys too; User/Password/SshKey are then ignored.
+  # CloudInitUserData:
+  #   packages: [curl]
+  #   write_files:
+  #   - path: /etc/nanocl-provisioned
+  #     content: "Provisioned by user configuration\n"
+  # Raw cloud-config/script/multipart text can also use a YAML block (|).
   Console: false
   HostConfig:
     Cpu: 2

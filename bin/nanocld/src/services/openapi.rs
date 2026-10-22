@@ -186,6 +186,42 @@ mod tests {
   }
 
   #[test]
+  fn generated_openapi_exposes_vm_cloud_init_user_data() {
+    use nanocl_stubs::vm_spec::CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL;
+
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    let schemas = &generated["components"]["schemas"];
+    let user_data = &schemas["VmCloudInitUserData"];
+    assert_eq!(user_data["oneOf"][0]["type"], "string");
+    assert_eq!(
+      user_data["oneOf"][1]["$ref"],
+      CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL
+    );
+    assert_eq!(
+      checked_in["components"]["schemas"]["VmCloudInitUserData"],
+      *user_data
+    );
+    for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+      assert_eq!(checked_in["components"]["schemas"][name], schemas[name]);
+    }
+    for document in [&generated, &checked_in] {
+      for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+        let schema = &document["components"]["schemas"][name];
+        let property = &schema["properties"]["CloudInitUserData"];
+        assert_eq!(
+          find_schema_reference(property),
+          Some("#/components/schemas/VmCloudInitUserData")
+        );
+        assert!(!schema["required"].as_array().is_some_and(|items| {
+          items.iter().any(|item| item == "CloudInitUserData")
+        }));
+      }
+    }
+  }
+
+  #[test]
   fn generated_openapi_uses_closed_flattened_container_spec() {
     let document =
       serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");

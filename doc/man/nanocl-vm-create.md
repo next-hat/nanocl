@@ -11,7 +11,7 @@ create - Create a vm
 
 ## SYNOPSIS
 
-**create** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cloud-init**\] \[**--console**\] \[**--cpu**\] \[**--mem**\]
+**create** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\]
 \[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
 \[**--kvm**\] \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
@@ -23,6 +23,9 @@ Create a vm
 
 **--cloud-init** *\<true|false\>*
 Enable cloud-init provisioning; defaults to true for compatibility. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
+
+**--cloud-init-user-data** *\<FILE\>*
+Read complete user-data from a local UTF-8 file, at most 64 KiB without NUL bytes. The file replaces generated user/password/SSH/hostname provisioning; NanoCL retains the stable instance ID and DHCP network-config. Cloud-config, scripts, and MIME multipart text are passed unchanged. An empty file selects blank user-data. The content is retained but unused when cloud-init is disabled, and is visible to operators through the VM specification and Docker environment. The runtime must advertise `io.nanocl.vm-cloud-init-user-data=1`. See [custom cloud-init](../vm-runtime.md#custom-cloud-init-user-data) for structured Statefiles and first-boot semantics.
 
 **--console** *\<true|false\>*
 Enable the browser console; defaults to false. Access requires the daemon Unix socket or verified mutual TLS.

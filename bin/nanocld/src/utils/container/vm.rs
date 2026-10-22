@@ -15,6 +15,7 @@ use nanocl_stubs::{
   process::{Process, ProcessKind},
   system::NativeEventAction,
   vm::Vm,
+  vm_spec::VmCloudInitUserData,
 };
 
 use crate::{
@@ -106,10 +107,34 @@ pub(crate) fn validate_spec(
   spec: &nanocl_stubs::vm_spec::VmSpecPartial,
 ) -> IoResult<()> {
   validate_host_config(&spec.host_config.clone().unwrap_or_default())?;
+  cloud_init_user_data(spec.cloud_init_user_data.as_ref())?;
   validate_cloud_init_user(
-    spec.cloud_init.unwrap_or(true),
+    spec.cloud_init.unwrap_or(true) && spec.cloud_init_user_data.is_none(),
     spec.user.as_deref(),
   )
+}
+
+fn cloud_init_user_data(
+  data: Option<&VmCloudInitUserData>,
+) -> IoResult<Option<String>> {
+  let Some(data) = data else {
+    return Ok(None);
+  };
+  let data = match data {
+    VmCloudInitUserData::Raw(data) => data.clone(),
+    VmCloudInitUserData::CloudConfig(config) => {
+      // JSON is a YAML subset. This preserves typed values without treating
+      // user strings as YAML syntax or changing raw user-data formatting.
+      format!("#cloud-config\n{}\n", serde_json::to_string(config)?)
+    }
+  };
+  if data.len() > 65_536 || data.contains('\0') {
+    return Err(IoError::invalid_input(
+      "VM provisioning",
+      "CloudInitUserData must render to at most 65536 UTF-8 bytes without NUL characters",
+    ));
+  }
+  Ok(Some(data))
 }
 
 fn validate_cloud_init_user(enabled: bool, user: Option<&str>) -> IoResult<()> {
@@ -211,10 +236,19 @@ async fn ensure_runtime_image(
     .inspect_image(&image)
     .await
     .map_err(|err| err.map_err_context(|| "VM runtime"))?;
-  let supported = inspect
+  let labels = inspect
     .config
     .as_ref()
-    .and_then(|config| config.labels.as_ref())
+    .and_then(|config| config.labels.as_ref());
+  validate_runtime_labels(vm, labels)?;
+  Ok(image)
+}
+
+fn validate_runtime_labels(
+  vm: &Vm,
+  labels: Option<&HashMap<String, String>>,
+) -> IoResult<()> {
+  let supported = labels
     .and_then(|labels| labels.get("io.nanocl.vm-runtime-api"))
     .map(String::as_str)
     == Some("0.19");
@@ -224,13 +258,26 @@ async fn ensure_runtime_image(
       "The image must implement io.nanocl.vm-runtime-api=0.19; build or select the matching nanocl-qemu runtime",
     ));
   }
-  Ok(image)
+  if vm.spec.cloud_init.unwrap_or(true)
+    && vm.spec.cloud_init_user_data.is_some()
+    && labels
+      .and_then(|labels| labels.get("io.nanocl.vm-cloud-init-user-data"))
+      .map(String::as_str)
+      != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "CloudInitUserData requires an image with io.nanocl.vm-cloud-init-user-data=1; select the matching nanocl-qemu runtime",
+    ));
+  }
+  Ok(())
 }
 
 fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
   validate_host_config(&vm.spec.host_config)?;
+  let user_data = cloud_init_user_data(vm.spec.cloud_init_user_data.as_ref())?;
   validate_cloud_init_user(
-    vm.spec.cloud_init.unwrap_or(true),
+    vm.spec.cloud_init.unwrap_or(true) && user_data.is_none(),
     vm.spec.user.as_deref(),
   )?;
   let mac = vm.spec.mac_address.as_deref().ok_or_else(|| {
@@ -251,13 +298,17 @@ fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
     envs.push(format!("DNS={}", servers.join(",")));
   }
   if vm.spec.cloud_init.unwrap_or(true) {
-    for (key, value) in [
-      ("USER", &vm.spec.user),
-      ("PASSWORD", &vm.spec.password),
-      ("SSH_KEY", &vm.spec.ssh_key),
-    ] {
-      if let Some(value) = value {
-        envs.push(format!("{key}={value}"));
+    if let Some(data) = user_data {
+      envs.push(format!("CLOUD_INIT_USER_DATA={data}"));
+    } else {
+      for (key, value) in [
+        ("USER", &vm.spec.user),
+        ("PASSWORD", &vm.spec.password),
+        ("SSH_KEY", &vm.spec.ssh_key),
+      ] {
+        if let Some(value) = value {
+          envs.push(format!("{key}={value}"));
+        }
       }
     }
   }
@@ -829,6 +880,93 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[test]
+  fn vm_custom_user_data_preserves_raw_and_renders_structured_config() {
+    let raw = "#cloud-config\nwrite_files:\n  - content: 'é $HOME'\n\n";
+    assert_eq!(cloud_init_user_data(None).unwrap(), None);
+    for raw in [raw, ""] {
+      assert_eq!(
+        cloud_init_user_data(Some(&VmCloudInitUserData::Raw(raw.into())))
+          .unwrap(),
+        Some(raw.to_owned())
+      );
+    }
+    let config = serde_json::json!({
+      "users": [{"name": "custom", "lock_passwd": true}],
+      "write_files": [{"path": "/tmp/example", "content": "yes\n$HOME\né"}],
+      "runcmd": [["sh", "-c", "echo done"]]
+    });
+    let data: VmCloudInitUserData =
+      serde_json::from_value(config.clone()).unwrap();
+    let rendered = cloud_init_user_data(Some(&data)).unwrap().unwrap();
+    assert!(rendered.starts_with("#cloud-config\n"));
+    assert_eq!(
+      serde_yaml::from_str::<serde_json::Value>(&rendered).unwrap(),
+      config
+    );
+  }
+
+  #[test]
+  fn vm_custom_user_data_is_bounded_and_errors_hide_contents() {
+    assert!(
+      cloud_init_user_data(Some(&VmCloudInitUserData::Raw("é".repeat(32_768))))
+        .is_ok()
+    );
+    for raw in ["é".repeat(32_769), "private-secret\0payload".to_owned()] {
+      let error = cloud_init_user_data(Some(&VmCloudInitUserData::Raw(raw)))
+        .unwrap_err()
+        .to_string();
+      assert!(error.contains("65536"));
+      assert!(!error.contains("private-secret"));
+    }
+    let oversized: VmCloudInitUserData = serde_json::from_value(
+      serde_json::json!({"write_files": [{"content": "x".repeat(65_536)}]}),
+    )
+    .unwrap();
+    assert!(cloud_init_user_data(Some(&oversized)).is_err());
+    let mut vm = Vm::default();
+    vm.spec.cloud_init = Some(false);
+    vm.spec.cloud_init_user_data = Some(oversized);
+    assert!(validate_spec(&vm.spec.into()).is_err());
+  }
+
+  #[test]
+  fn vm_custom_user_data_replaces_defaults_and_requires_runtime_support() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.user = Some("ignored invalid user".into());
+    vm.spec.password = Some("ignored password".into());
+    vm.spec.ssh_key = Some("ignored key".into());
+    vm.spec.cloud_init_user_data =
+      Some(VmCloudInitUserData::Raw(String::new()));
+    assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+    let env = runtime_env(&vm, false).unwrap();
+    assert!(env.contains(&"CLOUD_INIT_USER_DATA=".into()));
+    assert!(env.contains(&format!("INSTANCE_ID={}", vm.spec.vm_key)));
+    for key in ["USER=", "PASSWORD=", "SSH_KEY="] {
+      assert!(!env.iter().any(|value| value.starts_with(key)));
+    }
+    let mut labels =
+      HashMap::from([("io.nanocl.vm-runtime-api".into(), "0.19".into())]);
+    assert!(validate_runtime_labels(&vm, None).is_err());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
+    labels.insert("io.nanocl.vm-cloud-init-user-data".into(), "1".into());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+    labels.remove("io.nanocl.vm-cloud-init-user-data");
+    vm.spec.cloud_init = Some(false);
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+    assert!(
+      !runtime_env(&vm, false)
+        .unwrap()
+        .iter()
+        .any(|value| value.starts_with("CLOUD_INIT_USER_DATA="))
+    );
+    vm.spec.cloud_init = None;
+    vm.spec.cloud_init_user_data = None;
+    assert!(runtime_env(&vm, false).is_err());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+  }
 
   #[test]
   fn vm_runtime_link_interface_matches_docker_network_prefix() {

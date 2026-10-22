@@ -184,6 +184,7 @@ impl SpecDb {
       ssh_key: vm_spec_partial.ssh_key,
       init_container: vm_spec_partial.init_container,
       cloud_init: vm_spec_partial.cloud_init,
+      cloud_init_user_data: vm_spec_partial.cloud_init_user_data,
       console: vm_spec_partial.console,
       user: vm_spec_partial.user,
       mac_address: vm_spec_partial.mac_address,
@@ -205,6 +206,33 @@ mod tests {
   };
 
   use super::*;
+
+  #[test]
+  fn vm_cloud_init_user_data_survives_spec_persistence() {
+    for data in [
+      None,
+      Some(serde_json::json!("")),
+      Some(serde_json::json!("#cloud-config\nruncmd:\n- echo café\n")),
+      Some(serde_json::json!({"packages": ["curl"]})),
+    ] {
+      let desired = VmSpecPartial {
+        name: "custom".to_owned(),
+        image: "/vm.qcow2".to_owned(),
+        cloud_init: Some(false),
+        cloud_init_user_data: data
+          .map(|value| serde_json::from_value(value).unwrap()),
+        ..Default::default()
+      };
+      let stored =
+        SpecDb::try_from_vm_partial("team.custom", "v0.19.0", &desired)
+          .unwrap();
+      let restored = stored.try_to_vm_spec().unwrap();
+      assert_eq!(stored.data, serde_json::to_value(&desired).unwrap());
+      assert_eq!(restored.cloud_init, Some(false));
+      assert_eq!(restored.cloud_init_user_data, desired.cloud_init_user_data);
+      assert_eq!(restored.vm_key, "team.custom");
+    }
+  }
 
   fn container(name: &str, image: &str) -> ContainerSpec {
     ContainerSpec {
