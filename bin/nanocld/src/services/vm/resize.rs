@@ -17,7 +17,6 @@ use crate::{models::SystemState, utils};
   responses(
     (status = 200, description = "Observed QEMU resources and CPU/memory persistence", body = nanocl_stubs::vm::VmResources),
     (status = 400, description = "Invalid resource totals, shrink request, or boot ceiling exceeded", body = crate::services::openapi::ApiError),
-    (status = 403, description = "Trusted operator transport and matching Origin required", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "Runtime is unavailable, incompatible, or another VM operation is active", body = crate::services::openapi::ApiError),
     (status = 500, description = "Resize or persistence failed; changes may be partially applied, query resources before retrying", body = crate::services::openapi::ApiError),
@@ -29,9 +28,7 @@ pub async fn resize_vm(
   _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmResizeOptions>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  super::console::authorize_request(&req)?;
   let key = utils::key::parse_resource_key(&path.1)?;
   let options = payload.into_inner();
   options.validate().map_err(HttpError::bad_request)?;
@@ -50,7 +47,6 @@ pub async fn resize_vm(
   responses(
     (status = 200, description = "Observed QEMU resources and CPU/memory persistence", body = nanocl_stubs::vm::VmResources),
     (status = 400, description = "Invalid canonical VM key", body = crate::services::openapi::ApiError),
-    (status = 403, description = "Trusted operator transport and matching Origin required", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "Runtime is unavailable or incompatible", body = crate::services::openapi::ApiError),
     (status = 504, description = "QMP did not respond in time", body = crate::services::openapi::ApiError),
@@ -60,9 +56,7 @@ pub async fn vm_resources(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String)>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  super::console::authorize_request(&req)?;
   let key = utils::key::parse_resource_key(&path.1)?;
   let resources = utils::container::vm::runtime_resources(key.as_str(), state)
     .await

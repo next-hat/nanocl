@@ -258,14 +258,12 @@ mod tests {
       );
       assert_eq!(operation["requestBody"]["required"], true);
       assert!(operation["responses"]["504"].is_object());
-      assert!(operation["responses"]["403"].is_object());
+      assert!(operation["responses"].get("403").is_none());
     }
   }
 
   #[test]
   fn generated_openapi_exposes_vm_cloud_init_user_data() {
-    use nanocl_stubs::vm_spec::CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL;
-
     let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
     let checked_in: serde_json::Value =
       serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
@@ -274,7 +272,7 @@ mod tests {
     assert_eq!(user_data["oneOf"][0]["type"], "string");
     assert_eq!(
       user_data["oneOf"][1]["$ref"],
-      CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL
+      "#/components/schemas/CloudInit26_2"
     );
     assert_eq!(
       checked_in["components"]["schemas"]["VmCloudInitUserData"],
@@ -282,6 +280,17 @@ mod tests {
     );
     for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
       assert_eq!(checked_in["components"]["schemas"][name], schemas[name]);
+    }
+    let cloud_init: Vec<_> = schemas
+      .as_object()
+      .unwrap()
+      .iter()
+      .filter(|(name, _)| name.starts_with("CloudInit26_2"))
+      .collect();
+    assert_eq!(cloud_init.len(), 77);
+    for (name, schema) in cloud_init {
+      assert_eq!(checked_in["components"]["schemas"][name], *schema, "{name}");
+      assert_local_schema_references(&generated, schema);
     }
     for document in [&generated, &checked_in] {
       for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
@@ -295,6 +304,32 @@ mod tests {
           items.iter().any(|item| item == "CloudInitUserData")
         }));
       }
+    }
+  }
+
+  fn assert_local_schema_references(
+    document: &serde_json::Value,
+    value: &serde_json::Value,
+  ) {
+    match value {
+      serde_json::Value::Array(items) => {
+        for item in items {
+          assert_local_schema_references(document, item);
+        }
+      }
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get("$ref") {
+          let reference = reference.as_str().unwrap();
+          // Both the docs and VS Code Statefile converter require local
+          // component references, including references nested in cloud-config.
+          assert!(reference.starts_with("#/components/schemas/"));
+          assert!(document.pointer(&reference[1..]).is_some(), "{reference}");
+        }
+        for child in object.values() {
+          assert_local_schema_references(document, child);
+        }
+      }
+      _ => {}
     }
   }
 

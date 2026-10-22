@@ -18,6 +18,9 @@ for (const [name, variable] of [['ca', 'NANOCL_TLS_CA'], ['cert', 'NANOCL_TLS_CE
 }
 const api = '/v0.19.0';
 const vmPath = `/vms/${encodeURIComponent(key)}`;
+const requestTimeout = 30_000;
+// Default ACPI grace (60s), restart startup (30s), then response delivery.
+const lifecycleTimeout = 60_000 + 30_000 + requestTimeout;
 const peers = new Set();
 const passed = [];
 const skipped = [];
@@ -33,12 +36,12 @@ function endpoint(host, path, credentials = tls) {
   url.hash = '';
   return { url: url.href, options: { ...credentials, rejectUnauthorized: true } };
 }
-async function request(method, path, body) {
+async function request(method, path, body, timeout = requestTimeout) {
   const { url, options } = endpoint(host, path);
   const data = body === undefined ? undefined : JSON.stringify(body);
   return await new Promise((resolve, reject) => {
     const request = (url.startsWith('https:') ? httpsRequest : httpRequest)(url, {
-      ...options, method, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {},
+      ...options, method, signal: AbortSignal.timeout(timeout), headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {},
     }, response => {
       const chunks = [];
       response.on('data', chunk => chunks.push(chunk));
@@ -49,7 +52,7 @@ async function request(method, path, body) {
         resolve({ status: response.statusCode, body });
       });
     });
-    request.setTimeout(30_000, () => request.destroy(new Error('API request timed out')));
+    request.setTimeout(timeout, () => request.destroy(new Error('API request timed out')));
     request.once('error', reject);
     request.end(data);
   });
@@ -79,10 +82,10 @@ async function expectRejected(target, path, headers, expected, credentials = tls
     });
   } finally { socket.terminate(); }
 }
-async function readyConsole() {
+async function readyConsole(target = host, headers = {}) {
   const deadline = Date.now() + 60_000;
   while (true) {
-    const socket = connect();
+    const socket = connect(target, vmPath + '/console', headers);
     try {
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Console did not send an RFB banner')), 10_000);
@@ -117,15 +120,15 @@ async function readyConsole() {
     }
   }
 }
-const closed = socket => once(socket, 'close', { signal: AbortSignal.timeout(30_000) });
+const closed = (socket, timeout = requestTimeout) => once(socket, 'close', { signal: AbortSignal.timeout(timeout) });
 async function close(socket) { const done = closed(socket); socket.close(); await done; }
 async function mutate(method, path, body) {
-  const result = await request(method, path, body);
+  const result = await request(method, path, body, lifecycleTimeout);
   assert(result.status >= 200 && result.status < 300, `${method} ${path}: ${result.status} ${JSON.stringify(result.body)}`);
   return result.body;
 }
 async function settled(actual, consoleEnabled) {
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + lifecycleTimeout;
   while (true) {
     const result = await request('GET', vmPath + '/inspect');
     assert.equal(result.status, 200);
@@ -157,20 +160,24 @@ try {
     await rejected;
   }
   pass('text and oversized input close the console');
-  await expectRejected(host, vmPath + '/console', { Origin: 'https://foreign.example' }, 403);
-  await expectRejected(host, vmPath + '/console', { Origin: 'null' }, 403);
+  for (const origin of ['https://foreign.example', 'null']) {
+    socket = await readyConsole(host, { Origin: origin });
+    await close(socket);
+  }
+  pass('console follows daemon access policy with foreign/null Origin');
   await expectRejected(host, '/vms/not-a-canonical-key/console', {}, 400);
-  pass('foreign/null Origin and malformed key rejected');
+  pass('malformed key rejected');
   if (process.env.NANOCL_PLAINTEXT_HOST) {
-    await expectRejected(process.env.NANOCL_PLAINTEXT_HOST, vmPath + '/console', {}, 403);
-    pass('plaintext listener rejected');
+    socket = await readyConsole(process.env.NANOCL_PLAINTEXT_HOST);
+    await close(socket);
+    pass('console works through the configured plaintext listener');
   } else skipped.push('plaintext listener: NANOCL_PLAINTEXT_HOST unset');
   if (host.startsWith('https:')) {
     await expectRejected(host, vmPath + '/console', {}, 'tls', { ca: tls.ca });
     pass('missing client certificate rejected after successful mTLS console');
   } else skipped.push('missing client certificate: NANOCL_HOST is not HTTPS');
   socket = await readyConsole();
-  let oldClosed = closed(socket);
+  let oldClosed = closed(socket, lifecycleTimeout);
   await mutate('POST', `/processes/vm/${encodeURIComponent(key)}/stop`);
   await oldClosed;
   await settled('stop');
@@ -180,13 +187,13 @@ try {
   await settled('start', true);
   socket = await readyConsole();
   pass('start reconnects');
-  oldClosed = closed(socket);
+  oldClosed = closed(socket, lifecycleTimeout);
   await mutate('POST', `/processes/vm/${encodeURIComponent(key)}/restart`);
   await oldClosed;
   await settled('start', true);
   socket = await readyConsole();
   pass('restart closes old console and reconnects');
-  oldClosed = closed(socket);
+  oldClosed = closed(socket, lifecycleTimeout);
   await mutate('PATCH', vmPath, { Console: false });
   await expectRejected(host, vmPath + '/console', {}, 403);
   await oldClosed;
@@ -195,17 +202,17 @@ try {
   await mutate('PATCH', vmPath, { Console: true });
   await settled('start', true);
   socket = await readyConsole();
-  oldClosed = closed(socket);
+  oldClosed = closed(socket, lifecycleTimeout);
   await mutate('PATCH', vmPath, { Hostname: 'console-replacement-test' });
   await oldClosed;
   await settled('start', true);
   socket = await readyConsole();
   pass('replacement closes old console and reconnects');
-  oldClosed = closed(socket);
+  oldClosed = closed(socket, lifecycleTimeout);
   await mutate('DELETE', vmPath);
   await oldClosed;
   // Delete API schedules work; use its observed missing state as the barrier.
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + requestTimeout;
   while ((await request('GET', vmPath + '/inspect')).status !== 404) {
     assert(Date.now() < deadline, 'Deleted VM remained in the API');
     await yieldTurn();

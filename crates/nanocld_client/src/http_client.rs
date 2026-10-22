@@ -20,6 +20,58 @@ use crate::error::is_api_error;
 
 pub const NANOCLD_DEFAULT_VERSION: &str = "0.19.0";
 
+#[cfg(feature = "openssl")]
+pub(crate) fn tls_connector(
+  ssl: Option<&SslConfig>,
+) -> IoResult<openssl::ssl::SslConnector> {
+  use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+  let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+  let Some(ssl) = ssl else {
+    // Match ntex's ordinary HTTP client default when no SSL config is supplied.
+    builder.set_verify(SslVerifyMode::NONE);
+    return Ok(builder.build());
+  };
+  if ssl.verify {
+    builder
+      .set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
+    let cert_ca = openssl::x509::X509::from_pem(
+      ssl.cert_ca.clone().expect("Ssl.ca to be fill").as_bytes(),
+    )
+    .expect("Invalid ssl cert ca");
+    let mut store_builder = openssl::x509::store::X509StoreBuilder::new()
+      .expect("Failed to create X509 store builder");
+    store_builder
+      .add_cert(cert_ca)
+      .expect("Failed to add CA certificate to store");
+    builder.set_cert_store(store_builder.build());
+  } else {
+    builder.set_verify(SslVerifyMode::NONE);
+  }
+  let cert = openssl::x509::X509::from_pem(
+    ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
+  )
+  .map_err(|err| {
+    IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+  })?;
+  let cert_key = openssl::pkey::PKey::private_key_from_pem(
+    ssl
+      .cert_key
+      .clone()
+      .expect("Ssl.cert_key to be fill")
+      .as_bytes(),
+  )
+  .map_err(|err| {
+    IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
+  })?;
+  builder.set_certificate(&cert).map_err(|err| {
+    IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
+  })?;
+  builder.set_private_key(&cert_key).map_err(|err| {
+    IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
+  })?;
+  Ok(builder.build())
+}
+
 #[derive(Clone, Debug)]
 pub struct ConnectOpts {
   /// Url to connect to
@@ -124,50 +176,7 @@ impl NanocldClient {
     };
     #[cfg(feature = "openssl")]
     let client = if let Some(ssl) = &self.ssl {
-      use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-      let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-      if ssl.verify {
-        builder.set_verify(
-          SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
-        );
-        let cert_ca = openssl::x509::X509::from_pem(
-          ssl.cert_ca.clone().expect("Ssl.ca to be fill").as_bytes(),
-        )
-        .expect("Invalid ssl cert ca");
-        // Create an X509Store and add the certificate
-        let mut store_builder = openssl::x509::store::X509StoreBuilder::new()
-          .expect("Failed to create X509 store builder");
-        store_builder
-          .add_cert(cert_ca)
-          .expect("Failed to add CA certificate to store");
-        let store = store_builder.build();
-        builder.set_cert_store(store);
-      } else {
-        builder.set_verify(SslVerifyMode::NONE);
-      }
-      let cert = openssl::x509::X509::from_pem(
-        ssl.cert.clone().expect("Ssl.cert to be fill").as_bytes(),
-      )
-      .map_err(|err| {
-        IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
-      })?;
-      let cert_key = openssl::pkey::PKey::private_key_from_pem(
-        ssl
-          .cert_key
-          .clone()
-          .expect("Ssl.cert_key to be fill")
-          .as_bytes(),
-      )
-      .map_err(|err| {
-        IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
-      })?;
-      builder.set_certificate(&cert).map_err(|err| {
-        IoError::invalid_data("Invalid ssl cert", err.to_string().as_str())
-      })?;
-      builder.set_private_key(&cert_key).map_err(|err| {
-        IoError::invalid_data("Invalid ssl cert key", err.to_string().as_str())
-      })?;
-      client.openssl(builder.build())
+      client.openssl(tls_connector(Some(ssl))?)
     } else {
       client
     };
@@ -498,6 +507,82 @@ mod tests {
   use serde_json::{Value, json};
 
   use super::*;
+
+  #[cfg(feature = "openssl")]
+  #[test]
+  fn tls_connector_without_config_matches_http_client_default() {
+    let connector = tls_connector(None).unwrap();
+    assert_eq!(
+      connector.context().verify_mode(),
+      openssl::ssl::SslVerifyMode::NONE
+    );
+    assert!(connector.context().certificate().is_none());
+    assert!(connector.context().private_key().is_none());
+  }
+
+  #[cfg(feature = "openssl")]
+  #[test]
+  fn tls_connector_preserves_configured_verify_and_client_identity() {
+    use openssl::{asn1::Asn1Time, ec::EcGroup, ec::EcKey, nid::Nid};
+    let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+    let key =
+      openssl::pkey::PKey::from_ec_key(EcKey::generate(&group).unwrap())
+        .unwrap();
+    let mut name = openssl::x509::X509NameBuilder::new().unwrap();
+    name.append_entry_by_text("CN", "client.test").unwrap();
+    let name = name.build();
+    let mut cert = openssl::x509::X509::builder().unwrap();
+    cert.set_version(2).unwrap();
+    let serial = openssl::bn::BigNum::from_u32(1)
+      .unwrap()
+      .to_asn1_integer()
+      .unwrap();
+    cert.set_serial_number(&serial).unwrap();
+    cert.set_subject_name(&name).unwrap();
+    cert.set_issuer_name(&name).unwrap();
+    cert.set_pubkey(&key).unwrap();
+    cert
+      .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+      .unwrap();
+    cert
+      .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+      .unwrap();
+    cert
+      .sign(&key, openssl::hash::MessageDigest::sha256())
+      .unwrap();
+    let cert = String::from_utf8(cert.build().to_pem().unwrap()).unwrap();
+    let mut ssl = SslConfig {
+      cert_ca: Some(cert.clone()),
+      cert: Some(cert),
+      cert_key: Some(
+        String::from_utf8(key.private_key_to_pem_pkcs8().unwrap()).unwrap(),
+      ),
+      ..Default::default()
+    };
+    for verify in [false, true] {
+      ssl.verify = verify;
+      let connector = tls_connector(Some(&ssl)).unwrap();
+      let context = connector.context();
+      assert_eq!(
+        context.verify_mode(),
+        if verify {
+          openssl::ssl::SslVerifyMode::PEER
+            | openssl::ssl::SslVerifyMode::FAIL_IF_NO_PEER_CERT
+        } else {
+          openssl::ssl::SslVerifyMode::NONE
+        }
+      );
+      assert!(
+        context
+          .certificate()
+          .unwrap()
+          .public_key()
+          .unwrap()
+          .public_eq(&key)
+      );
+      assert!(context.private_key().unwrap().public_eq(&key));
+    }
+  }
 
   fn response_with_chunks(
     chunks: &[&'static [u8]],

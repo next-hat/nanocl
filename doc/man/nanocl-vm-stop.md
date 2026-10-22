@@ -15,7 +15,7 @@ stop - Shut down VMs by canonical keys
 
 ## DESCRIPTION
 
-Ask each guest to shut down through QMP and wait for its runtime to exit. A timeout reports failure without forced power-off. Requires the daemon Unix socket or verified mutual TLS.
+Ask each guest to shut down through QMP and wait for its runtime to exit. A timeout reports failure without forced power-off. Access follows the daemon's configured operator access controls.
 
 ## OPTIONS
 

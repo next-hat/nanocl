@@ -7,9 +7,7 @@ use nanocl_stubs::{
   process::{Process, ProcessKind},
   vm::Vm,
 };
-use ntex::{
-  Service, channel::oneshot, fn_service, http::header, rt, util::Bytes, web, ws,
-};
+use ntex::{Service, channel::oneshot, fn_service, rt, util::Bytes, web, ws};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::UnixStream,
@@ -22,69 +20,7 @@ use crate::{
   utils,
 };
 
-// Listener tags are assigned by the server, never by request headers.
-pub(crate) const CONSOLE_UNIX_TRANSPORT: &str = "nanocld-console-unix";
-pub(crate) const CONSOLE_MTLS_TRANSPORT: &str = "nanocld-console-mtls";
 const MAX_FRAME_SIZE: usize = 65_536;
-
-fn authorize_transport(
-  tag: Option<&str>,
-  peer_certificate: bool,
-) -> HttpResult<()> {
-  match tag {
-    Some(CONSOLE_UNIX_TRANSPORT) => Ok(()),
-    Some(CONSOLE_MTLS_TRANSPORT) if peer_certificate => Ok(()),
-    _ => Err(HttpError::forbidden(
-      "VM control requires the daemon Unix socket or mutual TLS",
-    )),
-  }
-}
-
-fn validate_origin(
-  origin: Option<&str>,
-  host: Option<&str>,
-  tls: bool,
-) -> HttpResult<()> {
-  let Some(origin) = origin else {
-    return Ok(());
-  };
-  // Browsers use mutual TLS directly, or a local authenticated example bridge.
-  // Forwarded headers deliberately do not establish trust or an allowed origin.
-  let Some(host) = host else {
-    return Err(HttpError::forbidden(
-      "VM control Origin has no matching Host",
-    ));
-  };
-  if !tls || origin != format!("https://{host}") {
-    return Err(HttpError::forbidden(
-      "VM control Origin must match the mutual TLS endpoint",
-    ));
-  }
-  Ok(())
-}
-
-/// Apply the same daemon-operator boundary to console and lifecycle requests.
-pub(crate) fn authorize_request(req: &web::HttpRequest) -> HttpResult<()> {
-  let io = req.io();
-  let tag = io.map(|io| io.tag());
-  let certificate = io.is_some_and(|io| {
-    io.query::<ntex::tls::openssl::PeerCert>()
-      .as_ref()
-      .is_some()
-  });
-  authorize_transport(tag, certificate)?;
-  let origin = req
-    .headers()
-    .get(header::ORIGIN)
-    .map(|value| value.to_str())
-    .transpose()
-    .map_err(HttpError::bad_request)?;
-  let host = req
-    .headers()
-    .get(header::HOST)
-    .and_then(|value| value.to_str().ok());
-  validate_origin(origin, host, tag == Some(CONSOLE_MTLS_TRANSPORT))
-}
 
 fn validate_runtime(
   vm: &Vm,
@@ -318,11 +254,11 @@ fn console_service(
   get,
   tag = "Vms",
   path = "/vms/{key}/console",
-  description = "Requires Console: true and a current local VM runtime. Available only over the daemon Unix socket or verified mutual TLS; plaintext TCP is denied. Browser Origin must match the HTTPS endpoint. Binary frames contain unmodified RFB bytes, limited to 64 KiB per frame. Access follows NanoCL's daemon-operator trust model, not per-user VM ownership.",
+  description = "Requires Console: true and a current local VM runtime. Access follows the daemon's configured operator access controls. Binary frames contain unmodified RFB bytes, limited to 64 KiB per frame. There is no per-user VM ownership model.",
   params(("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format")),
   responses(
     (status = 101, description = "Binary RFB console WebSocket"),
-    (status = 403, description = "Untrusted transport, Origin, or disabled console"),
+    (status = 403, description = "Console is disabled"),
     (status = 404, description = "VM does not exist"),
     (status = 409, description = "VM runtime is not ready or does not match")
   )
@@ -333,7 +269,6 @@ pub async fn console_vm(
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  authorize_request(&req)?;
   if let Err(error) = ws::verify_handshake(req.head()) {
     return utils::ws::response(Err(error.into()));
   }
@@ -385,39 +320,77 @@ pub async fn console_vm(
 mod tests {
   use super::*;
 
-  #[test]
-  fn vm_control_trust_requires_listener_identity_and_verified_tls() {
-    assert!(authorize_transport(Some(CONSOLE_UNIX_TRANSPORT), false).is_ok());
-    assert!(authorize_transport(Some(CONSOLE_MTLS_TRANSPORT), true).is_ok());
-    for tag in [None, Some("--"), Some("http"), Some(CONSOLE_MTLS_TRANSPORT)] {
-      assert!(authorize_transport(tag, false).is_err());
-    }
-    for tag in [None, Some("--"), Some("http")] {
-      let error = authorize_transport(tag, true).unwrap_err();
-      assert_eq!(error.status, ntex::http::StatusCode::FORBIDDEN);
-    }
-  }
+  #[ntex::test]
+  async fn console_http_requests_reach_vm_key_validation() {
+    use diesel::{PgConnection, r2d2::ConnectionManager};
+    use std::sync::Arc;
 
-  #[test]
-  fn vm_control_origin_rejects_cross_site_null_and_plaintext() {
-    assert!(validate_origin(None, None, false).is_ok());
-    assert!(
-      validate_origin(Some("https://host:8443"), Some("host:8443"), true)
-        .is_ok()
-    );
-    for origin in [
-      "null",
-      "http://host:8443",
-      "https://evil",
-      "https://host:8443/",
-      "https://host:8443.evil",
-    ] {
-      assert!(validate_origin(Some(origin), Some("host:8443"), true).is_err());
+    use crate::models::{Pool, SystemStateInner};
+
+    // No connection or event loop is started. The malformed key must be
+    // rejected before the handler reaches its database or Docker clients.
+    let pool = Pool::builder()
+      .min_idle(Some(0))
+      .max_size(1)
+      .build_unchecked(ConnectionManager::<PgConnection>::new(
+        "invalid-test-connection-string",
+      ));
+    let (event_emitter, _events) = futures::channel::mpsc::unbounded();
+    let state = SystemState {
+      inner: Arc::new(SystemStateInner {
+        pool,
+        docker_api: bollard_next::Docker::connect_with_unix(
+          "/dev/null",
+          1,
+          bollard_next::API_DEFAULT_VERSION,
+        )
+        .unwrap(),
+        config: nanocl_stubs::config::DaemonConfig {
+          hosts: vec![],
+          state_dir: String::new(),
+          docker_host: String::new(),
+          store_addr: None,
+          gateway: String::new(),
+          hostname: "unit-test".into(),
+          nodes: vec![],
+          advertise_addr: String::new(),
+          conf_dir: String::new(),
+          gid: 0,
+          ssl: None,
+        },
+        task_manager: Default::default(),
+        event_emitter,
+        event_emitter_raw: Default::default(),
+        arbiter: rt::Arbiter::current(),
+      }),
+    };
+    for origin in [None, Some("https://foreign.example"), Some("null")] {
+      let mut request = web::test::TestRequest::default()
+        .uri("http://daemon.test/v0.19.0/vms/not-a-canonical-key/console")
+        .header("Host", "daemon.test")
+        .header("Connection", "upgrade")
+        .header("Upgrade", "websocket")
+        .header("Sec-WebSocket-Version", "13")
+        .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+      if let Some(origin) = origin {
+        request = request.header("Origin", origin);
+      }
+      let request = request.to_http_request();
+      assert!(ws::verify_handshake(request.head()).is_ok());
+      let error = console_vm(
+        &state,
+        (),
+        web::types::Path::from((
+          "v0.19.0".to_owned(),
+          "not-a-canonical-key".to_owned(),
+        )),
+        request,
+      )
+      .await
+      .unwrap_err();
+      assert_eq!(error.status, ntex::http::StatusCode::BAD_REQUEST);
     }
-    assert!(
-      validate_origin(Some("https://host"), Some("host"), false).is_err()
-    );
-    assert!(validate_origin(Some("https://host"), None, true).is_err());
+    assert_eq!(state.inner.pool.state().connections, 0);
   }
 
   #[test]

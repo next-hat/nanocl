@@ -19,11 +19,8 @@ export function isConsoleRequest(request, origin, token) {
     && timingSafeEqual(Buffer.from(supplied), Buffer.from(token));
 }
 
-// The bridge holds the operator's daemon credentials. The browser gets only a
-// random, process-scoped capability for this one VM, carried in a subprotocol.
-export async function startConsole({ key, host = 'unix:///run/nanocl/nanocl.sock', tls = {}, port = 0 }) {
+export function consoleUpstream(key, host, tls = {}) {
   if (!/^[^\s/?#%\\]+\.[^\s./?#%\\]+$/.test(key)) throw new Error('Supply the canonical namespace.name VM key');
-  const token = randomBytes(32).toString('hex');
   const upstreamPath = `/v0.19.0/vms/${encodeURIComponent(key)}/console`;
   let upstreamUrl;
   let upstreamOptions;
@@ -34,16 +31,25 @@ export async function startConsole({ key, host = 'unix:///run/nanocl/nanocl.sock
     upstreamOptions = { createConnection: () => createConnection({ path: socketPath }) };
   } else {
     const url = new URL(host);
-    if (url.protocol !== 'https:' || url.username || url.password || !tls.ca || !tls.cert || !tls.key) {
-      throw new Error('Remote consoles require HTTPS, a CA, a client certificate and its key');
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+      throw new Error('Daemon host must use HTTP or HTTPS without URL credentials');
     }
-    url.protocol = 'wss:';
+    const secure = url.protocol === 'https:';
+    url.protocol = secure ? 'wss:' : 'ws:';
     url.pathname = upstreamPath;
     url.search = '';
     url.hash = '';
     upstreamUrl = url.href;
-    upstreamOptions = { ...tls, rejectUnauthorized: true };
+    upstreamOptions = secure ? { ...tls } : {};
   }
+  return { upstreamUrl, upstreamOptions };
+}
+
+// The bridge holds the operator's daemon credentials. The browser gets only a
+// random, process-scoped capability for this one VM, carried in a subprotocol.
+export async function startConsole({ key, host = 'unix:///run/nanocl/nanocl.sock', tls = {}, port = 0 }) {
+  const { upstreamUrl, upstreamOptions } = consoleUpstream(key, host, tls);
+  const token = randomBytes(32).toString('hex');
   let origin;
   const peers = new Set();
   const server = createServer(async (request, response) => {

@@ -32,16 +32,18 @@ NANOCL_TLS_KEY=/path/to/client-key.pem \
 npm start -- global.my-vm
 ```
 
-The browser never receives daemon credentials. The bridge verifies the daemon
-certificate. Plain HTTP daemon connections are rejected. Do not put an
-unauthenticated reverse proxy in front of the daemon Unix socket.
+Set `NANOCL_HOST=http://127.0.0.1:8585` to use a configured HTTP daemon listener.
+HTTPS uses system certificate trust by default; `NANOCL_TLS_CA` supplies a custom
+CA, and `NANOCL_TLS_CERT`/`NANOCL_TLS_KEY` supply client credentials when required
+by the daemon. The browser never receives daemon credentials. The bridge's
+loopback token, Host, and Origin checks apply with every upstream transport.
 
 The API is `GET /v0.19.0/vms/{namespace.name}/console`, with RFC6455 binary
 frames containing raw RFB bytes (64 KiB per frame). Native clients can call
 `NanocldClient::console_vm`; HTTPS requires the client crate's `openssl`
-feature. Direct browser clients can use noVNC against the mutual TLS endpoint
-with a client certificate installed in the browser and a page served from that
-same HTTPS origin. The API denies the plaintext and development TCP listeners.
+feature. Direct browser clients can use noVNC through the daemon's configured
+listeners. If the daemon requires mutual TLS, install its client certificate in
+the browser. The API adds no VM-specific transport or Origin restriction.
 Access follows NanoCL's existing daemon-operator trust boundary: a trusted
 operator can control every VM. Namespaces are not per-user authorization.
 The API verifies the canonical VM, current specification generation, local
@@ -54,10 +56,11 @@ the bridge URL to reconnect to the current runtime. No sessions are persisted.
 Run the bridge authorization and browser module tests with `npm test`. Release validation
 must additionally use a real VM: observe the noVNC `connect` event and rendered
 guest display, send keyboard input, disconnect/reconnect, restart/delete the VM,
-and confirm every old socket closes. Verify disabled consoles, plaintext TCP,
-foreign Origins, missing/invalid client certificates and wrong runtime labels
-are rejected. A successful WebSocket upgrade alone does not prove RFB or guest
-input works.
+and confirm every old socket closes. Verify disabled consoles and wrong runtime
+labels are rejected, and check the daemon's configured listener access policy.
+The example bridge must reject foreign Origins; a mutual TLS daemon listener
+must reject missing/invalid client certificates. A successful WebSocket upgrade
+alone does not prove RFB or guest input works.
 
 Two opt-in release runners are included. Use a disposable VM with `Console:
 true`, a visible guest login prompt, and an isolated daemon/Docker engine.
@@ -73,8 +76,9 @@ NANOCL_HOST=unix:///path/to/task.sock npm run test:api -- global.test-vm --dispo
 
 The API runner **deletes the named VM** after exercising stop/start, restart,
 console disable/enable, and runtime replacement. It checks raw RFB, binary
-frames, disconnect/reconnect, rejected Origins and malformed keys. Set
-`NANOCL_PLAINTEXT_HOST=http://127.0.0.1:port` to assert plaintext rejection.
+frames, disconnect/reconnect, daemon access with foreign/null Origins, and
+malformed keys. Set `NANOCL_PLAINTEXT_HOST=http://127.0.0.1:port` to verify access
+through a configured plaintext listener.
 Run against `NANOCL_HOST=https://...` with the TLS variables above to additionally
 check missing-client-certificate rejection. Unconfigured transport checks are
 reported as skipped. These runners do not install a daemon or create guests.

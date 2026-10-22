@@ -115,7 +115,7 @@ impl NanocldClient {
   }
 
   /// Connect to an enabled VM graphical console. Binary frames are raw RFB.
-  /// Requires the daemon Unix socket or HTTPS with a verified client certificate.
+  /// Uses the client's configured Unix, HTTP or HTTPS transport and SSL policy.
   pub async fn console_vm(
     &self,
     key: &str,
@@ -139,42 +139,31 @@ impl NanocldClient {
           .seal(),
       );
     }
-    if !self.url.starts_with("https://") {
+    if self.url.starts_with("https://") {
+      #[cfg(feature = "openssl")]
+      return Ok(
+        ws::WsClient::new(&url, ntex::SharedCfg::default())
+          .openssl(crate::http_client::tls_connector(self.ssl.as_ref())?)
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| "VM console HTTPS connection"))?
+          .seal(),
+      );
+      #[cfg(not(feature = "openssl"))]
       return Err(
         IoError::invalid_input(
           "VM console",
-          "Remote console connections require mutual TLS",
+          "Enable the nanocld_client openssl feature for HTTPS",
         )
         .into(),
       );
     }
-    #[cfg(feature = "openssl")]
-    {
-      let ssl = self.ssl.as_ref().ok_or_else(|| {
-        IoError::invalid_input(
-          "VM console",
-          "Mutual TLS credentials are required",
-        )
-      })?;
-      let connector = console_tls_connector(ssl)?;
-      Ok(
-        ws::WsClient::new(&url, ntex::SharedCfg::default())
-          .openssl(connector)
-          .connect()
-          .await
-          .map_err(|err| {
-            err.map_err_context(|| "VM console mutual TLS connection")
-          })?
-          .seal(),
-      )
-    }
-    #[cfg(not(feature = "openssl"))]
-    Err(
-      IoError::invalid_input(
-        "VM console",
-        "Enable the nanocld_client openssl feature for mutual TLS",
-      )
-      .into(),
+    Ok(
+      ws::WsClient::new(&url, ntex::SharedCfg::default())
+        .connect()
+        .await
+        .map_err(|err| err.map_err_context(|| "VM console HTTP connection"))?
+        .seal(),
     )
   }
 
@@ -266,61 +255,6 @@ impl NanocldClient {
       .await?;
     Ok(())
   }
-}
-
-#[cfg(feature = "openssl")]
-fn console_tls_connector(
-  ssl: &nanocl_stubs::system::SslConfig,
-) -> nanocl_error::io::IoResult<openssl::ssl::SslConnector> {
-  use openssl::{
-    pkey::PKey,
-    ssl::{SslConnector, SslMethod, SslVerifyMode},
-    x509::X509,
-  };
-  if !ssl.verify {
-    return Err(IoError::invalid_input(
-      "VM console",
-      "TLS server verification must be enabled",
-    ));
-  }
-  let required = |value: &Option<String>| {
-    value.clone().ok_or_else(|| {
-      IoError::invalid_input(
-        "VM console",
-        "CA, client certificate, and private key are required",
-      )
-    })
-  };
-  let ca = required(&ssl.cert_ca)?;
-  let cert = required(&ssl.cert)?;
-  let key = required(&ssl.cert_key)?;
-  let mut builder = SslConnector::builder(SslMethod::tls())
-    .map_err(|err| IoError::other("VM console TLS", &err.to_string()))?;
-  builder.set_verify(SslVerifyMode::PEER);
-  for cert in X509::stack_from_pem(ca.as_bytes())
-    .map_err(|err| IoError::other("VM console CA", &err.to_string()))?
-  {
-    builder
-      .cert_store_mut()
-      .add_cert(cert)
-      .map_err(|err| IoError::other("VM console CA", &err.to_string()))?;
-  }
-  let cert = X509::from_pem(cert.as_bytes()).map_err(|err| {
-    IoError::other("VM console client certificate", &err.to_string())
-  })?;
-  let key = PKey::private_key_from_pem(key.as_bytes()).map_err(|err| {
-    IoError::other("VM console private key", &err.to_string())
-  })?;
-  builder.set_certificate(&cert).map_err(|err| {
-    IoError::other("VM console client certificate", &err.to_string())
-  })?;
-  builder.set_private_key(&key).map_err(|err| {
-    IoError::other("VM console private key", &err.to_string())
-  })?;
-  builder.check_private_key().map_err(|err| {
-    IoError::other("VM console private key", &err.to_string())
-  })?;
-  Ok(builder.build())
 }
 
 #[cfg(test)]

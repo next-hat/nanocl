@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isConsoleRequest, startConsole } from './server.mjs';
+import { consoleUpstream, isConsoleRequest, startConsole } from './server.mjs';
 
 test('console capability requires the selected path, exact origin and token', () => {
   const token = 'a'.repeat(64);
@@ -18,12 +18,23 @@ test('console capability requires the selected path, exact origin and token', ()
   assert.equal(isConsoleRequest({ ...request, url: '/console?token=anything' }, origin, token), false);
 });
 
-test('remote console configuration requires verified mutual TLS credentials', async () => {
-  for (const host of ['http://localhost:8585', 'https://localhost:8443', 'https://user:password@localhost:8443']) {
-    await assert.rejects(startConsole({ key: 'global.desktop', host }), /Remote consoles require HTTPS/);
+test('console upstream follows configured transport and optional TLS settings', () => {
+  for (const [host, expected] of [['http://localhost:8585', 'ws://localhost:8585'], ['https://localhost:8443', 'wss://localhost:8443']]) {
+    const upstream = consoleUpstream('global.desktop', host);
+    assert.equal(upstream.upstreamUrl, `${expected}/v0.19.0/vms/global.desktop/console`);
+    assert.deepEqual(upstream.upstreamOptions, {});
   }
-  await assert.rejects(startConsole({ key: 'desktop' }), /canonical namespace.name/);
-  await assert.rejects(startConsole({ key: 'global.desktop', host: 'unix://relative.sock' }), /must be absolute/);
+  const tls = { ca: 'configured CA', cert: 'configured certificate', key: 'configured key', rejectUnauthorized: false };
+  assert.deepEqual(consoleUpstream('global.desktop', 'https://localhost:8443', tls).upstreamOptions, tls);
+  assert.deepEqual(consoleUpstream('global.desktop', 'http://localhost:8585', tls).upstreamOptions, {});
+  const unix = consoleUpstream('global.desktop', 'unix:///run/nanocl/nanocl.sock');
+  assert.equal(unix.upstreamUrl, 'ws://localhost/v0.19.0/vms/global.desktop/console');
+  assert.equal(typeof unix.upstreamOptions.createConnection, 'function');
+  for (const host of ['ftp://localhost:8585', 'https://user:password@localhost:8443']) {
+    assert.throws(() => consoleUpstream('global.desktop', host), /HTTP or HTTPS without URL credentials/);
+  }
+  assert.throws(() => consoleUpstream('desktop', 'http://localhost'), /canonical namespace.name/);
+  assert.throws(() => consoleUpstream('global.desktop', 'unix://relative.sock'), /must be absolute/);
 });
 
 test('browser entry point and published noVNC ES module are served locally', async () => {

@@ -51,7 +51,7 @@ nanocl vm stop global.desktop --force
 nanocl vm restart global.desktop --force
 ```
 
-The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restart`, and `GET /v0.19.0/vms/{key}/status`. POST requests require a JSON body; `{}` uses defaults, and `{"Timeout":120,"Force":false}` sets an explicit grace period. Shutdown timeout returns HTTP 504. These endpoints accept the daemon Unix socket or verified mutual TLS; plaintext TCP is denied, and a browser Origin must exactly match the HTTPS endpoint. They use the same daemon-wide operator privileges as the console.
+The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restart`, and `GET /v0.19.0/vms/{key}/status`. POST requests require a JSON body; `{}` uses defaults, and `{"Timeout":120,"Force":false}` sets an explicit grace period. Shutdown timeout returns HTTP 504. These endpoints use the daemon's configured access controls and the same daemon-wide operator privileges as the other APIs.
 
 Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. Pause/resume is not exposed.
 
@@ -88,7 +88,7 @@ Each value is the requested total, not an increment. `--disk-size` is bytes (the
 
 NanoCL does not execute guest commands or install a guest agent for resizing. A successful API response confirms QEMU capacity, not guest CPU/memory online state or usable filesystem space. Host memory and storage capacity must still support the requested allocation.
 
-The API exposes `POST /v0.19.0/vms/{key}/resize` with a JSON body such as `{"Cpu":4,"Memory":2048,"DiskSize":34359738368}`, and `GET /v0.19.0/vms/{key}/resources`. Both use the same trusted operator transport and Origin checks as lifecycle operations. At least one resource must be supplied. The response contains `Cpu`, `Memory`, `DiskSize`, `MaxCpu`, `MaxMemory`, and `Persistent`.
+The API exposes `POST /v0.19.0/vms/{key}/resize` with a JSON body such as `{"Cpu":4,"Memory":2048,"DiskSize":34359738368}`, and `GET /v0.19.0/vms/{key}/resources`. Both use the daemon's configured operator access controls. At least one resource must be supplied. The response contains `Cpu`, `Memory`, `DiskSize`, `MaxCpu`, `MaxMemory`, and `Persistent`.
 
 `Persistent: true` means observed CPU and memory match both the saved VM specification and the runtime's restart configuration. Successful growth survives a same-container restart; CPU and memory changes also create specification history without replacing the running VM. Disk growth is stored in the disk image itself. Keep desired Statefiles consistent with the new allocation before applying them again.
 
@@ -107,7 +107,7 @@ VirtualMachines:
   HostConfig:
     Cpu: 2
     Memory: 2048
-    Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0
+    Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
     NetworkMode: vm-private
 ```
 
@@ -145,7 +145,7 @@ VirtualMachines:
     Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
 ```
 
-NanoCL writes the object as `#cloud-config` followed by JSON, which cloud-init accepts as YAML. OpenAPI and Statefile schemas describe the object through the [official cloud-init 26.2 cloud-config schema](https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/schemas/schema-cloud-config-v1.json). Editors and schema tools that resolve external references can use it for completion and validation. NanoCL does not run that upstream schema validator; the guest's installed cloud-init version determines which settings it supports.
+NanoCL writes the object as `#cloud-config` followed by JSON, which cloud-init accepts as YAML. OpenAPI and Statefile schemas bundle the [official cloud-init 26.2 cloud-config schema](https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/schemas/schema-cloud-config-v1.json) with local references, so editors can provide completion and validation without fetching an external schema. NanoCL does not run that upstream schema validator; the guest's installed cloud-init version determines which settings it supports.
 
 For an existing complete user-data document, use a raw string instead:
 
@@ -177,7 +177,7 @@ Custom user-data requires a runtime image with `io.nanocl.vm-cloud-init-user-dat
 
 `Console` defaults to `false`. When enabled, QEMU serves VNC through a Unix socket owned by the runtime. NanoCL relays binary RFB frames through `GET /v0.19.0/vms/{namespace.name}/console`. The runtime does not expose an unauthenticated VNC or WebSocket TCP port. QEMU's native WebSocket listener and a separate websockify process are unnecessary for this Unix-socket relay.
 
-The endpoint accepts the daemon Unix socket or verified mutual TLS. Plaintext daemon TCP, including development TCP, is rejected. A browser's Origin must exactly match the HTTPS endpoint. Access grants the same daemon-wide operator privileges as the underlying authenticated transport; there is no per-user VM ownership model. The daemon verifies the VM key, namespace, local runtime identity, running state, and specification generation before opening its socket.
+The endpoint uses the daemon's configured access controls, including its Unix, TCP, or mutual TLS listeners. It adds no VM-specific transport or Origin restriction. Access grants the same daemon-wide operator privileges as the other APIs; there is no per-user VM ownership model. The daemon verifies the VM key, namespace, local runtime identity, running state, and specification generation before opening its socket.
 
 A containerized daemon must bind its state directory at the same absolute path on the Docker host, as the standard installer already does. Console and QMP sockets share the private per-VM generation directory described above.
 
@@ -187,7 +187,7 @@ Use the [noVNC example](../examples/vm-console/README.md) for a local browser co
 | --- | --- |
 | 101 | WebSocket established. |
 | 400 | Invalid canonical key or WebSocket handshake. |
-| 403 | Disabled console, untrusted transport, or rejected Origin. |
+| 403 | Disabled console. |
 | 404 | VM does not exist. |
 | 409 | Runtime is absent, stopped, ambiguous, stale, or its console is not ready. |
 
@@ -195,19 +195,19 @@ CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data 
 
 ## Migration
 
-1. Build the matching `nanocl-qemu` checkout locally and select it explicitly:
+1. Pull the published nightly runtime for current development and CI testing:
 
    ```sh
-   docker build -t ghcr.io/next-hat/nanocl-qemu:8.0.5.0 /path/to/nanocl-qemu
+   docker pull ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
    ```
 
-   This is the new default runtime tag. The image must be built locally or published through the release process before another installation can use it; this change does not publish an image. `HostConfig.Runtime` can select an explicit candidate. NanoCL requires the image labels `io.nanocl.vm-runtime-api=0.19` and `io.nanocl.vm-qmp=1`; an older runtime without those contracts is rejected before replacement.
+   Nightly NanoCL builds default to this tag. Stable builds retain `ghcr.io/next-hat/nanocl-qemu:8.0.5.0`, which requires stable release publication. `HostConfig.Runtime` can select the nightly or an explicitly built local candidate. Pull updated nightly images explicitly because NanoCL uses `IfNotPresent`; an existing cached image is not refreshed automatically. NanoCL requires the image labels `io.nanocl.vm-runtime-api=0.19` and `io.nanocl.vm-qmp=1`; an older runtime without those contracts is rejected before replacement.
 
 2. Move `NetworkMode: host`, legacy `RuntimeNetwork: host`, and physical `LinkNetIface` configurations onto a named Docker bridge. `RuntimeNetwork` remains a spelling alias for `NetworkMode`.
 3. Existing VM images that retain cloud-init static network configuration need guest-side migration to DHCP. Disabling future seed generation does not remove guest state already written by an earlier seed. Back up the image and use its distribution's network tools to enable DHCP before replacing the runtime.
 4. Legacy VM specs without a MAC receive a persisted address before their next runtime creation. Their former runtime-generated MAC was not a durable identity. Check guest network rules that match the old MAC. A legacy VM may supply an explicit `MacAddress` before identity is assigned.
 5. Shut down a legacy guest from inside the guest OS, or explicitly use `nanocl vm stop <key> --force` if a power cut is acceptable. Replace its runtime to use the new DHCP, QMP, and console behavior. Stop/start alone can reuse an existing old container configuration. Retain `CloudInit: true` when existing guest provisioning is needed; set it to `false` for a prepared non-cloud-init image.
-6. Enable `Console` only for the VMs that need it, and use the authenticated endpoint or the loopback example. Do not restore the old public websockify port mapping.
+6. Enable `Console` only for the VMs that need it, and connect through the configured daemon endpoint or the loopback example. Do not restore the old public websockify port mapping.
 
 ## Reproducible release validation
 
@@ -219,7 +219,7 @@ Use disposable guest disk copies and a development NanoCL daemon. Record the Nan
 4. Stop and start each VM through NanoCL, use `nanocl vm restart`, and restart the development daemon. Recheck MAC, lease, gateway, DNS, egress, and ingress. Verify graceful shutdown while the guest writes data and separately test a guest that ignores ACPI: a short timeout must report failure without power-off or restart. Verify explicit `--force` separately. Query QMP status after daemon reconnection, and reject a stale VM generation or wrong container identity. Replace a spec separately and record any Docker IP change. Do not confuse replacement behavior with same-container restart.
 5. Confirm the no-cloud-init VM receives DHCP with no seed attached. Check the runtime's QEMU arguments and guest devices. Confirm cloud-init provisioning and SSH keys work on the enabled image.
 6. Enable `Console`, start the [noVNC example](../examples/vm-console/README.md), and use a real browser to observe display output and send keyboard input. Test disconnect/reconnect, runtime restart, and replacement. Verify the old connection closes when its backend exits.
-7. Attempt the console from plaintext TCP, with a foreign/null Origin, with no trusted client certificate, with `Console: false`, against a missing VM, and against a stopped runtime. Record the actual rejection status. An operator trusted by the daemon can access enabled consoles across namespaces by design.
+7. Verify console access through the configured daemon listeners, including development TCP when enabled. Confirm that requests with a foreign/null Origin follow the same daemon access policy. Check rejection with `Console: false`, against a missing VM, and against a stopped runtime. If the daemon requires mutual TLS, verify that missing or invalid client certificates are rejected by that listener. Separately verify the example bridge's own Origin/Host restrictions. An operator trusted by the daemon can access enabled consoles across namespaces by design.
 8. Delete the VMs. Verify their runtime containers, TAP devices, dnsmasq/QEMU processes, and console sockets disappear. Delete only test-owned images/networks after checking that no unrelated workloads use them.
 
 For live resizing, start a guest with explicit CPU/memory ceilings and the resize-capable runtime. Record QEMU resources, guest online CPU/memory, and disk/filesystem sizes separately. Grow each resource and a combined request, verify shrink/ceiling/alignment rejection before mutation, then verify persistence across a same-container restart. Exercise a partial failure, inspect `Persistent`, and retry the same totals. Confirm stale generation and foreign container identities are rejected and console access still works after a resource-only specification revision.

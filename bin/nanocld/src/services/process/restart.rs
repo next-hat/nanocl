@@ -116,13 +116,11 @@ pub async fn restart_processes(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String, String)>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   if kind == ProcessKind::Vm {
-    crate::services::vm::console::authorize_request(&req)?;
     utils::container::vm::restart_with_options(
       &key,
       &VmLifecycleOptions::default(),
@@ -154,7 +152,6 @@ pub async fn restart_process(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String)>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
   let runtime = state
@@ -163,7 +160,6 @@ pub async fn restart_process(
     .inspect_container(&name, None)
     .await?;
   if let Some(key) = super::managed_vm_runtime_key(&runtime, false)? {
-    crate::services::vm::console::authorize_request(&req)?;
     let id = runtime
       .id
       .as_deref()

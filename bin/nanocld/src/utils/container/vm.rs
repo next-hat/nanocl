@@ -54,6 +54,16 @@ async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
     .inspect_network(&mode, None::<InspectNetworkOptions<String>>)
     .await
     .map_err(|err| err.map_err_context(|| "VM network"))?;
+  validate_runtime_network(&network)?;
+  validate_link_net_iface(
+    vm.spec.host_config.link_net_iface.as_deref(),
+    network.options.as_ref(),
+  )
+}
+
+fn validate_runtime_network(
+  network: &bollard_next::models::Network,
+) -> IoResult<()> {
   if network.driver.as_deref() != Some("bridge")
     || network.internal == Some(true)
     || network.enable_ipv6 == Some(true)
@@ -63,10 +73,44 @@ async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
       "VM networking requires an external IPv4-only Docker bridge network",
     ));
   }
-  validate_link_net_iface(
-    vm.spec.host_config.link_net_iface.as_deref(),
-    network.options.as_ref(),
-  )
+  let configs = network
+    .ipam
+    .as_ref()
+    .and_then(|ipam| ipam.config.as_deref())
+    .filter(|configs| !configs.is_empty())
+    .ok_or_else(|| {
+      IoError::invalid_input(
+        "VM network",
+        "VM networking requires an IPv4 IPAM subnet",
+      )
+    })?;
+  // Docker may have multiple address pools; each possible assignment must
+  // meet the runtime contract before an update removes the existing VM.
+  for config in configs {
+    let subnet = config
+      .subnet
+      .as_deref()
+      .and_then(|subnet| subnet.parse::<ipnet::Ipv4Net>().ok())
+      .ok_or_else(|| {
+        IoError::invalid_input(
+          "VM network",
+          "Invalid or missing IPv4 IPAM subnet",
+        )
+      })?;
+    if subnet.contains(&std::net::Ipv4Addr::new(169, 254, 254, 1)) {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "Docker subnet overlaps the private DHCP helper 169.254.254.1",
+      ));
+    }
+    if !(1..=30).contains(&subnet.prefix_len()) {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "VM networking requires an IPv4 subnet prefix between 1 and 30",
+      ));
+    }
+  }
+  Ok(())
 }
 
 fn validate_link_net_iface(
@@ -255,7 +299,7 @@ async fn ensure_runtime_image(
     .host_config
     .runtime
     .clone()
-    .unwrap_or_else(|| vars::VM_RUNTIME.to_owned());
+    .unwrap_or_else(|| vars::vm_runtime(vars::CHANNEL).to_owned());
   super::image::download(
     &image,
     None,
@@ -648,7 +692,7 @@ async fn create_init_container(
       .host_config
       .runtime
       .clone()
-      .unwrap_or_else(|| vars::VM_RUNTIME.to_owned())
+      .unwrap_or_else(|| vars::vm_runtime(vars::CHANNEL).to_owned())
   });
   init_container.image = Some(image.clone());
   super::image::download(
@@ -991,6 +1035,102 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  fn bridge_network(subnets: &[&str]) -> bollard_next::models::Network {
+    bollard_next::models::Network {
+      driver: Some("bridge".into()),
+      internal: Some(false),
+      enable_ipv6: Some(false),
+      ipam: Some(bollard_next::models::Ipam {
+        config: Some(
+          subnets
+            .iter()
+            .map(|subnet| bollard_next::models::IpamConfig {
+              subnet: Some((*subnet).into()),
+              ..Default::default()
+            })
+            .collect(),
+        ),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn vm_runtime_network_rejects_private_dhcp_helper_overlap() {
+    for subnet in [
+      "169.254.0.0/16",
+      "169.254.254.0/24",
+      "169.254.254.0/30",
+      "169.254.254.1/32",
+    ] {
+      let error =
+        validate_runtime_network(&bridge_network(&[subnet])).unwrap_err();
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      assert!(error.to_string().contains("169.254.254.1"));
+    }
+    assert!(
+      validate_runtime_network(&bridge_network(&[
+        "192.0.2.0/24",
+        "169.254.0.0/16",
+      ]))
+      .is_err()
+    );
+  }
+
+  #[test]
+  fn vm_runtime_network_accepts_adjacent_ipv4_subnets() {
+    for subnet in [
+      "169.254.253.0/24",
+      "169.254.255.0/24",
+      "169.254.254.4/30",
+      "172.29.222.0/24",
+    ] {
+      assert!(validate_runtime_network(&bridge_network(&[subnet])).is_ok());
+    }
+    assert!(
+      validate_runtime_network(&bridge_network(&[
+        "192.0.2.0/24",
+        "198.51.100.0/24",
+      ]))
+      .is_ok()
+    );
+  }
+
+  #[test]
+  fn vm_runtime_network_requires_supported_ipv4_ipam() {
+    for subnets in [
+      vec![],
+      vec![""],
+      vec!["invalid-cidr"],
+      vec!["192.0.2.0/33"],
+      vec!["2001:db8::/64"],
+      vec!["192.0.2.0/31"],
+      vec!["192.0.2.1/32"],
+    ] {
+      assert!(validate_runtime_network(&bridge_network(&subnets)).is_err());
+    }
+    let valid = bridge_network(&["192.0.2.0/24"]);
+    let mut network = valid.clone();
+    network.ipam = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.ipam.as_mut().unwrap().config = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.ipam.as_mut().unwrap().config.as_mut().unwrap()[0].subnet = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.driver = Some("overlay".into());
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.internal = Some(true);
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid;
+    network.enable_ipv6 = Some(true);
+    assert!(validate_runtime_network(&network).is_err());
+  }
 
   #[test]
   fn vm_custom_user_data_preserves_raw_and_renders_structured_config() {

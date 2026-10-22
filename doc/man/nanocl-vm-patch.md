@@ -28,7 +28,7 @@ Enable or disable cloud-init provisioning; omitted preserves the current setting
 Replace custom user-data with a local UTF-8 file, at most 64 KiB without NUL bytes. Omitted preserves current user-data; an empty file selects blank user-data. Custom data replaces generated user/password/SSH/hostname provisioning while NanoCL retains the stable instance ID and DHCP network-config. It is stored but unused when cloud-init is disabled, and is visible through the VM specification and Docker environment. Requires `io.nanocl.vm-cloud-init-user-data=1` on the runtime. Changing user-data does not force first-boot cloud-init modules to rerun on an existing guest disk. See [custom cloud-init](../vm-runtime.md#custom-cloud-init-user-data).
 
 **--console** *\<true|false\>*
-Enable or disable the browser console; omitted preserves the current setting. Access requires the daemon Unix socket or verified mutual TLS.
+Enable or disable the browser console; omitted preserves the current setting. Access follows the daemon's configured operator access controls.
 
 **--user** *\<USER\>*  
 Default user of the VM

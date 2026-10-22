@@ -5,6 +5,7 @@ set -eu
 docker run -i --rm \
   -v $(pwd):/project \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
+  -e NANOCL_CHANNEL=${NANOCL_CHANNEL:-nightly} \
   ghcr.io/next-hat/nanocl-dev:dev \
   build --bin nanocld --no-default-features --features "test"
 
@@ -43,6 +44,7 @@ docker run -d \
   -v /tmp:/tmp \
   -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
+  -e NANOCL_CHANNEL=${NANOCL_CHANNEL:-nightly} \
   -w /project \
   --hostname nanocl.internal \
   --network host \

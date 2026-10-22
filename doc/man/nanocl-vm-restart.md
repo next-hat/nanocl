@@ -14,7 +14,7 @@ restart - Shut down and start VMs by canonical keys
 
 ## DESCRIPTION
 
-Ask each guest to shut down through QMP, wait for its runtime to exit, then start it. A shutdown timeout reports failure without forced power-off or restart. Requires the daemon Unix socket or verified mutual TLS.
+Ask each guest to shut down through QMP, wait for its runtime to exit, then start it. A shutdown timeout reports failure without forced power-off or restart. Access follows the daemon's configured operator access controls.
 
 ## OPTIONS
 

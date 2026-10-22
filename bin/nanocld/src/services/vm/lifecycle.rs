@@ -27,7 +27,6 @@ pub(crate) fn lifecycle_error(error: IoError) -> HttpError {
   responses(
     (status = 200, description = "VM runtime has stopped"),
     (status = 400, description = "Invalid canonical key or shutdown timeout", body = crate::services::openapi::ApiError),
-    (status = 403, description = "Trusted operator transport and matching Origin required", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "Runtime is stale or a lifecycle operation is already active", body = crate::services::openapi::ApiError),
     (status = 504, description = "VM operation timed out; check runtime status before retrying", body = crate::services::openapi::ApiError),
@@ -38,9 +37,7 @@ pub async fn stop_vm(
   _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmLifecycleOptions>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  super::console::authorize_request(&req)?;
   let key = utils::key::parse_resource_key(&path.1)?;
   let options = payload.into_inner();
   options.validate().map_err(HttpError::bad_request)?;
@@ -60,7 +57,6 @@ pub async fn stop_vm(
   responses(
     (status = 200, description = "VM runtime has restarted"),
     (status = 400, description = "Invalid canonical key or shutdown timeout", body = crate::services::openapi::ApiError),
-    (status = 403, description = "Trusted operator transport and matching Origin required", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "Runtime is stale or a lifecycle operation is already active", body = crate::services::openapi::ApiError),
     (status = 504, description = "VM operation timed out; check runtime status before retrying", body = crate::services::openapi::ApiError),
@@ -71,9 +67,7 @@ pub async fn restart_vm(
   _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmLifecycleOptions>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  super::console::authorize_request(&req)?;
   let key = utils::key::parse_resource_key(&path.1)?;
   let options = payload.into_inner();
   options.validate().map_err(HttpError::bad_request)?;
@@ -92,7 +86,6 @@ pub async fn restart_vm(
   responses(
     (status = 200, description = "Actual QEMU execution state", body = nanocl_stubs::vm::VmRuntimeStatus),
     (status = 400, description = "Invalid canonical VM key", body = crate::services::openapi::ApiError),
-    (status = 403, description = "Trusted operator transport and matching Origin required", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "VM runtime identity is stale or unavailable", body = crate::services::openapi::ApiError),
     (status = 504, description = "QMP did not respond in time", body = crate::services::openapi::ApiError),
@@ -102,9 +95,7 @@ pub async fn vm_status(
   state: &SystemState,
   _request_state: (),
   path: web::types::Path<(String, String)>,
-  req: web::HttpRequest,
 ) -> HttpResult<web::HttpResponse> {
-  super::console::authorize_request(&req)?;
   let key = utils::key::parse_resource_key(&path.1)?;
   let status = utils::container::vm::runtime_status(key.as_str(), state)
     .await

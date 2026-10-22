@@ -9,8 +9,11 @@ use serde::{Deserialize, Serialize};
 use super::generic::Any;
 
 /// Pinned upstream schema for structured cloud-config user-data.
-/// NanoCL publishes this reference for clients; the daemon does not fetch it.
+/// NanoCL bundles this schema; clients and the daemon do not fetch it.
 pub const CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL: &str = "https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/schemas/schema-cloud-config-v1.json";
+
+#[cfg(any(feature = "utoipa", feature = "schemars"))]
+const CLOUD_INIT_SCHEMA_NAME: &str = "CloudInit26_2";
 
 /// Complete cloud-init user-data, supplied as raw text or a cloud-config object.
 /// The rendered UTF-8 payload must be at most 64 KiB. It replaces generated user
@@ -34,14 +37,67 @@ impl From<String> for VmCloudInitUserData {
 }
 
 #[cfg(any(feature = "utoipa", feature = "schemars"))]
-fn cloud_init_user_data_schema() -> serde_json::Value {
+fn cloud_init_user_data_schema(reference_prefix: &str) -> serde_json::Value {
   serde_json::json!({
     "description": "Complete cloud-init user-data: raw text or a cloud-config object. Replaces generated user setup; rendered UTF-8 is limited to 64 KiB. The upstream schema documents the object format; NanoCL does not validate guest module semantics.",
     "oneOf": [
       {"type": "string", "description": "Verbatim user-data, including an empty string"},
-      {"$ref": CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL}
+      {"$ref": format!("{reference_prefix}{CLOUD_INIT_SCHEMA_NAME}")}
     ]
   })
+}
+
+#[cfg(any(feature = "utoipa", feature = "schemars"))]
+fn cloud_init_schema_components(
+  reference_prefix: &str,
+) -> BTreeMap<String, serde_json::Value> {
+  fn localize(value: &mut serde_json::Value, reference_prefix: &str) {
+    match value {
+      serde_json::Value::Array(items) => {
+        for item in items {
+          localize(item, reference_prefix);
+        }
+      }
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get_mut("$ref") {
+          let name = reference
+            .as_str()
+            .and_then(|reference| reference.strip_prefix("#/$defs/"))
+            .expect("the pinned cloud-init schema uses only local definitions");
+          *reference =
+            format!("{reference_prefix}{CLOUD_INIT_SCHEMA_NAME}.{name}").into();
+        }
+        for child in object.values_mut() {
+          localize(child, reference_prefix);
+        }
+      }
+      _ => {}
+    }
+  }
+
+  let mut root: serde_json::Value =
+    serde_json::from_str(include_str!("../schemas/cloud-init-26.2.json"))
+      .expect("the bundled upstream cloud-init schema must be valid JSON");
+  let object = root
+    .as_object_mut()
+    .expect("cloud-init schema is an object");
+  let definitions = object.remove("$defs").expect("cloud-init definitions");
+  // The containing document supplies the dialect. Structured user-data is an
+  // object; upstream validates only its fields and otherwise accepts scalars.
+  object.remove("$schema");
+  object.insert("type".into(), "object".into());
+  let mut schemas = BTreeMap::new();
+  for (name, value) in definitions
+    .as_object()
+    .expect("cloud-init definitions are an object")
+  {
+    schemas.insert(format!("{CLOUD_INIT_SCHEMA_NAME}.{name}"), value.clone());
+  }
+  schemas.insert(CLOUD_INIT_SCHEMA_NAME.to_owned(), root);
+  for schema in schemas.values_mut() {
+    localize(schema, reference_prefix);
+  }
+  schemas
 }
 
 #[cfg(feature = "utoipa")]
@@ -49,12 +105,37 @@ impl utoipa::ToSchema for VmCloudInitUserData {
   fn name() -> std::borrow::Cow<'static, str> {
     "VmCloudInitUserData".into()
   }
+
+  fn schemas(
+    schemas: &mut Vec<(
+      String,
+      utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+    )>,
+  ) {
+    for (name, value) in cloud_init_schema_components("#/components/schemas/") {
+      // Utoipa's typed enum cannot retain patternProperties, not, or combined
+      // properties/oneOf schemas. Its flattened map preserves every upstream
+      // JSON Schema keyword, including nested schemas, during serialization.
+      let mut schema = utoipa::openapi::schema::Object::with_type(
+        utoipa::openapi::schema::SchemaType::AnyValue,
+      );
+      schema.extensions = Some(
+        value
+          .as_object()
+          .expect("cloud-init components are objects")
+          .clone()
+          .into_iter()
+          .collect(),
+      );
+      schemas.push((name, schema.into()));
+    }
+  }
 }
 
 #[cfg(feature = "utoipa")]
 impl utoipa::PartialSchema for VmCloudInitUserData {
   fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-    serde_json::from_value(cloud_init_user_data_schema())
+    serde_json::from_value(cloud_init_user_data_schema("#/components/schemas/"))
       .expect("the static cloud-init user-data OpenAPI schema must be valid")
   }
 }
@@ -66,9 +147,17 @@ impl schemars::JsonSchema for VmCloudInitUserData {
   }
 
   fn json_schema(
-    _generator: &mut schemars::r#gen::SchemaGenerator,
+    generator: &mut schemars::r#gen::SchemaGenerator,
   ) -> schemars::schema::Schema {
-    serde_json::from_value(cloud_init_user_data_schema())
+    let prefix = generator.settings().definitions_path.clone();
+    for (name, schema) in cloud_init_schema_components(&prefix) {
+      generator.definitions_mut().insert(
+        name,
+        serde_json::from_value(schema)
+          .expect("the bundled cloud-init JSON Schema must be valid"),
+      );
+    }
+    serde_json::from_value(cloud_init_user_data_schema(&prefix))
       .expect("the static cloud-init user-data JSON schema must be valid")
   }
 }
@@ -667,7 +756,7 @@ mod tests {
 
   #[cfg(feature = "utoipa")]
   #[test]
-  fn vm_cloud_init_user_data_openapi_references_upstream_schema() {
+  fn vm_cloud_init_user_data_openapi_preserves_bundled_schema() {
     let schema = serde_json::to_value(
       <VmCloudInitUserData as utoipa::PartialSchema>::schema(),
     )
@@ -675,20 +764,90 @@ mod tests {
     assert_eq!(schema["oneOf"][0]["type"], "string");
     assert_eq!(
       schema["oneOf"][1]["$ref"],
-      CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL
+      "#/components/schemas/CloudInit26_2"
     );
     assert_eq!(schema["oneOf"].as_array().unwrap().len(), 2);
+    let mut components = Vec::new();
+    <VmCloudInitUserData as utoipa::ToSchema>::schemas(&mut components);
+    let components: BTreeMap<_, _> = components
+      .into_iter()
+      .map(|(name, schema)| {
+        let json = serde_json::to_value(&schema).unwrap();
+        // Value's YAML map visitor rejects duplicate keys; JSON maps alone
+        // could hide a duplicate type emitted by the flattened keyword map.
+        let yaml: serde_yaml::Value =
+          serde_yaml::from_str(&serde_yaml::to_string(&schema).unwrap())
+            .unwrap();
+        assert_eq!(serde_json::to_value(yaml).unwrap(), json, "{name}");
+        (name, json)
+      })
+      .collect();
+    let expected = cloud_init_schema_components("#/components/schemas/");
+    // Exact serialization keeps keywords not represented by Utoipa's enum,
+    // including patternProperties and mixed properties/oneOf constraints.
+    assert_eq!(components, expected);
+    assert_eq!(components.len(), 77);
+    let user = &components["CloudInit26_2.users_groups.user"];
+    assert!(user["oneOf"].is_array());
+    assert!(user["properties"]["name"].is_object());
+    assert_eq!(user["additionalProperties"], false);
+    assert!(
+      components["CloudInit26_2.users_groups.groups_by_groupname"]
+        ["patternProperties"]
+        .is_object()
+    );
+    let document = serde_json::json!({"components": {"schemas": components}});
+    assert_local_cloud_init_references(
+      &document,
+      &document,
+      "#/components/schemas/",
+    );
   }
 
   #[cfg(feature = "schemars")]
   #[test]
-  fn vm_cloud_init_user_data_statefile_schema_references_upstream_schema() {
+  fn vm_cloud_init_user_data_statefile_schema_resolves_bundled_definitions() {
     let schema =
       serde_json::to_value(schemars::schema_for!(crate::statefile::Statefile))
         .unwrap();
     let data = &schema["definitions"]["VmCloudInitUserData"];
     assert_eq!(data["oneOf"][0]["type"], "string");
-    assert_eq!(data["oneOf"][1]["$ref"], CLOUD_INIT_CLOUD_CONFIG_SCHEMA_URL);
+    assert_eq!(data["oneOf"][1]["$ref"], "#/definitions/CloudInit26_2");
     assert_eq!(data["oneOf"].as_array().unwrap().len(), 2);
+    assert_local_cloud_init_references(&schema, &schema, "#/definitions/");
+    let root = &schema["definitions"]["CloudInit26_2"];
+    assert_eq!(root["type"], "object");
+    assert_eq!(root["additionalProperties"], false);
+    assert!(root["allOf"].is_array());
+    assert!(root["properties"]["users"].is_object());
+    let user = &schema["definitions"]["CloudInit26_2.users_groups.user"];
+    assert!(user["oneOf"].is_array());
+    assert_eq!(user["properties"]["name"]["type"], "string");
+  }
+
+  #[cfg(any(feature = "utoipa", feature = "schemars"))]
+  fn assert_local_cloud_init_references(
+    document: &serde_json::Value,
+    value: &serde_json::Value,
+    prefix: &str,
+  ) {
+    match value {
+      serde_json::Value::Array(items) => {
+        for item in items {
+          assert_local_cloud_init_references(document, item, prefix);
+        }
+      }
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get("$ref") {
+          let reference = reference.as_str().unwrap();
+          assert!(reference.starts_with(prefix), "{reference}");
+          assert!(document.pointer(&reference[1..]).is_some(), "{reference}");
+        }
+        for child in object.values() {
+          assert_local_cloud_init_references(document, child, prefix);
+        }
+      }
+      _ => {}
+    }
   }
 }
