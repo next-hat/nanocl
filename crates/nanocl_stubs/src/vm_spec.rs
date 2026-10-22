@@ -28,7 +28,8 @@ pub struct VmHostConfig {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub net_iface: Option<String>,
-  /// Network interface to link the vm (default: eth0)
+  /// Docker uplink interface (default: discovered by the runtime).
+  /// If supplied, it must match the network's container interface prefix plus 0.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -111,7 +112,9 @@ pub struct VmSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub hostname: Option<String>,
-  /// Default user of the vm (default: cloud)
+  /// Default user of the vm (default: cloud).
+  /// With CloudInit enabled, use lowercase ASCII letters, digits, underscores
+  /// or hyphens, starting with a letter or underscore.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")

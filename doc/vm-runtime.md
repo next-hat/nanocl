@@ -22,6 +22,8 @@ Alternative designs were considered:
 
 The implementation uses the third model. Only local Docker bridge networking is supported. `host`, `none`, and `container:` namespace sharing are incompatible with runtime network setup. Existing physical-interface takeover configurations must migrate to a Docker bridge.
 
+Leave `HostConfig.LinkNetIface` unset to discover the Docker uplink. An explicit value must match the selected network's container interface prefix followed by `0` (`eth0` by default). NanoCL checks this before starting or replacing the runtime; `eth1` does not select a second endpoint.
+
 The MAC is generated once as a locally administered unicast address and saved in the VM specification. A supplied MAC must be canonicalizable hexadecimal unicast notation. NanoCL rejects duplicate addresses across its active VMs and refuses changes to an existing identity. Omitted MAC values in Statefiles retain the persisted address. External Docker workloads and independently managed VMs remain outside this allocation check.
 
 Stop/start and restart preserve the VM MAC. A container replacement can receive a different address from Docker IPAM; the new runtime offers that newly allocated address. A stable MAC does not reserve a permanent Docker IP across deletion or replacement.
@@ -46,6 +48,8 @@ VirtualMachines:
 ```
 
 `CloudInit` defaults to `true` for existing configurations. When enabled, it provisions users, SSH keys, passwords, and hostname. Its DHCP configuration matches the persisted MAC and gives the interface the stable name `nanocl0`, so early boot readiness does not retain a name that udev later changes. `CloudInit: false` generates and attaches no seed; the guest must already have a DHCP client and usable login credentials. Its interface naming remains guest-managed. Provisioning fields do not create guest accounts when cloud-init is disabled.
+
+When cloud-init is enabled, `User` must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores, or hyphens. An omitted or empty value uses `cloud`. NanoCL rejects unsupported usernames before accepting a create or update. With `CloudInit: false`, provisioning fields are ignored.
 
 `Console` defaults to `false`. When enabled, QEMU serves VNC through a Unix socket owned by the runtime. NanoCL relays binary RFB frames through `GET /v0.19.0/vms/{namespace.name}/console`. The runtime does not expose an unauthenticated VNC or WebSocket TCP port. QEMU's native WebSocket listener and a separate websockify process are unnecessary for this Unix-socket relay.
 

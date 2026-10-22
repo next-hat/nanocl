@@ -54,6 +54,36 @@ async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
       "VM networking requires an external IPv4-only Docker bridge network",
     ));
   }
+  validate_link_net_iface(
+    vm.spec.host_config.link_net_iface.as_deref(),
+    network.options.as_ref(),
+  )
+}
+
+fn validate_link_net_iface(
+  interface: Option<&str>,
+  options: Option<&HashMap<String, String>>,
+) -> IoResult<()> {
+  let Some(interface) = interface else {
+    return Ok(());
+  };
+  let prefix = options
+    .and_then(|options| {
+      options.get("com.docker.network.container_iface_prefix")
+    })
+    .map(String::as_str)
+    .filter(|prefix| !prefix.is_empty())
+    .unwrap_or("eth");
+  // Each VM starts with one endpoint in its own Docker network namespace.
+  let expected = format!("{prefix}0");
+  if interface != expected {
+    return Err(IoError::invalid_input(
+      "VM network",
+      &format!(
+        "LinkNetIface must match the Docker uplink {expected}; omit it for automatic discovery"
+      ),
+    ));
+  }
   Ok(())
 }
 
@@ -75,7 +105,30 @@ fn validate_network_mode(mode: &str) -> IoResult<()> {
 pub(crate) fn validate_spec(
   spec: &nanocl_stubs::vm_spec::VmSpecPartial,
 ) -> IoResult<()> {
-  validate_host_config(&spec.host_config.clone().unwrap_or_default())
+  validate_host_config(&spec.host_config.clone().unwrap_or_default())?;
+  validate_cloud_init_user(
+    spec.cloud_init.unwrap_or(true),
+    spec.user.as_deref(),
+  )
+}
+
+fn validate_cloud_init_user(enabled: bool, user: Option<&str>) -> IoResult<()> {
+  if !enabled {
+    return Ok(());
+  }
+  // Match the runtime's ${USER:-cloud} fallback and account-name contract.
+  let user = user.filter(|user| !user.is_empty()).unwrap_or("cloud");
+  if !user.bytes().enumerate().all(|(index, character)| {
+    character.is_ascii_lowercase()
+      || character == b'_'
+      || (index > 0 && (character.is_ascii_digit() || character == b'-'))
+  }) {
+    return Err(IoError::invalid_input(
+      "VM provisioning",
+      "User must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores or hyphens when CloudInit is enabled",
+    ));
+  }
+  Ok(())
 }
 
 fn validate_host_config(
@@ -176,24 +229,24 @@ async fn ensure_runtime_image(
 
 fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
   validate_host_config(&vm.spec.host_config)?;
-  let interface = vm
-    .spec
-    .host_config
-    .link_net_iface
-    .as_deref()
-    .unwrap_or("eth0");
+  validate_cloud_init_user(
+    vm.spec.cloud_init.unwrap_or(true),
+    vm.spec.user.as_deref(),
+  )?;
   let mac = vm.spec.mac_address.as_deref().ok_or_else(|| {
     IoError::invalid_input("VM MAC", "A persisted MAC address is required")
   })?;
   let mut envs = vec![
     format!("MAC={mac}"),
     "NANOCL_NETWORK_MODE=bridge".to_owned(),
-    format!("DEFAULT_INTERFACE={interface}"),
     format!("CLOUD_INIT={}", vm.spec.cloud_init.unwrap_or(true)),
     format!("CONSOLE={}", vm.spec.console.unwrap_or(false)),
     format!("DELETE_SSH_KEY={disable_keygen}"),
     format!("INSTANCE_ID={}", vm.spec.vm_key),
   ];
+  if let Some(interface) = &vm.spec.host_config.link_net_iface {
+    envs.push(format!("DEFAULT_INTERFACE={interface}"));
+  }
   if let Some(servers) = &vm.spec.host_config.dns {
     envs.push(format!("DNS={}", servers.join(",")));
   }
@@ -776,6 +829,70 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[test]
+  fn vm_runtime_link_interface_matches_docker_network_prefix() {
+    assert!(validate_link_net_iface(None, None).is_ok());
+    assert!(validate_link_net_iface(Some("eth0"), None).is_ok());
+    assert!(validate_link_net_iface(Some("eth1"), None).is_err());
+    let options = HashMap::from([(
+      "com.docker.network.container_iface_prefix".to_owned(),
+      "vm".to_owned(),
+    )]);
+    assert!(validate_link_net_iface(None, Some(&options)).is_ok());
+    assert!(validate_link_net_iface(Some("vm0"), Some(&options)).is_ok());
+    assert!(validate_link_net_iface(Some("eth0"), Some(&options)).is_err());
+
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    assert!(
+      !runtime_env(&vm, false)
+        .unwrap()
+        .iter()
+        .any(|item| item.starts_with("DEFAULT_INTERFACE="))
+    );
+    vm.spec.host_config.link_net_iface = Some("vm0".into());
+    assert!(
+      runtime_env(&vm, false)
+        .unwrap()
+        .contains(&"DEFAULT_INTERFACE=vm0".into())
+    );
+  }
+
+  #[test]
+  fn vm_runtime_validates_user_only_when_cloud_init_is_enabled() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    for user in [None, Some(""), Some("cloud"), Some("_guest-123")] {
+      vm.spec.user = user.map(str::to_owned);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(runtime_env(&vm, false).is_ok());
+    }
+    for user in [
+      "Alice",
+      "1guest",
+      "-guest",
+      "guest.name",
+      "guest name",
+      "guést",
+      "guest\nname",
+    ] {
+      vm.spec.user = Some(user.to_owned());
+      for enabled in [None, Some(true)] {
+        vm.spec.cloud_init = enabled;
+        assert!(validate_spec(&vm.spec.clone().into()).is_err());
+        assert!(runtime_env(&vm, false).is_err());
+      }
+      vm.spec.cloud_init = Some(false);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(
+        !runtime_env(&vm, false)
+          .unwrap()
+          .iter()
+          .any(|item| item.starts_with("USER="))
+      );
+    }
+  }
 
   #[test]
   fn vm_runtime_requires_isolated_network_and_persisted_identity() {
