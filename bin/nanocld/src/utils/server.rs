@@ -1,3 +1,5 @@
+use std::os::unix::fs::PermissionsExt;
+
 use ntex::web;
 use ntex_cors::Cors;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslVerifyMode};
@@ -56,13 +58,19 @@ pub async fn generate(
     let host = &hosts[count];
     if host.starts_with("unix://") {
       let addr = host.replace("unix://", "");
-      server = match server.bind_uds(&addr, ntex::SharedCfg::default()) {
+      server = match server.bind_uds(
+        &addr,
+        ntex::SharedCfg::new(services::vm::console::CONSOLE_UNIX_TRANSPORT),
+      ) {
         Err(err) => {
           log::error!("server::gen: {addr}: {err}");
           return Err(err);
         }
         Ok(server) => server,
       };
+      // Every Unix listener carries operator privileges, including custom
+      // paths. Apply its permissions before any server worker accepts requests.
+      std::fs::set_permissions(&addr, std::fs::Permissions::from_mode(0o770))?;
     } else if host.starts_with("tcp://") {
       let addr = host.replace("tcp://", "");
       if let Some(ssl) = config.ssl.clone() {
@@ -86,7 +94,7 @@ pub async fn generate(
             );
             builder
           },
-          ntex::SharedCfg::default(),
+          ntex::SharedCfg::new(services::vm::console::CONSOLE_MTLS_TRANSPORT),
         ) {
           Err(err) => {
             log::error!("server::gen: {addr}: {err}");

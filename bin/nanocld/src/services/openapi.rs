@@ -98,6 +98,7 @@ impl Modify for VersionModifier {
     vm::count_vm,
     vm::list_vm_history,
     vm::patch_vm,
+    vm::console_vm,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,

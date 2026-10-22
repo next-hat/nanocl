@@ -17,7 +17,7 @@ mod resource;
 mod resource_kind;
 mod secret;
 mod system;
-mod vm;
+pub(crate) mod vm;
 
 pub async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError::not_found("Route or method unhandled"))

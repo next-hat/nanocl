@@ -183,6 +183,8 @@ impl SpecDb {
       host_config: vm_spec_partial.host_config.unwrap_or_default(),
       ssh_key: vm_spec_partial.ssh_key,
       init_container: vm_spec_partial.init_container,
+      cloud_init: vm_spec_partial.cloud_init,
+      console: vm_spec_partial.console,
       user: vm_spec_partial.user,
       mac_address: vm_spec_partial.mac_address,
       labels: vm_spec_partial.labels,

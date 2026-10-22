@@ -11,9 +11,9 @@ run - Run a vm
 
 ## SYNOPSIS
 
-**run** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cpu**\] \[**--mem**\]
+**run** \[**-n**\|**--namespace**\] \[**--hostname**\] \[**--cloud-init**\] \[**--console**\] \[**--cpu**\] \[**--mem**\]
 \[**--net-iface**\] \[**--user**\] \[**--password**\] \[**--ssh-key**\]
-\[**--img-size**\] \[**--kvm**\] \[**-a**\|**--attach**\]
+\[**--kvm**\] \[**-a**\|**--attach**\]
 \[**-h**\|**--help**\] \<*NAME*\> \<*IMAGE*\>
 
 ## DESCRIPTION
@@ -21,6 +21,12 @@ run - Run a vm
 Run a vm
 
 ## OPTIONS
+
+**--cloud-init** *\<true|false\>*
+Enable cloud-init provisioning; defaults to true for compatibility. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
+
+**--console** *\<true|false\>*
+Enable the browser console; defaults to false. Access requires the daemon Unix socket or verified mutual TLS.
 
 **-n**, **--namespace** *\<NAMESPACE\>*
 Namespace for the new VM; defaults to global
@@ -45,9 +51,6 @@ Default password of the VM
 
 **--ssh-key** *\<SSH_KEY\>*
 Ssh key for the user
-
-**--img-size** *\<IMAGE_SIZE\>*
-Size of the disk in GB
 
 **--kvm**
 Enable KVM

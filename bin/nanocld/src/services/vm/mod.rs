@@ -1,5 +1,6 @@
 use ntex::web;
 
+pub(crate) mod console;
 pub mod count;
 pub mod create;
 pub mod delete;
@@ -8,6 +9,7 @@ pub mod list;
 pub mod list_history;
 pub mod patch;
 
+pub use console::*;
 pub use count::*;
 pub use create::*;
 pub use delete::*;
@@ -19,6 +21,10 @@ pub use patch::*;
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
 ) {
+  config.service(
+    web::resource("/vms/{key}/console")
+      .route(web::get().to_with_state(console_vm)),
+  );
   config.service(
     web::resource("/vms")
       .name("list_vm")

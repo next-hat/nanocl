@@ -135,6 +135,19 @@ pub struct VmSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub init_container: Option<Config>,
+  /// Enable cloud-init provisioning (default: true for compatibility).
+  /// Guest networking uses DHCP independently of this setting.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console (default: false).
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub console: Option<bool>,
   /// The image the vm will use, it must be a full path to the image (ex: /var/lib/nanocl/vm/image.qcow2)
   pub image: String,
   /// Mac address of the vm (default: generated)
@@ -215,6 +228,25 @@ pub struct VmSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub init_container: Option<Config>,
+  /// Enable cloud-init provisioning; omitted preserves the current setting.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console; omitted preserves the setting.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub console: Option<bool>,
+  /// Stable MAC identity. An existing address cannot be changed; this may
+  /// supply an address for a legacy VM that does not have one yet.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub mac_address: Option<String>,
   /// User-defined key/value metadata.
   #[cfg_attr(
     feature = "serde",
@@ -240,6 +272,9 @@ impl From<VmSpecPartial> for VmSpecUpdate {
       password: spec.password,
       ssh_key: spec.ssh_key,
       init_container: spec.init_container,
+      cloud_init: spec.cloud_init,
+      console: spec.console,
+      mac_address: spec.mac_address,
       metadata: spec.metadata,
     }
   }
@@ -295,6 +330,18 @@ pub struct VmSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub init_container: Option<Config>,
+  /// Enable cloud-init provisioning (default: true for compatibility).
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console (default: false).
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub console: Option<bool>,
   /// Default user of the vm (cloud)
   #[cfg_attr(
     feature = "serde",
@@ -330,6 +377,9 @@ impl From<VmSpec> for VmSpecUpdate {
       password: spec.password,
       ssh_key: spec.ssh_key,
       init_container: spec.init_container,
+      cloud_init: spec.cloud_init,
+      console: spec.console,
+      mac_address: spec.mac_address,
       metadata: spec.metadata,
     }
   }
@@ -346,9 +396,50 @@ impl From<VmSpec> for VmSpecPartial {
       password: spec.password,
       ssh_key: spec.ssh_key,
       init_container: spec.init_container,
+      cloud_init: spec.cloud_init,
+      console: spec.console,
       metadata: spec.metadata,
       image: spec.image,
       mac_address: spec.mac_address,
     }
+  }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn vm_optional_provisioning_and_console_preserve_wire_values() {
+    let legacy: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "legacy", "Image": "/vm.qcow2"
+    }))
+    .unwrap();
+    assert_eq!(legacy.cloud_init, None);
+    assert_eq!(legacy.console, None);
+    let spec: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "plain", "Image": "/vm.qcow2", "CloudInit": false,
+      "Console": true, "MacAddress": "02:00:00:00:00:01"
+    }))
+    .unwrap();
+    let update = VmSpecUpdate::from(spec.clone());
+    assert_eq!(update.cloud_init, Some(false));
+    assert_eq!(update.console, Some(true));
+    assert_eq!(update.mac_address.as_deref(), Some("02:00:00:00:00:01"));
+    let encoded = serde_json::to_value(spec).unwrap();
+    assert_eq!(encoded["CloudInit"], false);
+    assert_eq!(encoded["Console"], true);
+    let absent = serde_json::to_value(VmSpecUpdate::default()).unwrap();
+    assert!(absent.get("CloudInit").is_none());
+    assert!(absent.get("Console").is_none());
+    let stored = VmSpec {
+      cloud_init: Some(false),
+      console: Some(true),
+      ..Default::default()
+    };
+    let partial = VmSpecPartial::from(stored.clone());
+    let update = VmSpecUpdate::from(stored);
+    assert_eq!(partial.cloud_init, update.cloud_init);
+    assert_eq!(partial.console, update.console);
   }
 }

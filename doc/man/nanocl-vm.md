@@ -15,7 +15,9 @@ vm - Manage virtual machines
 
 ## DESCRIPTION
 
-Manage virtual machines
+Manage virtual machines. Guest networking uses DHCP with the Docker endpoint IPv4 address. Cloud-init provisioning is optional and enabled by default for compatibility. The browser console is disabled by default and follows the daemon operator trust boundary.
+
+See [VM runtime and migration](../vm-runtime.md) for the network model, local runtime build, migration, and validation instructions.
 
 ## OPTIONS
 

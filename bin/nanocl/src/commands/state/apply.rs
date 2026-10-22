@@ -44,6 +44,60 @@ fn insert_nanocl_group(
   }
 }
 
+fn preserve_vm_identity(
+  desired: &mut VmSpecPartial,
+  current: &VmSpecPartial,
+) -> IoResult<()> {
+  if let (Some(desired), Some(current)) =
+    (&desired.mac_address, &current.mac_address)
+    && !desired.eq_ignore_ascii_case(current)
+  {
+    return Err(IoError::invalid_input(
+      "state apply",
+      "MacAddress is immutable; create a new VM to use another address",
+    ));
+  }
+  desired.mac_address =
+    current.mac_address.clone().or(desired.mac_address.clone());
+  desired.cloud_init = desired.cloud_init.or(current.cloud_init);
+  desired.console = desired.console.or(current.console);
+  Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn vm_state_apply_preserves_generated_identity_and_omitted_options() {
+    let current = VmSpecPartial {
+      name: "guest".to_owned(),
+      image: "/vm.qcow2".to_owned(),
+      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
+      cloud_init: Some(false),
+      console: Some(true),
+      ..Default::default()
+    };
+    let mut desired = VmSpecPartial {
+      name: current.name.clone(),
+      image: current.image.clone(),
+      ..Default::default()
+    };
+    preserve_vm_identity(&mut desired, &current).unwrap();
+    assert_eq!(desired, current);
+    desired.console = Some(false);
+    preserve_vm_identity(&mut desired, &current).unwrap();
+    assert_eq!(desired.console, Some(false));
+    desired.mac_address = Some("02:00:00:00:00:02".to_owned());
+    assert!(preserve_vm_identity(&mut desired, &current).is_err());
+    let mut legacy = current.clone();
+    legacy.mac_address = None;
+    preserve_vm_identity(&mut desired, &legacy).unwrap();
+    let update = VmSpecUpdate::from(desired);
+    assert_eq!(update.mac_address.as_deref(), Some("02:00:00:00:00:02"));
+  }
+}
+
 async fn state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -257,6 +311,7 @@ async fn state_apply(
               }
               Ok(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
+                preserve_vm_identity(&mut vm, &cmp)?;
                 if (cmp != vm) || opts.reload {
                   let update: VmSpecUpdate = vm.clone().into();
                   utils::progress::set_state_message(

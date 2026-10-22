@@ -102,14 +102,14 @@ fn vm_runtime_failure_effect(
   action: &str,
   process_name: &str,
   wanted: &str,
-  prev_actual: &str,
+  actual: &str,
 ) -> VmRuntimeFailureEffect {
   if action != "die"
     || process_name.starts_with("tmp-")
     || process_name.ends_with(".init.v")
     || wanted == ObjPsStatusKind::Stop.to_string()
     || wanted == ObjPsStatusKind::Destroy.to_string()
-    || prev_actual == ObjPsStatusKind::Updating.to_string()
+    || actual == ObjPsStatusKind::Updating.to_string()
   {
     return VmRuntimeFailureEffect::NoRuntimeFailure;
   }
@@ -435,7 +435,9 @@ async fn exec_docker(
               .await?;
         }
         (EventActorKind::Vm, status)
-          if status != &ObjPsStatusKind::Start.to_string() =>
+          if status != &ObjPsStatusKind::Start.to_string()
+            && !name.starts_with("tmp-")
+            && !name.ends_with(".init.v") =>
         {
           ObjPsStatusDb::update_actual_status(
             &kind_key,
@@ -508,14 +510,24 @@ async fn exec_docker(
               );
             }
           }
-          (EventActorKind::Vm, wanted, _)
-            if vm_runtime_failure_effect(
-              action,
-              &name,
-              wanted,
-              &actual_status.prev_actual,
-            ) == VmRuntimeFailureEffect::FailAndEmitRuntimeError =>
+          (EventActorKind::Vm, wanted, actual)
+            if vm_runtime_failure_effect(action, &name, wanted, actual)
+              == VmRuntimeFailureEffect::FailAndEmitRuntimeError =>
           {
+            // An old runtime may finish exiting after replacement. Only the
+            // immutable Docker ID currently bound to the VM can fail it.
+            let runtime = state
+              .inner
+              .docker_api
+              .inspect_container(
+                &format!("{kind_key}.v"),
+                None::<InspectContainerOptions>,
+              )
+              .await
+              .map_err(|err| err.map_err_context(|| "VM Docker event"))?;
+            if runtime.id.as_deref() != Some(id.as_str()) {
+              return Ok(());
+            }
             ObjPsStatusDb::update_actual_status(
               &kind_key,
               &ObjPsStatusKind::Fail,
@@ -799,13 +811,13 @@ mod tests {
     action: &str,
     process_name: &str,
     wanted: ObjPsStatusKind,
-    prev_actual: ObjPsStatusKind,
+    actual: ObjPsStatusKind,
   ) -> VmRuntimeFailureEffect {
     vm_runtime_failure_effect(
       action,
       process_name,
       &wanted.to_string(),
-      &prev_actual.to_string(),
+      &actual.to_string(),
     )
   }
 
@@ -898,6 +910,15 @@ mod tests {
 
   #[test]
   fn vm_docker_event_update_replacement_die_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::FailAndEmitRuntimeError
+    );
     assert_eq!(
       vm_failure_effect(
         "die",

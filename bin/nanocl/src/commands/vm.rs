@@ -23,7 +23,7 @@ use nanocld_client::{
     resource_key::ResourceKey,
     system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
-    vm_spec::VmSpecPartial,
+    vm_spec::{VmSpecPartial, VmSpecUpdate},
   },
 };
 
@@ -152,9 +152,13 @@ pub async fn exec_vm_patch(
   options: &VmPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let mut vm: VmSpecUpdate = options.clone().into();
+  if vm.host_config.is_some() {
+    let current = client.inspect_vm(&options.key).await?;
+    vm.host_config = options.patch_host_config(&current.spec.host_config);
+  }
   let waiter =
     wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
-  let vm = options.clone().into();
   client.patch_vm(&options.key, &vm).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_process_state", &err.to_string())

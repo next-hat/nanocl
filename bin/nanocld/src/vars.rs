@@ -16,4 +16,4 @@ pub const CHANNEL: &str = env!("CHANNEL");
 /// Controller
 pub const CONTROLLER_NAME: &str = "nanocl.io/core";
 /// Default Virtual Machine runtime
-pub const VM_RUNTIME: &str = "ghcr.io/next-hat/nanocl-qemu:8.0.2.0";
+pub const VM_RUNTIME: &str = "ghcr.io/next-hat/nanocl-qemu:8.0.5.0";

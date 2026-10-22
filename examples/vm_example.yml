@@ -1,4 +1,4 @@
-ApiVersion: v0.16
+ApiVersion: v0.19
 
 Namespace: global
 
@@ -21,6 +21,10 @@ Resources:
 VirtualMachines:
 - Name: vm-test
   Image: ./tests/ubuntu-24.04-minimal-cloudimg-amd64.img
+  # Build this candidate locally; see doc/vm-runtime.md.
+  CloudInit: true
+  Console: false
   HostConfig:
     Cpu: 2
     Memory: 2048
+    Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0

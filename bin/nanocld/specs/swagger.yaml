@@ -2008,6 +2008,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /vms/{key}/console:
+    get:
+      tags:
+      - Vms
+      summary: Open a VM graphical console using binary RFB over WebSocket
+      description: Requires Console true and a current local runtime. Only the daemon Unix socket or verified mutual TLS is accepted; plaintext TCP is denied. Browser Origin must exactly match the HTTPS endpoint. Access follows the daemon-operator trust model, without per-user ownership. Binary frames carry unmodified RFB bytes and are limited to 64 KiB.
+      operationId: console_vm
+      parameters:
+      - name: key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      responses:
+        '101':
+          description: Binary RFB console WebSocket
+        '400':
+          description: Invalid canonical key or WebSocket handshake
+        '403':
+          description: Untrusted transport, Origin, or disabled console
+        '404':
+          description: VM does not exist
+        '409':
+          description: VM runtime is not ready or does not match the current VM
   /vms/{key}/histories:
     get:
       tags:
@@ -9243,6 +9268,16 @@ components:
       - Image
       - HostConfig
       properties:
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
         Key:
           type: string
           format: uuid
@@ -9319,6 +9354,16 @@ components:
       - Name
       - Image
       properties:
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
         Name:
           type: string
           description: Name of the vm
@@ -9386,6 +9431,21 @@ components:
         It will create a new [VmSpec](VmSpec) with the new values
         and keep the old values in the history
       properties:
+        CloudInit:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable cloud-init provisioning (default: true for compatibility). Guest networking uses DHCP independently.'
+        Console:
+          type:
+          - boolean
+          - 'null'
+          description: 'Enable the authenticated browser console (default: false). Access requires the daemon Unix socket or verified mutual TLS.'
+        MacAddress:
+          type:
+          - string
+          - 'null'
+          description: 'Stable MAC identity. An existing address cannot change; this can assign an address to a legacy VM without one. Omitted preserves the saved address.'
         Name:
           type:
           - string

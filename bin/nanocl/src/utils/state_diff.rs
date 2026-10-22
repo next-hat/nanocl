@@ -22,6 +22,19 @@ pub(crate) fn diff_item(
   orphan: bool,
   reason: Option<&str>,
 ) -> StateDiffItem {
+  // VM identity is allocated by the daemon. Omitted provisioning/console
+  // fields retain their current values under the VM PATCH contract.
+  let mut vm_before = before.filter(|_| kind == "vm").cloned();
+  if let (Some(before), Some(after)) =
+    (vm_before.as_mut().and_then(Value::as_object_mut), after)
+  {
+    for field in ["MacAddress", "CloudInit", "Console"] {
+      if after.get(field).is_none_or(Value::is_null) {
+        before.remove(field);
+      }
+    }
+  }
+  let before = vm_before.as_ref().or(before);
   let action = match (before, after) {
     (None, Some(_)) => StateDiffAction::Create,
     (Some(_), None) => StateDiffAction::Remove,
@@ -126,7 +139,9 @@ fn field_context(context: &str, field: &str) -> &'static str {
     | ("secret", "Immutable")
     | ("cargo", "Replicas" | "NetworkMode" | "Hostname")
     | ("job", "Schedule" | "Ttl" | "ImagePullPolicy" | "ImagePullSecret")
-    | ("vm", "Hostname" | "Image" | "MacAddress") => "scalar",
+    | ("vm", "Hostname" | "Image" | "MacAddress" | "CloudInit" | "Console") => {
+      "scalar"
+    }
     ("cargo", "Secrets" | "Dns") | ("job", "Secrets") => "scalars",
     ("cargo", "Containers" | "InitContainers") | ("job", "Containers") => {
       "containers"
@@ -438,6 +453,38 @@ mod tests {
   use serde_json::json;
 
   use super::*;
+
+  #[test]
+  fn vm_state_diff_ignores_omitted_allocated_identity_and_preserved_options() {
+    let current = json!({"Name": "guest", "MacAddress": "02:00:00:00:00:01",
+      "CloudInit": false, "Console": true});
+    let desired = json!({"Name": "guest"});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&current),
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert!(matches!(diff.action, StateDiffAction::Unchanged));
+    assert!(diff.changes.is_empty());
+    let disabled = json!({"Name": "guest", "Console": false});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&current),
+      Some(&disabled),
+      false,
+      false,
+      None,
+    );
+    assert!(matches!(diff.action, StateDiffAction::Update));
+    assert_eq!(diff.after.as_ref().unwrap()["Console"], false);
+  }
 
   fn without_style(output: &str) -> String {
     // Keep text assertions independent of the test runner's terminal settings.

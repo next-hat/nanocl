@@ -12,7 +12,7 @@ patch - Patch a vm
 ## SYNOPSIS
 
 **patch** \[**--user**\] \[**--password**\] \[**--ssh-key**\]
-\[**--hostname**\] \[**--cpu**\] \[**--mem**\] \[**--kvm**\]
+\[**--hostname**\] \[**--cloud-init**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--kvm**\]
 \[**--net-iface**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
@@ -20,6 +20,12 @@ patch - Patch a vm
 Patch a vm
 
 ## OPTIONS
+
+**--cloud-init** *\<true|false\>*
+Enable or disable cloud-init provisioning; omitted preserves the current setting. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
+
+**--console** *\<true|false\>*
+Enable or disable the browser console; omitted preserves the current setting. Access requires the daemon Unix socket or verified mutual TLS.
 
 **--user** *\<USER\>*  
 Default user of the VM
@@ -34,10 +40,10 @@ Ssh key for the user
 hostname of the vm
 
 **--cpu** *\<CPU\>*  
-Cpu of the vm default to 1
+Number of CPUs; omitted preserves the current setting
 
 **--mem** *\<MEMORY\>*  
-Memory of the vm in MB default to 512
+Memory in MB; omitted preserves the current setting
 
 **--kvm**  
 Enable KVM

@@ -57,10 +57,16 @@ pub struct VmPatchOpts {
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
-  /// Cpu of the vm default to 1
+  /// Enable cloud-init provisioning (true or false)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console (true or false)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub console: Option<bool>,
+  /// Number of CPUs; omitted preserves the current setting
   #[clap(long)]
   pub cpu: Option<u64>,
-  /// Memory of the vm in MB default to 512
+  /// Memory in MB; omitted preserves the current setting
   #[clap(long = "mem")]
   pub memory: Option<u64>,
   /// Enable KVM
@@ -71,22 +77,50 @@ pub struct VmPatchOpts {
   pub net_iface: Option<String>,
 }
 
+impl VmPatchOpts {
+  /// Overlay only explicitly supplied host settings. Console/provisioning
+  /// patches must not replace the runtime image, network, or resource limits.
+  pub(crate) fn patch_host_config(
+    &self,
+    current: &VmHostConfig,
+  ) -> Option<VmHostConfig> {
+    if self.cpu.is_none()
+      && self.memory.is_none()
+      && self.net_iface.is_none()
+      && !self.kvm
+    {
+      return None;
+    }
+    let mut config = current.clone();
+    if let Some(cpu) = self.cpu {
+      config.cpu = cpu;
+    }
+    if let Some(memory) = self.memory {
+      config.memory = memory;
+    }
+    if let Some(interface) = &self.net_iface {
+      config.net_iface = Some(interface.clone());
+    }
+    if self.kvm {
+      config.kvm = Some(true);
+    }
+    Some(config)
+  }
+}
+
 /// Convert VmPatchOpts to VmSpecUpdate
 impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
+    let host_config = val.patch_host_config(&VmHostConfig::default());
     Self {
       name: None,
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
       hostname: val.hostname,
-      host_config: Some(VmHostConfig {
-        kvm: Some(val.kvm),
-        cpu: val.cpu.unwrap_or(1),
-        memory: val.memory.unwrap_or(512),
-        net_iface: val.net_iface,
-        ..Default::default()
-      }),
+      cloud_init: val.cloud_init,
+      console: val.console,
+      host_config,
       ..Default::default()
     }
   }
@@ -101,6 +135,12 @@ pub struct VmRunOpts {
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
+  /// Enable cloud-init provisioning (default: true)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console (default: false)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub console: Option<bool>,
   /// Cpu of the vm default to 1
   #[clap(long)]
   pub cpu: Option<u64>,
@@ -137,6 +177,8 @@ impl From<VmRunOpts> for VmSpecPartial {
     Self {
       name: val.name,
       hostname: val.hostname,
+      cloud_init: val.cloud_init,
+      console: val.console,
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
@@ -162,6 +204,12 @@ pub struct VmCreateOpts {
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
+  /// Enable cloud-init provisioning (default: true)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub cloud_init: Option<bool>,
+  /// Enable the authenticated browser console (default: false)
+  #[clap(long, action = clap::ArgAction::Set)]
+  pub console: Option<bool>,
   /// Cpu of the vm default to 1
   #[clap(long)]
   pub cpu: Option<u64>,
@@ -195,6 +243,8 @@ impl From<VmCreateOpts> for VmSpecPartial {
     Self {
       name: val.name,
       hostname: val.hostname,
+      cloud_init: val.cloud_init,
+      console: val.console,
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
@@ -303,7 +353,78 @@ mod tests {
   use clap::Parser;
   use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
 
+  #[test]
+  fn vm_cli_optional_provisioning_and_console_accept_explicit_booleans() {
+    for action in ["create", "run"] {
+      let args = VmArg::try_parse_from([
+        "vm",
+        action,
+        "guest",
+        "/vm.qcow2",
+        "--cloud-init",
+        "false",
+        "--console",
+        "true",
+      ])
+      .unwrap();
+      let spec = match args.command {
+        VmCommand::Create(opts) => VmSpecPartial::from(opts),
+        VmCommand::Run(opts) => VmSpecPartial::from(opts),
+        _ => panic!("expected create or run"),
+      };
+      assert_eq!(spec.cloud_init, Some(false));
+      assert_eq!(spec.console, Some(true));
+    }
+    let args = VmArg::try_parse_from([
+      "vm",
+      "patch",
+      "global.guest",
+      "--console",
+      "false",
+    ])
+    .unwrap();
+    let VmCommand::Patch(opts) = args.command else {
+      panic!("expected patch");
+    };
+    let update = VmSpecUpdate::from(opts);
+    assert_eq!(update.console, Some(false));
+    assert_eq!(update.cloud_init, None);
+    assert!(update.host_config.is_none());
+  }
+
   use super::*;
+
+  #[test]
+  fn vm_cli_host_patch_preserves_runtime_network_and_unrequested_resources() {
+    let current = VmHostConfig {
+      cpu: 8,
+      memory: 4096,
+      kvm: Some(true),
+      runtime: Some("local/runtime:candidate".to_owned()),
+      runtime_network: Some("private-vms".to_owned()),
+      dns: Some(vec!["192.0.2.53".to_owned()]),
+      link_net_iface: Some("eth1".to_owned()),
+      ..Default::default()
+    };
+    for flag in ["--cpu", "--mem", "--net-iface"] {
+      let value = if flag == "--net-iface" { "ens4" } else { "2" };
+      let options =
+        VmPatchOpts::try_parse_from(["patch", "global.guest", flag, value])
+          .unwrap();
+      let mut expected = current.clone();
+      match flag {
+        "--cpu" => expected.cpu = 2,
+        "--mem" => expected.memory = 2,
+        _ => expected.net_iface = Some("ens4".to_owned()),
+      }
+      assert_eq!(options.patch_host_config(&current), Some(expected));
+    }
+    let options =
+      VmPatchOpts::try_parse_from(["patch", "global.guest", "--kvm"]).unwrap();
+    let mut without_kvm = current.clone();
+    without_kvm.kvm = None;
+    assert_eq!(options.patch_host_config(&without_kvm), Some(current));
+  }
 
   #[test]
   fn compact_vm_row_preserves_image_status_and_age() {
