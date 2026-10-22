@@ -116,9 +116,13 @@ pub(crate) fn validate_spec(
 ) -> IoResult<()> {
   validate_host_config(&spec.host_config.clone().unwrap_or_default())?;
   cloud_init_user_data(spec.cloud_init_user_data.as_ref())?;
-  validate_cloud_init_user(
-    spec.cloud_init.unwrap_or(true) && spec.cloud_init_user_data.is_none(),
-    spec.user.as_deref(),
+  let generated =
+    spec.cloud_init.unwrap_or(true) && spec.cloud_init_user_data.is_none();
+  validate_cloud_init_user(generated, spec.user.as_deref())?;
+  validate_cloud_init_credentials(
+    generated,
+    spec.password.as_deref(),
+    spec.ssh_key.as_deref(),
   )
 }
 
@@ -160,6 +164,27 @@ fn validate_cloud_init_user(enabled: bool, user: Option<&str>) -> IoResult<()> {
       "VM provisioning",
       "User must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores or hyphens when CloudInit is enabled",
     ));
+  }
+  Ok(())
+}
+
+fn validate_cloud_init_credentials(
+  enabled: bool,
+  password: Option<&str>,
+  ssh_key: Option<&str>,
+) -> IoResult<()> {
+  if !enabled {
+    return Ok(());
+  }
+  for (field, value) in [("Password", password), ("SshKey", ssh_key)] {
+    if value.is_some_and(|value| value.contains(['\r', '\n'])) {
+      return Err(IoError::invalid_input(
+        "VM provisioning",
+        &format!(
+          "{field} must not contain carriage returns or newlines when generated cloud-init is enabled"
+        ),
+      ));
+    }
   }
   Ok(())
 }
@@ -305,9 +330,12 @@ fn validate_runtime_labels(
 fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
   validate_host_config(&vm.spec.host_config)?;
   let user_data = cloud_init_user_data(vm.spec.cloud_init_user_data.as_ref())?;
-  validate_cloud_init_user(
-    vm.spec.cloud_init.unwrap_or(true) && user_data.is_none(),
-    vm.spec.user.as_deref(),
+  let generated = vm.spec.cloud_init.unwrap_or(true) && user_data.is_none();
+  validate_cloud_init_user(generated, vm.spec.user.as_deref())?;
+  validate_cloud_init_credentials(
+    generated,
+    vm.spec.password.as_deref(),
+    vm.spec.ssh_key.as_deref(),
   )?;
   let mac = vm.spec.mac_address.as_deref().ok_or_else(|| {
     IoError::invalid_input("VM MAC", "A persisted MAC address is required")
@@ -1118,6 +1146,59 @@ mod tests {
           .iter()
           .any(|item| item.starts_with("USER="))
       );
+    }
+  }
+
+  #[test]
+  fn vm_generated_cloud_init_rejects_multiline_credentials_without_secrets() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    for value in [None, Some(""), Some("normal credential: 'value'")] {
+      vm.spec.password = value.map(str::to_owned);
+      vm.spec.ssh_key = value.map(str::to_owned);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(runtime_env(&vm, false).is_ok());
+    }
+    for field in ["Password", "SshKey"] {
+      for separator in ['\r', '\n'] {
+        let secret = format!("private-credential{separator}must-not-leak");
+        vm.spec.password = (field == "Password").then(|| secret.clone());
+        vm.spec.ssh_key = (field == "SshKey").then(|| secret.clone());
+        for enabled in [None, Some(true)] {
+          vm.spec.cloud_init = enabled;
+          for error in [
+            validate_spec(&vm.spec.clone().into()).unwrap_err(),
+            runtime_env(&vm, false).unwrap_err(),
+          ] {
+            assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+            assert!(error.to_string().contains(field));
+            let diagnostics = format!("{error} {error:?}");
+            assert!(!diagnostics.contains("private-credential"));
+            assert!(!diagnostics.contains("must-not-leak"));
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn vm_ignored_cloud_init_credentials_allow_multiline_values() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.password = Some("ignored\r\npassword".into());
+    vm.spec.ssh_key = Some("ignored\r\nkey".into());
+    for (enabled, data) in [
+      (Some(false), None),
+      (None, Some(VmCloudInitUserData::Raw(String::new()))),
+      (Some(true), Some(VmCloudInitUserData::Raw(String::new()))),
+    ] {
+      vm.spec.cloud_init = enabled;
+      vm.spec.cloud_init_user_data = data;
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      let env = runtime_env(&vm, false).unwrap();
+      assert!(!env.iter().any(|value| {
+        value.starts_with("PASSWORD=") || value.starts_with("SSH_KEY=")
+      }));
     }
   }
 
