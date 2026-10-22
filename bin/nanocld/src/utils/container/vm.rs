@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::os::{
-  fd::AsRawFd,
+  fd::{AsRawFd, FromRawFd},
   unix::fs::{FileTypeExt, OpenOptionsExt, PermissionsExt},
 };
 use std::path::{Path, PathBuf};
@@ -556,12 +556,16 @@ pub(crate) fn open_runtime_socket(
   directory: &Path,
   name: &str,
 ) -> IoResult<(std::fs::File, PathBuf)> {
-  if !matches!(name, "qmp.sock" | "console.sock") {
-    return Err(IoError::invalid_input(
-      "VM socket",
-      "Invalid managed socket name",
-    ));
-  }
+  let name = match name {
+    "qmp.sock" => c"qmp.sock",
+    "console.sock" => c"console.sock",
+    _ => {
+      return Err(IoError::invalid_input(
+        "VM socket",
+        "Invalid managed socket name",
+      ));
+    }
+  };
   if std::fs::canonicalize(directory)? != directory {
     return Err(IoError::invalid_input(
       "VM socket",
@@ -578,10 +582,22 @@ pub(crate) fn open_runtime_socket(
       "VM socket directory must be private",
     ));
   }
-  let socket = std::fs::OpenOptions::new()
-    .read(true)
-    .custom_flags(libc::O_PATH | libc::O_NOFOLLOW)
-    .open(format!("/proc/self/fd/{}/{name}", parent.as_raw_fd()))?;
+  // musl includes O_PATH in O_ACCMODE, which OpenOptions masks out. Open
+  // relative to the held directory descriptor without losing that flag.
+  // SAFETY: parent is live, name is a fixed NUL-terminated basename, and these
+  // flags do not create a file or require a variadic mode argument.
+  let fd = unsafe {
+    libc::openat(
+      parent.as_raw_fd(),
+      name.as_ptr(),
+      libc::O_PATH | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+    )
+  };
+  if fd < 0 {
+    return Err(std::io::Error::last_os_error().into());
+  }
+  // SAFETY: openat returned a fresh owned descriptor, transferred exactly once.
+  let socket = unsafe { std::fs::File::from_raw_fd(fd) };
   if !socket.metadata()?.file_type().is_socket() {
     return Err(IoError::invalid_input(
       "VM socket",
@@ -1331,6 +1347,16 @@ mod tests {
     std::fs::rename(root.join("socket"), &original).unwrap();
     let (socket, pinned) =
       open_runtime_socket(&directory, "console.sock").unwrap();
+    // SAFETY: socket owns a live descriptor; both commands only read its flags.
+    let (open_flags, descriptor_flags) = unsafe {
+      (
+        libc::fcntl(socket.as_raw_fd(), libc::F_GETFL),
+        libc::fcntl(socket.as_raw_fd(), libc::F_GETFD),
+      )
+    };
+    assert!(open_flags >= 0 && descriptor_flags >= 0);
+    assert_ne!(open_flags & libc::O_PATH, 0);
+    assert_ne!(descriptor_flags & libc::FD_CLOEXEC, 0);
     assert!(original.as_os_str().len() > 108);
     assert!(pinned.as_os_str().len() < 108);
     std::fs::rename(&original, directory.join("old.sock")).unwrap();

@@ -301,14 +301,26 @@ impl Default for VmHostConfig {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct VmHostConfigUpdate {
+  #[cfg_attr(feature = "utoipa", schema(nullable = false))]
+  #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
   #[cfg_attr(
     feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
   )]
   pub cpu: Option<u64>,
+  #[cfg_attr(feature = "utoipa", schema(nullable = false))]
+  #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
   #[cfg_attr(
     feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
   )]
   pub memory: Option<u64>,
   #[cfg_attr(feature = "utoipa", schema(minimum = 1, maximum = 255))]
@@ -823,6 +835,36 @@ mod tests {
   use super::*;
 
   #[test]
+  fn vm_host_patch_rejects_null_required_resources() {
+    for field in ["Cpu", "Memory"] {
+      assert!(
+        serde_json::from_value::<VmSpecUpdate>(serde_json::json!({
+          "HostConfig": {field: null},
+        }))
+        .is_err(),
+        "{field} cannot be cleared"
+      );
+      assert!(
+        serde_yaml::from_str::<VmSpecUpdate>(&format!(
+          "HostConfig:\n  {field}: null\n"
+        ))
+        .is_err(),
+        "{field} cannot be cleared in YAML either"
+      );
+    }
+    for payload in [
+      serde_json::json!({}),
+      serde_json::json!({"Cpu": 4}),
+      serde_json::json!({"Memory": 2048}),
+      serde_json::json!({"Cpu": 4, "Memory": 2048}),
+    ] {
+      let patch: VmHostConfigUpdate =
+        serde_json::from_value(payload.clone()).unwrap();
+      assert_eq!(serde_json::to_value(patch).unwrap(), payload);
+    }
+  }
+
+  #[test]
   fn vm_host_patch_is_sparse_and_merges_with_latest_settings() {
     let patch: VmSpecUpdate = serde_json::from_value(serde_json::json!({
       "HostConfig": {"Cpu": 4},
@@ -1181,6 +1223,7 @@ mod tests {
     )
     .unwrap();
     assert_boot_limit_schema(&update);
+    assert_required_resource_patch_schema(&update);
   }
 
   #[cfg(feature = "schemars")]
@@ -1192,6 +1235,19 @@ mod tests {
     let update =
       serde_json::to_value(schemars::schema_for!(VmHostConfigUpdate)).unwrap();
     assert_boot_limit_schema(&update);
+    assert_required_resource_patch_schema(&update);
+  }
+
+  #[cfg(any(feature = "utoipa", feature = "schemars"))]
+  fn assert_required_resource_patch_schema(schema: &serde_json::Value) {
+    for field in ["Cpu", "Memory"] {
+      assert_eq!(schema["properties"][field]["type"], "integer", "{field}");
+      assert!(
+        !schema["required"]
+          .as_array()
+          .is_some_and(|fields| { fields.contains(&serde_json::json!(field)) })
+      );
+    }
   }
 
   #[cfg(any(feature = "utoipa", feature = "schemars"))]

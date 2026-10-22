@@ -14,7 +14,10 @@ fn lock_vm_signal(
   };
   // An explicit hard kill is the operator's escape hatch when a guest ignores
   // ACPI. It targets the inspected immutable ID, even while shutdown waits.
-  if matches!(signal, "SIGKILL" | "KILL" | "9") {
+  if signal.eq_ignore_ascii_case("SIGKILL")
+    || signal.eq_ignore_ascii_case("KILL")
+    || signal == "9"
+  {
     return Ok(None);
   }
   crate::utils::container::vm::lifecycle_lock(&key)
@@ -83,8 +86,11 @@ mod tests {
       ..Default::default()
     };
     let guard = super::lock_vm_signal(&runtime, "SIGTERM").unwrap().unwrap();
-    assert!(super::lock_vm_signal(&runtime, "SIGTERM").is_err());
-    for signal in ["SIGKILL", "KILL", "9"] {
+    for signal in ["SIGTERM", "sigterm", "term", "15"] {
+      assert!(super::lock_vm_signal(&runtime, signal).is_err());
+    }
+    for signal in ["SIGKILL", "KILL", "9", "sigkill", "kill", "SigKill", "Kill"]
+    {
       assert!(super::lock_vm_signal(&runtime, signal).unwrap().is_none());
     }
     assert!(

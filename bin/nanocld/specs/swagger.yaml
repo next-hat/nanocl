@@ -12536,15 +12536,11 @@ components:
         explicit null clears optional settings.
       properties:
         Cpu:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
           minimum: 0
         Memory:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
           minimum: 0
         MaxCpu:
