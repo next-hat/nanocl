@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, io::Write};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 use serde_json::Value;
 
 use crate::models::{
@@ -8,6 +8,21 @@ use crate::models::{
 };
 
 const REDACTED: &str = "[REDACTED]";
+
+pub(crate) fn validate_vm_identity(
+  desired: Option<&str>,
+  current: Option<&str>,
+) -> IoResult<()> {
+  if let (Some(desired), Some(current)) = (desired, current)
+    && !desired.eq_ignore_ascii_case(current)
+  {
+    return Err(IoError::invalid_input(
+      "VM specification",
+      "MacAddress is immutable; create a new VM to use another address",
+    ));
+  }
+  Ok(())
+}
 
 /// Compare the authored values before hiding sensitive information. A secret-only
 /// change must still be reported even when its displayed values are identical.
@@ -25,16 +40,30 @@ pub(crate) fn diff_item(
   // VM identity is allocated by the daemon. Omitted provisioning/console
   // fields retain their current values under the VM PATCH contract.
   let mut vm_before = before.filter(|_| kind == "vm").cloned();
-  if let (Some(before), Some(after)) =
-    (vm_before.as_mut().and_then(Value::as_object_mut), after)
-  {
-    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
+  let mut vm_after = after.filter(|_| kind == "vm").cloned();
+  if let (Some(before), Some(after)) = (
+    vm_before.as_mut().and_then(Value::as_object_mut),
+    vm_after.as_mut().and_then(Value::as_object_mut),
+  ) {
+    for field in ["MacAddress", "CloudInit", "Console"] {
       if after.get(field).is_none_or(Value::is_null) {
         before.remove(field);
+        after.remove(field);
+      }
+    }
+    if !after.contains_key("CloudInitUserData") {
+      before.remove("CloudInitUserData");
+    } else if after.get("CloudInitUserData").is_some_and(Value::is_null) {
+      after.remove("CloudInitUserData");
+    }
+    for value in [before, after] {
+      if let Some(Value::String(address)) = value.get_mut("MacAddress") {
+        address.make_ascii_lowercase();
       }
     }
   }
   let before = vm_before.as_ref().or(before);
+  let after = vm_after.as_ref().or(after);
   let action = match (before, after) {
     (None, Some(_)) => StateDiffAction::Create,
     (Some(_), None) => StateDiffAction::Remove,
@@ -485,16 +514,42 @@ mod tests {
     );
     assert!(matches!(diff.action, StateDiffAction::Update));
     assert_eq!(diff.after.as_ref().unwrap()["Console"], false);
+    let uppercase = json!({"Name": "guest", "MacAddress": "02:AB:CD:EF:00:01"});
+    let lowercase = json!({"Name": "guest", "MacAddress": "02:ab:cd:ef:00:01"});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&lowercase),
+      Some(&uppercase),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(diff.action, StateDiffAction::Unchanged);
+    assert!(diff.changes.is_empty());
+    validate_vm_identity(Some("02:AB:CD:EF:00:01"), Some("02:ab:cd:ef:00:01"))
+      .unwrap();
+    assert!(
+      validate_vm_identity(
+        Some("02:00:00:00:00:02"),
+        Some("02:00:00:00:00:01")
+      )
+      .is_err()
+    );
+    validate_vm_identity(None, Some("02:00:00:00:00:01")).unwrap();
   }
 
   #[test]
   fn vm_state_diff_reports_user_data_changes_without_exposing_contents() {
     let before = json!({"Name": "guest", "CloudInitUserData": "#cloud-config\npassword: hidden-before\n"});
     for data in [
+      Value::Null,
       json!(""),
       json!("#cloud-config\npassword: hidden-after\n"),
       json!({"hidden-module": {"password": "hidden-after"}}),
     ] {
+      let cleared = data.is_null();
       let after = json!({"Name": "guest", "CloudInitUserData": data});
       let diff = diff_item(
         "vm.yml",
@@ -511,7 +566,7 @@ mod tests {
       assert_eq!(diff.changes[0].path, "CloudInitUserData");
       assert!(diff.changes[0].redacted);
       assert_eq!(diff.changes[0].before, Some(json!(REDACTED)));
-      assert_eq!(diff.changes[0].after, Some(json!(REDACTED)));
+      assert_eq!(diff.changes[0].after, (!cleared).then(|| json!(REDACTED)));
       let report = StateDiff::new(vec![diff]);
       for json in [false, true] {
         let mut output = Vec::new();

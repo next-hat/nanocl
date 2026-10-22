@@ -12,7 +12,7 @@ patch - Patch a vm
 ## SYNOPSIS
 
 **patch** \[**--user**\] \[**--password**\] \[**--ssh-key**\]
-\[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--max-cpu**\] \[**--max-memory**\] \[**--kvm**\]
+\[**--hostname**\] \[**--cloud-init**\] \[**--cloud-init-user-data**\] \[**--clear-cloud-init-user-data**\] \[**--console**\] \[**--cpu**\] \[**--mem**\] \[**--max-cpu**\] \[**--max-memory**\] \[**--kvm**\]
 \[**--net-iface**\] \[**-h**\|**--help**\] \<*KEY*\>
 
 ## DESCRIPTION
@@ -23,6 +23,9 @@ Patch a vm
 
 **--cloud-init** *\<true|false\>*
 Enable or disable cloud-init provisioning; omitted preserves the current setting. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
+
+**--clear-cloud-init-user-data**
+Clear custom user-data and restore generated provisioning. Conflicts with **--cloud-init-user-data**.
 
 **--cloud-init-user-data** *\<FILE\>*
 Replace custom user-data with a local UTF-8 file, at most 64 KiB without NUL bytes. Omitted preserves current user-data; an empty file selects blank user-data. Custom data replaces generated user/password/SSH/hostname provisioning while NanoCL retains the stable instance ID and DHCP network-config. It is stored but unused when cloud-init is disabled, and is visible through the VM specification and Docker environment. Requires `io.nanocl.vm-cloud-init-user-data=1` on the runtime. Changing user-data does not force first-boot cloud-init modules to rerun on an existing guest disk. See [custom cloud-init](../vm-runtime.md#custom-cloud-init-user-data).

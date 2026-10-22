@@ -32,9 +32,9 @@ Use NanoCL's VM stop and restart commands for guest-aware shutdown. Direct Docke
 
 ## QMP lifecycle control
 
-NanoCL mounts `${state_dir}/run/vms/{namespace.name}/{specification_uuid}` into the runtime at `/run/nanocl-vm`. QEMU creates `qmp.sock` there and, when `Console: true`, `console.sock`. The per-VM generation directory is private to the daemon and runtime. A containerized daemon must bind its state directory at the same absolute host path. The full Unix-socket path must fit the Linux path limit; overly long paths are rejected before replacing a runtime.
+NanoCL mounts `${state_dir}/run/vms/{namespace.name}/{specification_uuid}` into the runtime at `/run/nanocl-vm`. QEMU creates `qmp.sock` there and, when `Console: true`, `console.sock`. The per-VM generation directory is private to the daemon and runtime. A containerized daemon must bind its state directory at the same absolute host path. The daemon canonicalizes the configured state root and connects through a pinned socket file descriptor, so long host paths do not exceed the Unix-socket address limit. Runtime-created symlinks cannot redirect the connection.
 
-QMP stays on this private Unix socket. NanoCL exposes specific lifecycle operations through the existing daemon operator boundary; it does not provide a public raw-QMP endpoint. The daemon verifies the current VM key, namespace, local container ID, and specification generation before using the socket. Concurrent lifecycle operations for the same VM are serialized.
+QMP stays on this private Unix socket. NanoCL exposes specific lifecycle operations through the existing daemon operator boundary; it does not provide a public raw-QMP endpoint. The daemon verifies the current VM key, namespace, local container ID, and specification generation before using the socket. Concurrent lifecycle operations for the same VM are serialized. An explicit `nanocl kill global.desktop.v --signal SIGKILL` remains available during a pending guest shutdown; it signals the inspected container ID without waiting for the lifecycle lock.
 
 ```sh
 nanocl vm status global.desktop
@@ -55,11 +55,11 @@ The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restar
 
 Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. Pause/resume is not exposed.
 
-Generic process stop/restart, VM replacement, and VM deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
+Generic process stop/restart returns HTTP 202 after accepting the bounded operation; completion or failure is reported through events and VM status. The dedicated VM stop/restart endpoints wait for completion. VM replacement and deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
 
 ## Live resource growth
 
-Reserve CPU and memory ceilings when creating the VM. `HostConfig.MaxCpu` and `HostConfig.MaxMemory` are optional; omitted values use the initial `Cpu` and `Memory`, leaving no capacity for live growth of that resource. Memory values are MiB. The ceilings cannot be changed by a live resize: changing them through PATCH replaces the runtime and requires guest shutdown.
+Reserve CPU and memory ceilings when creating the VM. `HostConfig.MaxCpu` and `HostConfig.MaxMemory` are optional; omitted values use the initial `Cpu` and `Memory`, leaving no capacity for live growth of that resource. Memory values are MiB. The ceilings cannot be changed by a live resize: changing them through PATCH replaces the runtime and requires guest shutdown. `HostConfig` PATCH merges only supplied fields under the VM lifecycle lock; omitted fields retain their current values and explicit null clears nullable settings.
 
 ```yaml
 HostConfig:
@@ -111,7 +111,7 @@ VirtualMachines:
     NetworkMode: vm-private
 ```
 
-`CloudInit` defaults to `true` for existing configurations. When enabled without `CloudInitUserData`, it provisions users, SSH keys, passwords, and hostname from NanoCL's fields. Its DHCP configuration matches the persisted MAC and gives the interface the stable name `nanocl0`, so early boot readiness does not retain a name that udev later changes. `CloudInit: false` generates and attaches no seed; the guest must already have a DHCP client and usable login credentials. Its interface naming remains guest-managed. Provisioning fields do not create guest accounts when cloud-init is disabled.
+`CloudInit` defaults to `true` for existing configurations. When enabled without `CloudInitUserData`, it provisions users, SSH keys, passwords, and hostname from NanoCL's fields. Its DHCP configuration matches the persisted MAC and gives the interface the stable name configured by `HostConfig.NetIface` (default `nanocl0`), so early boot readiness does not retain a name that udev later changes. `CloudInit: false` generates and attaches no seed; the guest must already have a DHCP client and usable login credentials. Its interface naming remains guest-managed. Provisioning fields do not create guest accounts when cloud-init is disabled.
 
 When generated provisioning is enabled, `User` must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores, or hyphens. An omitted or empty value uses `cloud`. NanoCL rejects unsupported usernames before accepting a create or update. With `CloudInit: false` or custom `CloudInitUserData`, these generated provisioning fields are ignored.
 
@@ -169,7 +169,7 @@ Custom user-data replaces the entire generated user-data document; it is not mer
 
 User-data must contain no NUL bytes and must fit in 64 KiB after rendering. CLI files must be UTF-8. These limits also apply while `CloudInit: false`; the configuration is retained but unused until cloud-init is enabled. User-data is saved in the VM specification and its history and passed through the Docker runtime environment, so authorized operators who can inspect them can read it. The `state apply` confirmation preview (without `-y`) also prints the full rendered user-data. `state diff` redacts custom user-data in its change display.
 
-PATCH and Statefile apply preserve existing user-data when the field is omitted or `null`. Use `CloudInit: false` to disable seed attachment; an explicit empty string selects blank custom user-data, rather than restoring generated accounts. Updating the specification or restarting a VM does not force first-boot cloud-init modules to rerun: the instance ID stays stable and the guest keeps its cloud-init state on disk. Test new provisioning with a fresh guest disk, or explicitly manage reprovisioning from inside the guest.
+PATCH and Statefile apply preserve existing user-data when the field is omitted. Explicit `CloudInitUserData: null` clears custom user-data and restores generated account provisioning; the CLI equivalent is `nanocl vm patch global.guest --clear-cloud-init-user-data`. An empty string remains blank custom user-data. Use `CloudInit: false` to disable seed attachment. Updating the specification or restarting a VM does not force first-boot cloud-init modules to rerun: the instance ID stays stable and the guest keeps its cloud-init state on disk. Test new provisioning with a fresh guest disk, or explicitly manage reprovisioning from inside the guest.
 
 Custom user-data requires a runtime image with `io.nanocl.vm-cloud-init-user-data=1` in addition to the runtime API label. Pull the updated nightly image with `docker pull ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly`, then select that tag through `HostConfig.Runtime` as above. NanoCL uses an `IfNotPresent` pull policy, so a cached older nightly without the capability is rejected when custom user-data is enabled; pull the updated image explicitly before creating or replacing the runtime. A matching locally built runtime can also be selected through `HostConfig.Runtime`.
 
@@ -178,6 +178,8 @@ Custom user-data requires a runtime image with `io.nanocl.vm-cloud-init-user-dat
 `Console` defaults to `false`. When enabled, QEMU serves VNC through a Unix socket owned by the runtime. NanoCL relays binary RFB frames through `GET /v0.19.0/vms/{namespace.name}/console`. The runtime does not expose an unauthenticated VNC or WebSocket TCP port. QEMU's native WebSocket listener and a separate websockify process are unnecessary for this Unix-socket relay.
 
 The endpoint uses the daemon's configured access controls, including its Unix, TCP, or mutual TLS listeners. It adds no VM-specific transport or Origin restriction. Access grants the same daemon-wide operator privileges as the other APIs; there is no per-user VM ownership model. The daemon verifies the VM key, namespace, local runtime identity, running state, and specification generation before opening its socket.
+
+For a custom Unix daemon socket, the connecting account must already have filesystem access. Socket ownership and group permissions are configured by the operator; the daemon does not automatically grant group access to custom paths. This access grants daemon-wide operator privileges.
 
 A containerized daemon must bind its state directory at the same absolute path on the Docker host, as the standard installer already does. Console and QMP sockets share the private per-VM generation directory described above.
 
@@ -191,7 +193,7 @@ Use the [noVNC example](../examples/vm-console/README.md) for a local browser co
 | 404 | VM does not exist. |
 | 409 | Runtime is absent, stopped, ambiguous, stale, or its console is not ready. |
 
-CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data FILE`, and `--console true|false`. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
+CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data FILE`, and `--console true|false`. PATCH also accepts `--clear-cloud-init-user-data`, mutually exclusive with the user-data file. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
 
 ## Migration
 

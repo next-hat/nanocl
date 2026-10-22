@@ -468,7 +468,19 @@ async fn exec_docker(
     }
     "die" => {
       let current_name =
-        refresh_process_observation(&id, &name, &kind, state).await?;
+        match refresh_process_observation(&id, &name, &kind, state).await {
+          Ok(name) => name,
+          Err(error) => {
+            // Replacement can remove the exited container and process row
+            // before this queued event is consumed. Keep its event even when
+            // refreshing the old observation fails; the analyzer logs the error.
+            if kind == EventActorKind::Vm {
+              action.clone_into(&mut event.action);
+              state.spawn_emit_event(event);
+            }
+            return Err(error);
+          }
+        };
       observation_refreshed = true;
       if kind != EventActorKind::Cargo
         || (labels_describe_active_cargo_runtime(&name, Some(&attributes))
@@ -523,24 +535,32 @@ async fn exec_docker(
                 &format!("{kind_key}.v"),
                 None::<InspectContainerOptions>,
               )
-              .await
-              .map_err(|err| err.map_err_context(|| "VM Docker event"))?;
-            if runtime.id.as_deref() != Some(id.as_str()) {
-              return Ok(());
+              .await;
+            let is_current = match runtime {
+              Ok(runtime) => runtime.id.as_deref() == Some(id.as_str()),
+              Err(bollard_next::errors::Error::DockerResponseServerError {
+                status_code: 404,
+                ..
+              }) => false,
+              Err(error) => {
+                return Err(*error.map_err_context(|| "VM Docker event"));
+              }
+            };
+            if is_current {
+              ObjPsStatusDb::update_actual_status(
+                &kind_key,
+                &ObjPsStatusKind::Fail,
+                &state.inner.pool,
+              )
+              .await?;
+              let vm = VmDb::transform_read_by_pk(&kind_key, &state.inner.pool)
+                .await?;
+              state.emit_error_native_action(
+                &vm,
+                NativeEventAction::Die,
+                Some(format!("process {name} die but should be alive")),
+              );
             }
-            ObjPsStatusDb::update_actual_status(
-              &kind_key,
-              &ObjPsStatusKind::Fail,
-              &state.inner.pool,
-            )
-            .await?;
-            let vm =
-              VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-            state.emit_error_native_action(
-              &vm,
-              NativeEventAction::Die,
-              Some(format!("process {name} die but should be alive")),
-            );
           }
           _ => {}
         }

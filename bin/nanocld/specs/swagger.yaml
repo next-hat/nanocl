@@ -3025,64 +3025,6 @@ components:
           $ref: '#/components/schemas/CargoSpecRevision'
           description: Specification of the cargo
     CloudInit26_2:
-      allOf:
-      - $ref: '#/components/schemas/CloudInit26_2.base_config'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ansible'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apk_configure'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_configure'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_pipelining'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_autoinstall'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_bootcmd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_byobu'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ca_certs'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_chef'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_disable_ec2_metadata'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_disk_setup'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_fan'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_final_message'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_growpart'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_grub_dpkg'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_install_hotplug'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_keyboard'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_keys_to_console'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_landscape'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_locale'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_lxd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_mcollective'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_mounts'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ntp'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_package_update_upgrade_install'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_phone_home'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_power_state_change'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_puppet'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_raspberry_pi'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_resizefs'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_resolv_conf'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_rh_subscription'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_rsyslog'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_runcmd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_salt_minion'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_scripts_vendor'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_seed_random'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_set_hostname'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_set_passwords'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_snap'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_spacewalk'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_authkey_fingerprints'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_import_id'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_timezone'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_drivers'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_pro'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_update_etc_hosts'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_update_hostname'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_users_groups'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_wireguard'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_write_files'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_yum_add_repo'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_zypper_add_repo'
-      - $ref: '#/components/schemas/CloudInit26_2.reporting_config'
-      - $ref: '#/components/schemas/CloudInit26_2.output_config'
       type: object
       properties:
         allow_public_ssh_keys: {}
@@ -3185,6 +3127,64 @@ components:
         yum_repos: {}
         zypper: {}
       additionalProperties: false
+      allOf:
+      - $ref: '#/components/schemas/CloudInit26_2.base_config'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ansible'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apk_configure'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_configure'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_pipelining'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_autoinstall'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_bootcmd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_byobu'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ca_certs'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_chef'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_disable_ec2_metadata'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_disk_setup'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_fan'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_final_message'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_growpart'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_grub_dpkg'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_install_hotplug'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_keyboard'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_keys_to_console'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_landscape'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_locale'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_lxd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_mcollective'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_mounts'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ntp'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_package_update_upgrade_install'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_phone_home'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_power_state_change'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_puppet'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_raspberry_pi'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_resizefs'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_resolv_conf'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_rh_subscription'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_rsyslog'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_runcmd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_salt_minion'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_scripts_vendor'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_seed_random'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_set_hostname'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_set_passwords'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_snap'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_spacewalk'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_authkey_fingerprints'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_import_id'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_timezone'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_drivers'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_pro'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_update_etc_hosts'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_update_hostname'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_users_groups'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_wireguard'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_write_files'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_yum_add_repo'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_zypper_add_repo'
+      - $ref: '#/components/schemas/CloudInit26_2.reporting_config'
+      - $ref: '#/components/schemas/CloudInit26_2.output_config'
     CloudInit26_2.all_modules:
       enum:
       - ansible
@@ -3286,15 +3286,7 @@ components:
       - zypper-add-repo
       - zypper_add_repo
     CloudInit26_2.ansible.pull:
-      additionalProperties: false
       type: object
-      oneOf:
-      - required:
-        - url
-        - playbook_name
-      - required:
-        - url
-        - playbook_names
       properties:
         accept_host_key:
           default: false
@@ -3354,8 +3346,15 @@ components:
         verify_commit:
           default: false
           type: boolean
+      oneOf:
+      - required:
+        - url
+        - playbook_name
+      - required:
+        - url
+        - playbook_names
+      additionalProperties: false
     CloudInit26_2.apt_configure.mirror:
-      minItems: 1
       type: array
       items:
         additionalProperties: false
@@ -3385,6 +3384,7 @@ components:
         required:
         - arches
         type: object
+      minItems: 1
     CloudInit26_2.base_config:
       properties:
         cloud_config_modules:
@@ -3409,6 +3409,7 @@ components:
     CloudInit26_2.ca_certs.properties:
       additionalProperties: false
       minProperties: 1
+      type: object
       properties:
         remove-defaults:
           deprecated: true
@@ -3425,7 +3426,6 @@ components:
             type: string
           minItems: 1
           type: array
-      type: object
     CloudInit26_2.cc_ansible:
       type: object
       properties:
@@ -3735,6 +3735,7 @@ components:
               type: string
           type: object
     CloudInit26_2.cc_apt_pipelining:
+      type: object
       properties:
         apt_pipelining:
           oneOf:
@@ -3750,9 +3751,7 @@ components:
               - none
               - unchanged
             type: string
-      type: object
     CloudInit26_2.cc_bootcmd:
-      type: object
       properties:
         bootcmd:
           additionalItems: false
@@ -3764,8 +3763,8 @@ components:
             - type: string
           minItems: 1
           type: array
-    CloudInit26_2.cc_byobu:
       type: object
+    CloudInit26_2.cc_byobu:
       properties:
         byobu_by_default:
           enum:
@@ -3778,6 +3777,7 @@ components:
           - user
           - system
           type: string
+      type: object
     CloudInit26_2.cc_ca_certs:
       properties:
         ca-certs:
@@ -3933,12 +3933,12 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_disable_ec2_metadata:
+      type: object
       properties:
         disable_ec2_metadata:
           default: false
           description: 'Set true to disable IPv4 routes to EC2 metadata. Default: ``false``.'
           type: boolean
-      type: object
     CloudInit26_2.cc_disk_setup:
       properties:
         device_aliases:
@@ -4052,11 +4052,11 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_final_message:
-      type: object
       properties:
         final_message:
           description: The message to display at the end of the run.
           type: string
+      type: object
     CloudInit26_2.cc_growpart:
       properties:
         growpart:
@@ -4131,7 +4131,6 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_install_hotplug:
-      type: object
       properties:
         updates:
           additionalProperties: false
@@ -4152,6 +4151,7 @@ components:
               - when
               type: object
           type: object
+      type: object
     CloudInit26_2.cc_keyboard:
       properties:
         keyboard:
@@ -4175,7 +4175,6 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_keys_to_console:
-      type: object
       properties:
         ssh:
           additionalProperties: false
@@ -4200,6 +4199,7 @@ components:
             type: string
           type: array
           uniqueItems: true
+      type: object
     CloudInit26_2.cc_landscape:
       type: object
       properties:
@@ -4268,7 +4268,6 @@ components:
           description: The file in which to write the locale configuration (defaults to the distro's default location).
           type: string
     CloudInit26_2.cc_lxd:
-      type: object
       properties:
         lxd:
           additionalProperties: false
@@ -4365,6 +4364,7 @@ components:
               description: 'Opaque LXD preseed YAML config passed via stdin to the command: lxd init --preseed. See: https://documentation.ubuntu.com/lxd/en/latest/howto/initialize/#non-interactive-configuration or lxd init --dump for viable config. Can not be combined with either **lxd.init** or **lxd.bridge**.'
               type: string
           type: object
+      type: object
     CloudInit26_2.cc_mcollective:
       properties:
         mcollective:
@@ -4714,7 +4714,6 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_raspberry_pi:
-      type: object
       properties:
         rpi:
           properties:
@@ -4753,6 +4752,7 @@ components:
                   type: boolean
               type: object
           type: object
+      type: object
     CloudInit26_2.cc_resizefs:
       type: object
       properties:
@@ -4967,6 +4967,7 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_runcmd:
+      type: object
       properties:
         runcmd:
           items:
@@ -4978,8 +4979,8 @@ components:
             - type: 'null'
           minItems: 1
           type: array
-      type: object
     CloudInit26_2.cc_salt_minion:
+      type: object
       properties:
         salt_minion:
           additionalProperties: false
@@ -5009,7 +5010,6 @@ components:
               description: 'Service name to enable. Default: ``salt-minion``.'
               type: string
           type: object
-      type: object
     CloudInit26_2.cc_scripts_vendor:
       properties:
         vendor_data:
@@ -5155,6 +5155,7 @@ components:
             type: string
       type: object
     CloudInit26_2.cc_snap:
+      type: object
       properties:
         snap:
           additionalProperties: false
@@ -5194,8 +5195,8 @@ components:
               - object
               - array
           type: object
-      type: object
     CloudInit26_2.cc_spacewalk:
+      type: object
       properties:
         spacewalk:
           additionalProperties: false
@@ -5210,7 +5211,6 @@ components:
               description: The Spacewalk server to use.
               type: string
           type: object
-      type: object
     CloudInit26_2.cc_ssh:
       type: object
       properties:
@@ -5301,8 +5301,8 @@ components:
           description: The timezone to use as represented in /usr/share/zoneinfo.
           type: string
     CloudInit26_2.cc_ubuntu_autoinstall:
-      additionalProperties: true
       type: object
+      additionalProperties: true
       properties:
         autoinstall:
           description: 'Cloud-init ignores this key and its values. It is used by Subiquity, the Ubuntu Autoinstaller. See: https://ubuntu.com/server/docs/install/autoinstall-reference.'
@@ -5313,6 +5313,7 @@ components:
           - version
           type: object
     CloudInit26_2.cc_ubuntu_drivers:
+      type: object
       properties:
         drivers:
           additionalProperties: false
@@ -5330,9 +5331,7 @@ components:
               - license-accepted
               type: object
           type: object
-      type: object
     CloudInit26_2.cc_ubuntu_pro:
-      type: object
       properties:
         ubuntu_advantage:
           $ref: '#/components/schemas/CloudInit26_2.ubuntu_pro.properties'
@@ -5341,8 +5340,8 @@ components:
           deprecated_version: '24.1'
         ubuntu_pro:
           $ref: '#/components/schemas/CloudInit26_2.ubuntu_pro.properties'
-    CloudInit26_2.cc_update_etc_hosts:
       type: object
+    CloudInit26_2.cc_update_etc_hosts:
       properties:
         fqdn:
           description: Optional fully qualified domain name to use when updating ``/etc/hosts``. Preferred over **hostname** if both are provided. In absence of **hostname** and **fqdn** in cloud-config, the ``local-hostname`` value will be used from datasource metadata.
@@ -5363,6 +5362,7 @@ components:
             changed_version: '22.3'
             enum:
             - template
+      type: object
     CloudInit26_2.cc_update_hostname:
       type: object
       properties:
@@ -5379,7 +5379,6 @@ components:
           description: 'Do not update system hostname when ``true``. Default: ``false``.'
           type: boolean
     CloudInit26_2.cc_users_groups:
-      type: object
       properties:
         groups:
           $ref: '#/components/schemas/CloudInit26_2.users_groups.groups_by_groupname'
@@ -5414,8 +5413,8 @@ components:
           - string
           - array
           - object
-    CloudInit26_2.cc_wireguard:
       type: object
+    CloudInit26_2.cc_wireguard:
       properties:
         wireguard:
           additionalProperties: false
@@ -5448,7 +5447,9 @@ components:
           type:
           - 'null'
           - object
+      type: object
     CloudInit26_2.cc_write_files:
+      type: object
       properties:
         write_files:
           items:
@@ -5512,8 +5513,8 @@ components:
             type: object
           minItems: 1
           type: array
-      type: object
     CloudInit26_2.cc_yum_add_repo:
+      type: object
       properties:
         yum_repo_dir:
           default: /etc/yum.repos.d
@@ -5564,9 +5565,7 @@ components:
                   type: string
               type: object
           type: object
-      type: object
     CloudInit26_2.cc_zypper_add_repo:
-      type: object
       properties:
         zypper:
           additionalProperties: true
@@ -5593,6 +5592,7 @@ components:
               minItems: 1
               type: array
           type: object
+      type: object
     CloudInit26_2.merge_definition:
       oneOf:
       - type: string
@@ -5626,20 +5626,18 @@ components:
         minItems: 1
         type: array
     CloudInit26_2.modules_definition:
-      type: array
       items:
         oneOf:
         - $ref: '#/components/schemas/CloudInit26_2.all_modules'
         - prefixItems:
-          - enum:
-              $ref: '#/components/schemas/CloudInit26_2.all_modules'
+          - $ref: '#/components/schemas/CloudInit26_2.all_modules'
           - enum:
             - always
             - once
             - once-per-instance
           type: array
+      type: array
     CloudInit26_2.output_config:
-      type: object
       properties:
         output:
           additionalProperties: false
@@ -5653,6 +5651,7 @@ components:
             init:
               $ref: '#/components/schemas/CloudInit26_2.output_log_operator'
           type: object
+      type: object
     CloudInit26_2.output_log_operator:
       oneOf:
       - description: 'A filepath operation configuration. This is a string containing a filepath and an optional leading operator: ''>'', ''>>'' or ''|''. Operators ''>'' and ''>>'' indicate whether to overwrite or append to the file. The operator ''|'' redirects content to the command arguments specified.'
@@ -5770,26 +5769,26 @@ components:
       description: The activation key to use. Must be used with **org**. Should not be used with **username** or **password**.
       type: string
     CloudInit26_2.rh_subscription_add_pool:
+      description: A list of pool IDs add to the subscription.
       items:
         type: string
-      description: A list of pool IDs add to the subscription.
       type: array
     CloudInit26_2.rh_subscription_auto_attach:
-      description: Whether to attach subscriptions automatically.
       type: boolean
+      description: Whether to attach subscriptions automatically.
     CloudInit26_2.rh_subscription_disable_repo:
+      description: A list of repositories to disable.
       items:
         type: string
-      description: A list of repositories to disable.
       type: array
     CloudInit26_2.rh_subscription_enable_repo:
-      description: A list of repositories to enable.
-      type: array
       items:
         type: string
+      type: array
+      description: A list of repositories to enable.
     CloudInit26_2.rh_subscription_rhsm_baseurl:
-      type: string
       description: Sets the baseurl in ``/etc/rhsm/rhsm.conf``.
+      type: string
     CloudInit26_2.rh_subscription_server_hostname:
       description: Sets the serverurl in ``/etc/rhsm/rhsm.conf``.
       type: string
@@ -5797,6 +5796,8 @@ components:
       description: The service level to use when subscribing to RH repositories. ``auto_attach`` must be true for this to be used.
       type: string
     CloudInit26_2.ubuntu_pro.properties:
+      type: object
+      additionalProperties: false
       properties:
         config:
           additionalProperties: true
@@ -5861,8 +5862,6 @@ components:
         token:
           description: Contract token obtained from https://ubuntu.com/pro to attach. Required for non-Pro instances.
           type: string
-      additionalProperties: false
-      type: object
     CloudInit26_2.users_groups.groups_by_groupname:
       additionalProperties: false
       patternProperties:
@@ -5876,12 +5875,6 @@ components:
           - string
           - array
     CloudInit26_2.users_groups.user:
-      additionalProperties: false
-      oneOf:
-      - required:
-        - name
-      - required:
-        - snapuser
       properties:
         create-groups:
           deprecated: true
@@ -6079,6 +6072,12 @@ components:
             changed_description: The use of ``string`` type is deprecated. Use an ``integer`` instead.
             changed_version: '22.3'
             type: string
+      oneOf:
+      - required:
+        - name
+      - required:
+        - snapuser
+      additionalProperties: false
     ClusterInfo:
       type: object
       description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.
@@ -12451,8 +12450,11 @@ components:
     VmCloudInitUserData:
       oneOf:
       - type: string
-        description: Verbatim user-data, including an empty string
+        description: Verbatim user-data, including an empty string. The daemon enforces a 65536-byte UTF-8 limit; maxLength bounds characters, so non-ASCII text may reach the byte limit sooner.
+        maxLength: 65536
       - $ref: '#/components/schemas/CloudInit26_2'
+      - type: 'null'
+        description: Restore generated User/Password/SshKey provisioning
       description: 'Complete cloud-init user-data: raw text or a cloud-config object. Replaces generated user setup; rendered UTF-8 is limited to 64 KiB. The upstream schema documents the object format; NanoCL does not validate guest module semantics.'
     VmHostConfig:
       type: object
@@ -12477,19 +12479,21 @@ components:
           - 'null'
           format: int64
           description: Maximum vCPU count reserved at boot; omitted uses Cpu and disables CPU growth.
-          minimum: 0
+          maximum: 255
+          minimum: 1
         MaxMemory:
           type:
           - integer
           - 'null'
           format: int64
           description: Maximum memory in MiB reserved at boot; omitted uses Memory and disables memory growth.
-          minimum: 0
+          maximum: 8796093022207
+          minimum: 1
         NetIface:
           type:
           - string
           - 'null'
-          description: 'Network interface of the vm to setup (default: ens3)'
+          description: 'Network interface of the vm to setup (default: nanocl0)'
         LinkNetIface:
           type:
           - string
@@ -12524,6 +12528,69 @@ components:
           - boolean
           - 'null'
           description: Use host tun device
+      additionalProperties: false
+    VmHostConfigUpdate:
+      type: object
+      description: |-
+        Host settings changed by PATCH. Omitted settings retain their current value;
+        explicit null clears optional settings.
+      properties:
+        Cpu:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        Memory:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        MaxCpu:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          maximum: 255
+          minimum: 1
+        MaxMemory:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          maximum: 8796093022207
+          minimum: 1
+        NetIface:
+          type:
+          - string
+          - 'null'
+        LinkNetIface:
+          type:
+          - string
+          - 'null'
+        Kvm:
+          type:
+          - boolean
+          - 'null'
+        Dns:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        Runtime:
+          type:
+          - string
+          - 'null'
+        NetworkMode:
+          type:
+          - string
+          - 'null'
+        HostTun:
+          type:
+          - boolean
+          - 'null'
       additionalProperties: false
     VmInspect:
       type: object
@@ -12725,14 +12792,12 @@ components:
           - 'null'
           description: 'Enable cloud-init provisioning (default: true for compatibility).'
         CloudInitUserData:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/VmCloudInitUserData'
-            description: |-
-              Complete cloud-init user-data as raw text or a cloud-config object.
-              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
-              NanoCL retains its instance ID and DHCP network configuration.
-              Stored but ignored when CloudInit is false.
+          $ref: '#/components/schemas/VmCloudInitUserData'
+          description: |-
+            Complete cloud-init user-data as raw text or a cloud-config object.
+            Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+            NanoCL retains its instance ID and DHCP network configuration.
+            Stored but ignored when CloudInit is false.
         Console:
           type:
           - boolean
@@ -12816,14 +12881,13 @@ components:
             Enable cloud-init provisioning (default: true for compatibility).
             Guest networking uses DHCP independently of this setting.
         CloudInitUserData:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/VmCloudInitUserData'
-            description: |-
-              Complete cloud-init user-data as raw text or a cloud-config object.
-              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
-              NanoCL retains its instance ID and DHCP network configuration.
-              Stored but ignored when CloudInit is false.
+          $ref: '#/components/schemas/VmCloudInitUserData'
+          description: |-
+            Complete cloud-init user-data as raw text or a cloud-config object.
+            Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+            NanoCL retains its instance ID and DHCP network configuration.
+            Stored but ignored when CloudInit is false.
+            Explicit null restores generated user setup; omission preserves existing data on apply.
         Console:
           type:
           - boolean
@@ -12904,14 +12968,13 @@ components:
           - 'null'
           description: Enable cloud-init provisioning; omitted preserves the current setting.
         CloudInitUserData:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/VmCloudInitUserData'
-            description: |-
-              Complete cloud-init user-data as raw text or a cloud-config object.
-              Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
-              Omitted or null preserves the current data; an empty string replaces it.
-              Stored but ignored when CloudInit is false.
+          $ref: '#/components/schemas/VmCloudInitUserData'
+          description: |-
+            Complete cloud-init user-data as raw text or a cloud-config object.
+            Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
+            Omitted preserves the current data; null restores generated user setup.
+            An empty string replaces the data with an empty document.
+            Stored but ignored when CloudInit is false.
         Console:
           type:
           - boolean
@@ -12936,7 +12999,7 @@ components:
         HostConfig:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/VmHostConfig'
+          - $ref: '#/components/schemas/VmHostConfigUpdate'
             description: A vm's resources (cpu, memory, network)
       additionalProperties: false
     VmSummary:

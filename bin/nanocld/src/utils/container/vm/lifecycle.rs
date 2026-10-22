@@ -1,5 +1,4 @@
 use std::{
-  os::unix::fs::{FileTypeExt, PermissionsExt},
   path::PathBuf,
   sync::{Arc, OnceLock},
   time::Duration,
@@ -151,15 +150,10 @@ pub(crate) fn socket_directory(
     .vm_key
     .parse::<nanocl_stubs::resource_key::ResourceKey>()
     .map_err(|_| conflict("Invalid VM resource key"))?;
-  let directory = PathBuf::from(state_dir)
+  let directory = std::fs::canonicalize(state_dir)?
     .join("run/vms")
     .join(key.to_string())
     .join(generation.to_string());
-  if !directory.is_absolute()
-    || directory.join("qmp.sock").as_os_str().len() >= 108
-  {
-    return Err(conflict("Invalid or excessively long VM socket directory"));
-  }
   let mounts = runtime.mounts.as_deref().unwrap_or_default();
   let mut matches = mounts
     .iter()
@@ -186,23 +180,8 @@ pub(super) async fn connect(
   deadline: Instant,
 ) -> IoResult<QmpClient> {
   let directory = socket_directory(vm, runtime, &state.inner.config.state_dir)?;
-  if tokio::fs::canonicalize(&directory).await? != directory {
-    return Err(conflict(
-      "VM socket directory must not redirect through symlinks",
-    ));
-  }
-  let metadata = tokio::fs::symlink_metadata(&directory).await?;
-  if !metadata.is_dir() || metadata.permissions().mode() & 0o077 != 0 {
-    return Err(conflict("VM socket directory must be private"));
-  }
-  let socket = directory.join("qmp.sock");
-  if !tokio::fs::symlink_metadata(&socket)
-    .await?
-    .file_type()
-    .is_socket()
-  {
-    return Err(conflict("VM QMP path must be a Unix socket"));
-  }
+  let (_socket_inode, socket) =
+    super::open_runtime_socket(&directory, "qmp.sock")?;
   QmpClient::connect(&socket, deadline).await
 }
 
@@ -417,16 +396,11 @@ async fn run_lifecycle(
     Err(err) => {
       // A timeout must not mark a live guest stopped or leave a stop request
       // queued for reconciliation to retry later without the operator.
-      restore_observed_status(&vm, state).await?;
-      state.emit_error_native_action(
-        &vm,
-        if restart {
-          NativeEventAction::Restart
-        } else {
-          NativeEventAction::Stop
-        },
-        Some(err.to_string()),
-      );
+      if let Err(restore_error) = restore_observed_status(&vm, state).await {
+        log::error!(
+          "Unable to restore VM {key} status after {err}: {restore_error}"
+        );
+      }
       return Err(err);
     }
   };
@@ -482,12 +456,11 @@ async fn run_lifecycle(
       ))
     });
     if let Err(err) = result {
-      restore_observed_status(&vm, state).await?;
-      state.emit_error_native_action(
-        &vm,
-        NativeEventAction::Restart,
-        Some(err.to_string()),
-      );
+      if let Err(restore_error) = restore_observed_status(&vm, state).await {
+        log::error!(
+          "Unable to restore VM {key} status after {err}: {restore_error}"
+        );
+      }
       return Err(err);
     }
     state
@@ -501,19 +474,21 @@ async fn run_lifecycle(
   Ok(())
 }
 
-async fn lifecycle(
+async fn begin_lifecycle(
   key: &str,
   options: &VmLifecycleOptions,
   restart: bool,
   expected_id: Option<&str>,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<tokio::sync::oneshot::Receiver<IoResult<()>>> {
   options
     .validate()
     .map_err(|err| IoError::invalid_input("VM shutdown", &err))?;
   let guard = lifecycle_lock(key)
     .try_lock_owned()
     .map_err(|_| conflict("A VM lifecycle operation is active"))?;
+  // Validate existence before an asynchronous process endpoint accepts work.
+  let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let key = key.to_owned();
   let options = options.clone();
   let state = state.clone();
@@ -526,11 +501,48 @@ async fn lifecycle(
     let result =
       run_lifecycle(&key, &options, restart, expected_id.as_deref(), &state)
         .await;
+    if let Err(error) = &result {
+      state.emit_error_native_action(
+        &vm,
+        if restart {
+          NativeEventAction::Restart
+        } else {
+          NativeEventAction::Stop
+        },
+        Some(error.to_string()),
+      );
+    }
     let _ = tx.send(result);
   });
+  Ok(rx)
+}
+
+async fn lifecycle(
+  key: &str,
+  options: &VmLifecycleOptions,
+  restart: bool,
+  expected_id: Option<&str>,
+  state: &SystemState,
+) -> IoResult<()> {
+  let rx = begin_lifecycle(key, options, restart, expected_id, state).await?;
   rx.await.map_err(|_| {
     IoError::interrupted("VM lifecycle", "Lifecycle task was interrupted")
   })?
+}
+
+/// Preserve the process API's asynchronous 202 contract. The owned task and
+/// lifecycle guard survive dropping the completion receiver.
+pub(crate) async fn enqueue_lifecycle(
+  key: &str,
+  expected_id: Option<&str>,
+  restart: bool,
+  state: &SystemState,
+) -> IoResult<()> {
+  drop(
+    begin_lifecycle(key, &Default::default(), restart, expected_id, state)
+      .await?,
+  );
+  Ok(())
 }
 
 pub(crate) async fn stop_with_options(
@@ -549,15 +561,6 @@ pub(crate) async fn restart_with_options(
   lifecycle(key, options, true, None, state).await
 }
 
-pub(crate) async fn control_process(
-  key: &str,
-  id: &str,
-  restart: bool,
-  state: &SystemState,
-) -> IoResult<()> {
-  lifecycle(key, &Default::default(), restart, Some(id), state).await
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -570,7 +573,7 @@ mod tests {
     let runtime = serde_json::from_value(serde_json::json!({
       "Id":"immutable-id", "Name":"/global.test.v", "State":{"Running":true},
       "Config":{"Labels":{"io.nanocl.v":"global.test","io.nanocl.n":"global","io.nanocl.vm-spec":generation.to_string(),"io.nanocl.vm-qmp":"1"}},
-      "Mounts":[{"Type":"bind","Source":format!("/state/run/vms/global.test/{generation}"),"Destination":"/run/nanocl-vm","RW":true}]
+      "Mounts":[{"Type":"bind","Source":format!("/run/vms/global.test/{generation}"),"Destination":"/run/nanocl-vm","RW":true}]
     })).unwrap();
     (vm, runtime)
   }
@@ -580,9 +583,9 @@ mod tests {
     let (mut vm, runtime) = fixture();
     vm.spec.key = uuid::Uuid::new_v4();
     assert_eq!(
-      socket_directory(&vm, &runtime, "/state").unwrap(),
+      socket_directory(&vm, &runtime, "/").unwrap(),
       PathBuf::from(
-        "/state/run/vms/global.test/00000000-0000-0000-0000-000000000000"
+        "/run/vms/global.test/00000000-0000-0000-0000-000000000000"
       )
     );
     for (field, value) in [
@@ -600,19 +603,15 @@ mod tests {
         .as_mut()
         .unwrap()
         .insert(field.into(), value.into());
-      assert!(
-        socket_directory(&vm, &changed, "/state").is_err(),
-        "{field}"
-      );
+      assert!(socket_directory(&vm, &changed, "/").is_err(), "{field}");
     }
     let mut changed = runtime.clone();
-    changed.mounts.as_mut().unwrap()[0].source = Some(
-      "/state/run/vms/global.other/00000000-0000-0000-0000-000000000000".into(),
-    );
-    assert!(socket_directory(&vm, &changed, "/state").is_err());
+    changed.mounts.as_mut().unwrap()[0].source =
+      Some("/run/vms/global.other/00000000-0000-0000-0000-000000000000".into());
+    assert!(socket_directory(&vm, &changed, "/").is_err());
     changed = runtime.clone();
     changed.mounts.as_mut().unwrap()[0].rw = Some(false);
-    assert!(socket_directory(&vm, &changed, "/state").is_err());
+    assert!(socket_directory(&vm, &changed, "/").is_err());
     assert!(socket_directory(&vm, &runtime, "relative").is_err());
   }
 

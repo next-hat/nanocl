@@ -8,7 +8,6 @@ use nanocl_stubs::{
   system::{
     EventActorKind, NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
   },
-  vm::VmLifecycleOptions,
 };
 
 use crate::{
@@ -121,13 +120,9 @@ pub async fn restart_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   if kind == ProcessKind::Vm {
-    utils::container::vm::restart_with_options(
-      &key,
-      &VmLifecycleOptions::default(),
-      state,
-    )
-    .await
-    .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+    utils::container::vm::enqueue_lifecycle(&key, None, true, state)
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
   } else if kind == ProcessKind::Cargo {
     enqueue_cargo_restart(&key, &state).await?;
   } else {
@@ -164,7 +159,7 @@ pub async fn restart_process(
       .id
       .as_deref()
       .ok_or_else(|| HttpError::conflict("VM runtime has no container ID"))?;
-    utils::container::vm::control_process(&key, id, true, state)
+    utils::container::vm::enqueue_lifecycle(&key, Some(id), true, state)
       .await
       .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
     return Ok(web::HttpResponse::Accepted().build());

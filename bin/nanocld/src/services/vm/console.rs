@@ -80,7 +80,7 @@ fn console_input(frame: ws::Frame) -> HttpResult<Bytes> {
 }
 
 async fn relay_console<S, F, Fut>(
-  mut stream: S,
+  stream: S,
   mut input: mpsc::Receiver<Bytes>,
   send: F,
 ) -> io::Result<()>
@@ -89,32 +89,26 @@ where
   F: Fn(Bytes) -> Fut,
   Fut: std::future::Future<Output = io::Result<()>>,
 {
-  let mut buffer = [0u8; 16 * 1024];
-  loop {
-    let next = {
-      let read = stream.read(&mut buffer);
-      let receive = input.recv();
-      futures::pin_mut!(read, receive);
-      match select(read, receive).await {
-        Either::Left((result, _)) => Either::Left(result),
-        Either::Right((message, _)) => Either::Right(message),
+  let (mut reader, mut writer) = tokio::io::split(stream);
+  let output = async {
+    let mut buffer = [0u8; 16 * 1024];
+    loop {
+      let count = reader.read(&mut buffer).await?;
+      if count == 0 {
+        return Ok(());
       }
-    };
-    match next {
-      Either::Left(result) => {
-        let count = result?;
-        if count == 0 {
-          return Ok(());
-        }
-        send(Bytes::copy_from_slice(&buffer[..count])).await?;
-      }
-      Either::Right(message) => {
-        let Some(message) = message else {
-          return Ok(());
-        };
-        stream.write_all(&message).await?;
-      }
+      send(Bytes::copy_from_slice(&buffer[..count])).await?;
     }
+  };
+  let input = async {
+    while let Some(bytes) = input.recv().await {
+      writer.write_all(&bytes).await?;
+    }
+    Ok(())
+  };
+  futures::pin_mut!(output, input);
+  match select(output, input).await {
+    Either::Left((result, _)) | Either::Right((result, _)) => result,
   }
 }
 
@@ -177,16 +171,12 @@ fn console_service(
         }
         frame => match console_input(frame) {
           Ok(bytes) => {
-            if input_tx.try_send(bytes).is_err() {
+            if input_tx.send(bytes).await.is_err() {
               if let Some(stop) = stop_tx.borrow_mut().take() {
                 let _ = stop.send(());
               }
               Ok(Some(ws::Message::Close(Some(
-                (
-                  ws::CloseCode::Policy,
-                  "Console input queue is full or closed",
-                )
-                  .into(),
+                (ws::CloseCode::Policy, "Console input is closed").into(),
               ))))
             } else {
               Ok(None)
@@ -249,6 +239,16 @@ fn console_service(
     })
 }
 
+fn console_inspect_error(error: bollard_next::errors::Error) -> HttpError {
+  match error {
+    bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    } => HttpError::conflict("VM runtime is not ready"),
+    error => error.into(),
+  }
+}
+
 /// Open a VM's graphical console using binary RFB over WebSocket.
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
@@ -293,19 +293,22 @@ pub async fn console_vm(
     .inner
     .docker_api
     .inspect_container(&process.key, None)
-    .await?;
+    .await
+    .map_err(console_inspect_error)?;
   let mut boot_vm = vm.clone();
   boot_vm.spec = utils::container::vm::validate_boot_spec(&vm, &runtime, state)
     .await
     .map_err(super::lifecycle::lifecycle_error)?;
   validate_runtime(&boot_vm, process, &runtime, &state.inner.config.hostname)?;
-  let socket = utils::container::vm::socket_directory(
+  let directory = utils::container::vm::socket_directory(
     &vm,
     &runtime,
     &state.inner.config.state_dir,
   )
-  .map_err(super::lifecycle::lifecycle_error)?
-  .join("console.sock");
+  .map_err(super::lifecycle::lifecycle_error)?;
+  let (_socket, socket) =
+    utils::container::vm::open_runtime_socket(&directory, "console.sock")
+      .map_err(|_| HttpError::conflict("VM console is not ready"))?;
   let stream = UnixStream::connect(socket)
     .await
     .map_err(|_| HttpError::conflict("VM console is not ready"))?;
@@ -319,6 +322,66 @@ pub async fn console_vm(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn console_missing_runtime_is_conflict_and_preserves_other_docker_errors() {
+    for (code, expected) in [(404, 409), (500, 500), (403, 403)] {
+      let error = console_inspect_error(
+        bollard_next::errors::Error::DockerResponseServerError {
+          status_code: code,
+          message: "Docker error".into(),
+        },
+      );
+      assert_eq!(error.status.as_u16(), expected);
+    }
+  }
+
+  #[ntex::test]
+  async fn console_input_bursts_continue_while_output_is_blocked() {
+    let (backend, mut guest) = tokio::io::duplex(64);
+    let (input_tx, input_rx) = mpsc::channel(8);
+    let (stop_tx, stop_rx) = oneshot::channel();
+    let (entered_tx, entered_rx) = oneshot::channel();
+    let entered_tx = Rc::new(RefCell::new(Some(entered_tx)));
+    let task = rt::spawn(cancellable_relay(
+      backend,
+      input_rx,
+      move |_| {
+        if let Some(tx) = entered_tx.borrow_mut().take() {
+          let _ = tx.send(());
+        }
+        std::future::pending::<io::Result<()>>()
+      },
+      stop_rx,
+    ));
+    guest.write_all(b"framebuffer update").await.unwrap();
+    ntex::time::timeout(std::time::Duration::from_secs(1), entered_rx)
+      .await
+      .unwrap()
+      .unwrap();
+    // More than one queue's capacity, preserving every input byte in order.
+    let sender = rt::spawn(async move {
+      for value in 0..24u8 {
+        input_tx
+          .send(Bytes::copy_from_slice(&[value]))
+          .await
+          .unwrap();
+      }
+      input_tx
+    });
+    let mut received = [0; 24];
+    ntex::time::timeout(
+      std::time::Duration::from_secs(1),
+      guest.read_exact(&mut received),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(received, std::array::from_fn(|index| index as u8));
+    let _sender = sender.await.unwrap();
+    stop_tx.send(()).unwrap();
+    assert!(task.await.unwrap().is_none());
+  }
 
   #[ntex::test]
   async fn console_http_requests_reach_vm_key_validation() {

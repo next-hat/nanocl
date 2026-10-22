@@ -201,7 +201,12 @@ mod tests {
         "{path}"
       );
     }
-    for name in ["VmResizeOptions", "VmResources", "VmHostConfig"] {
+    for name in [
+      "VmResizeOptions",
+      "VmResources",
+      "VmHostConfig",
+      "VmHostConfigUpdate",
+    ] {
       assert_eq!(
         checked_in["components"]["schemas"][name],
         generated["components"]["schemas"][name],
@@ -230,6 +235,17 @@ mod tests {
           .any(|item| item == field)
       );
     }
+    assert_eq!(
+      find_schema_reference(
+        &generated["components"]["schemas"]["VmSpecUpdate"]["properties"]["HostConfig"]
+      ),
+      Some("#/components/schemas/VmHostConfigUpdate")
+    );
+    assert!(
+      generated["components"]["schemas"]["VmHostConfigUpdate"]["required"]
+        .as_array()
+        .is_none_or(Vec::is_empty)
+    );
   }
 
   #[test]
@@ -399,10 +415,13 @@ mod tests {
 
   #[test]
   fn checked_in_swagger_matches_generated_openapi() {
-    let generated = generated_openapi_yaml();
+    // Schema extension maps do not guarantee YAML key order. Compare every
+    // value in the parsed document while preserving array order and types.
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
     assert_eq!(
-      generated,
-      include_str!("../../specs/swagger.yaml"),
+      generated, checked_in,
       "run the ignored regenerate_checked_in_swagger test"
     );
   }

@@ -7,12 +7,21 @@
 - SHA-256: `a2923d8886201b5478683cf9c6118a00d5603f36d69f8ad899c5b7909c807d63`
 - Copyright Canonical Ltd.; distributed here under the Apache License 2.0
   option in the accompanying, unchanged upstream `LICENSE-cloud-init` notice.
-  The Apache License text is in the repository's `LICENSE-APACHE`.
+  The full Apache License text is in the package-local [LICENSE-APACHE](LICENSE-APACHE),
+  so published `nanocl_stubs` archives include both the upstream attribution and
+  the selected license. The upstream notice also offers GPLv3; that alternative
+  is not the license selected for this bundled copy. This third-party asset is
+  not covered by NanoCL's MIT option.
 
 `vm_spec.rs` registers the root as `CloudInit26_2` and the upstream `$defs`
 as `CloudInit26_2.<name>`, rewriting references to the containing document's
 local schema definitions. It removes the embedded `$schema` declaration and
 adds `type: object` to the root to match NanoCL's structured user-data type.
+The export also corrects one invalid upstream wrapper at
+`$defs.modules_definition.items.oneOf[1].prefixItems[0]`: it replaces
+`{"enum":{"$ref":"#/$defs/all_modules"}}` with a direct `$ref` to the same
+module-name enum. JSON Schema requires an array for `enum`; this correction
+retains the upstream module-name constraints. The bundled JSON remains unchanged.
 All other upstream keywords are preserved, including nested validation rules.
 OpenAPI uses local component references so NanoCL's documentation and VS Code
 Statefile consumers work without fetching external schemas.

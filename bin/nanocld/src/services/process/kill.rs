@@ -7,10 +7,16 @@ use crate::models::SystemState;
 
 fn lock_vm_signal(
   runtime: &bollard_next::service::ContainerInspectResponse,
+  signal: &str,
 ) -> HttpResult<Option<tokio::sync::OwnedMutexGuard<()>>> {
   let Some(key) = super::managed_vm_runtime_key(runtime, false)? else {
     return Ok(None);
   };
+  // An explicit hard kill is the operator's escape hatch when a guest ignores
+  // ACPI. It targets the inspected immutable ID, even while shutdown waits.
+  if matches!(signal, "SIGKILL" | "KILL" | "9") {
+    return Ok(None);
+  }
   crate::utils::container::vm::lifecycle_lock(&key)
     .try_lock_owned()
     .map(Some)
@@ -46,7 +52,7 @@ pub async fn kill_process(
     .id
     .as_deref()
     .ok_or_else(|| HttpError::conflict("Process has no container identity"))?;
-  let _guard = lock_vm_signal(&runtime)?;
+  let _guard = lock_vm_signal(&runtime, &payload.signal)?;
   state
     .inner
     .docker_api
@@ -64,7 +70,7 @@ mod tests {
   use bollard_next::service::{ContainerConfig, ContainerInspectResponse};
 
   #[test]
-  fn vm_signals_share_lifecycle_lock_and_leave_other_processes_unchanged() {
+  fn vm_signals_coordinate_but_hard_kill_remains_available_during_shutdown() {
     let mut runtime = ContainerInspectResponse {
       name: Some("/global.signal-lock.v".into()),
       config: Some(ContainerConfig {
@@ -76,24 +82,39 @@ mod tests {
       }),
       ..Default::default()
     };
-    let guard = super::lock_vm_signal(&runtime).unwrap().unwrap();
-    assert!(super::lock_vm_signal(&runtime).is_err());
+    let guard = super::lock_vm_signal(&runtime, "SIGTERM").unwrap().unwrap();
+    assert!(super::lock_vm_signal(&runtime, "SIGTERM").is_err());
+    for signal in ["SIGKILL", "KILL", "9"] {
+      assert!(super::lock_vm_signal(&runtime, signal).unwrap().is_none());
+    }
     assert!(
       crate::utils::container::vm::lifecycle_lock("global.signal-lock")
         .try_lock_owned()
         .is_err()
     );
     drop(guard);
-    assert!(super::lock_vm_signal(&runtime).unwrap().is_some());
+    assert!(
+      super::lock_vm_signal(&runtime, "SIGTERM")
+        .unwrap()
+        .is_some()
+    );
 
     runtime.name = Some("/global.other.v".into());
-    assert!(super::lock_vm_signal(&runtime).is_err());
+    assert!(super::lock_vm_signal(&runtime, "SIGKILL").is_err());
     runtime.config.as_mut().unwrap().labels = Some(HashMap::new());
-    assert!(super::lock_vm_signal(&runtime).unwrap().is_none());
+    assert!(
+      super::lock_vm_signal(&runtime, "SIGTERM")
+        .unwrap()
+        .is_none()
+    );
     runtime.config.as_mut().unwrap().labels = Some(HashMap::from([(
       "io.nanocl.init-v".into(),
       "global.signal-lock".into(),
     )]));
-    assert!(super::lock_vm_signal(&runtime).unwrap().is_none());
+    assert!(
+      super::lock_vm_signal(&runtime, "SIGTERM")
+        .unwrap()
+        .is_none()
+    );
   }
 }

@@ -44,19 +44,17 @@ fn insert_nanocl_group(
   }
 }
 
-fn preserve_vm_identity(
-  desired: &mut VmSpecPartial,
+fn vm_spec_for_comparison(
+  desired: &VmSpecPartial,
   current: &VmSpecPartial,
-) -> IoResult<()> {
-  if let (Some(desired), Some(current)) =
-    (&desired.mac_address, &current.mac_address)
-    && !desired.eq_ignore_ascii_case(current)
-  {
-    return Err(IoError::invalid_input(
-      "state apply",
-      "MacAddress is immutable; create a new VM to use another address",
-    ));
-  }
+) -> IoResult<VmSpecPartial> {
+  utils::state_diff::validate_vm_identity(
+    desired.mac_address.as_deref(),
+    current.mac_address.as_deref(),
+  )?;
+  // Resolve omitted values only for comparison. PATCH must retain omissions
+  // so a concurrent change after this inspect is not overwritten.
+  let mut desired = desired.clone();
   desired.mac_address =
     current.mac_address.clone().or(desired.mac_address.clone());
   desired.cloud_init = desired.cloud_init.or(current.cloud_init);
@@ -65,7 +63,13 @@ fn preserve_vm_identity(
     .clone()
     .or_else(|| current.cloud_init_user_data.clone());
   desired.console = desired.console.or(current.console);
-  Ok(())
+  if matches!(
+    desired.cloud_init_user_data,
+    Some(nanocld_client::stubs::vm_spec::VmCloudInitUserData::Reset)
+  ) {
+    desired.cloud_init_user_data = None;
+  }
+  Ok(desired)
 }
 
 #[cfg(test)]
@@ -91,20 +95,45 @@ mod tests {
       image: current.image.clone(),
       ..Default::default()
     };
-    preserve_vm_identity(&mut desired, &current).unwrap();
-    assert_eq!(desired, current);
+    assert_eq!(vm_spec_for_comparison(&desired, &current).unwrap(), current);
+    let payload =
+      serde_json::to_value(VmSpecUpdate::from(desired.clone())).unwrap();
+    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
+      assert!(payload.get(field).is_none(), "{field} must remain omitted");
+    }
     desired.console = Some(false);
     desired.cloud_init_user_data = Some(String::new().into());
-    preserve_vm_identity(&mut desired, &current).unwrap();
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert_eq!(comparison.console, Some(false));
+    assert_eq!(comparison.cloud_init_user_data, Some(String::new().into()));
     assert_eq!(desired.console, Some(false));
     assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
     desired.mac_address = Some("02:00:00:00:00:02".to_owned());
-    assert!(preserve_vm_identity(&mut desired, &current).is_err());
+    assert!(vm_spec_for_comparison(&desired, &current).is_err());
     let mut legacy = current.clone();
     legacy.mac_address = None;
-    preserve_vm_identity(&mut desired, &legacy).unwrap();
+    vm_spec_for_comparison(&desired, &legacy).unwrap();
     let update = VmSpecUpdate::from(desired);
     assert_eq!(update.mac_address.as_deref(), Some("02:00:00:00:00:02"));
+  }
+
+  #[test]
+  fn vm_state_apply_explicit_null_clears_user_data_without_mutating_payload() {
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: "/vm.qcow2".into(),
+      cloud_init_user_data: Some("#cloud-config\n".to_owned().into()),
+      ..Default::default()
+    };
+    let desired: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "guest", "Image": "/vm.qcow2", "CloudInitUserData": null,
+    }))
+    .unwrap();
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert!(comparison.cloud_init_user_data.is_none());
+    assert_ne!(comparison, current);
+    let payload = serde_json::to_value(VmSpecUpdate::from(desired)).unwrap();
+    assert_eq!(payload.get("CloudInitUserData"), Some(&Value::Null));
   }
 }
 
@@ -321,8 +350,8 @@ async fn state_apply(
               }
               Ok(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
-                preserve_vm_identity(&mut vm, &cmp)?;
-                if (cmp != vm) || opts.reload {
+                let comparison = vm_spec_for_comparison(&vm, &cmp)?;
+                if (cmp != comparison) || opts.reload {
                   let update: VmSpecUpdate = vm.clone().into();
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,

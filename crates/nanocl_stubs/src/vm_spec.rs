@@ -22,12 +22,25 @@ const CLOUD_INIT_SCHEMA_NAME: &str = "CloudInit26_2";
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum VmCloudInitUserData {
+  /// Explicit null restores generated user setup. Omitted PATCH data is retained.
+  Reset,
   /// Verbatim user-data, including shell scripts and multipart documents.
   Raw(String),
   /// Cloud-config keys as defined by the pinned upstream schema. NanoCL
   /// renders this object with a #cloud-config header; the guest cloud-init
   /// version determines which modules and values it supports.
   CloudConfig(BTreeMap<String, serde_json::Value>),
+}
+
+#[cfg(feature = "serde")]
+fn deserialize_optional_update<'de, D, T>(
+  deserializer: D,
+) -> Result<Option<T>, D::Error>
+where
+  D: serde::Deserializer<'de>,
+  T: Deserialize<'de>,
+{
+  T::deserialize(deserializer).map(Some)
 }
 
 impl From<String> for VmCloudInitUserData {
@@ -41,8 +54,9 @@ fn cloud_init_user_data_schema(reference_prefix: &str) -> serde_json::Value {
   serde_json::json!({
     "description": "Complete cloud-init user-data: raw text or a cloud-config object. Replaces generated user setup; rendered UTF-8 is limited to 64 KiB. The upstream schema documents the object format; NanoCL does not validate guest module semantics.",
     "oneOf": [
-      {"type": "string", "description": "Verbatim user-data, including an empty string"},
-      {"$ref": format!("{reference_prefix}{CLOUD_INIT_SCHEMA_NAME}")}
+      {"type": "string", "maxLength": 65536, "description": "Verbatim user-data, including an empty string. The daemon enforces a 65536-byte UTF-8 limit; maxLength bounds characters, so non-ASCII text may reach the byte limit sooner."},
+      {"$ref": format!("{reference_prefix}{CLOUD_INIT_SCHEMA_NAME}")},
+      {"type": "null", "description": "Restore generated User/Password/SshKey provisioning"}
     ]
   })
 }
@@ -78,6 +92,17 @@ fn cloud_init_schema_components(
   let mut root: serde_json::Value =
     serde_json::from_str(include_str!("../schemas/cloud-init-26.2.json"))
       .expect("the bundled upstream cloud-init schema must be valid JSON");
+  // The pinned upstream module tuple wraps a schema reference in `enum`,
+  // whose value must be an array. Refer directly to the existing enum schema.
+  // Keep the bundled upstream file unchanged for provenance and licensing.
+  let module = root
+    .pointer_mut("/$defs/modules_definition/items/oneOf/1/prefixItems/0")
+    .expect("the pinned cloud-init module tuple exists");
+  assert_eq!(
+    module,
+    &serde_json::json!({"enum": {"$ref": "#/$defs/all_modules"}})
+  );
+  *module = serde_json::json!({"$ref": "#/$defs/all_modules"});
   let object = root
     .as_object_mut()
     .expect("cloud-init schema is an object");
@@ -177,6 +202,8 @@ pub struct VmHostConfig {
   /// Memory of the vm in MB (default: 512)
   pub memory: u64,
   /// Maximum vCPU count reserved at boot; omitted uses Cpu and disables CPU growth.
+  #[cfg_attr(feature = "utoipa", schema(minimum = 1, maximum = 255))]
+  #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 255)))]
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -184,11 +211,19 @@ pub struct VmHostConfig {
   pub max_cpu: Option<u64>,
   /// Maximum memory in MiB reserved at boot; omitted uses Memory and disables memory growth.
   #[cfg_attr(
+    feature = "utoipa",
+    schema(minimum = 1, maximum = 8796093022207_u64)
+  )]
+  #[cfg_attr(
+    feature = "schemars",
+    schemars(range(min = 1, max = 8796093022207_u64))
+  )]
+  #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub max_memory: Option<u64>,
-  /// Network interface of the vm to setup (default: ens3)
+  /// Network interface of the vm to setup (default: nanocl0)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -255,6 +290,170 @@ impl Default for VmHostConfig {
   }
 }
 
+/// Host settings changed by PATCH. Omitted settings retain their current value;
+/// explicit null clears optional settings.
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct VmHostConfigUpdate {
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cpu: Option<u64>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub memory: Option<u64>,
+  #[cfg_attr(feature = "utoipa", schema(minimum = 1, maximum = 255))]
+  #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 255)))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub max_cpu: Option<Option<u64>>,
+  #[cfg_attr(
+    feature = "utoipa",
+    schema(minimum = 1, maximum = 8796093022207u64)
+  )]
+  #[cfg_attr(
+    feature = "schemars",
+    schemars(range(min = 1, max = 8796093022207u64))
+  )]
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub max_memory: Option<Option<u64>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub net_iface: Option<Option<String>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub link_net_iface: Option<Option<String>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub kvm: Option<Option<bool>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub dns: Option<Option<Vec<String>>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub runtime: Option<Option<String>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      rename = "NetworkMode",
+      alias = "RuntimeNetwork",
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub runtime_network: Option<Option<String>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  pub host_tun: Option<Option<bool>>,
+}
+
+impl VmHostConfigUpdate {
+  pub fn apply_to(&self, current: &VmHostConfig) -> VmHostConfig {
+    VmHostConfig {
+      cpu: self.cpu.unwrap_or(current.cpu),
+      memory: self.memory.unwrap_or(current.memory),
+      max_cpu: self.max_cpu.unwrap_or(current.max_cpu),
+      max_memory: self.max_memory.unwrap_or(current.max_memory),
+      net_iface: self
+        .net_iface
+        .clone()
+        .unwrap_or_else(|| current.net_iface.clone()),
+      link_net_iface: self
+        .link_net_iface
+        .clone()
+        .unwrap_or_else(|| current.link_net_iface.clone()),
+      kvm: self.kvm.unwrap_or(current.kvm),
+      dns: self.dns.clone().unwrap_or_else(|| current.dns.clone()),
+      runtime: self
+        .runtime
+        .clone()
+        .unwrap_or_else(|| current.runtime.clone()),
+      runtime_network: self
+        .runtime_network
+        .clone()
+        .unwrap_or_else(|| current.runtime_network.clone()),
+      host_tun: self.host_tun.unwrap_or(current.host_tun),
+    }
+  }
+}
+
+impl From<VmHostConfig> for VmHostConfigUpdate {
+  fn from(value: VmHostConfig) -> Self {
+    Self {
+      cpu: Some(value.cpu),
+      memory: Some(value.memory),
+      max_cpu: Some(value.max_cpu),
+      max_memory: Some(value.max_memory),
+      net_iface: Some(value.net_iface),
+      link_net_iface: Some(value.link_net_iface),
+      kvm: Some(value.kvm),
+      dns: Some(value.dns),
+      runtime: Some(value.runtime),
+      runtime_network: Some(value.runtime_network),
+      host_tun: Some(value.host_tun),
+    }
+  }
+}
+
 /// A vm spec partial is used to create a vm
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -317,9 +516,15 @@ pub struct VmSpecPartial {
   /// Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
   /// NanoCL retains its instance ID and DHCP network configuration.
   /// Stored but ignored when CloudInit is false.
+  /// Explicit null restores generated user setup; omission preserves existing data on apply.
+  #[cfg_attr(feature = "utoipa", schema(nullable = false))]
   #[cfg_attr(
     feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
   )]
   pub cloud_init_user_data: Option<VmCloudInitUserData>,
   /// Enable the authenticated browser console (default: false).
@@ -416,11 +621,17 @@ pub struct VmSpecUpdate {
   pub cloud_init: Option<bool>,
   /// Complete cloud-init user-data as raw text or a cloud-config object.
   /// Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
-  /// Omitted or null preserves the current data; an empty string replaces it.
+  /// Omitted preserves the current data; null restores generated user setup.
+  /// An empty string replaces the data with an empty document.
   /// Stored but ignored when CloudInit is false.
+  #[cfg_attr(feature = "utoipa", schema(nullable = false))]
   #[cfg_attr(
     feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
+    serde(
+      default,
+      deserialize_with = "deserialize_optional_update",
+      skip_serializing_if = "Option::is_none"
+    )
   )]
   pub cloud_init_user_data: Option<VmCloudInitUserData>,
   /// Enable the authenticated browser console; omitted preserves the setting.
@@ -447,7 +658,7 @@ pub struct VmSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub host_config: Option<VmHostConfig>,
+  pub host_config: Option<VmHostConfigUpdate>,
 }
 
 impl From<VmSpecPartial> for VmSpecUpdate {
@@ -457,7 +668,7 @@ impl From<VmSpecPartial> for VmSpecUpdate {
       hostname: spec.hostname,
       user: spec.user,
       labels: spec.labels,
-      host_config: spec.host_config,
+      host_config: spec.host_config.map(Into::into),
       password: spec.password,
       ssh_key: spec.ssh_key,
       init_container: spec.init_container,
@@ -530,6 +741,7 @@ pub struct VmSpec {
   /// Replaces generated user setup; rendered UTF-8 is limited to 64 KiB.
   /// NanoCL retains its instance ID and DHCP network configuration.
   /// Stored but ignored when CloudInit is false.
+  #[cfg_attr(feature = "utoipa", schema(nullable = false))]
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -572,7 +784,7 @@ impl From<VmSpec> for VmSpecUpdate {
       hostname: spec.hostname,
       user: spec.user,
       labels: spec.labels,
-      host_config: Some(spec.host_config),
+      host_config: Some(spec.host_config.into()),
       password: spec.password,
       ssh_key: spec.ssh_key,
       init_container: spec.init_container,
@@ -609,6 +821,77 @@ impl From<VmSpec> for VmSpecPartial {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vm_host_patch_is_sparse_and_merges_with_latest_settings() {
+    let patch: VmSpecUpdate = serde_json::from_value(serde_json::json!({
+      "HostConfig": {"Cpu": 4},
+    }))
+    .unwrap();
+    let latest = VmHostConfig {
+      cpu: 2,
+      memory: 4096,
+      max_cpu: Some(8),
+      max_memory: Some(8192),
+      runtime: Some("local/runtime:candidate".into()),
+      runtime_network: Some("private-vms".into()),
+      ..Default::default()
+    };
+    let mut expected = latest.clone();
+    expected.cpu = 4;
+    assert_eq!(
+      patch.host_config.as_ref().unwrap().apply_to(&latest),
+      expected
+    );
+    assert_eq!(
+      serde_json::to_value(patch).unwrap(),
+      serde_json::json!({"HostConfig": {"Cpu": 4}})
+    );
+    let clear: VmHostConfigUpdate = serde_json::from_value(serde_json::json!({
+      "MaxCpu": null, "MaxMemory": null, "Runtime": null, "NetworkMode": null,
+    }))
+    .unwrap();
+    let cleared = clear.apply_to(&latest);
+    assert_eq!(cleared.cpu, latest.cpu);
+    assert_eq!(cleared.memory, latest.memory);
+    assert!(cleared.max_cpu.is_none());
+    assert!(cleared.max_memory.is_none());
+    assert!(cleared.runtime.is_none());
+    assert!(cleared.runtime_network.is_none());
+    let full = VmHostConfigUpdate::from(VmHostConfig::default());
+    let encoded = serde_json::to_value(&full).unwrap();
+    assert_eq!(encoded.get("Runtime"), Some(&serde_json::Value::Null));
+    let decoded: VmHostConfigUpdate = serde_json::from_value(encoded).unwrap();
+    assert_eq!(decoded.apply_to(&latest), VmHostConfig::default());
+  }
+
+  #[test]
+  fn vm_cloud_init_null_and_omission_roundtrip() {
+    let state: crate::statefile::Statefile = serde_yaml::from_str(
+      "ApiVersion: v0.19.0\nVirtualMachines:\n- Name: guest\n  Image: /vm.qcow2\n  CloudInitUserData: null\n",
+    ).unwrap();
+    let partial = state.virtual_machines.unwrap().remove(0);
+    assert_eq!(
+      partial.cloud_init_user_data,
+      Some(VmCloudInitUserData::Reset)
+    );
+    let update = VmSpecUpdate::from(partial);
+    assert_eq!(
+      serde_json::to_value(update)
+        .unwrap()
+        .get("CloudInitUserData"),
+      Some(&serde_json::Value::Null)
+    );
+    let omitted: VmSpecUpdate =
+      serde_json::from_value(serde_json::json!({})).unwrap();
+    assert!(omitted.cloud_init_user_data.is_none());
+    assert!(
+      serde_json::to_value(omitted)
+        .unwrap()
+        .get("CloudInitUserData")
+        .is_none()
+    );
+  }
 
   #[test]
   fn vm_host_config_resize_limits_preserve_legacy_defaults_and_wire_values() {
@@ -717,7 +1000,11 @@ mod tests {
       "CloudInitUserData": null
     }))
     .unwrap();
-    assert_eq!(null.cloud_init_user_data, None);
+    assert_eq!(null.cloud_init_user_data, Some(VmCloudInitUserData::Reset));
+    assert_eq!(
+      serde_json::to_value(null).unwrap()["CloudInitUserData"],
+      serde_json::Value::Null
+    );
   }
 
   #[test]
@@ -756,17 +1043,72 @@ mod tests {
 
   #[cfg(feature = "utoipa")]
   #[test]
+  fn vm_cloud_init_openapi_fields_reuse_the_nullable_union() {
+    for schema in [
+      <VmSpecPartial as utoipa::PartialSchema>::schema(),
+      <VmSpecUpdate as utoipa::PartialSchema>::schema(),
+      <VmSpec as utoipa::PartialSchema>::schema(),
+    ] {
+      let schema = serde_json::to_value(schema).unwrap();
+      let field = &schema["properties"]["CloudInitUserData"];
+      assert_eq!(field["$ref"], "#/components/schemas/VmCloudInitUserData");
+      assert!(
+        field.get("oneOf").is_none(),
+        "the union already accepts null"
+      );
+      assert!(!schema["required"].as_array().is_some_and(|fields| {
+        fields.contains(&serde_json::json!("CloudInitUserData"))
+      }));
+    }
+  }
+
+  #[cfg(any(feature = "utoipa", feature = "schemars"))]
+  #[test]
+  fn vm_cloud_init_module_tuple_references_the_original_enum() {
+    let upstream: serde_json::Value =
+      serde_json::from_str(include_str!("../schemas/cloud-init-26.2.json"))
+        .unwrap();
+    assert_eq!(
+      upstream
+        .pointer("/$defs/modules_definition/items/oneOf/1/prefixItems/0")
+        .unwrap(),
+      &serde_json::json!({"enum": {"$ref": "#/$defs/all_modules"}})
+    );
+    for prefix in ["#/components/schemas/", "#/definitions/"] {
+      let components = cloud_init_schema_components(prefix);
+      assert_eq!(
+        components["CloudInit26_2.modules_definition"]["items"]["oneOf"][1]["prefixItems"]
+          [0],
+        serde_json::json!({"$ref": format!("{prefix}CloudInit26_2.all_modules")})
+      );
+      assert_eq!(
+        components["CloudInit26_2.all_modules"],
+        upstream["$defs"]["all_modules"]
+      );
+      let names = components["CloudInit26_2.all_modules"]["enum"]
+        .as_array()
+        .unwrap();
+      assert!(names.iter().all(serde_json::Value::is_string));
+      assert!(names.contains(&serde_json::json!("growpart")));
+      assert!(!names.contains(&serde_json::json!("unknown-probe-module")));
+    }
+  }
+
+  #[cfg(feature = "utoipa")]
+  #[test]
   fn vm_cloud_init_user_data_openapi_preserves_bundled_schema() {
     let schema = serde_json::to_value(
       <VmCloudInitUserData as utoipa::PartialSchema>::schema(),
     )
     .unwrap();
     assert_eq!(schema["oneOf"][0]["type"], "string");
+    assert_eq!(schema["oneOf"][0]["maxLength"], 65536);
     assert_eq!(
       schema["oneOf"][1]["$ref"],
       "#/components/schemas/CloudInit26_2"
     );
-    assert_eq!(schema["oneOf"].as_array().unwrap().len(), 2);
+    assert_eq!(schema["oneOf"].as_array().unwrap().len(), 3);
+    assert_eq!(schema["oneOf"][2]["type"], "null");
     let mut components = Vec::new();
     <VmCloudInitUserData as utoipa::ToSchema>::schemas(&mut components);
     let components: BTreeMap<_, _> = components
@@ -812,8 +1154,10 @@ mod tests {
         .unwrap();
     let data = &schema["definitions"]["VmCloudInitUserData"];
     assert_eq!(data["oneOf"][0]["type"], "string");
+    assert_eq!(data["oneOf"][0]["maxLength"], 65536);
     assert_eq!(data["oneOf"][1]["$ref"], "#/definitions/CloudInit26_2");
-    assert_eq!(data["oneOf"].as_array().unwrap().len(), 2);
+    assert_eq!(data["oneOf"].as_array().unwrap().len(), 3);
+    assert_eq!(data["oneOf"][2]["type"], "null");
     assert_local_cloud_init_references(&schema, &schema, "#/definitions/");
     let root = &schema["definitions"]["CloudInit26_2"];
     assert_eq!(root["type"], "object");
@@ -823,6 +1167,45 @@ mod tests {
     let user = &schema["definitions"]["CloudInit26_2.users_groups.user"];
     assert!(user["oneOf"].is_array());
     assert_eq!(user["properties"]["name"]["type"], "string");
+  }
+
+  #[cfg(feature = "utoipa")]
+  #[test]
+  fn vm_host_config_openapi_bounds_boot_limits() {
+    let schema =
+      serde_json::to_value(<VmHostConfig as utoipa::PartialSchema>::schema())
+        .unwrap();
+    assert_boot_limit_schema(&schema);
+    let update = serde_json::to_value(
+      <VmHostConfigUpdate as utoipa::PartialSchema>::schema(),
+    )
+    .unwrap();
+    assert_boot_limit_schema(&update);
+  }
+
+  #[cfg(feature = "schemars")]
+  #[test]
+  fn vm_host_config_statefile_schema_bounds_boot_limits() {
+    let schema =
+      serde_json::to_value(schemars::schema_for!(VmHostConfig)).unwrap();
+    assert_boot_limit_schema(&schema);
+    let update =
+      serde_json::to_value(schemars::schema_for!(VmHostConfigUpdate)).unwrap();
+    assert_boot_limit_schema(&update);
+  }
+
+  #[cfg(any(feature = "utoipa", feature = "schemars"))]
+  fn assert_boot_limit_schema(schema: &serde_json::Value) {
+    for (field, maximum) in [("MaxCpu", 255_u64), ("MaxMemory", 8796093022207)]
+    {
+      let property = &schema["properties"][field];
+      assert_eq!(property["minimum"].as_f64(), Some(1.0), "{field}");
+      assert_eq!(
+        property["maximum"].as_f64(),
+        Some(maximum as f64),
+        "{field}"
+      );
+    }
   }
 
   #[cfg(any(feature = "utoipa", feature = "schemars"))]

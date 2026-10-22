@@ -4,7 +4,7 @@ use tabled::Tabled;
 
 use nanocld_client::stubs::vm::VmSummary;
 use nanocld_client::stubs::vm_spec::{
-  VmHostConfig, VmSpecPartial, VmSpecUpdate,
+  VmHostConfig, VmHostConfigUpdate, VmSpecPartial, VmSpecUpdate,
 };
 
 use super::{
@@ -126,6 +126,9 @@ pub struct VmPatchOpts {
   /// Read complete cloud-init user-data from a UTF-8 file (maximum 64 KiB)
   #[clap(long, value_name = "FILE")]
   pub cloud_init_user_data: Option<String>,
+  /// Restore generated User/Password/SshKey provisioning
+  #[clap(long, conflicts_with = "cloud_init_user_data")]
+  pub clear_cloud_init_user_data: bool,
   /// Enable the authenticated browser console (true or false)
   #[clap(long, action = clap::ArgAction::Set)]
   pub console: Option<bool>,
@@ -150,12 +153,8 @@ pub struct VmPatchOpts {
 }
 
 impl VmPatchOpts {
-  /// Overlay only explicitly supplied host settings. Console/provisioning
-  /// patches must not replace the runtime image, network, or resource limits.
-  pub(crate) fn patch_host_config(
-    &self,
-    current: &VmHostConfig,
-  ) -> Option<VmHostConfig> {
+  /// Send only explicitly supplied host settings, merged atomically by the daemon.
+  pub(crate) fn patch_host_config(&self) -> Option<VmHostConfigUpdate> {
     if self.cpu.is_none()
       && self.memory.is_none()
       && self.max_cpu.is_none()
@@ -165,33 +164,22 @@ impl VmPatchOpts {
     {
       return None;
     }
-    let mut config = current.clone();
-    if let Some(cpu) = self.cpu {
-      config.cpu = cpu;
-    }
-    if let Some(memory) = self.memory {
-      config.memory = memory;
-    }
-    if let Some(max_cpu) = self.max_cpu {
-      config.max_cpu = Some(max_cpu);
-    }
-    if let Some(max_memory) = self.max_memory {
-      config.max_memory = Some(max_memory);
-    }
-    if let Some(interface) = &self.net_iface {
-      config.net_iface = Some(interface.clone());
-    }
-    if self.kvm {
-      config.kvm = Some(true);
-    }
-    Some(config)
+    Some(VmHostConfigUpdate {
+      cpu: self.cpu,
+      memory: self.memory,
+      max_cpu: self.max_cpu.map(Some),
+      max_memory: self.max_memory.map(Some),
+      net_iface: self.net_iface.clone().map(Some),
+      kvm: self.kvm.then_some(Some(true)),
+      ..Default::default()
+    })
   }
 }
 
 /// Convert VmPatchOpts to VmSpecUpdate
 impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
-    let host_config = val.patch_host_config(&VmHostConfig::default());
+    let host_config = val.patch_host_config();
     Self {
       name: None,
       user: val.user,
@@ -521,7 +509,7 @@ mod tests {
     let options =
       VmPatchOpts::try_parse_from(["patch", "global.guest", "--max-cpu", "16"])
         .unwrap();
-    let updated = options.patch_host_config(&current).unwrap();
+    let updated = options.patch_host_config().unwrap().apply_to(&current);
     assert_eq!(updated.max_cpu, Some(16));
     assert_eq!(updated.max_memory, current.max_memory);
     assert_eq!(updated.cpu, current.cpu);
@@ -530,7 +518,11 @@ mod tests {
       VmPatchOpts::try_parse_from(["patch", "global.guest", "--cpu", "4"])
         .unwrap();
     assert_eq!(
-      options.patch_host_config(&current).unwrap().max_cpu,
+      options
+        .patch_host_config()
+        .unwrap()
+        .apply_to(&current)
+        .max_cpu,
       current.max_cpu
     );
   }
@@ -616,7 +608,7 @@ mod tests {
       opts.cloud_init_user_data.as_deref(),
       Some("./replacement.yaml")
     );
-    assert!(opts.patch_host_config(&VmHostConfig::default()).is_none());
+    assert!(opts.patch_host_config().is_none());
     let omitted =
       VmPatchOpts::try_parse_from(["patch", "global.guest"]).unwrap();
     assert!(omitted.cloud_init_user_data.is_none());
@@ -669,6 +661,33 @@ mod tests {
     assert!(update.host_config.is_none());
   }
 
+  #[test]
+  fn vm_cli_cloud_init_clear_is_explicit_and_conflicts_with_replacement() {
+    let options = VmPatchOpts::try_parse_from([
+      "patch",
+      "global.guest",
+      "--clear-cloud-init-user-data",
+    ])
+    .unwrap();
+    assert!(options.clear_cloud_init_user_data);
+    assert!(options.cloud_init_user_data.is_none());
+    assert!(
+      !VmPatchOpts::try_parse_from(["patch", "global.guest"])
+        .unwrap()
+        .clear_cloud_init_user_data
+    );
+    assert!(
+      VmPatchOpts::try_parse_from([
+        "patch",
+        "global.guest",
+        "--clear-cloud-init-user-data",
+        "--cloud-init-user-data",
+        "./user-data.yaml",
+      ])
+      .is_err()
+    );
+  }
+
   use super::*;
 
   #[test]
@@ -694,13 +713,19 @@ mod tests {
         "--mem" => expected.memory = 2,
         _ => expected.net_iface = Some("ens4".to_owned()),
       }
-      assert_eq!(options.patch_host_config(&current), Some(expected));
+      let patch = options.patch_host_config().unwrap();
+      assert_eq!(patch.apply_to(&current), expected);
+      let serialized = serde_json::to_value(patch).unwrap();
+      assert_eq!(serialized.as_object().unwrap().len(), 1);
     }
     let options =
       VmPatchOpts::try_parse_from(["patch", "global.guest", "--kvm"]).unwrap();
     let mut without_kvm = current.clone();
     without_kvm.kvm = None;
-    assert_eq!(options.patch_host_config(&without_kvm), Some(current));
+    assert_eq!(
+      options.patch_host_config().unwrap().apply_to(&without_kvm),
+      current
+    );
   }
 
   #[test]

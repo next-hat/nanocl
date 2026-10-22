@@ -25,10 +25,14 @@ pub(crate) fn tls_connector(
   ssl: Option<&SslConfig>,
 ) -> IoResult<openssl::ssl::SslConnector> {
   use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-  let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+  let mut builder = SslConnector::builder(SslMethod::tls()).map_err(|err| {
+    IoError::invalid_data("Unable to configure TLS", &err.to_string())
+  })?;
   let Some(ssl) = ssl else {
-    // Match ntex's ordinary HTTP client default when no SSL config is supplied.
-    builder.set_verify(SslVerifyMode::NONE);
+    // SslConnector loads the system trust store and verifies the hostname.
+    // ntex's default connector disables verification, so both HTTP and console
+    // clients must use this helper even without a custom client identity.
+    builder.set_verify(SslVerifyMode::PEER);
     return Ok(builder.build());
   };
   if ssl.verify {
@@ -175,8 +179,8 @@ impl NanocldClient {
       client
     };
     #[cfg(feature = "openssl")]
-    let client = if let Some(ssl) = &self.ssl {
-      client.openssl(tls_connector(Some(ssl))?)
+    let client = if self.ssl.is_some() || self.url.starts_with("https://") {
+      client.openssl(tls_connector(self.ssl.as_ref())?)
     } else {
       client
     };
@@ -510,26 +514,28 @@ mod tests {
 
   #[cfg(feature = "openssl")]
   #[test]
-  fn tls_connector_without_config_matches_http_client_default() {
+  fn tls_connector_without_config_verifies_server_without_client_identity() {
     let connector = tls_connector(None).unwrap();
     assert_eq!(
       connector.context().verify_mode(),
-      openssl::ssl::SslVerifyMode::NONE
+      openssl::ssl::SslVerifyMode::PEER
     );
     assert!(connector.context().certificate().is_none());
     assert!(connector.context().private_key().is_none());
   }
 
   #[cfg(feature = "openssl")]
-  #[test]
-  fn tls_connector_preserves_configured_verify_and_client_identity() {
+  fn tls_test_identity() -> (
+    openssl::x509::X509,
+    openssl::pkey::PKey<openssl::pkey::Private>,
+  ) {
     use openssl::{asn1::Asn1Time, ec::EcGroup, ec::EcKey, nid::Nid};
     let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
     let key =
       openssl::pkey::PKey::from_ec_key(EcKey::generate(&group).unwrap())
         .unwrap();
     let mut name = openssl::x509::X509NameBuilder::new().unwrap();
-    name.append_entry_by_text("CN", "client.test").unwrap();
+    name.append_entry_by_text("CN", "server.test").unwrap();
     let name = name.build();
     let mut cert = openssl::x509::X509::builder().unwrap();
     cert.set_version(2).unwrap();
@@ -547,18 +553,39 @@ mod tests {
     cert
       .set_not_after(&Asn1Time::days_from_now(1).unwrap())
       .unwrap();
+    let subject_alt_name =
+      openssl::x509::extension::SubjectAlternativeName::new()
+        .dns("server.test")
+        .build(&cert.x509v3_context(None, None))
+        .unwrap();
+    cert.append_extension(subject_alt_name).unwrap();
     cert
       .sign(&key, openssl::hash::MessageDigest::sha256())
       .unwrap();
-    let cert = String::from_utf8(cert.build().to_pem().unwrap()).unwrap();
-    let mut ssl = SslConfig {
+    (cert.build(), key)
+  }
+
+  #[cfg(feature = "openssl")]
+  fn tls_test_config(
+    cert: &openssl::x509::X509,
+    key: &openssl::pkey::PKey<openssl::pkey::Private>,
+  ) -> SslConfig {
+    let cert = String::from_utf8(cert.to_pem().unwrap()).unwrap();
+    SslConfig {
       cert_ca: Some(cert.clone()),
       cert: Some(cert),
       cert_key: Some(
         String::from_utf8(key.private_key_to_pem_pkcs8().unwrap()).unwrap(),
       ),
       ..Default::default()
-    };
+    }
+  }
+
+  #[cfg(feature = "openssl")]
+  #[test]
+  fn tls_connector_preserves_configured_verify_and_client_identity() {
+    let (cert, key) = tls_test_identity();
+    let mut ssl = tls_test_config(&cert, &key);
     for verify in [false, true] {
       ssl.verify = verify;
       let connector = tls_connector(Some(&ssl)).unwrap();
@@ -582,6 +609,114 @@ mod tests {
       );
       assert!(context.private_key().unwrap().public_eq(&key));
     }
+  }
+
+  #[cfg(feature = "openssl")]
+  #[test]
+  fn tls_connector_rejects_untrusted_servers_and_wrong_hostnames() {
+    use openssl::ssl::{ErrorCode, Ssl, SslContext, SslMethod, SslStream};
+    use std::{cell::RefCell, collections::VecDeque, io, rc::Rc};
+
+    // Drive real TLS handshakes over paired memory queues, without listeners,
+    // threads, external certificates, or timing-sensitive waits.
+    struct Pipe {
+      incoming: Rc<RefCell<VecDeque<u8>>>,
+      outgoing: Rc<RefCell<VecDeque<u8>>>,
+    }
+    impl io::Read for Pipe {
+      fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        if buffer.is_empty() {
+          return Ok(0);
+        }
+        let mut incoming = self.incoming.borrow_mut();
+        if incoming.is_empty() {
+          return Err(io::ErrorKind::WouldBlock.into());
+        }
+        let count = buffer.len().min(incoming.len());
+        for byte in &mut buffer[..count] {
+          *byte = incoming.pop_front().unwrap();
+        }
+        Ok(count)
+      }
+    }
+    impl io::Write for Pipe {
+      fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.outgoing.borrow_mut().extend(bytes);
+        Ok(bytes.len())
+      }
+      fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+      }
+    }
+
+    let (cert, key) = tls_test_identity();
+    let mut server_context =
+      SslContext::builder(SslMethod::tls_server()).unwrap();
+    server_context.set_certificate(&cert).unwrap();
+    server_context.set_private_key(&key).unwrap();
+    let server_context = server_context.build();
+    let handshake = |connector: openssl::ssl::SslConnector, hostname: &str| {
+      let to_client = Rc::new(RefCell::new(VecDeque::new()));
+      let to_server = Rc::new(RefCell::new(VecDeque::new()));
+      let mut client = SslStream::new(
+        connector.configure().unwrap().into_ssl(hostname).unwrap(),
+        Pipe {
+          incoming: to_client.clone(),
+          outgoing: to_server.clone(),
+        },
+      )
+      .unwrap();
+      let mut server = SslStream::new(
+        Ssl::new(&server_context).unwrap(),
+        Pipe {
+          incoming: to_server,
+          outgoing: to_client,
+        },
+      )
+      .unwrap();
+      let mut client_done = false;
+      let mut server_done = false;
+      for _ in 0..16 {
+        if !client_done {
+          match client.connect() {
+            Ok(()) => client_done = true,
+            Err(error) if error.code() == ErrorCode::WANT_READ => {}
+            Err(error) => {
+              assert_eq!(error.code(), ErrorCode::SSL);
+              let result = client.ssl().verify_result();
+              assert_ne!(result, openssl::x509::X509VerifyResult::OK);
+              return Err(result);
+            }
+          }
+        }
+        if !server_done {
+          match server.accept() {
+            Ok(()) => server_done = true,
+            Err(error) if error.code() == ErrorCode::WANT_READ => {}
+            Err(error) => {
+              panic!("unexpected server handshake failure: {error}")
+            }
+          }
+        }
+        if client_done && server_done {
+          return Ok(());
+        }
+      }
+      panic!("in-memory TLS handshake did not complete");
+    };
+
+    assert!(handshake(tls_connector(None).unwrap(), "server.test").is_err());
+    let mut config = tls_test_config(&cert, &key);
+    assert!(
+      handshake(tls_connector(Some(&config)).unwrap(), "server.test").is_ok()
+    );
+    config.verify = true;
+    assert!(
+      handshake(tls_connector(Some(&config)).unwrap(), "server.test").is_ok()
+    );
+    assert!(
+      handshake(tls_connector(Some(&config)).unwrap(), "other.test").is_err()
+    );
   }
 
   fn response_with_chunks(

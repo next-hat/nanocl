@@ -11,7 +11,7 @@ use nanocl_stubs::{
     ObjPsStatusPartial,
   },
   vm::{Vm, VmInspect},
-  vm_spec::VmSpecPartial,
+  vm_spec::{VmCloudInitUserData, VmSpecPartial},
 };
 
 use crate::{
@@ -31,6 +31,17 @@ use super::generic::*;
 fn mac_allocation_lock() -> &'static Mutex<()> {
   static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
   LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn merge_cloud_init_user_data(
+  requested: Option<VmCloudInitUserData>,
+  current: Option<VmCloudInitUserData>,
+) -> Option<VmCloudInitUserData> {
+  match requested {
+    Some(VmCloudInitUserData::Reset) => None,
+    Some(data) => Some(data),
+    None => current,
+  }
 }
 
 fn normalize_mac_address(value: &str) -> HttpResult<String> {
@@ -132,6 +143,8 @@ impl VmDb {
   ) -> HttpResult<Vm> {
     let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let mut spec = obj.spec.clone();
+    spec.cloud_init_user_data =
+      merge_cloud_init_user_data(spec.cloud_init_user_data, None);
     utils::container::vm::validate_spec(&spec)
       .map_err(|err| HttpError::bad_request(err.to_string()))?;
     let in_use = assigned_mac_addresses(pk, state).await?;
@@ -165,8 +178,18 @@ impl VmDb {
     key: &str,
     state: &SystemState,
   ) -> HttpResult<Vm> {
+    let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+    if let Some(address) = &vm.spec.mac_address {
+      normalize_mac_address(address)?;
+      // Allocation checked uniqueness before persisting this immutable identity.
+      return Ok(vm);
+    }
     let _guard = mac_allocation_lock().lock().await;
     let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+    if let Some(address) = &vm.spec.mac_address {
+      normalize_mac_address(address)?;
+      return Ok(vm);
+    }
     let in_use = assigned_mac_addresses(key, state).await?;
     let address =
       select_mac_address(None, vm.spec.mac_address.as_deref(), &in_use)?;
@@ -193,6 +216,8 @@ impl ObjCreate for VmDb {
     let namespace = &obj.namespace;
     let version = &obj.version;
     let mut vm = obj.spec.clone();
+    vm.cloud_init_user_data =
+      merge_cloud_init_user_data(vm.cloud_init_user_data, None);
     log::debug!(
       "Creating VM {name} in namespace {namespace} with version: {version}",
     );
@@ -314,9 +339,10 @@ impl ObjPatchByPk for VmDb {
     let vm_partial = VmSpecPartial {
       name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
       image: old_spec.image,
-      host_config: Some(
-        spec.host_config.to_owned().unwrap_or(old_spec.host_config),
-      ),
+      host_config: Some(spec.host_config.as_ref().map_or_else(
+        || old_spec.host_config.clone(),
+        |update| update.apply_to(&old_spec.host_config),
+      )),
       hostname: if spec.hostname.is_some() {
         spec.hostname.clone()
       } else {
@@ -344,10 +370,10 @@ impl ObjPatchByPk for VmDb {
       },
       mac_address: spec.mac_address.clone().or(old_spec.mac_address),
       cloud_init: spec.cloud_init.or(old_spec.cloud_init),
-      cloud_init_user_data: spec
-        .cloud_init_user_data
-        .clone()
-        .or(old_spec.cloud_init_user_data),
+      cloud_init_user_data: merge_cloud_init_user_data(
+        spec.cloud_init_user_data.clone(),
+        old_spec.cloud_init_user_data,
+      ),
       console: spec.console.or(old_spec.console),
       labels: if spec.labels.is_some() {
         spec.labels.clone()
@@ -396,6 +422,25 @@ impl ObjInspectByPk for VmDb {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vm_cloud_init_patch_distinguishes_omitted_null_and_empty() {
+    let current = Some(VmCloudInitUserData::Raw("#cloud-config\n".into()));
+    assert_eq!(merge_cloud_init_user_data(None, current.clone()), current);
+    assert_eq!(
+      merge_cloud_init_user_data(
+        Some(VmCloudInitUserData::Reset),
+        current.clone()
+      ),
+      None
+    );
+    let empty = Some(VmCloudInitUserData::Raw(String::new()));
+    assert_eq!(merge_cloud_init_user_data(empty.clone(), current), empty);
+    assert_eq!(
+      merge_cloud_init_user_data(Some(VmCloudInitUserData::Reset), None),
+      None
+    );
+  }
 
   #[test]
   fn vm_mac_validation_rejects_multicast_zero_and_injected_values() {

@@ -196,13 +196,12 @@ pub async fn exec_vm_patch(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut vm: VmSpecUpdate = options.clone().into();
-  vm.cloud_init_user_data =
+  vm.cloud_init_user_data = if options.clear_cloud_init_user_data {
+    Some(VmCloudInitUserData::Reset)
+  } else {
     load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
-      .map(VmCloudInitUserData::Raw);
-  if vm.host_config.is_some() {
-    let current = client.inspect_vm(&options.key).await?;
-    vm.host_config = options.patch_host_config(&current.spec.host_config);
-  }
+      .map(VmCloudInitUserData::Raw)
+  };
   let waiter =
     wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
   client.patch_vm(&options.key, &vm).await?;
@@ -225,15 +224,37 @@ async fn exec_vm_lifecycle(
   restart: bool,
 ) -> IoResult<()> {
   let request = options.into();
-  for key in &options.keys {
+  let request = &request;
+  run_vm_lifecycle(&options.keys, |key| async move {
     if restart {
-      client.restart_vm(key, &request).await?;
+      client.restart_vm(key, request).await.map(|_| ())
     } else {
-      client.stop_vm(key, &request).await?;
+      client.stop_vm(key, request).await.map(|_| ())
     }
-    println!("{key}");
+    .map_err(IoError::from)
+  })
+  .await
+}
+
+async fn run_vm_lifecycle<'a, F, Fut>(
+  keys: &'a [String],
+  mut action: F,
+) -> IoResult<()>
+where
+  F: FnMut(&'a str) -> Fut,
+  Fut: std::future::Future<Output = IoResult<()>>,
+{
+  let mut first_error = None;
+  for key in keys {
+    match action(key).await {
+      Ok(()) => println!("{key}"),
+      Err(error) => {
+        eprintln!("{key}: {error}");
+        first_error.get_or_insert(error);
+      }
+    }
   }
-  Ok(())
+  first_error.map_or(Ok(()), Err)
 }
 
 /// Function executed when running `nanocl vm attach`
@@ -396,8 +417,34 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
 #[cfg(test)]
 mod tests {
   use super::{
-    load_cloud_init_user_data, read_cloud_init_user_data, vm_process_name,
+    load_cloud_init_user_data, read_cloud_init_user_data, run_vm_lifecycle,
+    vm_process_name,
   };
+  use nanocl_error::io::IoError;
+
+  #[test]
+  fn vm_lifecycle_attempts_all_keys_and_returns_first_failure() {
+    let keys =
+      ["global.first", "global.second", "global.third"].map(String::from);
+    let mut attempted = Vec::new();
+    let result = futures::executor::block_on(run_vm_lifecycle(&keys, |key| {
+      attempted.push(key.to_owned());
+      std::future::ready(if key == "global.first" || key == "global.third" {
+        Err(IoError::other("VM lifecycle", key))
+      } else {
+        Ok(())
+      })
+    }));
+    assert_eq!(attempted, keys);
+    assert_eq!(result.unwrap_err().inner.to_string(), "global.first");
+    let mut completed = 0;
+    futures::executor::block_on(run_vm_lifecycle(&keys, |_| {
+      completed += 1;
+      std::future::ready(Ok(()))
+    }))
+    .unwrap();
+    assert_eq!(completed, keys.len());
+  }
 
   #[test]
   fn vm_cloud_init_user_data_preserves_raw_utf8_and_empty_input() {

@@ -2,7 +2,7 @@ use ntex::web;
 
 use bollard_next::container::StopContainerOptions;
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::{process::ProcessKind, vm::VmLifecycleOptions};
+use nanocl_stubs::process::ProcessKind;
 
 use crate::{models::SystemState, utils};
 
@@ -28,13 +28,9 @@ pub async fn stop_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   if kind == ProcessKind::Vm {
-    utils::container::vm::stop_with_options(
-      &key,
-      &VmLifecycleOptions::default(),
-      state,
-    )
-    .await
-    .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+    utils::container::vm::enqueue_lifecycle(&key, None, false, state)
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
   } else {
     utils::container::generic::emit_stopping(&key, &kind, &state).await?;
   }
@@ -69,7 +65,7 @@ pub async fn stop_process(
       .id
       .as_deref()
       .ok_or_else(|| HttpError::conflict("VM runtime has no container ID"))?;
-    utils::container::vm::control_process(&key, id, false, state)
+    utils::container::vm::enqueue_lifecycle(&key, Some(id), false, state)
       .await
       .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
     return Ok(web::HttpResponse::Accepted().build());

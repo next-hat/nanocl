@@ -94,18 +94,65 @@ pub fn ntex_config(
 
 #[cfg(test)]
 mod tests {
+  use futures::StreamExt;
   use nanocl_stubs::{
     generic::{
       GenericClause, GenericCount, GenericFilter, GenericListQueryNsp,
       GenericNspQuery,
     },
     namespace::NamespacePartial,
+    system::{EventActorKind, EventCondition, EventKind, NativeEventAction},
     vm::{VmInspect, VmSummary},
     vm_spec::{VmSpecPartial, VmSpecUpdate},
   };
   use ntex::http;
 
   use crate::utils::tests::*;
+
+  async fn vm_task_registration(
+    state: &crate::models::SystemState,
+    key: &str,
+    action: NativeEventAction,
+  ) -> crate::models::RawEventReceiver {
+    state
+      .subscribe_raw(Some(vec![EventCondition {
+        actor_key: Some(key.to_owned()),
+        actor_kind: Some(EventActorKind::Vm),
+        kind: vec![EventKind::Normal],
+        action: vec![action],
+        ..Default::default()
+      }]))
+      .await
+      .unwrap()
+  }
+
+  async fn wait_vm_task(
+    mut registration: crate::models::RawEventReceiver,
+    state: &crate::models::SystemState,
+    key: &str,
+  ) {
+    ntex::time::timeout(std::time::Duration::from_secs(90), async {
+      // The raw event is delivered after exec_event registers the task.
+      // Waiting on the task map before this barrier can miss queued work.
+      loop {
+        let event = registration
+          .next()
+          .await
+          .expect("VM event stream ended")
+          .unwrap();
+        if !event.is_empty() {
+          break;
+        }
+      }
+      state
+        .inner
+        .task_manager
+        .wait_task(&format!("Vm@{key}"))
+        .await;
+    })
+    .await
+    .expect("VM task did not settle");
+  }
 
   #[ntex::test]
   async fn collection_namespace_and_key_semantics() {
@@ -217,6 +264,12 @@ mod tests {
       "VM name is immutable"
     );
 
+    let update = vm_task_registration(
+      &system.state,
+      OTHER_KEY,
+      NativeEventAction::Updating,
+    )
+    .await;
     let response = client
       .send_patch(
         &format!("/vms/{OTHER_KEY}"),
@@ -232,8 +285,12 @@ mod tests {
       http::StatusCode::OK,
       "patch VM by canonical key"
     );
+    wait_vm_task(update, &system.state, OTHER_KEY).await;
 
     for key in [GLOBAL_KEY, OTHER_KEY] {
+      let deletion =
+        vm_task_registration(&system.state, key, NativeEventAction::Destroying)
+          .await;
       let response = client
         .send_delete(&format!("/vms/{key}"), None::<String>)
         .await;
@@ -241,6 +298,15 @@ mod tests {
         response.status(),
         http::StatusCode::OK,
         "delete VM by canonical key"
+      );
+      wait_vm_task(deletion, &system.state, key).await;
+      let response = client
+        .send_get(&format!("/vms/{key}/inspect"), None::<String>)
+        .await;
+      test_status_code!(
+        response.status(),
+        http::StatusCode::NOT_FOUND,
+        "VM deletion completed"
       );
     }
   }

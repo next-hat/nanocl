@@ -65,7 +65,7 @@ impl NanocldClient {
     self.send_vm_lifecycle(key, "restart", options).await
   }
 
-  /// Query actual QEMU execution state through the trusted operator transport.
+  /// Query actual QEMU execution state through the configured daemon transport.
   pub async fn vm_status(
     &self,
     key: &str,

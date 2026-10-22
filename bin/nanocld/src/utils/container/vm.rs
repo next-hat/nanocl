@@ -1,10 +1,12 @@
 use std::collections::HashMap;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::os::{
+  fd::AsRawFd,
+  unix::fs::{FileTypeExt, OpenOptionsExt, PermissionsExt},
+};
+use std::path::{Path, PathBuf};
 
 use bollard_next::{
   container::{Config, StartContainerOptions, WaitContainerOptions},
-  network::InspectNetworkOptions,
   secret::{DeviceMapping, HostConfig},
 };
 use futures::StreamExt;
@@ -27,7 +29,7 @@ use crate::{
 mod lifecycle;
 mod resize;
 pub(crate) use lifecycle::{
-  control_process, lifecycle_lock, restart_with_options, runtime_status,
+  enqueue_lifecycle, lifecycle_lock, restart_with_options, runtime_status,
   socket_directory, stop_with_options,
 };
 pub(crate) use resize::{resize, runtime_resources, validate_boot_spec};
@@ -48,17 +50,92 @@ async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
   );
   validate_network_mode(&mode)?;
   super::network::ensure_networks(network_modes(vm), state).await?;
-  let network = state
-    .inner
-    .docker_api
-    .inspect_network(&mode, None::<InspectNetworkOptions<String>>)
-    .await
-    .map_err(|err| err.map_err_context(|| "VM network"))?;
-  validate_runtime_network(&network)?;
+  let network =
+    inspect_runtime_network(&mode, &state.inner.config.docker_host).await?;
   validate_link_net_iface(
     vm.spec.host_config.link_net_iface.as_deref(),
     network.options.as_ref(),
   )
+}
+
+// The pinned Docker model predates EnableIPv4. Read the same configured Unix
+// transport once so an explicitly configured subnet cannot hide disabled IPv4.
+async fn inspect_runtime_network(
+  mode: &str,
+  docker_host: &str,
+) -> IoResult<bollard_next::models::Network> {
+  let socket = docker_host.replacen("unix://", "", 1);
+  let cfg = ntex::SharedCfg::new("vm-network-inspect").add(
+    ntex::client::ClientConfig::new()
+      .set_response_timeout(ntex::time::Millis::from_secs(120))
+      .set_response_payload_timeout(ntex::time::Millis::from_secs(120)),
+  );
+  let client = ntex::client::Client::builder()
+    .connector(async move |cfg: &ntex::SharedCfg, _| {
+      Ok(
+        ntex::rt::unix_connect(&socket, cfg.clone())
+          .await
+          .map_err(ntex::connect::ConnectError::from)?,
+      )
+    })
+    .build(cfg);
+  let mut url = url::Url::parse("http://localhost/networks/").unwrap();
+  url.path_segments_mut().unwrap().pop_if_empty().push(mode);
+  tokio::time::timeout(std::time::Duration::from_secs(120), async {
+    let response = client
+      .get(url.as_str())
+      .send()
+      .await
+      .map_err(|err| IoError::other("VM network", &err.to_string()))?;
+    if !response.status().is_success() {
+      return Err(IoError::other(
+        "VM network",
+        &format!(
+          "Docker network inspection returned HTTP {}",
+          response.status()
+        ),
+      ));
+    }
+    let document = response
+      .json::<serde_json::Value>()
+      .limit(8 * 1024 * 1024)
+      .await
+      .map_err(|err| IoError::invalid_data("VM network", &err.to_string()))?;
+    parse_runtime_network(document)
+  })
+  .await
+  .map_err(|_| {
+    IoError::with_context(
+      "VM network",
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "Docker network inspection timed out",
+      ),
+    )
+  })?
+}
+
+fn parse_runtime_network(
+  document: serde_json::Value,
+) -> IoResult<bollard_next::models::Network> {
+  match document.get("EnableIPv4") {
+    None | Some(serde_json::Value::Bool(true)) => {}
+    Some(serde_json::Value::Bool(false)) => {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "VM networking requires IPv4 to be enabled",
+      ));
+    }
+    _ => {
+      return Err(IoError::invalid_data(
+        "VM network",
+        "Invalid Docker EnableIPv4 value",
+      ));
+    }
+  }
+  let network = serde_json::from_value(document)?;
+  validate_runtime_network(&network)?;
+  Ok(network)
 }
 
 fn validate_runtime_network(
@@ -159,9 +236,8 @@ pub(crate) fn validate_spec(
   spec: &nanocl_stubs::vm_spec::VmSpecPartial,
 ) -> IoResult<()> {
   validate_host_config(&spec.host_config.clone().unwrap_or_default())?;
-  cloud_init_user_data(spec.cloud_init_user_data.as_ref())?;
-  let generated =
-    spec.cloud_init.unwrap_or(true) && spec.cloud_init_user_data.is_none();
+  let user_data = cloud_init_user_data(spec.cloud_init_user_data.as_ref())?;
+  let generated = spec.cloud_init.unwrap_or(true) && user_data.is_none();
   validate_cloud_init_user(generated, spec.user.as_deref())?;
   validate_cloud_init_credentials(
     generated,
@@ -177,6 +253,7 @@ fn cloud_init_user_data(
     return Ok(None);
   };
   let data = match data {
+    VmCloudInitUserData::Reset => return Ok(None),
     VmCloudInitUserData::Raw(data) => data.clone(),
     VmCloudInitUserData::CloudConfig(config) => {
       // JSON is a YAML subset. This preserves typed values without treating
@@ -240,17 +317,25 @@ fn validate_host_config(
   validate_network_mode(&super::network::resolve_network_mode(
     config.runtime_network.clone(),
   ))?;
-  let interface = config.link_net_iface.as_deref().unwrap_or("eth0");
-  if interface.is_empty()
-    || interface.len() > 15
-    || !interface
-      .bytes()
-      .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
-  {
-    return Err(IoError::invalid_input(
-      "VM network",
-      "LinkNetIface must be an interface name containing letters, digits, underscores or hyphens",
-    ));
+  for (field, interface) in [
+    ("LinkNetIface", config.link_net_iface.as_deref()),
+    ("NetIface", config.net_iface.as_deref()),
+  ] {
+    if let Some(interface) = interface
+      && (interface.is_empty()
+        || interface.len() > 15
+        || interface == "lo"
+        || !interface
+          .bytes()
+          .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-')))
+    {
+      return Err(IoError::invalid_input(
+        "VM network",
+        &format!(
+          "{field} must be a non-loopback interface name containing letters, digits, underscores or hyphens"
+        ),
+      ));
+    }
   }
   if let Some(servers) = &config.dns {
     if servers.is_empty()
@@ -288,6 +373,34 @@ fn runtime_sysctls() -> HashMap<String, String> {
     }
   }
   sysctls
+}
+
+fn runtime_networking(
+  mode: String,
+) -> bollard_next::container::NetworkingConfig<String> {
+  // Unlike conf.default, endpoint options apply to the already-created veth.
+  // Docker replaces IFNAME with the endpoint's actual interface name.
+  let settings = [
+    "proxy_arp=1",
+    "accept_local=1",
+    "arp_ignore=1",
+    "send_redirects=0",
+    "rp_filter=0",
+  ]
+  .map(|setting| format!("net.ipv4.conf.IFNAME.{setting}"))
+  .join(",");
+  bollard_next::container::NetworkingConfig {
+    endpoints_config: HashMap::from([(
+      mode,
+      bollard_next::models::EndpointSettings {
+        driver_opts: Some(HashMap::from([(
+          "com.docker.network.endpoint.sysctls".into(),
+          settings,
+        )])),
+        ..Default::default()
+      },
+    )]),
+  }
 }
 
 async fn ensure_runtime_image(
@@ -396,6 +509,9 @@ fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
   if let Some(interface) = &vm.spec.host_config.link_net_iface {
     envs.push(format!("DEFAULT_INTERFACE={interface}"));
   }
+  if let Some(interface) = &vm.spec.host_config.net_iface {
+    envs.push(format!("FROM_NETWORK={interface}"));
+  }
   if let Some(servers) = &vm.spec.host_config.dns {
     envs.push(format!("DNS={}", servers.join(",")));
   }
@@ -417,7 +533,7 @@ fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
   Ok(envs)
 }
 
-fn console_directory(vm: &Vm, state: &SystemState) -> IoResult<PathBuf> {
+fn console_directory(vm: &Vm, state_dir: &str) -> IoResult<PathBuf> {
   // Resource keys come from the API; check again before using one as a path.
   let key = &vm.spec.vm_key;
   if key.is_empty()
@@ -427,27 +543,62 @@ fn console_directory(vm: &Vm, state: &SystemState) -> IoResult<PathBuf> {
   {
     return Err(IoError::invalid_input("VM runtime", "Invalid VM key"));
   }
-  let path = PathBuf::from(&state.inner.config.state_dir)
+  let path = std::fs::canonicalize(state_dir)?
     .join("run/vms")
     .join(key)
     .join(vm.spec.key.to_string());
-  if path.join("console.sock").as_os_str().len() >= 108 {
+  Ok(path)
+}
+
+/// Pin the socket inode before connecting. The short procfs path avoids the
+/// sockaddr_un limit without changing persistent VM directory identities.
+pub(crate) fn open_runtime_socket(
+  directory: &Path,
+  name: &str,
+) -> IoResult<(std::fs::File, PathBuf)> {
+  if !matches!(name, "qmp.sock" | "console.sock") {
     return Err(IoError::invalid_input(
-      "VM runtime",
-      "VM socket path exceeds the Unix socket limit; use a shorter state directory or VM name",
+      "VM socket",
+      "Invalid managed socket name",
     ));
   }
-  Ok(path)
+  if std::fs::canonicalize(directory)? != directory {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM socket directory must not redirect through symlinks",
+    ));
+  }
+  let parent = std::fs::OpenOptions::new()
+    .read(true)
+    .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+    .open(directory)?;
+  if parent.metadata()?.permissions().mode() & 0o077 != 0 {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM socket directory must be private",
+    ));
+  }
+  let socket = std::fs::OpenOptions::new()
+    .read(true)
+    .custom_flags(libc::O_PATH | libc::O_NOFOLLOW)
+    .open(format!("/proc/self/fd/{}/{name}", parent.as_raw_fd()))?;
+  if !socket.metadata()?.file_type().is_socket() {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM control path must be a Unix socket",
+    ));
+  }
+  let path = PathBuf::from(format!("/proc/self/fd/{}", socket.as_raw_fd()));
+  Ok((socket, path))
 }
 
 async fn prepare_console_directory(
   vm: &Vm,
-  state: &SystemState,
+  state_dir: &str,
 ) -> IoResult<PathBuf> {
-  let path = console_directory(vm, state)?;
-  tokio::fs::create_dir_all(&state.inner.config.state_dir).await?;
-  let mut parent =
-    tokio::fs::canonicalize(&state.inner.config.state_dir).await?;
+  tokio::fs::create_dir_all(state_dir).await?;
+  let path = console_directory(vm, state_dir)?;
+  let mut parent = tokio::fs::canonicalize(state_dir).await?;
   for component in ["run", "vms", &vm.spec.vm_key, &vm.spec.key.to_string()] {
     let directory = parent.join(component);
     match tokio::fs::create_dir(&directory).await {
@@ -477,11 +628,14 @@ async fn prepare_console_directory(
   Ok(path)
 }
 
-async fn remove_console_directory(
-  vm: &Vm,
-  state: &SystemState,
-) -> IoResult<()> {
-  let path = console_directory(vm, state)?;
+async fn remove_console_directory(vm: &Vm, state_dir: &str) -> IoResult<()> {
+  let path = match console_directory(vm, state_dir) {
+    Ok(path) => path,
+    Err(err) if err.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(err) => return Err(err),
+  };
   match tokio::fs::canonicalize(&path).await {
     Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
     Err(err) => return Err(err.into()),
@@ -551,16 +705,15 @@ async fn cleanup_process_consoles(
     };
     let mut old_vm = vm.clone();
     old_vm.spec.key = generation;
-    remove_console_directory(&old_vm, state).await?;
+    remove_console_directory(&old_vm, &state.inner.config.state_dir).await?;
   }
   Ok(())
 }
 
 /// Include generations left by failed creates or externally removed containers,
 /// which no longer have a process row. Never recurse into arbitrary entries.
-async fn cleanup_all_consoles(vm: &Vm, state: &SystemState) -> IoResult<()> {
-  // Derive the owned VM parent without imposing the leaf socket length limit
-  // on VMs which have never enabled a console.
+async fn cleanup_all_consoles(vm: &Vm, state_dir: &str) -> IoResult<()> {
+  // Resolve the configured root before enumerating only owned generations.
   let key = &vm.spec.vm_key;
   if key.is_empty()
     || matches!(key.as_str(), "." | "..")
@@ -568,9 +721,12 @@ async fn cleanup_all_consoles(vm: &Vm, state: &SystemState) -> IoResult<()> {
   {
     return Err(IoError::invalid_input("VM console", "Invalid VM key"));
   }
-  let parent = PathBuf::from(&state.inner.config.state_dir)
-    .join("run/vms")
-    .join(key);
+  let root = match tokio::fs::canonicalize(state_dir).await {
+    Ok(root) => root,
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+  };
+  let parent = root.join("run/vms").join(key);
   match tokio::fs::canonicalize(&parent).await {
     Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
     Err(err) => return Err(err.into()),
@@ -596,7 +752,7 @@ async fn cleanup_all_consoles(vm: &Vm, state: &SystemState) -> IoResult<()> {
     }
     let mut old_vm = vm.clone();
     old_vm.spec.key = generation;
-    remove_console_directory(&old_vm, state).await?;
+    remove_console_directory(&old_vm, state_dir).await?;
   }
   match tokio::fs::remove_dir(&parent).await {
     Ok(()) => {}
@@ -812,17 +968,6 @@ pub async fn create_instance(
     });
     log::debug!("KVM enabled /dev/kvm mapped");
   }
-  if let Some(init_container) = &vm.spec.init_container {
-    let process = create_init_container(vm, init_container, state).await?;
-    if let Err(err) = start_init_container(&process, state).await {
-      if let Err(cleanup) =
-        super::process::delete_instances(&[process.key], state).await
-      {
-        log::warn!("Unable to remove failed VM init container: {cleanup}");
-      }
-      return Err(err);
-    }
-  }
   let mut binds = vec![format!("{}:{}", vm.spec.image, vm.spec.image)];
   // A lost process row must not let a failed create rewrite a live runtime's
   // restart projection before Docker rejects the duplicate container name.
@@ -835,13 +980,32 @@ pub async fn create_instance(
       ),
     ));
   }
-  let directory = prepare_console_directory(vm, state).await?;
+  let directory =
+    prepare_console_directory(vm, &state.inner.config.state_dir).await?;
   resize::write_resources(
     &directory,
     &resize::configured_resources(&host_config)?,
   )
   .await?;
   binds.push(format!("{}:/run/nanocl-vm", directory.display()));
+  // Complete all fallible runtime preparation before creating an init process.
+  let init_process = if let Some(init_container) = &vm.spec.init_container {
+    let process = create_init_container(vm, init_container, state).await?;
+    if let Err(err) = start_init_container(&process, state).await {
+      if let Err(cleanup) =
+        super::process::delete_instances(&[process.key], state).await
+      {
+        log::warn!("Unable to remove failed VM init container: {cleanup}");
+      }
+      return Err(err);
+    }
+    Some(process.key)
+  } else {
+    None
+  };
+  let network_mode = super::network::resolve_network_mode(
+    vm.spec.host_config.runtime_network.clone(),
+  );
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -853,10 +1017,9 @@ pub async fn create_instance(
     attach_stdin: Some(true),
     attach_stdout: Some(true),
     open_stdin: Some(true),
+    networking_config: Some(runtime_networking(network_mode.clone())),
     host_config: Some(HostConfig {
-      network_mode: Some(super::network::resolve_network_mode(
-        vm.spec.host_config.runtime_network.clone(),
-      )),
+      network_mode: Some(network_mode),
       binds: Some(binds),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
@@ -875,6 +1038,14 @@ pub async fn create_instance(
   )
   .await;
   if result.is_err() {
+    if let Some(init_key) = init_process
+      && let Err(cleanup) =
+        super::process::delete_instances(&[init_key], state).await
+    {
+      log::warn!(
+        "Unable to remove VM init container after runtime create failure: {cleanup}"
+      );
+    }
     // A name-conflict can mean a live runtime exists without its process row.
     // Never unlink its socket (or its mounted directory) on a create error.
     if matches!(
@@ -884,7 +1055,7 @@ pub async fn create_instance(
         ..
       })
     ) {
-      let _ = remove_console_directory(vm, state).await;
+      let _ = remove_console_directory(vm, &state.inner.config.state_dir).await;
     }
   }
   result
@@ -906,12 +1077,15 @@ async fn record_task_failure(
   state: &SystemState,
 ) -> IoResult<()> {
   if result.is_err() {
-    ObjPsStatusDb::update_actual_status(
+    if let Err(error) = ObjPsStatusDb::update_actual_status(
       key,
       &ObjPsStatusKind::Fail,
       &state.inner.pool,
     )
-    .await?;
+    .await
+    {
+      log::warn!("Unable to record failed VM lifecycle status: {error}");
+    }
   }
   result
 }
@@ -964,7 +1138,7 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
       "The runtime still exists after deletion",
     ));
   }
-  cleanup_all_consoles(&vm, state).await?;
+  cleanup_all_consoles(&vm, &state.inner.config.state_dir).await?;
   VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
   state
     .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
@@ -988,7 +1162,7 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   ensure_networks(&vm, state).await?;
   validate_spec(&vm.spec.clone().into())?;
   ensure_runtime_image(&vm, state).await?;
-  prepare_console_directory(&vm, state).await?;
+  prepare_console_directory(&vm, &state.inner.config.state_dir).await?;
   let runtime_name = format!("{}.v", &vm.spec.vm_key);
   let old_processes =
     ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
@@ -1035,6 +1209,164 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[test]
+  fn vm_endpoint_sysctls_apply_to_the_actual_uplink() {
+    let config = runtime_networking("vm-network".into());
+    let endpoint = &config.endpoints_config["vm-network"];
+    let options = endpoint.driver_opts.as_ref().unwrap();
+    let settings = &options["com.docker.network.endpoint.sysctls"];
+    for setting in [
+      "proxy_arp=1",
+      "accept_local=1",
+      "arp_ignore=1",
+      "send_redirects=0",
+      "rp_filter=0",
+    ] {
+      assert!(
+        settings
+          .split(',')
+          .any(|value| value == format!("net.ipv4.conf.IFNAME.{setting}"))
+      );
+    }
+    assert_eq!(settings.split(',').count(), 5);
+  }
+
+  #[test]
+  fn vm_network_inspect_rejects_disabled_ipv4_even_with_an_explicit_subnet() {
+    let enabled = serde_json::json!({
+      "Driver": "bridge", "EnableIPv4": true, "EnableIPv6": false,
+      "Internal": false, "IPAM": { "Config": [{ "Subnet": "192.0.2.0/24" }] }
+    });
+    assert!(parse_runtime_network(enabled.clone()).is_ok());
+    let mut legacy = enabled.clone();
+    legacy.as_object_mut().unwrap().remove("EnableIPv4");
+    assert!(parse_runtime_network(legacy).is_ok());
+    for flag in [
+      serde_json::json!(false),
+      serde_json::json!("true"),
+      serde_json::Value::Null,
+    ] {
+      let mut disabled = enabled.clone();
+      disabled["EnableIPv4"] = flag;
+      assert!(parse_runtime_network(disabled).is_err());
+    }
+    let mut unsafe_network = enabled;
+    unsafe_network["Driver"] = serde_json::json!("overlay");
+    assert!(parse_runtime_network(unsafe_network).is_err());
+  }
+
+  #[ntex::test]
+  async fn vm_directories_accept_long_names_and_canonical_state_aliases() {
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-directory-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let target = root.join("state");
+    std::fs::create_dir(&target).unwrap();
+    let alias = root.join("alias");
+    std::os::unix::fs::symlink(&target, &alias).unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let relative = PathBuf::from("../".repeat(cwd.components().count() - 1))
+      .join(target.strip_prefix("/").unwrap());
+    let mut vm = Vm::default();
+    vm.spec.vm_key = format!("global.{}", "long-valid-vm-name".repeat(6));
+    let expected = target
+      .join("run/vms")
+      .join(&vm.spec.vm_key)
+      .join(vm.spec.key.to_string());
+    assert!(expected.join("console.sock").as_os_str().len() > 108);
+    for state_dir in [&target, &alias, &relative] {
+      let directory =
+        prepare_console_directory(&vm, state_dir.to_str().unwrap())
+          .await
+          .unwrap();
+      assert_eq!(directory, expected);
+      assert_eq!(
+        std::fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
+        0o700
+      );
+      std::fs::write(directory.join("resources.json"), "{}").unwrap();
+      cleanup_all_consoles(&vm, state_dir.to_str().unwrap())
+        .await
+        .unwrap();
+      assert!(!directory.exists());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[ntex::test]
+  async fn vm_directories_reject_symlinks_below_the_configured_root() {
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-directory-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let outside = root.join("outside");
+    std::fs::create_dir(&outside).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join("run")).unwrap();
+    let mut vm = Vm::default();
+    vm.spec.vm_key = "global.test".into();
+    assert!(
+      prepare_console_directory(&vm, root.to_str().unwrap())
+        .await
+        .is_err()
+    );
+    assert!(!outside.join("vms").exists());
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn vm_socket_descriptor_pins_inode_and_rejects_redirects() {
+    use std::os::unix::net::{UnixListener, UnixStream};
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-socket-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let directory = root.join("long-directory".repeat(8));
+    std::fs::create_dir(&directory).unwrap();
+    std::fs::set_permissions(
+      &directory,
+      std::fs::Permissions::from_mode(0o700),
+    )
+    .unwrap();
+    let listener = UnixListener::bind(root.join("socket")).unwrap();
+    let original = directory.join("console.sock");
+    std::fs::rename(root.join("socket"), &original).unwrap();
+    let (socket, pinned) =
+      open_runtime_socket(&directory, "console.sock").unwrap();
+    assert!(original.as_os_str().len() > 108);
+    assert!(pinned.as_os_str().len() < 108);
+    std::fs::rename(&original, directory.join("old.sock")).unwrap();
+    std::os::unix::fs::symlink("/dev/null", &original).unwrap();
+    let _client = UnixStream::connect(pinned).unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    assert!(open_runtime_socket(&directory, "../socket").is_err());
+    std::fs::remove_file(&original).unwrap();
+    std::fs::write(&original, "not a socket").unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    std::fs::set_permissions(
+      &directory,
+      std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    drop((socket, listener));
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn vm_guest_interface_is_validated_and_forwarded_separately_from_uplink() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.host_config.net_iface = Some("guest0".into());
+    vm.spec.host_config.link_net_iface = Some("eth0".into());
+    let env = runtime_env(&vm, false).unwrap();
+    assert!(env.contains(&"FROM_NETWORK=guest0".into()));
+    assert!(env.contains(&"DEFAULT_INTERFACE=eth0".into()));
+    for invalid in
+      ["", "lo", "too-long-interface", "guest 0", "x\ny", "guest:0"]
+    {
+      vm.spec.host_config.net_iface = Some(invalid.into());
+      assert!(runtime_env(&vm, false).is_err());
+    }
+  }
 
   fn bridge_network(subnets: &[&str]) -> bollard_next::models::Network {
     bollard_next::models::Network {

@@ -22,6 +22,10 @@ never a request query, and is removed from browser history after loading.
 The bridge checks the exact browser Origin and Host to prevent cross-site
 WebSocket connections and DNS rebinding. It is intentionally loopback-only.
 
+For a custom Unix socket, the bridge account must already have filesystem access
+to that socket. Configure its ownership and group permissions in your deployment;
+the daemon does not automatically grant group access to custom socket paths.
+
 For an existing daemon configured with mutual TLS:
 
 ```sh
