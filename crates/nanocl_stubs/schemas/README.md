@@ -5,13 +5,15 @@
 
 - Upstream Git blob: `7796073c9281fffd669f5efa874aa1f55ee95fbb`
 - SHA-256: `a2923d8886201b5478683cf9c6118a00d5603f36d69f8ad899c5b7909c807d63`
-- Copyright Canonical Ltd.; distributed here under the Apache License 2.0
-  option in the accompanying, unchanged upstream `LICENSE-cloud-init` notice.
-  The full Apache License text is in the package-local [LICENSE-APACHE](LICENSE-APACHE),
-  so published `nanocl_stubs` archives include both the upstream attribution and
-  the selected license. The upstream notice also offers GPLv3; that alternative
-  is not the license selected for this bundled copy. This third-party asset is
-  not covered by NanoCL's MIT option.
+- Copyright 2015 Canonical Ltd.; distributed here under the Apache License 2.0.
+  The [upstream notice](https://github.com/canonical/cloud-init/blob/26.2/LICENSE)
+  permits Apache 2.0-only redistribution by replacing its dual-license provisions
+  with the Apache notice. [LICENSE-cloud-init](LICENSE-cloud-init) records the
+  Apache 2.0-only option selected for this bundled copy and retains the upstream
+  copyright. The full Apache License text is in the package-local
+  [LICENSE-APACHE](LICENSE-APACHE), so published `nanocl_stubs` archives include
+  both the attribution notice and the selected license. This third-party asset
+  is not covered by NanoCL's MIT option.
 
 `vm_spec.rs` registers the root as `CloudInit26_2` and the upstream `$defs`
 as `CloudInit26_2.<name>`, rewriting references to the containing document's
