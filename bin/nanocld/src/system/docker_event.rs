@@ -500,6 +500,7 @@ async fn exec_docker(
   };
   match action {
     "start" => {
+      event.action = NativeEventAction::Start.to_string();
       let mut is_active_cargo_runtime_event = false;
       if kind == EventActorKind::Cargo {
         let current_name =
@@ -740,6 +741,92 @@ mod tests {
         ])),
       }),
       ..Default::default()
+    }
+  }
+
+  #[ntex::test]
+  async fn job_process_start_event_matches_waiting_log_subscription() {
+    use futures::FutureExt;
+    use nanocl_stubs::system::{Event, EventCondition, ObjPsStatusPartial};
+
+    let system = utils::tests::gen_default_test_system().await;
+    let key = format!("job-start-event-{}", uuid::Uuid::new_v4().simple());
+    let process_name = format!("{key}-1.j");
+    ObjPsStatusDb::create_from(
+      ObjPsStatusPartial {
+        key: key.clone(),
+        wanted: ObjPsStatusKind::Start,
+        prev_wanted: ObjPsStatusKind::Create,
+        actual: ObjPsStatusKind::Start,
+        prev_actual: ObjPsStatusKind::Starting,
+        health: ObjPsHealthStatusKind::Unknown,
+      },
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+
+    let result = std::panic::AssertUnwindSafe(async {
+      let condition = EventCondition {
+        actor_key: Some(process_name.clone()),
+        actor_kind: Some(EventActorKind::Process),
+        kind: vec![EventKind::Normal],
+        action: vec![NativeEventAction::Start],
+        ..Default::default()
+      };
+      let mut subscription = system
+        .state
+        .subscribe_raw(Some(vec![condition.clone()]))
+        .await
+        .unwrap();
+      let event = EventMessage {
+        typ: Some(EventMessageTypeEnum::CONTAINER),
+        action: Some("start".to_owned()),
+        actor: Some(DockerEventActor {
+          id: Some(format!("removed-{key}")),
+          attributes: Some(HashMap::from([
+            ("io.nanocl".to_owned(), "true".to_owned()),
+            ("io.nanocl.kind".to_owned(), "job".to_owned()),
+            ("io.nanocl.j".to_owned(), key.clone()),
+            ("name".to_owned(), process_name.clone()),
+          ])),
+        }),
+        ..Default::default()
+      };
+      // A queued start may be consumed after the short-lived container was
+      // removed. Its Process event is published before observation refresh;
+      // the log waiter must still receive Start, never the default Destroy.
+      exec_docker(&event, &system.state)
+        .await
+        .expect_err("the removed container cannot be refreshed");
+      let emitted =
+        ntex::time::timeout(std::time::Duration::from_secs(5), async {
+          while let Some(bytes) = subscription.next().await {
+            let bytes = bytes.unwrap();
+            if bytes.is_empty() {
+              continue;
+            }
+            let event: Event = serde_json::from_slice(&bytes).unwrap();
+            if event.actor.as_ref().and_then(|actor| actor.key.as_deref())
+              == Some(process_name.as_str())
+            {
+              return event;
+            }
+          }
+          panic!("Process event subscription ended without the job event");
+        })
+        .await
+        .expect("Docker Process start event was not published");
+      assert_eq!(emitted.action, NativeEventAction::Start.to_string());
+      assert!(condition == emitted);
+    })
+    .catch_unwind()
+    .await;
+    ObjPsStatusDb::del_by_pk(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
     }
   }
 
