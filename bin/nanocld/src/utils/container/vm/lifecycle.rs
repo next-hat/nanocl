@@ -390,20 +390,36 @@ async fn run_lifecycle(
   }
   set_status(key, ObjPsStatusKind::Stop, ObjPsStatusKind::Stopping, state)
     .await?;
-  let stopped = stop_runtime(&vm, options, state).await;
-  let id = match stopped {
-    Ok(id) => id,
-    Err(err) => {
-      // A timeout must not mark a live guest stopped or leave a stop request
-      // queued for reconciliation to retry later without the operator.
-      if let Err(restore_error) = restore_observed_status(&vm, state).await {
-        log::error!(
-          "Unable to restore VM {key} status after {err}: {restore_error}"
-        );
-      }
-      return Err(err);
+  if let Err(err) = complete_lifecycle(&vm, options, restart, state).await {
+    // Every failure after recording the stop request must restore observed
+    // state, including database failures after the guest has already stopped.
+    if let Err(restore_error) = restore_observed_status(&vm, state).await {
+      log::error!(
+        "Unable to restore VM {key} status after {err}: {restore_error}"
+      );
     }
-  };
+    return Err(err);
+  }
+  if restart {
+    state
+      .emit_normal_native_action_sync(&vm, NativeEventAction::Restart)
+      .await;
+  } else {
+    state
+      .emit_normal_native_action_sync(&vm, NativeEventAction::Stop)
+      .await;
+  }
+  Ok(())
+}
+
+async fn complete_lifecycle(
+  vm: &Vm,
+  options: &VmLifecycleOptions,
+  restart: bool,
+  state: &SystemState,
+) -> IoResult<()> {
+  let key = &vm.spec.vm_key;
+  let id = stop_runtime(vm, options, state).await?;
   set_status(key, ObjPsStatusKind::Stop, ObjPsStatusKind::Stop, state).await?;
   if restart {
     set_status(
@@ -413,7 +429,7 @@ async fn run_lifecycle(
       state,
     )
     .await?;
-    let result = timeout_at(Instant::now() + Duration::from_secs(30), async {
+    timeout_at(Instant::now() + Duration::from_secs(30), async {
       if let Some(id) = id {
         // Reuse the verified immutable runtime identity, never a mutable name.
         state
@@ -454,22 +470,7 @@ async fn run_lifecycle(
           "Runtime start was not confirmed; inspect VM status before retrying",
         ),
       ))
-    });
-    if let Err(err) = result {
-      if let Err(restore_error) = restore_observed_status(&vm, state).await {
-        log::error!(
-          "Unable to restore VM {key} status after {err}: {restore_error}"
-        );
-      }
-      return Err(err);
-    }
-    state
-      .emit_normal_native_action_sync(&vm, NativeEventAction::Restart)
-      .await;
-  } else {
-    state
-      .emit_normal_native_action_sync(&vm, NativeEventAction::Stop)
-      .await;
+    })?;
   }
   Ok(())
 }

@@ -827,23 +827,65 @@ fn owned_runtime_id(
     })
 }
 
-async fn inspect_runtime_id(
+async fn inspect_owned_runtime(
   vm: &Vm,
   state: &SystemState,
-) -> IoResult<Option<String>> {
+) -> IoResult<Option<(String, bollard_next::models::ContainerInspectResponse)>>
+{
   match state
     .inner
     .docker_api
     .inspect_container(&format!("{}.v", vm.spec.vm_key), None)
     .await
   {
-    Ok(inspect) => owned_runtime_id(vm, &inspect).map(Some),
+    Ok(inspect) => {
+      let id = owned_runtime_id(vm, &inspect)?;
+      Ok(Some((id, inspect)))
+    }
     Err(bollard_next::errors::Error::DockerResponseServerError {
       status_code: 404,
       ..
     }) => Ok(None),
     Err(err) => Err(*err.map_err_context(|| "VM runtime")),
   }
+}
+
+// Docker assigns fresh endpoint addresses at start. Check an existing assigned
+// address before a destructive update; the runtime still validates any newly
+// allocated address before launching the guest.
+fn validate_runtime_dns(
+  vm: &Vm,
+  inspect: &bollard_next::models::ContainerInspectResponse,
+) -> IoResult<()> {
+  let Some(servers) = vm.spec.host_config.dns.as_ref() else {
+    return Ok(());
+  };
+  let mode = super::network::resolve_network_mode(
+    vm.spec.host_config.runtime_network.clone(),
+  );
+  let networks = inspect
+    .network_settings
+    .as_ref()
+    .and_then(|settings| settings.networks.as_ref());
+  let address = networks
+    .and_then(|networks| {
+      networks.get(&mode).or_else(|| {
+        networks
+          .values()
+          .find(|endpoint| endpoint.network_id.as_deref() == Some(&mode))
+      })
+    })
+    .and_then(|endpoint| endpoint.ip_address.as_deref())
+    .filter(|address| !address.is_empty());
+  if address
+    .is_some_and(|address| servers.iter().any(|server| server == address))
+  {
+    return Err(IoError::invalid_input(
+      "VM DNS",
+      "Dns must not point back to the VM's assigned IPv4 address",
+    ));
+  }
+  Ok(())
 }
 
 async fn create_init_container(
@@ -987,7 +1029,7 @@ pub async fn create_instance(
   let mut binds = vec![format!("{}:{}", vm.spec.image, vm.spec.image)];
   // A lost process row must not let a failed create rewrite a live runtime's
   // restart projection before Docker rejects the duplicate container name.
-  if inspect_runtime_id(vm, state).await?.is_some() {
+  if inspect_owned_runtime(vm, state).await?.is_some() {
     return Err(IoError::with_context(
       "VM create",
       std::io::Error::new(
@@ -1116,6 +1158,11 @@ async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   if !processes.iter().any(|process| process.name == runtime_name) {
     create_instance(&vm, true, state).await?;
   }
+  if vm.spec.host_config.dns.is_some()
+    && let Some((_, inspect)) = inspect_owned_runtime(&vm, state).await?
+  {
+    validate_runtime_dns(&vm, &inspect)?;
+  }
   super::process::start_instances(
     &vm.spec.vm_key,
     &ProcessKind::Vm,
@@ -1141,14 +1188,14 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let mut targets = processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>();
   // A Docker runtime can survive a failed process-row write or reconciliation.
   // Verify its owner and use its immutable ID before releasing the VM identity.
-  if let Some(id) = inspect_runtime_id(&vm, state).await? {
+  if let Some((id, _)) = inspect_owned_runtime(&vm, state).await? {
     if !targets.contains(&id) {
       targets.push(id);
     }
   }
   lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
   super::process::delete_instances(&targets, state).await?;
-  if inspect_runtime_id(&vm, state).await?.is_some() {
+  if inspect_owned_runtime(&vm, state).await?.is_some() {
     return Err(IoError::interrupted(
       "VM runtime",
       "The runtime still exists after deletion",
@@ -1197,7 +1244,8 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     })
     .map(|process| process.key.clone())
     .collect::<Vec<_>>();
-  if let Some(id) = inspect_runtime_id(&vm, state).await? {
+  if let Some((id, inspect)) = inspect_owned_runtime(&vm, state).await? {
+    validate_runtime_dns(&vm, &inspect)?;
     if !old_runtime_keys.contains(&id) {
       old_runtime_keys.push(id);
     }
@@ -1791,6 +1839,51 @@ mod tests {
       vm_process_role("tmp-global.ubuntu.v", runtime_name),
       VmProcessRole::Other
     );
+  }
+
+  #[test]
+  fn vm_dns_preflight_rejects_its_assigned_address_on_the_selected_network() {
+    let mut vm = Vm::default();
+    vm.spec.host_config.runtime_network = Some("vm-network".into());
+    vm.spec.host_config.dns =
+      Some(vec!["192.0.2.53".into(), "192.0.2.7".into()]);
+    let mut inspect: bollard_next::models::ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "NetworkSettings": {"Networks": {"vm-network": {
+          "NetworkID": "network-id", "IPAddress": "192.0.2.7"
+        }}}
+      }))
+      .unwrap();
+    let error = validate_runtime_dns(&vm, &inspect).unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("assigned IPv4 address"));
+    vm.spec.host_config.runtime_network = Some("network-id".into());
+    assert!(validate_runtime_dns(&vm, &inspect).is_err());
+
+    vm.spec.host_config.runtime_network = Some("other-network".into());
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    vm.spec.host_config.runtime_network = Some("vm-network".into());
+    vm.spec.host_config.dns = Some(vec!["192.0.2.53".into()]);
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+
+    // An unassigned endpoint does not reveal the IP Docker will allocate on
+    // start. The runtime must perform the final check against that address.
+    vm.spec.host_config.dns = Some(vec!["192.0.2.7".into()]);
+    inspect
+      .network_settings
+      .as_mut()
+      .unwrap()
+      .networks
+      .as_mut()
+      .unwrap()
+      .get_mut("vm-network")
+      .unwrap()
+      .ip_address = Some(String::new());
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    inspect.network_settings = None;
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    vm.spec.host_config.dns = None;
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
   }
 
   #[test]

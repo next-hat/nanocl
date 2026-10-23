@@ -7,6 +7,7 @@ use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
   container::InspectContainerOptions,
+  models::ContainerInspectResponse,
   service::{EventMessage, EventMessageTypeEnum},
   system::EventsOptions,
 };
@@ -114,6 +115,88 @@ fn vm_runtime_failure_effect(
     return VmRuntimeFailureEffect::NoRuntimeFailure;
   }
   VmRuntimeFailureEffect::FailAndEmitRuntimeError
+}
+
+fn vm_runtime_has_exited(
+  event_id: &str,
+  runtime: &ContainerInspectResponse,
+) -> bool {
+  !event_id.is_empty()
+    && runtime.id.as_deref() == Some(event_id)
+    && runtime.state.as_ref().and_then(|state| state.running) == Some(false)
+}
+
+fn vm_runtime_failure_guard(
+  key: &str,
+) -> Option<tokio::sync::OwnedMutexGuard<()>> {
+  utils::container::vm::lifecycle_lock(key)
+    .try_lock_owned()
+    .ok()
+}
+
+async fn handle_vm_runtime_exit(
+  key: &str,
+  name: &str,
+  id: &str,
+  state: &SystemState,
+  _guard: tokio::sync::OwnedMutexGuard<()>,
+) -> IoResult<()> {
+  // A contended event is checked only after the operation releases its lock.
+  // The VM may have restarted, changed desired state, or been deleted by then.
+  let actual_status =
+    match ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await {
+      Ok(status) => status,
+      Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+        return Ok(());
+      }
+      Err(error) => return Err(error),
+    };
+  if vm_runtime_failure_effect(
+    "die",
+    name,
+    &actual_status.wanted,
+    &actual_status.actual,
+  ) != VmRuntimeFailureEffect::FailAndEmitRuntimeError
+  {
+    return Ok(());
+  }
+  // A delayed die event can describe a replaced runtime or an earlier run of
+  // a restarted container. Confirm that the current runtime is still exited.
+  let runtime = state
+    .inner
+    .docker_api
+    .inspect_container(&format!("{key}.v"), None::<InspectContainerOptions>)
+    .await;
+  let has_exited = match runtime {
+    Ok(runtime) => vm_runtime_has_exited(id, &runtime),
+    Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    }) => false,
+    Err(error) => return Err(*error.map_err_context(|| "VM Docker event")),
+  };
+  if !has_exited {
+    return Ok(());
+  }
+  let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
+    Ok(vm) => vm,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  ObjPsStatusDb::update_actual_status(
+    key,
+    &ObjPsStatusKind::Fail,
+    &state.inner.pool,
+  )
+  .await?;
+  state.emit_error_native_action(
+    &vm,
+    NativeEventAction::Die,
+    Some(format!("process {name} die but should be alive")),
+  );
+  Ok(())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -522,44 +605,26 @@ async fn exec_docker(
               );
             }
           }
-          (EventActorKind::Vm, wanted, actual)
-            if vm_runtime_failure_effect(action, &name, wanted, actual)
-              == VmRuntimeFailureEffect::FailAndEmitRuntimeError =>
-          {
-            // An old runtime may finish exiting after replacement. Only the
-            // immutable Docker ID currently bound to the VM can fail it.
-            let runtime = state
-              .inner
-              .docker_api
-              .inspect_container(
-                &format!("{kind_key}.v"),
-                None::<InspectContainerOptions>,
-              )
-              .await;
-            let is_current = match runtime {
-              Ok(runtime) => runtime.id.as_deref() == Some(id.as_str()),
-              Err(bollard_next::errors::Error::DockerResponseServerError {
-                status_code: 404,
-                ..
-              }) => false,
-              Err(error) => {
-                return Err(*error.map_err_context(|| "VM Docker event"));
-              }
-            };
-            if is_current {
-              ObjPsStatusDb::update_actual_status(
-                &kind_key,
-                &ObjPsStatusKind::Fail,
-                &state.inner.pool,
-              )
-              .await?;
-              let vm = VmDb::transform_read_by_pk(&kind_key, &state.inner.pool)
+          (EventActorKind::Vm, _, _) => {
+            if let Some(guard) = vm_runtime_failure_guard(&kind_key) {
+              handle_vm_runtime_exit(&kind_key, &name, &id, state, guard)
                 .await?;
-              state.emit_error_native_action(
-                &vm,
-                NativeEventAction::Die,
-                Some(format!("process {name} die but should be alive")),
-              );
+            } else {
+              // Recheck after the active operation instead of losing a crash
+              // during resize or blocking the serial Docker event stream.
+              let lock = utils::container::vm::lifecycle_lock(&kind_key);
+              let key = kind_key.clone();
+              let name = name.clone();
+              let id = id.clone();
+              let state = state.clone();
+              rt::spawn(async move {
+                let guard = lock.lock_owned().await;
+                if let Err(error) =
+                  handle_vm_runtime_exit(&key, &name, &id, &state, guard).await
+                {
+                  log::warn!("event::docker deferred VM exit: {error}");
+                }
+              });
             }
           }
           _ => {}
@@ -889,6 +954,78 @@ mod tests {
       ),
       VmRuntimeFailureEffect::FailAndEmitRuntimeError
     );
+  }
+
+  #[test]
+  fn vm_docker_event_delayed_die_does_not_fail_restarted_runtime() {
+    let mut runtime: ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "Id": "same-runtime-id",
+        "State": {"Running": true}
+      }))
+      .unwrap();
+    assert!(!vm_runtime_has_exited("same-runtime-id", &runtime));
+    runtime.state.as_mut().unwrap().running = Some(false);
+    assert!(vm_runtime_has_exited("same-runtime-id", &runtime));
+    assert!(!vm_runtime_has_exited("replaced-runtime-id", &runtime));
+  }
+
+  #[test]
+  fn vm_docker_event_lifecycle_guard_keeps_restart_authoritative() {
+    use std::{future::Future, task::Context};
+
+    for (key, running_after_operation) in [
+      ("global.event-restart-guard-test", true),
+      ("global.event-resize-crash-guard-test", false),
+    ] {
+      let lock = utils::container::vm::lifecycle_lock(key);
+      let lifecycle = lock.clone().try_lock_owned().unwrap();
+      let mut runtime: ContainerInspectResponse =
+        serde_json::from_value(serde_json::json!({
+          "Id": "same-runtime-id",
+          "State": {"Running": false}
+        }))
+        .unwrap();
+      assert!(vm_runtime_has_exited("same-runtime-id", &runtime));
+      assert!(vm_runtime_failure_guard(key).is_none());
+      // Poll the deferred lock directly: the event yields while the operation
+      // owns the outcome, without timers, services, or blocking another event.
+      let mut pending = Box::pin(lock.lock_owned());
+      let mut context = Context::from_waker(futures::task::noop_waker_ref());
+      assert!(pending.as_mut().poll(&mut context).is_pending());
+
+      runtime.state.as_mut().unwrap().running = Some(running_after_operation);
+      drop(lifecycle);
+      let std::task::Poll::Ready(event_guard) =
+        pending.as_mut().poll(&mut context)
+      else {
+        panic!("deferred event must proceed after the operation finishes");
+      };
+      // A completed restart suppresses the stale die. A real crash during
+      // resize remains a failure candidate after the resize releases its lock.
+      assert_eq!(
+        vm_runtime_has_exited("same-runtime-id", &runtime),
+        !running_after_operation
+      );
+      assert!(vm_runtime_failure_guard(key).is_none());
+      drop(event_guard);
+      assert!(vm_runtime_failure_guard(key).is_some());
+    }
+  }
+
+  #[test]
+  fn vm_docker_event_unknown_runtime_state_does_not_prove_exit() {
+    let mut runtime: ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "Id": "runtime-id",
+        "State": {}
+      }))
+      .unwrap();
+    assert!(!vm_runtime_has_exited("runtime-id", &runtime));
+    runtime.state = None;
+    assert!(!vm_runtime_has_exited("runtime-id", &runtime));
+    runtime.id = Some(String::new());
+    assert!(!vm_runtime_has_exited("", &runtime));
   }
 
   #[test]

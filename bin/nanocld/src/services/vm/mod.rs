@@ -101,7 +101,9 @@ mod tests {
       GenericNspQuery,
     },
     namespace::NamespacePartial,
-    system::{EventActorKind, EventCondition, EventKind, NativeEventAction},
+    system::{
+      Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
+    },
     vm::{VmInspect, VmSummary},
     vm_spec::{VmSpecPartial, VmSpecUpdate},
   };
@@ -126,21 +128,40 @@ mod tests {
       .unwrap()
   }
 
+  fn is_vm_task_registration(
+    bytes: &[u8],
+    key: &str,
+    action: NativeEventAction,
+  ) -> bool {
+    if bytes.is_empty() {
+      return false;
+    }
+    let event: Event = serde_json::from_slice(bytes).unwrap();
+    EventCondition {
+      actor_key: Some(key.to_owned()),
+      actor_kind: Some(EventActorKind::Vm),
+      kind: vec![EventKind::Normal],
+      action: vec![action],
+      ..Default::default()
+    } == event
+  }
+
   async fn wait_vm_task(
     mut registration: crate::models::RawEventReceiver,
     state: &crate::models::SystemState,
     key: &str,
+    action: NativeEventAction,
   ) {
     ntex::time::timeout(std::time::Duration::from_secs(90), async {
-      // The raw event is delivered after exec_event registers the task.
-      // Waiting on the task map before this barrier can miss queued work.
+      // Raw subscriptions deliver every event; their conditions only stop
+      // the stream. Match this operation before observing its registered task.
       loop {
         let event = registration
           .next()
           .await
           .expect("VM event stream ended")
           .unwrap();
-        if !event.is_empty() {
+        if is_vm_task_registration(&event, key, action.clone()) {
           break;
         }
       }
@@ -152,6 +173,34 @@ mod tests {
     })
     .await
     .expect("VM task did not settle");
+  }
+
+  #[test]
+  fn vm_task_registration_ignores_unrelated_raw_events() {
+    const KEY: &str = "global.example";
+    let event = |key: &str, actor_kind: &str, action: &str, kind: &str| {
+      serde_json::to_vec(&serde_json::json!({
+        "Key": uuid::Uuid::nil(),
+        "CreatedAt": "2026-01-01T00:00:00",
+        "ExpiresAt": "2026-01-01T00:01:00",
+        "ReportingNode": "test",
+        "ReportingController": "nanocl.io/core",
+        "Kind": kind,
+        "Action": action,
+        "Reason": "test",
+        "Actor": { "Key": key, "Kind": actor_kind },
+      }))
+      .unwrap()
+    };
+    let matches = |bytes: &[u8]| {
+      is_vm_task_registration(bytes, KEY, NativeEventAction::Destroying)
+    };
+    assert!(!matches(b""));
+    assert!(!matches(&event(KEY, "Vm", "update", "normal")));
+    assert!(!matches(&event("other.vm", "Vm", "destroying", "normal")));
+    assert!(!matches(&event(KEY, "Cargo", "destroying", "normal")));
+    assert!(!matches(&event(KEY, "Vm", "destroying", "error")));
+    assert!(matches(&event(KEY, "Vm", "destroying", "normal")));
   }
 
   #[ntex::test]
@@ -285,7 +334,13 @@ mod tests {
       http::StatusCode::OK,
       "patch VM by canonical key"
     );
-    wait_vm_task(update, &system.state, OTHER_KEY).await;
+    wait_vm_task(
+      update,
+      &system.state,
+      OTHER_KEY,
+      NativeEventAction::Updating,
+    )
+    .await;
 
     for key in [GLOBAL_KEY, OTHER_KEY] {
       let deletion =
@@ -299,7 +354,8 @@ mod tests {
         http::StatusCode::OK,
         "delete VM by canonical key"
       );
-      wait_vm_task(deletion, &system.state, key).await;
+      wait_vm_task(deletion, &system.state, key, NativeEventAction::Destroying)
+        .await;
       let response = client
         .send_get(&format!("/vms/{key}/inspect"), None::<String>)
         .await;

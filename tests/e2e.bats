@@ -183,8 +183,9 @@ teardown_file() {
   run nanocl state render -s ./examples/deploy_example.yml
   [ "$status" -eq 0 ]
 
-  run sleep 2
-  run curl --header "Host: deploy-example.com" 127.0.0.1
+  run curl --silent --show-error --fail --retry 10 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 \
+    --header "Host: deploy-example.com" 127.0.0.1
   [ "$status" -eq 0 ]
 
   run nanocl state rm -ys ./examples/deploy_example.yml
@@ -402,7 +403,8 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [ "$output" = "$gateway" ]
 
-  run curl --silent --fail --retry 10 --retry-all-errors \
+  run curl --silent --show-error --fail --retry 10 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 \
     --header 'Host: network-partitioning.nanocl.test' "http://${gateway}"
   [ "$status" -eq 0 ]
 
