@@ -153,6 +153,7 @@ impl VmDb {
       vm.spec.mac_address.as_deref(),
       &in_use,
     )?);
+    utils::container::vm::validate_replacement_spec(&vm, &spec, state).await?;
     let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     let new_status = ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Start.to_string()),
@@ -161,14 +162,18 @@ impl VmDb {
       prev_actual: Some(status.actual),
       health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
     };
-    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
-    let vm = VmDb::update_from_spec(
+    let mut vm = VmDb::update_from_spec(
       &vm.spec.vm_key,
       &spec,
       &obj.version,
       &state.inner.pool,
     )
     .await?;
+    // Pending is the final fallible acceptance mutation. Task setup already
+    // owns both locks, and immediately hands them to its registered executor.
+    vm.status = ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool)
+      .await?
+      .try_into()?;
     Ok(vm)
   }
 
@@ -278,15 +283,29 @@ impl ObjDelByPk for VmDb {
     NativeEventAction::Destroying
   }
 
+  async fn del_obj_by_pk(
+    pk: &str,
+    _opts: &Self::ObjDelOpts,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjDelOut> {
+    let key = pk.to_owned();
+    let prepare_state = state.clone();
+    crate::tasks::vm::accept_task(
+      pk,
+      NativeEventAction::Destroying,
+      state,
+      async move { Self::fn_del_obj_by_pk(&key, &(), &prepare_state).await },
+    )
+    .await
+  }
+
+  // Called only by accept_task while the operation owns both lifecycle locks.
   async fn fn_del_obj_by_pk(
     pk: &str,
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
-      .try_lock_owned()
-      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
-    let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+    let mut vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     let new_status = ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Destroy.to_string()),
@@ -295,7 +314,9 @@ impl ObjDelByPk for VmDb {
       prev_actual: Some(status.actual),
       ..Default::default()
     };
-    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
+    vm.status = ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool)
+      .await?
+      .try_into()?;
     Ok(vm)
   }
 }
@@ -304,14 +325,32 @@ impl ObjPutByPk for VmDb {
   type ObjPutIn = VmObjPutIn;
   type ObjPutOut = Vm;
 
+  async fn put_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPutOut> {
+    let key = pk.to_owned();
+    let prepare_state = state.clone();
+    let obj = VmObjPutIn {
+      spec: obj.spec.clone(),
+      version: obj.version.clone(),
+    };
+    crate::tasks::vm::accept_task(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      async move { Self::fn_put_obj_by_pk(&key, &obj, &prepare_state).await },
+    )
+    .await
+  }
+
+  // Called only by accept_task while the operation owns both lifecycle locks.
   async fn fn_put_obj_by_pk(
     pk: &str,
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
-      .try_lock_owned()
-      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
     let _guard = mac_allocation_lock().lock().await;
     Self::put_spec_unlocked(pk, obj, state).await
   }
@@ -321,14 +360,32 @@ impl ObjPatchByPk for VmDb {
   type ObjPatchIn = VmObjPatchIn;
   type ObjPatchOut = Vm;
 
+  async fn patch_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPatchOut> {
+    let key = pk.to_owned();
+    let prepare_state = state.clone();
+    let obj = VmObjPatchIn {
+      spec: obj.spec.clone(),
+      version: obj.version.clone(),
+    };
+    crate::tasks::vm::accept_task(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      async move { Self::fn_patch_obj_by_pk(&key, &obj, &prepare_state).await },
+    )
+    .await
+  }
+
+  // Called only by accept_task while the operation owns both lifecycle locks.
   async fn fn_patch_obj_by_pk(
     pk: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let _runtime_guard = utils::container::vm::lifecycle_lock(pk)
-      .try_lock_owned()
-      .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))?;
     let _guard = mac_allocation_lock().lock().await;
     let spec = &obj.spec;
     let version = &obj.version;

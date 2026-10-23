@@ -32,7 +32,7 @@ pub(crate) use lifecycle::{
   enqueue_lifecycle, lifecycle_lock, restart_with_options, runtime_status,
   socket_directory, stop_with_options,
 };
-pub(crate) use resize::{resize, runtime_resources, validate_boot_spec};
+pub(crate) use resize::{resize, runtime_resources};
 
 fn network_modes(vm: &Vm) -> Vec<String> {
   let mut modes = vec![super::network::resolve_network_mode(
@@ -850,6 +850,30 @@ async fn inspect_owned_runtime(
   }
 }
 
+// The request holds the lifecycle guard. Reject checks based on the current
+// assigned endpoint before persisting either a desired revision or transition.
+// A replacement's newly assigned address is still checked by the runtime.
+pub(crate) async fn validate_replacement_spec(
+  vm: &Vm,
+  spec: &nanocl_stubs::vm_spec::VmSpecPartial,
+  state: &SystemState,
+) -> IoResult<()> {
+  if spec
+    .host_config
+    .as_ref()
+    .and_then(|config| config.dns.as_ref())
+    .is_none()
+  {
+    return Ok(());
+  }
+  if let Some(runtime) = lifecycle::inspect_runtime(vm, state).await? {
+    let mut candidate = vm.clone();
+    candidate.spec.host_config = spec.host_config.clone().unwrap_or_default();
+    validate_runtime_dns(&candidate, &runtime)?;
+  }
+  Ok(())
+}
+
 // Docker assigns fresh endpoint addresses at start. Check an existing assigned
 // address before a destructive update; the runtime still validates any newly
 // allocated address before launching the guest.
@@ -1127,25 +1151,71 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   record_task_failure(key, result, state).await
 }
 
+// Acceptance hands both lifecycle and distributed ownership to the task.
+// This entry point must only be called while that lifecycle guard is held.
+pub(crate) async fn run_task_unlocked(
+  key: &str,
+  action: NativeEventAction,
+  state: &SystemState,
+) -> IoResult<()> {
+  let result = match action {
+    NativeEventAction::Starting => start_unlocked(key, state).await,
+    NativeEventAction::Updating => update_unlocked(key, state).await,
+    NativeEventAction::Destroying => delete_unlocked(key, state).await,
+    _ => Err(IoError::invalid_input(
+      "VM task",
+      "Unsupported VM task action",
+    )),
+  };
+  record_task_failure(key, result, state).await
+}
+
 // Call while holding the operation's lifecycle guard. The asynchronous task
 // error callback runs after release and must not overwrite a newer operation.
-async fn record_task_failure(
+pub(crate) async fn record_task_failure(
   key: &str,
   result: IoResult<()>,
   state: &SystemState,
 ) -> IoResult<()> {
-  if result.is_err() {
-    if let Err(error) = ObjPsStatusDb::update_actual_status(
-      key,
-      &ObjPsStatusKind::Fail,
-      &state.inner.pool,
-    )
-    .await
+  if let Err(operation_error) = &result {
+    // The requested operation failed, but its old guest may still be running
+    // after preflight or an ACPI timeout. Observe the owned runtime under the
+    // same guard; task error events retain the operation's failure explanation.
+    let observed =
+      tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+        lifecycle::inspect_runtime(&vm, state).await
+      })
+      .await;
+    let actual = match observed {
+      Ok(Ok(runtime)) => task_failure_actual(runtime.as_ref()),
+      _ => ObjPsStatusKind::Fail,
+    };
+    log::warn!(
+      "VM {key} operation failed: {operation_error}; observed status: {actual}"
+    );
+    if let Err(error) =
+      ObjPsStatusDb::update_actual_status(key, &actual, &state.inner.pool).await
     {
       log::warn!("Unable to record failed VM lifecycle status: {error}");
     }
   }
   result
+}
+
+fn task_failure_actual(
+  runtime: Option<&bollard_next::models::ContainerInspectResponse>,
+) -> ObjPsStatusKind {
+  match runtime {
+    None => ObjPsStatusKind::Stop,
+    Some(runtime) => {
+      match runtime.state.as_ref().and_then(|state| state.running) {
+        Some(true) => ObjPsStatusKind::Start,
+        Some(false) => ObjPsStatusKind::Stop,
+        None => ObjPsStatusKind::Fail,
+      }
+    }
+  }
 }
 
 async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
@@ -1273,6 +1343,19 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[test]
+  fn failed_vm_operation_preserves_observed_runtime_state() {
+    let mut runtime: bollard_next::models::ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({"State": {"Running": true}}))
+        .unwrap();
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Start);
+    runtime.state.as_mut().unwrap().running = Some(false);
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Stop);
+    runtime.state.as_mut().unwrap().running = None;
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Fail);
+    assert_eq!(task_failure_actual(None), ObjPsStatusKind::Stop);
+  }
 
   #[test]
   fn vm_endpoint_sysctls_apply_to_the_actual_uplink() {

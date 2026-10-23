@@ -15,19 +15,46 @@ use tokio::{
 };
 
 use crate::{
-  models::{ProcessDb, SystemState, VmDb, WsConState},
+  models::{ProcessDb, SpecDb, SystemState, VmDb, WsConState},
   repositories::generic::*,
   utils,
 };
 
 const MAX_FRAME_SIZE: usize = 65_536;
 
+fn runtime_generation(
+  runtime: &ContainerInspectResponse,
+) -> HttpResult<uuid::Uuid> {
+  runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref())
+    .and_then(|labels| labels.get("io.nanocl.vm-spec"))
+    .and_then(|value| uuid::Uuid::parse_str(value).ok())
+    .ok_or_else(|| HttpError::conflict("VM runtime generation is invalid"))
+}
+
 fn validate_runtime(
   vm: &Vm,
+  boot: &SpecDb,
   process: &Process,
   runtime: &ContainerInspectResponse,
   node: &str,
-) -> HttpResult<()> {
+) -> HttpResult<Vm> {
+  if !vm.spec.console.unwrap_or(false) {
+    return Err(HttpError::forbidden("VM console is disabled"));
+  }
+  if boot.kind_name != "Vm" || boot.kind_key != vm.spec.vm_key {
+    return Err(HttpError::conflict(
+      "Runtime boot specification belongs to another object",
+    ));
+  }
+  let boot_spec = boot.try_to_vm_spec()?;
+  if !boot_spec.console.unwrap_or(false) {
+    return Err(HttpError::conflict(
+      "VM console is disabled in the running boot specification",
+    ));
+  }
   let expected_name = format!("{}.v", vm.spec.vm_key);
   let labels = runtime
     .config
@@ -38,8 +65,9 @@ fn validate_runtime(
       .and_then(|labels| labels.get(name))
       .map(String::as_str)
   };
-  let generation = vm.spec.key.to_string();
-  if process.kind != ProcessKind::Vm
+  let generation = boot_spec.key.to_string();
+  if process.key.is_empty()
+    || process.kind != ProcessKind::Vm
     || process.kind_key != vm.spec.vm_key
     || process.name != expected_name
     || process.node_name != node
@@ -49,6 +77,7 @@ fn validate_runtime(
     || label("io.nanocl.n") != Some(vm.namespace_name.as_str())
     || label("io.nanocl.vm-spec") != Some(generation.as_str())
     || label("io.nanocl.vm-console") != Some("true")
+    || label("io.nanocl.vm-runtime-api") != Some("0.19")
     || label("io.nanocl.init-v").is_some()
   {
     return Err(HttpError::conflict(
@@ -58,7 +87,9 @@ fn validate_runtime(
   if runtime.state.as_ref().and_then(|state| state.running) != Some(true) {
     return Err(HttpError::conflict("VM runtime is not running"));
   }
-  Ok(())
+  let mut boot_vm = vm.clone();
+  boot_vm.spec = boot_spec;
+  Ok(boot_vm)
 }
 
 fn console_input(frame: ws::Frame) -> HttpResult<Bytes> {
@@ -295,13 +326,19 @@ pub async fn console_vm(
     .inspect_container(&process.key, None)
     .await
     .map_err(console_inspect_error)?;
-  let mut boot_vm = vm.clone();
-  boot_vm.spec = utils::container::vm::validate_boot_spec(&vm, &runtime, state)
-    .await
-    .map_err(super::lifecycle::lifecycle_error)?;
-  validate_runtime(&boot_vm, process, &runtime, &state.inner.config.hostname)?;
-  let directory = utils::container::vm::socket_directory(
+  // Replacement may have failed before the old guest exited. Console access
+  // follows that owned boot generation, independently of resize compatibility.
+  let generation = runtime_generation(&runtime)?;
+  let boot = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
+  let boot_vm = validate_runtime(
     &vm,
+    &boot,
+    process,
+    &runtime,
+    &state.inner.config.hostname,
+  )?;
+  let directory = utils::container::vm::socket_directory(
+    &boot_vm,
     &runtime,
     &state.inner.config.state_dir,
   )
@@ -476,20 +513,26 @@ mod tests {
     );
   }
 
-  #[test]
-  fn console_runtime_rejects_wrong_vm_node_generation_and_stopped_runtime() {
-    let vm = Vm {
-      namespace_name: "global".into(),
-      created_at: Default::default(),
-      status: Default::default(),
-      spec: nanocl_stubs::vm_spec::VmSpec {
-        vm_key: "global.desktop".into(),
+  fn console_fixture() -> (Vm, SpecDb, Process, ContainerInspectResponse) {
+    let mut boot = SpecDb::try_from_vm_partial(
+      "global.desktop",
+      "v0.19.0",
+      &nanocl_stubs::vm_spec::VmSpecPartial {
+        console: Some(true),
         ..Default::default()
       },
+    )
+    .unwrap();
+    boot.key = uuid::Uuid::from_u128(1);
+    let vm = Vm {
+      namespace_name: "global".into(),
+      spec: boot.try_to_vm_spec().unwrap(),
+      ..Default::default()
     };
     let runtime: ContainerInspectResponse = serde_json::from_value(serde_json::json!({
       "Id": "container-id", "Name": "/global.desktop.v", "State": { "Running": true },
-      "Config": { "Labels": { "io.nanocl.v": "global.desktop", "io.nanocl.n": "global", "io.nanocl.vm-spec": vm.spec.key.to_string(), "io.nanocl.vm-console": "true" } }
+      "Config": { "Labels": { "io.nanocl.v": "global.desktop", "io.nanocl.n": "global", "io.nanocl.vm-spec": boot.key.to_string(), "io.nanocl.vm-console": "true", "io.nanocl.vm-qmp": "1", "io.nanocl.vm-runtime-api": "0.19" } },
+      "Mounts": [{"Type": "bind", "Source": format!("/run/vms/global.desktop/{}", boot.key), "Destination": "/run/nanocl-vm", "RW": true}]
     })).unwrap();
     let process = Process {
       key: "container-id".into(),
@@ -502,16 +545,33 @@ mod tests {
       ip_address: None,
       data: runtime.clone(),
     };
-    assert!(validate_runtime(&vm, &process, &runtime, "local").is_ok());
-    assert!(validate_runtime(&vm, &process, &runtime, "other-node").is_err());
+    (vm, boot, process, runtime)
+  }
+
+  #[test]
+  fn console_runtime_rejects_wrong_vm_node_generation_and_stopped_runtime() {
+    let (vm, boot, process, runtime) = console_fixture();
+    assert_eq!(runtime_generation(&runtime).unwrap(), boot.key);
+    assert!(validate_runtime(&vm, &boot, &process, &runtime, "local").is_ok());
+    assert!(
+      validate_runtime(&vm, &boot, &process, &runtime, "other-node").is_err()
+    );
     let mut wrong_process = process.clone();
     wrong_process.kind_key = "global.other".into();
-    assert!(validate_runtime(&vm, &wrong_process, &runtime, "local").is_err());
+    assert!(
+      validate_runtime(&vm, &boot, &wrong_process, &runtime, "local").is_err()
+    );
+    wrong_process = process.clone();
+    wrong_process.key = "replaced-container-id".into();
+    assert!(
+      validate_runtime(&vm, &boot, &wrong_process, &runtime, "local").is_err()
+    );
     for (label, value) in [
       ("io.nanocl.v", "global.other"),
       ("io.nanocl.n", "other"),
       ("io.nanocl.vm-spec", "old-generation"),
       ("io.nanocl.vm-console", "false"),
+      ("io.nanocl.vm-runtime-api", "0.18"),
       ("io.nanocl.init-v", "true"),
     ] {
       let mut wrong = runtime.clone();
@@ -523,11 +583,97 @@ mod tests {
         .as_mut()
         .unwrap()
         .insert(label.into(), value.into());
-      assert!(validate_runtime(&vm, &process, &wrong, "local").is_err());
+      assert!(validate_runtime(&vm, &boot, &process, &wrong, "local").is_err());
+      if label == "io.nanocl.vm-spec" {
+        assert!(runtime_generation(&wrong).is_err());
+      }
     }
     let mut stopped = runtime.clone();
     stopped.state.as_mut().unwrap().running = Some(false);
-    assert!(validate_runtime(&vm, &process, &stopped, "local").is_err());
+    assert!(validate_runtime(&vm, &boot, &process, &stopped, "local").is_err());
+  }
+
+  #[test]
+  fn console_reconnects_to_original_boot_after_shutdown_timeout() {
+    let (mut desired, boot, process, runtime) = console_fixture();
+    // Snapshot after a replacement timed out waiting for the original guest:
+    // desired state advanced, while the original process is still running.
+    desired.spec.key = uuid::Uuid::from_u128(2);
+    desired.spec.hostname = Some("replacement".into());
+    desired.spec.host_config.dns = Some(vec!["9.9.9.9".into()]);
+    desired.spec.cloud_init = Some(false);
+    let resolved =
+      validate_runtime(&desired, &boot, &process, &runtime, "local").unwrap();
+    assert_eq!(resolved.spec.key, boot.key);
+    assert_eq!(resolved.spec.hostname, None);
+    assert_eq!(
+      utils::container::vm::socket_directory(&resolved, &runtime, "/").unwrap(),
+      std::path::PathBuf::from(format!("/run/vms/global.desktop/{}", boot.key)),
+    );
+    // A mount for the desired generation cannot impersonate the running one.
+    let mut stale = runtime.clone();
+    stale.mounts.as_mut().unwrap()[0].source =
+      Some(format!("/run/vms/global.desktop/{}", desired.spec.key));
+    assert!(
+      utils::container::vm::socket_directory(&resolved, &stale, "/").is_err()
+    );
+  }
+
+  #[test]
+  fn console_reconnects_to_original_boot_after_replacement_preflight_failure() {
+    let (mut desired, boot, process, runtime) = console_fixture();
+    // Runtime-image preflight can fail after acceptance without touching the
+    // old container. Reconnection must resolve its boot spec, not the request.
+    desired.spec.key = uuid::Uuid::from_u128(2);
+    desired.spec.host_config.runtime =
+      Some("missing-runtime:replacement".into());
+    desired.spec.cloud_init_user_data =
+      Some(nanocl_stubs::vm_spec::VmCloudInitUserData::Raw(
+        "replacement config".into(),
+      ));
+    let resolved =
+      validate_runtime(&desired, &boot, &process, &runtime, "local").unwrap();
+    assert_eq!(resolved.spec.key, runtime_generation(&runtime).unwrap());
+    assert_eq!(resolved.spec.host_config.runtime, None);
+    assert_eq!(resolved.spec.cloud_init_user_data, None);
+    assert!(
+      utils::container::vm::socket_directory(&resolved, &runtime, "/").is_ok()
+    );
+  }
+
+  #[test]
+  fn console_recovery_requires_desired_and_boot_enablement_and_owned_history() {
+    let (vm, boot, process, runtime) = console_fixture();
+    for console in [Some(false), None] {
+      let mut disabled = vm.clone();
+      disabled.spec.key = uuid::Uuid::from_u128(2);
+      disabled.spec.console = console;
+      assert_eq!(
+        validate_runtime(&disabled, &boot, &process, &runtime, "local")
+          .unwrap_err()
+          .status,
+        ntex::http::StatusCode::FORBIDDEN,
+      );
+    }
+    let mut disabled_boot = boot.clone();
+    disabled_boot.data["Console"] = serde_json::json!(false);
+    assert!(
+      validate_runtime(&vm, &disabled_boot, &process, &runtime, "local")
+        .is_err()
+    );
+    for field in ["kind", "owner", "generation"] {
+      let mut foreign = boot.clone();
+      match field {
+        "kind" => foreign.kind_name = "Cargo".into(),
+        "owner" => foreign.kind_key = "global.other".into(),
+        "generation" => foreign.key = uuid::Uuid::from_u128(3),
+        _ => unreachable!(),
+      }
+      assert!(
+        validate_runtime(&vm, &foreign, &process, &runtime, "local").is_err(),
+        "{field}"
+      );
+    }
   }
 
   #[ntex::test]

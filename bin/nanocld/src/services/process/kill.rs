@@ -3,12 +3,12 @@ use ntex::web;
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::ProcessKillOptions;
 
-use crate::models::SystemState;
+use crate::models::{SystemState, VmLifecycleGuard};
 
-fn lock_vm_signal(
+async fn lock_vm_signal(
   runtime: &bollard_next::service::ContainerInspectResponse,
   signal: &str,
-) -> HttpResult<Option<tokio::sync::OwnedMutexGuard<()>>> {
+) -> HttpResult<Option<VmLifecycleGuard>> {
   let Some(key) = super::managed_vm_runtime_key(runtime, false)? else {
     return Ok(None);
   };
@@ -20,10 +20,12 @@ fn lock_vm_signal(
   {
     return Ok(None);
   }
-  crate::utils::container::vm::lifecycle_lock(&key)
-    .try_lock_owned()
-    .map(Some)
-    .map_err(|_| HttpError::conflict("A VM lifecycle operation is active"))
+  Ok(Some(
+    crate::utils::container::vm::lifecycle_lock(&key)
+      .try_lock_owned()
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?,
+  ))
 }
 
 /// Send a signal to a single process by its name or id
@@ -55,7 +57,7 @@ pub async fn kill_process(
     .id
     .as_deref()
     .ok_or_else(|| HttpError::conflict("Process has no container identity"))?;
-  let _guard = lock_vm_signal(&runtime, &payload.signal)?;
+  let _guard = lock_vm_signal(&runtime, &payload.signal).await?;
   state
     .inner
     .docker_api
@@ -72,8 +74,9 @@ mod tests {
 
   use bollard_next::service::{ContainerConfig, ContainerInspectResponse};
 
-  #[test]
-  fn vm_signals_coordinate_but_hard_kill_remains_available_during_shutdown() {
+  #[ntex::test]
+  async fn vm_signals_coordinate_but_hard_kill_remains_available_during_shutdown()
+   {
     let mut runtime = ContainerInspectResponse {
       name: Some("/global.signal-lock.v".into()),
       config: Some(ContainerConfig {
@@ -85,31 +88,46 @@ mod tests {
       }),
       ..Default::default()
     };
-    let guard = super::lock_vm_signal(&runtime, "SIGTERM").unwrap().unwrap();
+    let guard = super::lock_vm_signal(&runtime, "SIGTERM")
+      .await
+      .unwrap()
+      .unwrap();
     for signal in ["SIGTERM", "sigterm", "term", "15"] {
-      assert!(super::lock_vm_signal(&runtime, signal).is_err());
+      let error = match super::lock_vm_signal(&runtime, signal).await {
+        Err(error) => error,
+        Ok(_) => panic!("concurrent VM signal must reject mutation admission"),
+      };
+      assert_eq!(error.status, ntex::http::StatusCode::CONFLICT);
     }
     for signal in ["SIGKILL", "KILL", "9", "sigkill", "kill", "SigKill", "Kill"]
     {
-      assert!(super::lock_vm_signal(&runtime, signal).unwrap().is_none());
+      assert!(
+        super::lock_vm_signal(&runtime, signal)
+          .await
+          .unwrap()
+          .is_none()
+      );
     }
     assert!(
       crate::utils::container::vm::lifecycle_lock("global.signal-lock")
         .try_lock_owned()
+        .await
         .is_err()
     );
     drop(guard);
     assert!(
       super::lock_vm_signal(&runtime, "SIGTERM")
+        .await
         .unwrap()
         .is_some()
     );
 
     runtime.name = Some("/global.other.v".into());
-    assert!(super::lock_vm_signal(&runtime, "SIGKILL").is_err());
+    assert!(super::lock_vm_signal(&runtime, "SIGKILL").await.is_err());
     runtime.config.as_mut().unwrap().labels = Some(HashMap::new());
     assert!(
       super::lock_vm_signal(&runtime, "SIGTERM")
+        .await
         .unwrap()
         .is_none()
     );
@@ -119,6 +137,7 @@ mod tests {
     )]));
     assert!(
       super::lock_vm_signal(&runtime, "SIGTERM")
+        .await
         .unwrap()
         .is_none()
     );

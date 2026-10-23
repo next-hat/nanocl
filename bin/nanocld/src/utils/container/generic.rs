@@ -1,5 +1,8 @@
 use bollard_next::network::InspectNetworkOptions;
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::{
+  http::HttpResult,
+  io::{IoError, IoResult},
+};
 use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{ConstraintOp, NodeConstraint},
@@ -102,24 +105,38 @@ pub async fn emit_starting(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,
-) -> IoResult<()> {
-  let _vm_guard = if *kind == ProcessKind::Vm {
-    Some(
-      super::vm::lifecycle_lock(kind_key)
-        .try_lock_owned()
-        .map_err(|_| {
-          IoError::with_context(
-            "VM lifecycle",
-            std::io::Error::new(
-              std::io::ErrorKind::WouldBlock,
-              "A VM lifecycle operation is active",
-            ),
-          )
-        })?,
+) -> HttpResult<()> {
+  if *kind == ProcessKind::Vm {
+    let key = kind_key.to_owned();
+    let prepare_state = state.clone();
+    crate::tasks::vm::accept_task(
+      kind_key,
+      NativeEventAction::Starting,
+      state,
+      async move {
+        let mut vm =
+          VmDb::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let current =
+          ObjPsStatusDb::read_by_pk(&key, &prepare_state.inner.pool).await?;
+        vm.status = ObjPsStatusDb::update_pk(
+          &key,
+          ObjPsStatusUpdate {
+            wanted: Some(ObjPsStatusKind::Start.to_string()),
+            prev_wanted: Some(current.wanted),
+            actual: Some(ObjPsStatusKind::Starting.to_string()),
+            prev_actual: Some(current.actual),
+            health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
+          },
+          &prepare_state.inner.pool,
+        )
+        .await?
+        .try_into()?;
+        Ok(vm)
+      },
     )
-  } else {
-    None
-  };
+    .await?;
+    return Ok(());
+  }
   log::debug!("starting {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;

@@ -65,8 +65,28 @@ pub struct VmObjPatchIn {
 /// Local serialization of a VM's sockets, runtime and desired specification.
 /// Weak entries are pruned so deleted VM names do not accumulate forever.
 pub(crate) type VmLifecycleLocks = std::sync::Mutex<
-  std::collections::HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>,
+  std::collections::HashMap<String, std::sync::Weak<VmLifecycleLock>>,
 >;
+
+/// Mutation admission is separate from Docker observation serialization.
+#[derive(Default)]
+pub(crate) struct VmLifecycleLock {
+  pub key: String,
+  pub mutation: std::sync::Arc<tokio::sync::Mutex<()>>,
+  pub observation: std::sync::Arc<tokio::sync::Mutex<()>>,
+}
+
+/// Keep the weak registry entry alive until both protected sections finish.
+pub(crate) struct VmLifecycleGuard {
+  pub _observation: tokio::sync::OwnedMutexGuard<()>,
+  pub _mutation: tokio::sync::OwnedMutexGuard<()>,
+  pub _lock: std::sync::Arc<VmLifecycleLock>,
+}
+
+pub(crate) struct VmLifecycleObservationGuard {
+  pub _observation: tokio::sync::OwnedMutexGuard<()>,
+  pub _lock: std::sync::Arc<VmLifecycleLock>,
+}
 
 /// Private restart projection for the QEMU generation mounted by Docker.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

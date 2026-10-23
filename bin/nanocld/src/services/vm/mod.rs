@@ -367,6 +367,252 @@ mod tests {
     }
   }
 
+  // Exercises daemon/database replacement handling with an owned sleeping
+  // container. This is a runtime model, not guest, QMP, or browser validation.
+  #[ntex::test]
+  async fn runtime_model_replacement_dns_and_preflight_recovery() {
+    use crate::{
+      models::{ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, VmDb},
+      repositories::generic::*,
+    };
+    use bollard_next::container::{
+      Config, CreateContainerOptions, RemoveContainerOptions,
+      StartContainerOptions,
+    };
+    use futures::FutureExt;
+    use nanocl_stubs::{
+      generic::ImagePullPolicy,
+      process::ProcessKind,
+      system::ObjPsStatusKind,
+      vm::Vm,
+      vm_spec::{VmHostConfig, VmHostConfigUpdate},
+    };
+    use std::collections::HashMap;
+
+    const IMAGE: &str = "alpine:3.23";
+    let system = gen_default_test_system().await;
+    let state = &system.state;
+    let docker = &state.inner.docker_api;
+    let name = format!("runtime-model-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let response = system
+      .client
+      .send_post(
+        "/vms",
+        Some(VmSpecPartial {
+          name,
+          image: "/tmp/runtime-model-unused.img".into(),
+          cloud_init: Some(false),
+          host_config: Some(VmHostConfig {
+            runtime_network: Some("bridge".into()),
+            ..Default::default()
+          }),
+          ..Default::default()
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "create runtime-model VM metadata"
+    );
+
+    let mut runtime_id = None;
+    let result = std::panic::AssertUnwindSafe(async {
+      let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      crate::utils::container::image::download(
+        IMAGE,
+        None,
+        ImagePullPolicy::IfNotPresent,
+        &vm,
+        state,
+      )
+      .await
+      .expect("download the runtime-model image when absent");
+      let runtime = docker
+        .create_container(
+          Some(CreateContainerOptions {
+            name: format!("{key}.v"),
+            ..Default::default()
+          }),
+          Config {
+            image: Some(IMAGE.to_owned()),
+            cmd: Some(vec!["sleep".to_owned(), "600".to_owned()]),
+            labels: Some(HashMap::from([
+              ("io.nanocl.v".to_owned(), key.clone()),
+              ("io.nanocl.n".to_owned(), "global".to_owned()),
+              ("io.nanocl.vm-spec".to_owned(), vm.spec.key.to_string()),
+            ])),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+      runtime_id = Some(runtime.id.clone());
+      docker
+        .start_container(&runtime.id, None::<StartContainerOptions<String>>)
+        .await
+        .unwrap();
+      let inspect = docker.inspect_container(&runtime.id, None).await.unwrap();
+      assert_eq!(
+        inspect.state.as_ref().and_then(|state| state.running),
+        Some(true)
+      );
+      let address = inspect
+        .network_settings
+        .as_ref()
+        .unwrap()
+        .networks
+        .as_ref()
+        .unwrap()
+        .get("bridge")
+        .unwrap()
+        .ip_address
+        .clone()
+        .filter(|address| !address.is_empty())
+        .unwrap();
+      let now = chrono::Utc::now().naive_utc();
+      ProcessDb::create_from(
+        ProcessDb {
+          key: runtime.id.clone(),
+          name: format!("{key}.v"),
+          kind: ProcessKind::Vm.to_string(),
+          kind_key: key.clone(),
+          node_name: state.inner.config.hostname.clone(),
+          data: serde_json::to_value(&inspect).unwrap(),
+          created_at: now,
+          updated_at: now,
+        },
+        &state.inner.pool,
+      )
+      .await
+      .unwrap();
+      ObjPsStatusDb::update_pk(
+        &key,
+        ObjPsStatusUpdate {
+          wanted: Some(ObjPsStatusKind::Start.to_string()),
+          actual: Some(ObjPsStatusKind::Start.to_string()),
+          ..Default::default()
+        },
+        &state.inner.pool,
+      )
+      .await
+      .unwrap();
+      let before = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+
+      let rejected = system
+        .client
+        .send_patch(
+          &format!("/vms/{key}"),
+          Some(VmSpecUpdate {
+            host_config: Some(VmHostConfigUpdate {
+              dns: Some(Some(vec![address])),
+              ..Default::default()
+            }),
+            ..Default::default()
+          }),
+          None::<String>,
+        )
+        .await;
+      test_status_code!(
+        rejected.status(),
+        http::StatusCode::BAD_REQUEST,
+        "self DNS rejected before acceptance"
+      );
+      let after_rejection = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(
+        after_rejection.spec.key, before.spec.key,
+        "rejection must not replace desired revision"
+      );
+      assert_eq!(
+        serde_json::to_value(&after_rejection.status).unwrap(),
+        serde_json::to_value(&before.status).unwrap(),
+        "rejection must not record a transition"
+      );
+      assert!(after_rejection.spec.host_config.dns.is_none());
+
+      let registration =
+        vm_task_registration(state, &key, NativeEventAction::Updating).await;
+      let accepted = system
+        .client
+        .send_patch(
+          &format!("/vms/{key}"),
+          Some(VmSpecUpdate {
+            hostname: Some("failed-replacement".into()),
+            host_config: Some(VmHostConfigUpdate {
+              runtime: Some(Some(IMAGE.to_owned())),
+              ..Default::default()
+            }),
+            ..Default::default()
+          }),
+          None::<String>,
+        )
+        .await;
+      test_status_code!(
+        accepted.status(),
+        http::StatusCode::OK,
+        "accept replacement before runtime capability preflight"
+      );
+      let accepted = accepted.json::<Vm>().await.unwrap();
+      assert_ne!(accepted.spec.key, before.spec.key);
+      wait_vm_task(registration, state, &key, NativeEventAction::Updating)
+        .await;
+      let after_failure = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(
+        after_failure.spec.key, accepted.spec.key,
+        "failed preflight must retain the accepted desired revision"
+      );
+      assert_eq!(
+        after_failure.spec.hostname.as_deref(),
+        Some("failed-replacement")
+      );
+      assert_eq!(
+        after_failure.status.actual,
+        ObjPsStatusKind::Start,
+        "the original runtime is still running"
+      );
+      let current = docker
+        .inspect_container(&format!("{key}.v"), None)
+        .await
+        .unwrap();
+      assert_eq!(current.id.as_deref(), Some(runtime.id.as_str()));
+      assert_eq!(
+        current.state.as_ref().and_then(|state| state.running),
+        Some(true)
+      );
+    })
+    .catch_unwind()
+    .await;
+
+    // Cleanup is tied to this test's immutable ID, even when an assertion fails.
+    if let Some(id) = runtime_id {
+      docker
+        .remove_container(
+          &id,
+          Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+          }),
+        )
+        .await
+        .unwrap();
+      ProcessDb::del_by_pk(&id, &state.inner.pool).await.unwrap();
+    }
+    VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
+    }
+  }
+
   #[ntex::test]
   async fn basic() {
     let system = gen_default_test_system().await;

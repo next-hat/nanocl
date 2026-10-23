@@ -580,17 +580,15 @@ pub(crate) async fn resize(
   options
     .validate()
     .map_err(|error| IoError::invalid_input("VM resize", &error))?;
-  let guard = super::lifecycle_lock(key)
-    .try_lock_owned()
-    .map_err(|_| conflict("A VM lifecycle operation is active"))?;
+  let guard = super::lifecycle_lock(key).try_lock_owned().await?;
   let key = key.to_owned();
   let options = options.clone();
   let state = state.clone();
   let (tx, rx) = tokio::sync::oneshot::channel();
   // Client disconnection must not interrupt mutation reconciliation/persistence.
   ntex::rt::spawn(async move {
-    let _guard = guard;
     let result = run_resize(&key, &options, &state).await;
+    drop(guard);
     let _ = tx.send(result);
   });
   rx.await.map_err(|_| {

@@ -22,12 +22,13 @@ use tokio::time::{Instant, timeout_at};
 use crate::{
   models::{
     ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, QmpClient, SystemState, VmDb,
-    VmLifecycleLocks,
+    VmLifecycleGuard, VmLifecycleLock, VmLifecycleLocks,
+    VmLifecycleObservationGuard,
   },
   repositories::generic::*,
 };
 
-pub(crate) fn lifecycle_lock(key: &str) -> Arc<tokio::sync::Mutex<()>> {
+pub(crate) fn lifecycle_lock(key: &str) -> Arc<VmLifecycleLock> {
   static LOCKS: OnceLock<VmLifecycleLocks> = OnceLock::new();
   let mut locks = LOCKS
     .get_or_init(Default::default)
@@ -37,9 +38,98 @@ pub(crate) fn lifecycle_lock(key: &str) -> Arc<tokio::sync::Mutex<()>> {
   if let Some(lock) = locks.get(key).and_then(std::sync::Weak::upgrade) {
     return lock;
   }
-  let lock = Arc::new(tokio::sync::Mutex::new(()));
+  let lock = Arc::new(VmLifecycleLock {
+    key: key.to_owned(),
+    ..Default::default()
+  });
   locks.insert(key.to_owned(), Arc::downgrade(&lock));
   lock
+}
+
+impl VmLifecycleLock {
+  /// Already accepted tasks wait for the preceding mutation and observation.
+  pub(crate) async fn lock_owned(self: Arc<Self>) -> VmLifecycleGuard {
+    let mutation = self.mutation.clone().lock_owned().await;
+    let observation = self.observation.clone().lock_owned().await;
+    VmLifecycleGuard {
+      _observation: observation,
+      _mutation: mutation,
+      _lock: self,
+    }
+  }
+
+  /// Reject concurrent mutations, but let an in-flight observation finish its
+  /// protected status write before starting this operation. No work is accepted
+  /// if observation completion exceeds the bounded admission wait.
+  pub(crate) async fn try_lock_owned(
+    self: Arc<Self>,
+  ) -> IoResult<VmLifecycleGuard> {
+    self
+      .try_lock_owned_before(Instant::now() + Duration::from_secs(30))
+      .await
+  }
+
+  async fn try_lock_owned_before(
+    self: Arc<Self>,
+    deadline: Instant,
+  ) -> IoResult<VmLifecycleGuard> {
+    let mutation = self.mutation.clone().try_lock_owned().map_err(|_| {
+      log::debug!(
+        "VM {} admission rejected: another mutation owns the lifecycle",
+        self.key
+      );
+      conflict("A VM lifecycle mutation is active")
+    })?;
+    let observation = match self.observation.clone().try_lock_owned() {
+      Ok(guard) => guard,
+      Err(_) => {
+        log::debug!(
+          "VM {} admission waits for Docker observation completion",
+          self.key
+        );
+        timeout_at(
+          deadline,
+          self.observation.clone().lock_owned(),
+        )
+        .await
+        .map_err(|_| {
+          log::warn!("VM {} admission timed out waiting for Docker observation; no mutation started", self.key);
+          IoError::with_context(
+            "VM lifecycle observation",
+            std::io::Error::new(
+              std::io::ErrorKind::TimedOut,
+              "Docker runtime observation did not finish within 30 seconds; no VM mutation was started",
+            ),
+          )
+        })?
+      }
+    };
+    Ok(VmLifecycleGuard {
+      _observation: observation,
+      _mutation: mutation,
+      _lock: self,
+    })
+  }
+
+  pub(crate) fn try_observe_owned(
+    self: Arc<Self>,
+  ) -> Option<VmLifecycleObservationGuard> {
+    let observation = self.observation.clone().try_lock_owned().ok()?;
+    Some(VmLifecycleObservationGuard {
+      _observation: observation,
+      _lock: self,
+    })
+  }
+
+  pub(crate) async fn observe_owned(
+    self: Arc<Self>,
+  ) -> VmLifecycleObservationGuard {
+    let observation = self.observation.clone().lock_owned().await;
+    VmLifecycleObservationGuard {
+      _observation: observation,
+      _lock: self,
+    }
+  }
 }
 
 fn conflict(message: &str) -> IoError {
@@ -485,9 +575,7 @@ async fn begin_lifecycle(
   options
     .validate()
     .map_err(|err| IoError::invalid_input("VM shutdown", &err))?;
-  let guard = lifecycle_lock(key)
-    .try_lock_owned()
-    .map_err(|_| conflict("A VM lifecycle operation is active"))?;
+  let guard = lifecycle_lock(key).try_lock_owned().await?;
   // Validate existence before an asynchronous process endpoint accepts work.
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let key = key.to_owned();
@@ -498,7 +586,7 @@ async fn begin_lifecycle(
   // No automatic retry is made after a timeout or an uncertain QMP response.
   let (tx, rx) = tokio::sync::oneshot::channel();
   ntex::rt::spawn(async move {
-    let _guard = guard;
+    let guard = guard;
     let result =
       run_lifecycle(&key, &options, restart, expected_id.as_deref(), &state)
         .await;
@@ -513,6 +601,8 @@ async fn begin_lifecycle(
         Some(error.to_string()),
       );
     }
+    // The completion receiver must not wake while mutation admission is held.
+    drop(guard);
     let _ = tx.send(result);
   });
   Ok(rx)
@@ -616,16 +706,120 @@ mod tests {
     assert!(socket_directory(&vm, &runtime, "relative").is_err());
   }
 
-  #[test]
-  fn vm_qmp_lifecycle_lock_is_shared_per_vm_and_released() {
-    let a = lifecycle_lock("global.lock-test-a");
-    let b = lifecycle_lock("global.lock-test-a");
-    let other = lifecycle_lock("global.lock-test-b");
-    let guard = a.try_lock().unwrap();
-    assert!(b.try_lock().is_err());
-    assert!(other.try_lock().is_ok());
+  #[ntex::test]
+  async fn vm_qmp_lifecycle_lock_is_shared_per_vm_and_released() {
+    let key = "global.lock-test-a";
+    // No caller retains the Arc: the owned guard must keep the weak registry
+    // entry alive so a fresh lookup cannot bypass the current owner.
+    let guard = lifecycle_lock(key).try_lock_owned().await.unwrap();
+    assert!(lifecycle_lock(key).try_lock_owned().await.is_err());
+    assert!(
+      lifecycle_lock("global.lock-test-b")
+        .try_lock_owned()
+        .await
+        .is_ok()
+    );
     drop(guard);
-    assert!(b.try_lock().is_ok());
+    assert!(lifecycle_lock(key).try_lock_owned().await.is_ok());
+  }
+
+  #[ntex::test]
+  async fn vm_lifecycle_completed_start_waits_for_exit_observation() {
+    use std::{
+      cell::RefCell,
+      future::Future,
+      task::{Context, Poll},
+    };
+
+    for runtime_running in [true, false] {
+      let key = format!("global.awaited-start-{runtime_running}");
+      let observed = RefCell::new(ObjPsStatusKind::Start);
+      let start = lifecycle_lock(&key).try_lock_owned().await.unwrap();
+      // The native Start barrier has completed, then the Docker observer wins
+      // serialization before the client's immediate forced-stop request.
+      drop(start);
+      let observer = lifecycle_lock(&key).try_observe_owned().unwrap();
+      let mut stop = Box::pin(async {
+        let guard = lifecycle_lock(&key).try_lock_owned().await?;
+        Ok::<_, IoError>((guard, observed.borrow().clone()))
+      });
+      let mut context = Context::from_waker(futures::task::noop_waker_ref());
+      assert!(stop.as_mut().poll(&mut context).is_pending());
+      // A real competing mutation must still reject, including while the
+      // admitted stop waits for observation's protected status write.
+      assert!(lifecycle_lock(&key).try_lock_owned().await.is_err());
+      *observed.borrow_mut() = if runtime_running {
+        ObjPsStatusKind::Start
+      } else {
+        ObjPsStatusKind::Fail
+      };
+      assert!(stop.as_mut().poll(&mut context).is_pending());
+      drop(observer);
+      let Poll::Ready(Ok((stop_guard, observed_after_acquisition))) =
+        stop.as_mut().poll(&mut context)
+      else {
+        panic!("stop must acquire only after the observation finishes");
+      };
+      // Both running and already-exited observations permit stop admission;
+      // the stop operation then inspects runtime identity/state under the guard.
+      assert_eq!(
+        observed_after_acquisition,
+        if runtime_running {
+          ObjPsStatusKind::Start
+        } else {
+          ObjPsStatusKind::Fail
+        }
+      );
+      assert!(lifecycle_lock(&key).try_observe_owned().is_none());
+      drop(stop_guard);
+      assert!(lifecycle_lock(&key).try_lock_owned().await.is_ok());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_lifecycle_cancelled_observation_wait_releases_only_admission() {
+    use std::{future::Future, task::Context};
+
+    let key = "global.cancelled-observation-wait";
+    let observer = lifecycle_lock(key).try_observe_owned().unwrap();
+    let mut stop = Box::pin(lifecycle_lock(key).try_lock_owned());
+    let mut context = Context::from_waker(futures::task::noop_waker_ref());
+    assert!(stop.as_mut().poll(&mut context).is_pending());
+    drop(stop);
+    assert!(lifecycle_lock(key).try_observe_owned().is_none());
+    assert!(
+      lifecycle_lock(key)
+        .mutation
+        .clone()
+        .try_lock_owned()
+        .is_ok()
+    );
+    drop(observer);
+    assert!(lifecycle_lock(key).try_lock_owned().await.is_ok());
+  }
+
+  #[ntex::test]
+  async fn vm_lifecycle_expired_observation_wait_does_not_release_observer() {
+    let key = "global.expired-observation-wait";
+    let observer = lifecycle_lock(key).try_observe_owned().unwrap();
+    let result = lifecycle_lock(key)
+      .try_lock_owned_before(Instant::now())
+      .await;
+    let Err(error) = result else {
+      panic!("admission must expire while observation owns the write");
+    };
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::TimedOut);
+    assert!(error.to_string().contains("observation"));
+    assert!(lifecycle_lock(key).try_observe_owned().is_none());
+    assert!(
+      lifecycle_lock(key)
+        .mutation
+        .clone()
+        .try_lock_owned()
+        .is_ok()
+    );
+    drop(observer);
+    assert!(lifecycle_lock(key).try_lock_owned().await.is_ok());
   }
 
   #[test]
