@@ -913,6 +913,66 @@ mod tests {
     use nanocl_stubs::generic::ImagePullPolicy;
     use std::collections::HashMap;
 
+    async fn recover_with_retries(
+      operation: &VmOperationDb,
+      state: &SystemState,
+    ) -> IoResult<bool> {
+      let before =
+        VmDb::transform_read_by_pk(&operation.vm_key, &state.inner.pool)
+          .await
+          .unwrap();
+      let specification = serde_json::to_value(&before.spec).unwrap();
+      let mut attempts = 0;
+      loop {
+        attempts += 1;
+        let result = recover_one(operation, state).await;
+        if matches!(&result, Ok(true)) {
+          return result;
+        }
+        let retry = match &result {
+          Ok(false) => {
+            // This isolated fixture still has valid, unowned file evidence;
+            // an admission deferral must not hide a changed or live owner.
+            assert!(
+              abandoned_owner(
+                operation,
+                &state.inner.config.hostname,
+                &state.inner.config.state_dir,
+              )
+              .unwrap()
+              .is_some()
+            );
+            true
+          }
+          Err(error) => {
+            error.context.as_deref() == Some("VM operation recovery")
+              && error.inner.kind() == std::io::ErrorKind::InvalidData
+              && error.inner.to_string()
+                == "Runtime observation timed out; recovery remains pending"
+          }
+          Ok(true) => unreachable!(),
+        };
+        // Production retries deferred scans. Verify each unsuccessful attempt
+        // preserves acceptance exactly before allowing at most two retries.
+        assert_eq!(
+          VmOperationDb::get(&operation.vm_key, &state.inner.pool)
+            .await
+            .unwrap()
+            .as_ref(),
+          Some(operation)
+        );
+        let current =
+          VmDb::transform_read_by_pk(&operation.vm_key, &state.inner.pool)
+            .await
+            .unwrap();
+        assert_eq!(serde_json::to_value(&current.spec).unwrap(), specification);
+        assert_eq!(current.status, before.status);
+        if !retry || attempts == 3 {
+          return result;
+        }
+      }
+    }
+
     const IMAGE: &str = "alpine:3.23";
     let system = crate::utils::tests::gen_default_test_system().await;
     let node = format!("runtime-recovery-test-{}", uuid::Uuid::new_v4());
@@ -980,8 +1040,24 @@ mod tests {
         accept(&vm, "starting", None, &state).await;
       lock_keys.push(provisioning.key);
       drop(guard);
-      assert!(
-        recover_one(&provisioning, &state).await.is_err(),
+      let active_auxiliary = recover_with_retries(&provisioning, &state)
+        .await
+        .unwrap_err();
+      assert_eq!(
+        active_auxiliary.context.as_deref(),
+        Some("VM operation recovery")
+      );
+      assert_eq!(
+        active_auxiliary.inner.kind(),
+        std::io::ErrorKind::InvalidData
+      );
+      assert_eq!(
+        active_auxiliary.inner.to_string(),
+        format!(
+          "Owned VM auxiliary container {} ({:?}) is active or unknown; wait for it to exit or explicitly stop it before retrying",
+          auxiliary.id,
+          Some(format!("/{key}.test.init.v"))
+        ),
         "a live init without a Process row must block retry"
       );
       assert_eq!(
@@ -995,7 +1071,7 @@ mod tests {
         .stop_container(&auxiliary.id, Some(StopContainerOptions { t: 0 }))
         .await
         .unwrap();
-      assert!(recover_one(&provisioning, &state).await.unwrap());
+      assert!(recover_with_retries(&provisioning, &state).await.unwrap());
       docker
         .remove_container(&auxiliary.id, None::<RemoveContainerOptions>)
         .await
@@ -1054,7 +1130,7 @@ mod tests {
         accept(&vm, "updating", Some(replacement), &state).await;
       lock_keys.push(operation.key);
       drop(guard);
-      assert!(recover_one(&operation, &state).await.unwrap());
+      assert!(recover_with_retries(&operation, &state).await.unwrap());
       let current = VmDb::transform_read_by_pk(&key, &state.inner.pool)
         .await
         .unwrap();
@@ -1102,7 +1178,7 @@ mod tests {
       .await
       .unwrap();
       drop(guard);
-      assert!(recover_one(&destroying, &state).await.unwrap());
+      assert!(recover_with_retries(&destroying, &state).await.unwrap());
       let current = VmDb::transform_read_by_pk(&key, &state.inner.pool)
         .await
         .unwrap();
@@ -1134,7 +1210,7 @@ mod tests {
         .unwrap();
       runtime_id = None;
       drop(guard);
-      assert!(recover_one(&starting, &state).await.unwrap());
+      assert!(recover_with_retries(&starting, &state).await.unwrap());
       assert_eq!(
         VmDb::transform_read_by_pk(&key, &state.inner.pool)
           .await
