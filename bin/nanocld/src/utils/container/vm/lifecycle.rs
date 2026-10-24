@@ -228,7 +228,7 @@ pub(crate) fn socket_directory(
   };
   if label("io.nanocl.vm-qmp") != Some("1") {
     return Err(conflict(
-      "This runtime lacks managed QMP; explicitly force-stop it before upgrading to a QMP-capable image",
+      "VM runtime does not provide the required managed QMP interface",
     ));
   }
   let generation = label("io.nanocl.vm-spec")

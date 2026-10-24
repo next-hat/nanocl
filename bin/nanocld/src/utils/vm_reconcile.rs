@@ -22,10 +22,10 @@ fn validate(args: &VmReconcileArgs) -> IoResult<()> {
   if args.confirm_quiescent
     && (args.incarnation.is_none()
       || args.spec.is_none()
-      || (args.operation.is_some() == args.legacy))
+      || args.operation.is_none())
   {
     return Err(conflict(
-      "Inspect first; reconciliation requires --incarnation, --spec and exactly one of --operation or --legacy, plus --confirm-quiescent",
+      "Inspect first; reconciliation requires --incarnation, --spec and --operation, plus --confirm-quiescent",
     ));
   }
   Ok(())
@@ -120,7 +120,7 @@ async fn execute(
       "RuntimeObservation": safe_observation(operation.diagnostic.as_ref()),
     })),
     "Reconciled": false,
-    "Prerequisite": "Stop every daemon and operation owner using this database/runtime, including older binaries and alternate/copied state directories. Keep the database and Docker available. Do not remove active ownership files. Inspect auxiliary provisioning containers; this command never stops them.",
+    "Prerequisite": "Stop every daemon and operation owner using this database/runtime, including alternate/copied state directories. Keep the database and Docker available. Do not remove active ownership files. Inspect auxiliary provisioning containers; this command never stops them.",
   });
   if !args.confirm_quiescent {
     report["AutomaticRecovery"] = match current.as_ref() {
@@ -149,12 +149,12 @@ async fn execute(
             | ObjPsStatusKind::Destroying
         ) =>
       {
-        json!({"Ownership": "legacy-unknown", "NextStep": "Use --legacy with exact incarnation/specification and confirmed quiescence."})
+        json!({"Ownership": "invalid-pending-state", "NextStep": "A pending transition without a recorded operation cannot be reconciled. Recreate the cluster from Nanocl statefiles."})
       }
       _ => json!({"Ownership": "not-pending"}),
     };
     report["NextStep"] = json!(
-      "Repeat with the exact --incarnation, --spec and --operation shown above (or --legacy when CurrentOperation is null), and --confirm-quiescent only after satisfying Prerequisite."
+      "For a recorded current operation, repeat with the exact --incarnation, --spec and --operation shown above, and --confirm-quiescent only after satisfying Prerequisite. A pending transition without a recorded operation requires recreating the cluster from Nanocl statefiles."
     );
     return Ok(report);
   }
@@ -174,119 +174,48 @@ async fn execute(
       .await
       .map_err(|_| conflict("VM lifecycle is busy"))?,
   );
-  let (operation, owner_guard) = match current {
-    Some(operation) => {
-      if args.legacy
-        && operation.action == "reconcile"
-        && operation.outcome.is_some()
-        && operation.incarnation_key == row.incarnation_key
-        && operation.spec_key == vm.spec.key
-      {
-        report["AlreadyTerminal"] = json!(true);
-        return Ok(report);
-      }
-      if args.legacy
-        || args.operation != Some(operation.key)
-        || operation.incarnation_key != row.incarnation_key
-        || operation.spec_key != vm.spec.key
-      {
-        return Err(conflict(
-          "Current operation changed; historical UUIDs do not authorize reconciliation",
-        ));
-      }
-      if operation.outcome.is_some() {
-        report["AlreadyTerminal"] = json!(true);
-        return Ok(report);
-      }
-      let owner_guard = super::operation::reconciliation_owner(
-        &operation.owner(),
-        &config.hostname,
-        &gate,
-      )?;
-      (operation, owner_guard)
-    }
-    None => {
-      if !args.legacy
-        || args.operation.is_some()
-        || identity.current_operation_key.is_some()
-        || !matches!(
-          vm.status.actual,
-          ObjPsStatusKind::Starting
-            | ObjPsStatusKind::Updating
-            | ObjPsStatusKind::Destroying
-        )
-      {
-        return Err(conflict(
-          "--legacy requires an exact pending VM with no current operation; no prior owner is inferred",
-        ));
-      }
-      let (owner, guard) = super::operation::create_owner_with_gate(
-        uuid::Uuid::new_v4(),
-        "Vm",
-        &args.vm_key,
-        row.incarnation_key,
-        &config.hostname,
-        gate.clone(),
-      )?;
-      (
-        OperationDb::new(&owner, "Vm", &args.vm_key, vm.spec.key, "reconcile"),
-        Some(guard),
-      )
-    }
-  };
-  let observed = tokio::time::timeout(Duration::from_secs(5), super::container::vm::recovery::observe(&vm, state)).await
+  let operation = current.ok_or_else(|| {
+    conflict("No recorded current operation; a pending transition without one requires recreating the cluster from Nanocl statefiles")
+  })?;
+  if args.operation != Some(operation.key)
+    || operation.incarnation_key != row.incarnation_key
+    || operation.spec_key != vm.spec.key
+  {
+    return Err(conflict(
+      "Current operation changed; historical UUIDs do not authorize reconciliation",
+    ));
+  }
+  if operation.outcome.is_some() {
+    report["AlreadyTerminal"] = json!(true);
+    return Ok(report);
+  }
+  let owner_guard = super::operation::reconciliation_owner(
+    &operation.owner(),
+    &config.hostname,
+    &gate,
+  )?;
+  let (actual, mut observation) = tokio::time::timeout(Duration::from_secs(5), super::container::vm::recovery::observe(&vm, state)).await
     .map_err(|_| conflict("Runtime inspection timed out; accepted state and ownership evidence were preserved"))
-    .and_then(|result| result);
-  let (actual, mut observation) = match observed {
-    Ok(observation) => observation,
-    Err(error) => {
-      if args.legacy
-        && let Some(guard) = &owner_guard
-        && let Err(cleanup) =
-          super::operation::cleanup_owner(guard, &state.inner.pool).await
-      {
-        log::warn!(
-          "Rejected legacy reconciliation cleanup deferred: {cleanup}"
-        );
-      }
-      return Err(error);
-    }
-  };
+    .and_then(|result| result)?;
   observation["Reconciliation"] = json!({
     "Mode": "offline-operator",
     "ConfirmedQuiescent": true,
     "OperatorNode": config.hostname,
-    "LegacyOwnershipUnknown": args.legacy,
-    "Note": "The operator confirmed all potential owners are stopped. The exclusive state-directory gate excludes compatible daemons. No runtime action was replayed.",
+    "Note": "The operator confirmed all potential owners are stopped. The exclusive state-directory gate excludes daemons using this state directory. No runtime action was replayed.",
   });
-  observation["Failure"] = json!(if args.legacy {
-    "Legacy transition reconciled; original request ownership and outcome are unknown"
-  } else {
+  observation["Failure"] = json!(
     "Accepted request interrupted; observed runtime reconciled after operator-confirmed quiescence"
-  });
+  );
   let keepalive = (gate.clone(), lifecycle, owner_guard.clone());
-  let changed = if args.legacy {
-    VmDb::reconcile_legacy(
-      &vm,
-      row.incarnation_key,
-      operation.clone(),
-      actual.clone(),
-      observation,
-      keepalive,
-      &state.inner.pool,
-    )
-    .await?
-  } else {
-    VmDb::finish_operation(
-      &operation,
-      actual.clone(),
-      "interrupted",
-      observation,
-      keepalive,
-      &state.inner.pool,
-    )
-    .await?
-  };
+  let changed = VmDb::finish_operation(
+    &operation,
+    actual.clone(),
+    "interrupted",
+    observation,
+    keepalive,
+    &state.inner.pool,
+  )
+  .await?;
   if !changed {
     return Err(conflict(
       "Target changed during reconciliation; no successor was modified",
@@ -378,10 +307,18 @@ mod tests {
     assert!(validate(&args).is_err());
     args.operation = Some(uuid::Uuid::new_v4());
     assert!(validate(&args).is_ok());
-    args.legacy = true;
-    assert!(validate(&args).is_err());
     args.operation = None;
-    assert!(validate(&args).is_ok());
+    assert!(validate(&args).is_err());
+    assert!(
+      crate::cli::Cli::try_parse_from([
+        "nanocld",
+        "vm-reconcile",
+        "--vm-key",
+        "global.example",
+        "--legacy",
+      ])
+      .is_err()
+    );
   }
 
   #[test]
@@ -522,7 +459,6 @@ mod tests {
       vm_key: vm.spec.vm_key.clone(),
       incarnation: Some(operation.incarnation_key),
       operation: Some(operation.key),
-      legacy: false,
       spec: Some(vm.spec.key),
       confirm_quiescent: true,
     }
@@ -582,6 +518,8 @@ mod tests {
   #[ntex::test]
   async fn vm_reconcile_offline_missing_and_old_boot_evidence_is_exact_and_idempotent()
    {
+    use crate::models::Pool;
+    use diesel::{PgConnection, r2d2::ConnectionManager};
     use futures::FutureExt;
     let system = crate::utils::tests::gen_default_test_system().await;
     let directory = FixtureDirectory::new();
@@ -630,6 +568,26 @@ mod tests {
         let mut unavailable = state.inner.config.clone();
         unavailable.docker_host = "/dev/null".into();
         assert!(run(&args, &unavailable).await.is_err());
+        assert_pending(&accepted, &operation, &state).await;
+        let unavailable_pool = Pool::builder()
+          .min_idle(Some(0))
+          .max_size(1)
+          .connection_timeout(Duration::from_millis(50))
+          .build_unchecked(ConnectionManager::<PgConnection>::new(
+            "invalid-reconcile-test-connection-string",
+          ));
+        let unavailable = SystemState {
+          inner: Arc::new(SystemStateInner {
+            pool: unavailable_pool,
+            docker_api: state.inner.docker_api.clone(),
+            config: state.inner.config.clone(),
+            task_manager: Default::default(),
+            event_emitter: state.inner.event_emitter.clone(),
+            event_emitter_raw: Default::default(),
+            arbiter: ntex::rt::Arbiter::current(),
+          }),
+        };
+        assert!(command(&args, &unavailable).await.is_err());
         assert_pending(&accepted, &operation, &state).await;
         // Exercise the production connection + command entry point as well as
         // the exact reconciliation body used by the bounded dependency tests.
@@ -715,50 +673,66 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn vm_reconcile_legacy_requires_quiescence_and_preserves_failed_dependencies()
-   {
-    use crate::models::{ObjPsStatusDb, Pool};
-    use diesel::{PgConnection, r2d2::ConnectionManager};
+  async fn vm_reconcile_pending_without_operation_requires_fresh_cluster() {
+    use crate::models::ObjPsStatusDb;
     use futures::FutureExt;
     let system = crate::utils::tests::gen_default_test_system().await;
     let directory = FixtureDirectory::new();
     let state = fixture_state(&system.state, &directory);
     let vm = create_fixture(&state).await;
     let result = std::panic::AssertUnwindSafe(async {
-      let (row, _, _) = VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool).await.unwrap();
-      ObjPsStatusDb::update_actual_status(&vm.spec.vm_key, &ObjPsStatusKind::Updating, &state.inner.pool).await.unwrap();
-      let before = VmDb::transform_read_by_pk(&vm.spec.vm_key, &state.inner.pool).await.unwrap();
-      let args = VmReconcileArgs { vm_key: vm.spec.vm_key.clone(), incarnation: Some(row.incarnation_key), operation: None,
-        legacy: true, spec: Some(vm.spec.key), confirm_quiescent: true };
-      let daemon = crate::utils::operation::acquire_daemon_guard(&state.inner.config.state_dir).unwrap();
-      assert_eq!(command(&args, &state).await.unwrap_err().inner.kind(), std::io::ErrorKind::WouldBlock);
-      drop(daemon);
-      let mut docker_unavailable = state.inner.config.clone();
-      docker_unavailable.docker_host = "/dev/null".into();
-      assert!(run(&args, &docker_unavailable).await.is_err());
-      assert_eq!(std::fs::read_dir(directory.0.join("run/operations")).unwrap().count(), 0,
-        "definitively rejected legacy attempts clean their owner files");
-      let unavailable_pool = Pool::builder().min_idle(Some(0)).max_size(1).connection_timeout(Duration::from_millis(50))
-        .build_unchecked(ConnectionManager::<PgConnection>::new("invalid-reconcile-test-connection-string"));
-      let unavailable = SystemState { inner: Arc::new(SystemStateInner {
-        pool: unavailable_pool, docker_api: state.inner.docker_api.clone(), config: state.inner.config.clone(), task_manager: Default::default(),
-        event_emitter: state.inner.event_emitter.clone(), event_emitter_raw: Default::default(), arbiter: ntex::rt::Arbiter::current(),
-      }) };
-      assert!(command(&args, &unavailable).await.is_err());
-      assert!(OperationDb::current("Vm", &args.vm_key, &state.inner.pool).await.unwrap().is_none());
-      assert_eq!(VmDb::transform_read_by_pk(&args.vm_key, &state.inner.pool).await.unwrap().status, before.status);
+      let (row, _, _) = VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+        .await
+        .unwrap();
+      ObjPsStatusDb::update_actual_status(
+        &vm.spec.vm_key,
+        &ObjPsStatusKind::Updating,
+        &state.inner.pool,
+      )
+      .await
+      .unwrap();
+      let before =
+        VmDb::transform_read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+          .await
+          .unwrap();
+      let mut args = VmReconcileArgs {
+        vm_key: vm.spec.vm_key.clone(),
+        incarnation: Some(row.incarnation_key),
+        operation: None,
+        spec: Some(vm.spec.key),
+        confirm_quiescent: false,
+      };
       let report = command(&args, &state).await.unwrap();
-      assert_eq!(report["Reconciled"], true);
-      let terminal = OperationDb::current("Vm", &args.vm_key, &state.inner.pool).await.unwrap().unwrap();
-      assert_eq!(terminal.action, "reconcile");
-      assert_eq!(terminal.outcome.as_deref(), Some("interrupted"));
-      assert_eq!(terminal.diagnostic.as_ref().unwrap()["Reconciliation"]["LegacyOwnershipUnknown"], true);
-      assert_eq!(command(&args, &state).await.unwrap()["AlreadyTerminal"], true);
-      assert_eq!(OperationDb::current("Vm", &args.vm_key, &state.inner.pool).await.unwrap().unwrap(), terminal);
-      assert_eq!(VmDb::transform_read_by_pk(&args.vm_key, &state.inner.pool).await.unwrap().status.actual, ObjPsStatusKind::Stop);
-      let path = directory.0.join("run/operations").join(format!("{}.lock", terminal.key));
-      assert!(!path.exists(), "verified legacy reconciliation owner is cleaned after durable completion");
-    }).catch_unwind().await;
+      assert_eq!(report["Reconciled"], false);
+      assert_eq!(
+        report["AutomaticRecovery"]["Ownership"],
+        "invalid-pending-state"
+      );
+      assert!(
+        report["AutomaticRecovery"]["NextStep"]
+          .as_str()
+          .unwrap()
+          .contains("Recreate the cluster")
+      );
+      args.operation = Some(uuid::Uuid::new_v4());
+      args.confirm_quiescent = true;
+      let error = command(&args, &state).await.unwrap_err();
+      assert!(error.to_string().contains("recreating the cluster"));
+      assert!(
+        OperationDb::current("Vm", &args.vm_key, &state.inner.pool)
+          .await
+          .unwrap()
+          .is_none()
+      );
+      let after = VmDb::transform_read_by_pk(&args.vm_key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(after.status, before.status);
+      assert_eq!(after.spec.key, before.spec.key);
+      assert!(!directory.0.join("run/operations").exists());
+    })
+    .catch_unwind()
+    .await;
     cleanup_fixture(&vm.spec.vm_key, &state).await;
     if let Err(panic) = result {
       std::panic::resume_unwind(panic);

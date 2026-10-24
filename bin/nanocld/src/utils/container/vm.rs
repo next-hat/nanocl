@@ -1059,25 +1059,15 @@ async fn start_init_container(
   Ok(())
 }
 
-async fn runtime_vm<G: Send + 'static>(
-  key: &str,
-  owner: &Option<OperationOwner>,
-  keepalive: G,
-  state: &SystemState,
-) -> IoResult<Vm> {
-  if owner.is_some() {
-    let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
-    if vm.spec.mac_address.is_none() {
-      return Err(IoError::invalid_data(
-        "VM MAC",
-        "Accepted revision has no MAC address; refusing to change it during execution",
-      ));
-    }
-    return Ok(vm);
+async fn runtime_vm(key: &str, state: &SystemState) -> IoResult<Vm> {
+  let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if vm.spec.mac_address.is_none() {
+    return Err(IoError::invalid_data(
+      "VM MAC",
+      "VM specification has no persisted MAC address",
+    ));
   }
-  VmDb::ensure_mac_address_owned(key, keepalive, state)
-    .await
-    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))
+  Ok(vm)
 }
 
 async fn create_instance_owned<G: Clone + Send + 'static>(
@@ -1087,8 +1077,7 @@ async fn create_instance_owned<G: Clone + Send + 'static>(
   keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
-  let vm =
-    runtime_vm(&vm.spec.vm_key, &owner, keepalive.clone(), state).await?;
+  let vm = runtime_vm(&vm.spec.vm_key, state).await?;
   let vm = &vm;
   let envs = runtime_env(vm, disable_keygen)?;
   // Ensure runtime and optional init networks before either container exists.
@@ -1362,7 +1351,7 @@ async fn start_unlocked_owned<G: Clone + Send + 'static>(
   keepalive: G,
   state: &SystemState,
 ) -> IoResult<()> {
-  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  let vm = runtime_vm(key, state).await?;
   ensure_networks(&vm, state).await?;
   let processes = ProcessDb::read_by_kind_key(
     &vm.spec.vm_key,
@@ -1375,8 +1364,9 @@ async fn start_unlocked_owned<G: Clone + Send + 'static>(
     create_instance_owned(&vm, true, owner.clone(), keepalive.clone(), state)
       .await?;
   }
+  let runtime = inspect_owned_runtime(&vm, state).await?;
   if vm.spec.host_config.dns.is_some()
-    && let Some((_, inspect)) = inspect_owned_runtime(&vm, state).await?
+    && let Some((_, inspect)) = runtime
   {
     validate_runtime_dns(&vm, &inspect)?;
   }
@@ -1471,7 +1461,7 @@ async fn update_unlocked_owned<G: Clone + Send + 'static>(
   keepalive: G,
   state: &SystemState,
 ) -> IoResult<()> {
-  let vm = runtime_vm(key, &owner, keepalive.clone(), state).await?;
+  let vm = runtime_vm(key, state).await?;
   // Fail before deleting the existing VM runtime.
   ensure_networks(&vm, state).await?;
   validate_spec(&vm.spec.clone().into())?;
@@ -1548,6 +1538,140 @@ mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
 
+  #[ntex::test]
+  async fn vm_start_without_dns_rejects_missing_or_foreign_runtime_generation()
+  {
+    use crate::{models::VmObjCreateIn, objects::generic::ObjCreate};
+    use futures::FutureExt;
+    use nanocl_stubs::vm_spec::VmSpecPartial;
+
+    const IMAGE: &str = "alpine:3.23";
+    let system = utils::tests::gen_default_test_system().await;
+    let state = &system.state;
+    let mut vm_keys = Vec::new();
+    let mut runtime_ids = Vec::new();
+    let result = std::panic::AssertUnwindSafe(async {
+      let mut vms = Vec::new();
+      for _ in 0..2 {
+        let vm = VmDb::fn_create_obj(
+          &VmObjCreateIn {
+            namespace: "global".into(),
+            version: vars::VERSION.into(),
+            spec: VmSpecPartial {
+              name: format!(
+                "start-generation-{}",
+                uuid::Uuid::new_v4().simple()
+              ),
+              image: "/tmp/start-generation-unused.img".into(),
+              cloud_init: Some(false),
+              host_config: Some(VmHostConfig {
+                runtime_network: Some("bridge".into()),
+                ..Default::default()
+              }),
+              ..Default::default()
+            },
+          },
+          state,
+        )
+        .await
+        .unwrap();
+        vm_keys.push(vm.spec.vm_key.clone());
+        vms.push(vm);
+      }
+      let vm = &vms[0];
+      assert!(vm.spec.host_config.dns.is_none());
+      super::super::image::download(
+        IMAGE,
+        None,
+        ImagePullPolicy::IfNotPresent,
+        vm,
+        state,
+      )
+      .await
+      .unwrap();
+      for generation in [None, Some(vms[1].spec.key)] {
+        let mut labels = HashMap::from([
+          ("io.nanocl.v".into(), vm.spec.vm_key.clone()),
+          ("io.nanocl.n".into(), vm.namespace_name.clone()),
+        ]);
+        if let Some(generation) = generation {
+          labels.insert("io.nanocl.vm-spec".into(), generation.to_string());
+        }
+        let process = super::super::process::create(
+          &ProcessKind::Vm,
+          &format!("{}.v", vm.spec.vm_key),
+          &vm.spec.vm_key,
+          &Config {
+            image: Some(IMAGE.into()),
+            cmd: Some(vec!["sleep".into(), "600".into()]),
+            labels: Some(labels),
+            host_config: Some(HostConfig {
+              network_mode: Some("bridge".into()),
+              ..Default::default()
+            }),
+            ..Default::default()
+          },
+          state,
+        )
+        .await
+        .unwrap();
+        runtime_ids.push(process.key.clone());
+        let before = state
+          .inner
+          .docker_api
+          .inspect_container(&process.key, None)
+          .await
+          .unwrap();
+        let guard = std::sync::Arc::new(
+          lifecycle_lock(&vm.spec.vm_key).lock_owned().await,
+        );
+        let error = start_unlocked_owned(&vm.spec.vm_key, None, guard, state)
+          .await
+          .unwrap_err();
+        assert!(error.to_string().contains(if generation.is_some() {
+          "another resource incarnation"
+        } else {
+          "generation is missing or invalid"
+        }));
+        let after = state
+          .inner
+          .docker_api
+          .inspect_container(&process.key, None)
+          .await
+          .unwrap();
+        assert_eq!(after.state.as_ref().unwrap().running, Some(false));
+        assert_eq!(
+          after.state.as_ref().unwrap().started_at,
+          before.state.as_ref().unwrap().started_at
+        );
+        assert_eq!(
+          VmDb::transform_read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+            .await
+            .unwrap()
+            .status,
+          vm.status
+        );
+        super::super::process::delete_instances(&[process.key], state)
+          .await
+          .unwrap();
+        runtime_ids.clear();
+      }
+    })
+    .catch_unwind()
+    .await;
+    for id in runtime_ids {
+      super::super::process::delete_instances(&[id], state)
+        .await
+        .unwrap();
+    }
+    for key in vm_keys {
+      VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+    }
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
+    }
+  }
+
   #[test]
   fn failed_vm_operation_preserves_observed_runtime_state() {
     let mut runtime: bollard_next::models::ContainerInspectResponse =
@@ -1590,9 +1714,12 @@ mod tests {
       "Internal": false, "IPAM": { "Config": [{ "Subnet": "192.0.2.0/24" }] }
     });
     assert!(parse_runtime_network(enabled.clone()).is_ok());
-    let mut legacy = enabled.clone();
-    legacy.as_object_mut().unwrap().remove("EnableIPv4");
-    assert!(parse_runtime_network(legacy).is_ok());
+    let mut optional_ipv4_field = enabled.clone();
+    optional_ipv4_field
+      .as_object_mut()
+      .unwrap()
+      .remove("EnableIPv4");
+    assert!(parse_runtime_network(optional_ipv4_field).is_ok());
     for flag in [
       serde_json::json!(false),
       serde_json::json!("true"),
@@ -2088,14 +2215,12 @@ mod tests {
   }
 
   #[test]
-  fn vm_network_mode_accepts_canonical_and_legacy_state_fields() {
-    for field in ["NetworkMode", "RuntimeNetwork"] {
-      let config = serde_yaml::from_str::<VmHostConfig>(&format!(
-        "Cpu: 1\nMemory: 512\n{field}: private-vm\n"
-      ))
-      .unwrap();
-      assert_eq!(config.runtime_network.as_deref(), Some("private-vm"));
-    }
+  fn vm_network_mode_uses_canonical_state_field() {
+    let config = serde_yaml::from_str::<VmHostConfig>(
+      "Cpu: 1\nMemory: 512\nNetworkMode: private-vm\n",
+    )
+    .unwrap();
+    assert_eq!(config.runtime_network.as_deref(), Some("private-vm"));
 
     let value = serde_json::to_value(VmHostConfig {
       runtime_network: Some("private-vm".to_owned()),

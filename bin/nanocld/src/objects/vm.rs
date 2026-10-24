@@ -134,36 +134,22 @@ async fn assigned_mac_addresses(
 }
 
 impl VmDb {
-  /// Include legacy MAC allocation in the accepted revision, before execution
-  /// can mount a generation. A rejected start must not commit that backfill.
+  /// Accept the persisted revision without changing its immutable identity.
   pub(crate) async fn prepare_start(
     key: &str,
     owner: OperationOwner,
     lease: VmOperationLease,
     state: &SystemState,
   ) -> HttpResult<AcceptedVmOperation> {
-    let _guard = mac_allocation_lock().lock().await;
     let vm = Self::transform_read_by_pk(key, &state.inner.pool).await?;
-    let replacement = if let Some(address) = &vm.spec.mac_address {
-      normalize_mac_address(address)?;
-      None
-    } else {
-      let used = assigned_mac_addresses(key, state).await?;
-      let mut spec = VmSpecPartial::from(vm.spec.clone());
-      spec.mac_address = Some(select_mac_address(None, None, &used)?);
-      Some(SpecDb::try_from_vm_partial(key, &vm.spec.version, &spec)?)
-    };
-    let revision = replacement.as_ref().map_or(vm.spec.key, |spec| spec.key);
-    let operation = OperationDb::new(&owner, "Vm", key, revision, "start");
+    let address = vm.spec.mac_address.as_deref().ok_or_else(|| {
+      HttpError::bad_request("VM specification has no persisted MacAddress")
+    })?;
+    normalize_mac_address(address)?;
+    let operation = OperationDb::new(&owner, "Vm", key, vm.spec.key, "start");
     Ok(
-      Self::accept_operation(
-        &vm,
-        replacement,
-        operation,
-        lease,
-        &state.inner.pool,
-      )
-      .await?,
+      Self::accept_operation(&vm, None, operation, lease, &state.inner.pool)
+        .await?,
     )
   }
 
@@ -183,10 +169,13 @@ impl VmDb {
       merge_cloud_init_user_data(spec.cloud_init_user_data, None);
     utils::container::vm::validate_spec(&spec)
       .map_err(|err| HttpError::bad_request(err.to_string()))?;
+    let current_address = vm.spec.mac_address.as_deref().ok_or_else(|| {
+      HttpError::bad_request("VM specification has no persisted MacAddress")
+    })?;
     let in_use = assigned_mac_addresses(pk, state).await?;
     spec.mac_address = Some(select_mac_address(
       spec.mac_address.as_deref(),
-      vm.spec.mac_address.as_deref(),
+      Some(current_address),
       &in_use,
     )?);
     utils::container::vm::validate_replacement_spec(&vm, &spec, state).await?;
@@ -199,53 +188,6 @@ impl VmDb {
         Some(replacement),
         operation,
         lease,
-        &state.inner.pool,
-      )
-      .await?,
-    )
-  }
-
-  /// Backfill a legacy VM before creating its next runtime container. This
-  /// persists an ordinary spec revision without requesting a lifecycle task.
-  pub async fn ensure_mac_address(
-    key: &str,
-    state: &SystemState,
-  ) -> HttpResult<Vm> {
-    Self::ensure_mac_address_owned(key, (), state).await
-  }
-
-  pub(crate) async fn ensure_mac_address_owned<G: Send + 'static>(
-    key: &str,
-    keepalive: G,
-    state: &SystemState,
-  ) -> HttpResult<Vm> {
-    let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
-    if let Some(address) = &vm.spec.mac_address {
-      normalize_mac_address(address)?;
-      // Allocation checked uniqueness before persisting this immutable identity.
-      return Ok(vm);
-    }
-    let _guard = mac_allocation_lock().lock().await;
-    let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
-    if let Some(address) = &vm.spec.mac_address {
-      normalize_mac_address(address)?;
-      return Ok(vm);
-    }
-    let in_use = assigned_mac_addresses(key, state).await?;
-    let address =
-      select_mac_address(None, vm.spec.mac_address.as_deref(), &in_use)?;
-    if vm.spec.mac_address.as_deref() == Some(address.as_str()) {
-      return Ok(vm);
-    }
-    let version = vm.spec.version.clone();
-    let mut spec = VmSpecPartial::from(vm.spec);
-    spec.mac_address = Some(address);
-    Ok(
-      VmDb::update_from_spec_owned(
-        key,
-        &spec,
-        &version,
-        keepalive,
         &state.inner.pool,
       )
       .await?,

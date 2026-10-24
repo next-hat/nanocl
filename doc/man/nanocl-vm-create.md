@@ -22,7 +22,7 @@ Create a vm
 ## OPTIONS
 
 **--cloud-init** *\<true|false\>*
-Enable cloud-init provisioning; defaults to true for compatibility. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
+Enable cloud-init provisioning; defaults to true. Networking uses DHCP independently. False generates and attaches no cloud-init seed.
 
 **--cloud-init-user-data** *\<FILE\>*
 Read complete user-data from a local UTF-8 file, at most 64 KiB without NUL bytes. The file replaces generated user/password/SSH/hostname provisioning; NanoCL retains the stable instance ID and DHCP network-config. Cloud-config, scripts, and MIME multipart text are passed unchanged. An empty file selects blank user-data. The content is retained but unused when cloud-init is disabled, and is visible to operators through the VM specification and Docker environment. The runtime must advertise `io.nanocl.vm-cloud-init-user-data=1`. See [custom cloud-init](../vm-runtime.md#custom-cloud-init-user-data) for structured Statefiles and first-boot semantics.

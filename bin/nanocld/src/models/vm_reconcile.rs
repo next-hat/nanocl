@@ -16,16 +16,13 @@ pub(crate) struct VmReconcileArgs {
   #[arg(long)]
   pub incarnation: Option<uuid::Uuid>,
   /// Exact current operation UUID printed by the inspection command
-  #[arg(long, conflicts_with = "legacy")]
-  pub operation: Option<uuid::Uuid>,
-  /// Reconcile a legacy pending transition with no recorded operation
   #[arg(long)]
-  pub legacy: bool,
+  pub operation: Option<uuid::Uuid>,
   /// Exact current specification UUID printed by the inspection command
   #[arg(long)]
   pub spec: Option<uuid::Uuid>,
   /// Confirm every daemon/owner using this database and runtime is stopped,
-  /// including older binaries and daemons using another state directory
+  /// including daemons using another state directory
   #[arg(long)]
   pub confirm_quiescent: bool,
 }

@@ -20,7 +20,7 @@ Alternative designs were considered:
 | TAP bridged directly to the Docker interface | Preserves the address but couples DHCP broadcast isolation and endpoint address ownership to bridge filtering. |
 | Routed TAP with proxy ARP | Preserves the guest's Docker endpoint address and separates DHCP at the link boundary. Requires explicit routes, proxy ARP, and removal of duplicate local IP ownership. |
 
-The implementation uses the third model. Only local Docker bridge networking is supported. `host`, `none`, and `container:` namespace sharing are incompatible with runtime network setup. Existing physical-interface takeover configurations must migrate to a Docker bridge.
+The implementation uses the third model. Only local Docker bridge networking is supported. `host`, `none`, and `container:` namespace sharing are incompatible with runtime network setup. Statefiles must select a Docker bridge.
 
 Leave `HostConfig.LinkNetIface` unset to discover the Docker uplink. An explicit value must match the selected network's container interface prefix followed by `0` (`eth0` by default). NanoCL checks this before starting or replacing the runtime; `eth1` does not select a second endpoint.
 
@@ -55,7 +55,7 @@ The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restar
 
 Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. Pause/resume is not exposed.
 
-Generic process stop/restart returns HTTP 202 after accepting the bounded operation; completion or failure is reported through events and VM status. The dedicated VM stop/restart endpoints wait for completion. VM replacement and deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. Failed operations emit an error while VM status reflects the observed owned runtime: a guest left running remains `Start`. The requested specification is retained for inspection and retry. Known self-referential DNS on the currently assigned endpoint is rejected before accepting a replacement specification. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
+Generic process stop/restart returns HTTP 202 after accepting the bounded operation; completion or failure is reported through events and VM status. The dedicated VM stop/restart endpoints wait for completion. VM replacement and deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. Failed operations emit an error while VM status reflects the observed owned runtime: a guest left running remains `Start`. The requested specification is retained for inspection and retry. Known self-referential DNS on the currently assigned endpoint is rejected before accepting a replacement specification. A runtime image must include `io.nanocl.vm-qmp=1`. Runtime containers must carry the current revision and runtime capability labels. Pulling an updated image alone does not change existing containers.
 
 Start, replacement, and deletion acquire lifecycle admission and their distributed mutex before changing desired state or recording a pending transition. The accepted task keeps that ownership through execution, failure reconciliation, and cleanup, even if the HTTP caller disconnects. A mutex acquisition failure leaves the pre-request specification and status untouched; an existing owner's mutex is never removed by that failed request. Error notifications after completion do not write VM status. Task completion and waiters retire only their own registered task handle.
 
@@ -104,7 +104,7 @@ nanocld --state-dir /var/lib/nanocl --hostname YOUR_NODE \
   vm-reconcile --vm-key global.desktop
 ```
 
-Inspection prints the exact incarnation, specification, current operation, owner evidence, and prerequisite without specification contents. `RecordedStatus` is database state; `AutomaticRecovery` explains ownership eligibility or its blocker; `RuntimeObservation` is typed evidence from the recorded diagnostic, not a fresh runtime inspection. Before mutation, stop **every daemon and operation owner using that database/runtime**, including older binaries and processes using alternate or copied state roots. Keep the store and Docker available. Inspect provisioning containers and allow them to finish or explicitly stop them only after assessing their disk writes. A host reboot alone is not this proof when another process or state-root copy could still act.
+Inspection prints the exact incarnation, specification, current operation, owner evidence, and prerequisite without specification contents. `RecordedStatus` is database state; `AutomaticRecovery` explains ownership eligibility or its blocker; `RuntimeObservation` is typed evidence from the recorded diagnostic, not a fresh runtime inspection. Before mutation, stop **every daemon and operation owner using that database/runtime**, including processes using alternate or copied state roots. Keep the store and Docker available. Inspect provisioning containers and allow them to finish or explicitly stop them only after assessing their disk writes. A host reboot alone is not this proof when another process or state-root copy could still act.
 
 Repeat using the exact UUIDs from inspection and explicitly attest quiescence:
 
@@ -115,9 +115,9 @@ nanocld --state-dir /var/lib/nanocl --hostname YOUR_NODE \
   --spec SPECIFICATION_UUID --operation OPERATION_UUID --confirm-quiescent
 ```
 
-Compatible daemons retain a shared lock on `${state_dir}/run/operations.gate` for their entire process lifetime. Mutation requires its exclusive lock, refusing an active compatible daemon or worker sharing that root. An existing busy owner file is always refused. This gate cannot detect old binaries or alternate/copied roots; the explicit operator prerequisite is essential. Missing or free ambiguous regular files can be reconciled only under this exclusive gate and exact target checks; symlinks/nonregular paths remain errors. Never delete an active lock or the gate to bypass refusal. Fix the reported dependency/identity problem, inspect again, and retry.
+Daemons retain a shared lock on `${state_dir}/run/operations.gate` for their entire process lifetime. Mutation requires its exclusive lock, refusing an active daemon or worker sharing that root. An existing busy owner file is always refused. This gate cannot detect processes using alternate/copied roots; the explicit operator prerequisite is essential. Missing or free ambiguous regular files can be reconciled only under this exclusive gate and exact target checks; symlinks/nonregular paths remain errors. Never delete an active lock or the gate to bypass refusal. Fix the reported dependency/identity problem, inspect again, and retry.
 
-For a legacy pending `Starting`, `Updating`, or `Destroying` transition with no current operation, use `--legacy` instead of `--operation`, still pinning incarnation/specification and confirming quiescence. This creates a `reconcile` operation recording that prior ownership/outcome is unknown; it does not fabricate an original accepted request. Successful reconciliation records a truthful interrupted outcome and observed status, preserving desired revision. Repeating an exact terminal target returns `AlreadyTerminal`; a successor or changed incarnation/specification is refused. Restart the daemon, inspect its inventory, and explicitly retry the desired action.
+Reconciliation requires an existing operation and never invents missing request history. A pending transition without its operation is invalid state. Successful reconciliation records a truthful interrupted outcome and observed status, preserving the desired revision. Repeating an exact terminal target returns `AlreadyTerminal`; a successor or changed incarnation/specification is refused. Restart the daemon, inspect its inventory, and explicitly retry the desired action.
 
 ### Ownership-file cleanup and migration
 
@@ -125,9 +125,9 @@ Completion and definitively rejected acceptance attempt exact file cleanup while
 
 The recovery loop also visits at most 32 directory entries per pass with a persistent directory cursor, eventually revisiting eligible files missed by a crash. It never bulk-deletes the directory or removes operation/specification history. Retaining every historical lock file is unnecessary; no history-retention policy is introduced.
 
-The eight `2026-10-24` migrations introduce this shared schema directly, backfill a retained identity for each existing VM, and associate its existing revisions without inventing operations for legacy transitions. They replace the two earlier, unmerged PR-only `vm_operations` migrations. Repository tags and `nightly` were checked before replacement: those earlier migrations were not released or merged. A development database that applied the earlier PR must not simply start the new head: first drain/reconcile work, stop all daemons/owners, back up the database, and revert those two migrations using the old PR checkout. Then apply the new migrations. For a disposable development environment, stop its entire Compose stack and reset only its isolated development state instead. Do not reset an installed or shared environment.
+The six `2026-10-24` migrations introduce the shared schema directly, with a required incarnation on every newly created VM. They replace the earlier, unmerged PR-only migrations; those migrations were absent from released tags and `nightly` when checked. Deployment requires a fresh cluster recreated from NanoCL Statefiles. There is no old-schema backfill, runtime adoption, or legacy pending-transition reconciliation. A development database that applied an earlier revision of this PR must be recreated with its cluster, not upgraded in place.
 
-Before upgrade or downgrade, drain/reconcile pending operations and stop all daemons/owners. Overlapping old/new binaries are unsupported. Reverse the new migrations in reverse order using the project migration tooling, only after backup: downgrade discards retained operations/incarnations and their associations, while existing specification rows remain. Do not downgrade with unresolved work or depend on an older binary to enforce this ownership protocol.
+Stop all daemons and operation owners before cluster recreation or schema reversal. Overlapping old/new binaries are unsupported. The down migrations are checked in reverse dependency order: they discard retained operations/incarnations and their associations while preserving specification rows. Reapplying the new schema requires empty VM state. Production deployment uses cluster recreation and Statefile apply rather than an in-place upgrade or downgrade.
 
 Follow-up work remains limited to Cargo control requests with Cargo-specific rollout/readiness outcomes; Job definitions using existing revision storage; and separate Job run identities pinning their revision/results, so short stop/cancel control operations need not remain open for an entire Job execution. No adapters or lifecycle changes for those consumers are part of this PR.
 
@@ -271,7 +271,7 @@ Use the [noVNC example](../examples/vm-console/README.md) for a local browser co
 
 CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data FILE`, and `--console true|false`. PATCH also accepts `--clear-cloud-init-user-data`, mutually exclusive with the user-data file. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
 
-## Migration
+## Fresh-cluster deployment
 
 1. Pull the published nightly runtime for current development and CI testing:
 
@@ -281,11 +281,10 @@ CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data 
 
    Nightly NanoCL builds default to this tag. Stable builds retain `ghcr.io/next-hat/nanocl-qemu:8.0.5.0`, which requires stable release publication. `HostConfig.Runtime` can select the nightly or an explicitly built local candidate. Pull updated nightly images explicitly because NanoCL uses `IfNotPresent`; an existing cached image is not refreshed automatically. NanoCL requires the image labels `io.nanocl.vm-runtime-api=0.19` and `io.nanocl.vm-qmp=1`; an older runtime without those contracts is rejected before replacement.
 
-2. Move `NetworkMode: host`, legacy `RuntimeNetwork: host`, and physical `LinkNetIface` configurations onto a named Docker bridge. `RuntimeNetwork` remains a spelling alias for `NetworkMode`.
-3. Existing VM images that retain cloud-init static network configuration need guest-side migration to DHCP. Disabling future seed generation does not remove guest state already written by an earlier seed. Back up the image and use its distribution's network tools to enable DHCP before replacing the runtime.
-4. Legacy VM specs without a MAC receive a persisted address before their next runtime creation. Their former runtime-generated MAC was not a durable identity. Check guest network rules that match the old MAC. A legacy VM may supply an explicit `MacAddress` before identity is assigned.
-5. Shut down a legacy guest from inside the guest OS, or explicitly use `nanocl vm stop <key> --force` if a power cut is acceptable. Replace its runtime to use the new DHCP, QMP, and console behavior. Stop/start alone can reuse an existing old container configuration. Retain `CloudInit: true` when existing guest provisioning is needed; set it to `false` for a prepared non-cloud-init image.
-6. Enable `Console` only for the VMs that need it, and connect through the configured daemon endpoint or the loopback example. Do not restore the old public websockify port mapping.
+2. Recreate the cluster and its database/state, then apply current NanoCL Statefiles. Use `HostConfig.NetworkMode` with a named Docker bridge and DHCP-capable guest images.
+3. VM creation assigns and persists a MAC when the Statefile omits it; an explicit `MacAddress` must be valid and unique. Existing definitions are not backfilled or adopted.
+4. Use `CloudInit: true` for cloud-init provisioning or `false` for a prepared image with its own DHCP configuration and login credentials.
+5. Enable `Console` only for the VMs that need it, and connect through the configured daemon endpoint or the loopback example.
 
 ## Reproducible release validation
 

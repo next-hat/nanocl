@@ -12786,7 +12786,7 @@ components:
           type:
           - boolean
           - 'null'
-          description: 'Enable cloud-init provisioning (default: true for compatibility).'
+          description: 'Enable cloud-init provisioning (default: true).'
         CloudInitUserData:
           $ref: '#/components/schemas/VmCloudInitUserData'
           description: |-
@@ -12874,7 +12874,7 @@ components:
           - boolean
           - 'null'
           description: |-
-            Enable cloud-init provisioning (default: true for compatibility).
+            Enable cloud-init provisioning (default: true).
             Guest networking uses DHCP independently of this setting.
         CloudInitUserData:
           $ref: '#/components/schemas/VmCloudInitUserData'
@@ -12980,9 +12980,7 @@ components:
           type:
           - string
           - 'null'
-          description: |-
-            Stable MAC identity. An existing address cannot be changed; this may
-            supply an address for a legacy VM that does not have one yet.
+          description: Stable MAC identity. If supplied, it must match the existing address.
         Labels:
           type:
           - object

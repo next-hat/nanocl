@@ -410,75 +410,6 @@ impl VmDb {
     })
     .await
   }
-
-  /// An offline operator records a new reconciliation request; this does not
-  /// manufacture ownership evidence for the legacy transition being repaired.
-  pub(crate) async fn reconcile_legacy<G: Send + 'static>(
-    expected: &Vm,
-    expected_incarnation: uuid::Uuid,
-    operation: OperationDb,
-    actual: ObjPsStatusKind,
-    diagnostic: serde_json::Value,
-    keepalive: G,
-    pool: &Pool,
-  ) -> IoResult<bool> {
-    let expected = expected.clone();
-    let actual = actual.to_string();
-    run_query_owned(pool, keepalive, move |conn| {
-      transaction(conn, |conn| {
-        let identity = operation::lock_incarnation(conn, expected_incarnation)?;
-        if identity.deleted_at.is_some()
-          || identity.current_operation_key.is_some()
-          || identity.resource_kind != "Vm"
-          || identity.resource_key != expected.spec.vm_key
-          || operation.incarnation_key != expected_incarnation
-          || operation.spec_key != expected.spec.key
-          || operation.action != "reconcile"
-          || pending_phase(&actual)
-        {
-          return Ok(false);
-        }
-        let Some(vm) = vms::table
-          .find(&expected.spec.vm_key)
-          .for_update()
-          .first::<VmDb>(conn)
-          .optional()?
-        else {
-          return Ok(false);
-        };
-        let status = object_process_statuses::table
-          .find(&vm.status_key)
-          .for_update()
-          .first::<ObjPsStatusDb>(conn)?;
-        if vm.incarnation_key != expected_incarnation
-          || vm.spec_key != expected.spec.key
-          || nanocl_stubs::system::ObjPsStatus::try_from(status.clone())?
-            != expected.status
-          || !pending_phase(&status.actual)
-        {
-          return Ok(false);
-        }
-        operation::accept_on_conn(conn, &identity, &operation)?;
-        diesel::update(object_process_statuses::table.find(&vm.status_key))
-          .set(ObjPsStatusUpdate {
-            wanted: Some(actual.clone()),
-            prev_wanted: Some(status.wanted),
-            actual: Some(actual.clone()),
-            prev_actual: Some(status.actual),
-            health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-          })
-          .execute(conn)?;
-        operation::complete_on_conn(
-          conn,
-          &operation,
-          "interrupted",
-          Some(&diagnostic),
-        )?;
-        Ok(true)
-      })
-    })
-    .await
-  }
 }
 
 #[cfg(test)]
@@ -796,19 +727,19 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn vm_start_acceptance_commits_legacy_mac_in_accepted_revision() {
+  async fn vm_start_rejects_missing_mac_without_persisting_acceptance() {
     let mut fixture = Fixture::new().await;
     assert!(fixture.vm.spec.mac_address.is_none());
     let admission = fixture.operation(fixture.vm.spec.key, "start").await;
-    let dir = std::env::temp_dir()
-      .join(format!("nanocl-start-{}", uuid::Uuid::new_v4()));
+    let directory = std::env::temp_dir()
+      .join(format!("nanocl-missing-mac-{}", uuid::Uuid::new_v4()));
     let (owner, guard) = utils::operation::create_owner(
       admission.key,
       "Vm",
       &fixture.vm.spec.vm_key,
       fixture.incarnation,
       &admission.node_name,
-      dir.to_str().unwrap(),
+      directory.to_str().unwrap(),
     )
     .unwrap();
     let lifecycle = std::sync::Arc::new(
@@ -816,34 +747,47 @@ mod tests {
         .lock_owned()
         .await,
     );
-    let accepted = VmDb::prepare_start(
+    let error = VmDb::prepare_start(
       &fixture.vm.spec.vm_key,
       owner,
       (lifecycle, guard.clone()),
       &fixture.system.state,
     )
     .await
-    .unwrap();
-    assert_ne!(accepted.vm.spec.key, fixture.vm.spec.key);
-    assert!(accepted.vm.spec.mac_address.is_some());
-    assert_eq!(accepted.vm.status.actual, ObjPsStatusKind::Starting);
-    let operation = fixture.current().await;
-    assert_eq!(operation.key, admission.key);
-    assert_eq!(operation.spec_key, accepted.vm.spec.key);
-    let runtime_spec =
-      VmDb::ensure_mac_address(&fixture.vm.spec.vm_key, &fixture.system.state)
+    .unwrap_err();
+    assert!(error.to_string().contains("MacAddress"), "{error}");
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
         .await
         .unwrap();
-    assert_eq!(runtime_spec.spec.key, accepted.vm.spec.key);
-    assert_eq!(runtime_spec.spec.mac_address, accepted.vm.spec.mac_address);
-    fixture.settle(&operation).await;
+    assert_eq!(current.spec.key, fixture.vm.spec.key);
+    assert_eq!(current.status, fixture.vm.status);
+    assert!(current.spec.mac_address.is_none());
+    assert_eq!(
+      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .len(),
+      1
+    );
+    assert!(
+      OperationDb::current("Vm", &fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .is_none()
+    );
+    assert!(
+      DistributedMutexDb::read_by_pk(&admission.key, fixture.pool())
+        .await
+        .is_ok()
+    );
     assert!(
       utils::operation::cleanup_owner(&guard, fixture.pool())
         .await
         .unwrap()
     );
     drop(guard);
-    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(directory).unwrap();
     fixture.cleanup().await;
   }
 
