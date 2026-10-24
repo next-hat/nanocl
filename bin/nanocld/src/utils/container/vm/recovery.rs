@@ -1093,110 +1093,364 @@ mod tests {
     }
   }
 
-  // Unlike the isolated-node tests above, this fixture deliberately uses the
-  // existing development/CI daemon's node. No test scanner or recovery helper
-  // is started: only that separate daemon can settle this committed operation.
+  #[test]
+  #[ignore = "subprocess helper invoked by the controller-exit recovery test"]
+  fn vm_recovery_owner_process() {
+    use std::io::{Read, Write};
+
+    let value = |key| std::env::var(key).unwrap();
+    let key = value("NANOCL_RECOVERY_TEST_VM");
+    let node = value("NANOCL_RECOVERY_TEST_NODE");
+    let state_dir = value("NANOCL_RECOVERY_TEST_STATE");
+    let operation = value("NANOCL_RECOVERY_TEST_OPERATION").parse().unwrap();
+    let incarnation =
+      value("NANOCL_RECOVERY_TEST_INCARNATION").parse().unwrap();
+    let (owner, _guard) = match std::env::var("NANOCL_RECOVERY_TEST_BOOT") {
+      Ok(boot) => utils::operation::create_owner_with_boot_id(
+        operation,
+        "Vm",
+        &key,
+        incarnation,
+        &node,
+        &state_dir,
+        &boot,
+      ),
+      Err(_) => utils::operation::create_owner(
+        operation,
+        "Vm",
+        &key,
+        incarnation,
+        &node,
+        &state_dir,
+      ),
+    }
+    .unwrap();
+    println!(
+      "VM_RECOVERY_OWNER:{}",
+      serde_json::to_string(&owner).unwrap()
+    );
+    std::io::stdout().flush().unwrap();
+    // Only the parent fixture terminates this process. Its kernel locks remain
+    // live after publishing the exact token and until that process exits.
+    let _ = std::io::stdin().read_exact(&mut [0]);
+  }
+
+  // Exercise the production scan after an actual controller process exits,
+  // using a unique state root and node. The development daemon is untouched.
   #[ntex::test]
-  async fn vm_recovery_external_daemon_scans_commit_before_registration() {
+  async fn vm_recovery_controller_exit_scans_current_and_previous_boot() {
+    use crate::models::OperationOwner;
+    use std::{path::PathBuf, process::Stdio};
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    struct StateDirectory(PathBuf);
+    impl Drop for StateDirectory {
+      fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+      }
+    }
+
     let system = crate::utils::tests::gen_default_test_system().await;
-    let state = &system.state;
-    let state_root = std::fs::canonicalize(&state.inner.config.state_dir)
-      .expect("the daemon and test runner must share their state directory");
-    let mut scanner_daemon = None;
-    // The normal development Compose and prepare_test_ci.sh use these names.
-    // Inspect deployment metadata first so a missing external daemon is a
-    // precise prerequisite failure, not a silently skipped recovery test.
-    for name in ["system.ndaemon.c", "nanocld-ci"] {
-      let daemon =
-        match state.inner.docker_api.inspect_container(name, None).await {
-          Ok(daemon) => daemon,
+    for previous_boot in [false, true] {
+      let root = StateDirectory(std::env::temp_dir().join(format!(
+        "nanocl-recovery-controller-{}",
+        uuid::Uuid::new_v4()
+      )));
+      std::fs::create_dir(&root.0).unwrap();
+      let node = format!("recovery-controller-{}", uuid::Uuid::new_v4());
+      let mut state = test_state(
+        &system.state,
+        &node,
+        system.state.inner.pool.clone(),
+        system.state.inner.docker_api.clone(),
+      );
+      Arc::get_mut(&mut state.inner).unwrap().config.state_dir =
+        root.0.to_str().unwrap().to_owned();
+      let vm = create_vm(&system).await;
+      let key = vm.spec.vm_key.clone();
+      let mut child: Option<tokio::process::Child> = None;
+      let result = std::panic::AssertUnwindSafe(async {
+        let incarnation = VmDb::read_by_pk(&key, &state.inner.pool)
+          .await
+          .unwrap()
+          .0
+          .incarnation_key;
+        let mutex = DistributedMutexDb::create_from(
+          DistributedMutexPartial {
+            action: "starting".into(),
+            resource_kind: "Vm".into(),
+            resource_key: key.clone(),
+            node_key: node.clone(),
+            acquired_by: "daemon".into(),
+          },
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
+        let mut command =
+          tokio::process::Command::new(std::env::current_exe().unwrap());
+        command
+          .args([
+            "--exact",
+            "utils::container::vm::recovery::tests::vm_recovery_owner_process",
+            "--ignored",
+            "--nocapture",
+          ])
+          .env("NANOCL_RECOVERY_TEST_VM", &key)
+          .env("NANOCL_RECOVERY_TEST_NODE", &node)
+          .env("NANOCL_RECOVERY_TEST_STATE", &root.0)
+          .env("NANOCL_RECOVERY_TEST_OPERATION", mutex.key.to_string())
+          .env("NANOCL_RECOVERY_TEST_INCARNATION", incarnation.to_string())
+          .stdin(Stdio::piped())
+          .stdout(Stdio::piped())
+          .kill_on_drop(true);
+        let simulated_boot = uuid::Uuid::new_v4().to_string();
+        if previous_boot {
+          command.env("NANOCL_RECOVERY_TEST_BOOT", &simulated_boot);
+        } else {
+          command.env_remove("NANOCL_RECOVERY_TEST_BOOT");
+        }
+        child = Some(command.spawn().unwrap());
+        let output = child.as_mut().unwrap().stdout.take().unwrap();
+        let mut lines = BufReader::new(output).lines();
+        let owner: OperationOwner =
+          tokio::time::timeout(Duration::from_secs(30), async {
+            while let Some(line) = lines.next_line().await.unwrap() {
+              if let Some((_, payload)) = line.split_once("VM_RECOVERY_OWNER:")
+              {
+                return serde_json::from_str(payload).unwrap();
+              }
+            }
+            panic!(
+              "child controller exited without publishing its ownership token"
+            );
+          })
+          .await
+          .expect("child controller did not publish its ownership token");
+        assert_eq!(owner.key, mutex.key);
+        assert_eq!(owner.incarnation_key, incarnation);
+        assert_eq!(owner.node_name, node);
+        assert_eq!(owner.resource_kind, "Vm");
+        assert_eq!(owner.resource_key, key);
+        if previous_boot {
+          assert_eq!(owner.owner_boot_id, simulated_boot);
+          assert_ne!(
+            owner.owner_boot_id,
+            std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+              .unwrap()
+              .trim()
+          );
+        }
+        let operation =
+          OperationDb::new(&owner, "Vm", &key, vm.spec.key, "start");
+        // The child owns both kernel locks. Commit the synthetic acceptance
+        // without registering an executor, modeling that exact crash gap.
+        let accepted = VmDb::accept_operation(
+          &vm,
+          None,
+          operation.clone(),
+          (),
+          &state.inner.pool,
+        )
+        .await
+        .unwrap()
+        .vm;
+        assert!(recover_one(&operation, &state).await.is_err());
+        assert_eq!(
+          OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(operation.clone())
+        );
+        assert_eq!(
+          VmDb::transform_read_by_pk(&key, &state.inner.pool)
+            .await
+            .unwrap()
+            .status,
+          accepted.status
+        );
+
+        child.as_mut().unwrap().kill().await.unwrap();
+        child.as_mut().unwrap().wait().await.unwrap();
+        child = None;
+        let owner_path = root
+          .0
+          .join("run/operations")
+          .join(format!("{}.lock", operation.key));
+        let hidden_owner = root.0.join("temporarily-missing-owner.lock");
+        std::fs::rename(&owner_path, &hidden_owner).unwrap();
+        let missing_result = recover_one(&operation, &state).await;
+        std::fs::rename(&hidden_owner, &owner_path).unwrap();
+        assert!(missing_result.is_err());
+        assert_eq!(
+          OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(operation.clone())
+        );
+
+        let unavailable = test_state(
+          &state,
+          &node,
+          state.inner.pool.clone(),
+          bollard_next::Docker::connect_with_unix(
+            "/dev/null",
+            1,
+            bollard_next::API_DEFAULT_VERSION,
+          )
+          .unwrap(),
+        );
+        assert!(recover_one(&operation, &unavailable).await.is_err());
+        assert_eq!(
+          OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(operation.clone())
+        );
+        assert_eq!(
+          VmDb::transform_read_by_pk(&key, &state.inner.pool)
+            .await
+            .unwrap()
+            .status,
+          accepted.status
+        );
+        assert!(owner_path.exists());
+
+        // Use the same bounded pass as startup/background recovery. A failed
+        // observation must leave the exact acceptance unchanged until retry.
+        let mut settled = operation.clone();
+        for _ in 0..3 {
+          assert_eq!(recover_pending(&state, None).await.unwrap(), None);
+          settled = OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap()
+            .unwrap();
+          if settled.outcome.is_some() {
+            break;
+          }
+          assert_eq!(settled, operation);
+          assert_eq!(
+            VmDb::transform_read_by_pk(&key, &state.inner.pool)
+              .await
+              .unwrap()
+              .status,
+            accepted.status
+          );
+        }
+        assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
+        assert_eq!(settled.owner(), owner);
+        assert_eq!(settled.spec_key, accepted.spec.key);
+        assert_eq!(settled.diagnostic.as_ref().unwrap()["Runtime"], "absent");
+        let observed = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+          .await
+          .unwrap();
+        assert_eq!(observed.spec.key, accepted.spec.key);
+        assert_eq!(observed.status.actual, ObjPsStatusKind::Stop);
+        assert_eq!(observed.status.wanted, ObjPsStatusKind::Stop);
+        assert!(!owner_path.exists());
+        assert!(
+          state
+            .inner
+            .task_manager
+            .get_task(&format!("Vm@{key}"))
+            .await
+            .is_none()
+        );
+        assert!(matches!(
+          state
+            .inner
+            .docker_api
+            .inspect_container(&format!("{key}.v"), None)
+            .await,
           Err(bollard_next::errors::Error::DockerResponseServerError {
             status_code: 404,
             ..
-          }) => continue,
-          Err(error) => {
-            panic!("cannot inspect external recovery daemon {name}: {error}")
-          }
-        };
-      if daemon.state.as_ref().and_then(|state| state.running) != Some(true)
-        || daemon
-          .config
-          .as_ref()
-          .and_then(|config| config.hostname.as_deref())
-          != Some(state.inner.config.hostname.as_str())
-      {
-        continue;
-      }
-      let shared_state = daemon
-        .mounts
-        .as_deref()
-        .unwrap_or_default()
-        .iter()
-        .any(|mount| {
-          let (Some(source), Some(destination)) =
-            (&mount.source, &mount.destination)
-          else {
-            return false;
-          };
-          if mount.rw != Some(true) {
-            return false;
-          }
-          let Ok(suffix) = std::path::Path::new(&state.inner.config.state_dir)
-            .strip_prefix(destination)
-          else {
-            return false;
-          };
-          std::fs::canonicalize(std::path::Path::new(source).join(suffix))
-            .is_ok_and(|mapped| mapped == state_root)
-        });
-      if shared_state {
-        assert!(
-          scanner_daemon.is_none(),
-          "multiple external daemons match the test node and state directory"
+          })
+        ));
+        assert!(!recover_one(&operation, &state).await.unwrap());
+        recover_pending(&state, None).await.unwrap();
+        assert_eq!(
+          OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(settled)
         );
-        scanner_daemon = Some(name);
+
+        let (_, successor, guard) =
+          accept(&observed, "starting", None, &state).await;
+        assert!(
+          VmDb::finish_operation(
+            &successor,
+            ObjPsStatusKind::Stop,
+            "completed",
+            json!({"Test": "completed same-spec successor"}),
+            guard.clone(),
+            &state.inner.pool
+          )
+          .await
+          .unwrap()
+        );
+        utils::operation::cleanup_owner(&guard, &state.inner.pool)
+          .await
+          .unwrap();
+        drop(guard);
+        let completed = OperationDb::current("Vm", &key, &state.inner.pool)
+          .await
+          .unwrap()
+          .unwrap();
+        assert_eq!(completed.key, successor.key);
+        assert_eq!(completed.spec_key, operation.spec_key);
+        assert_eq!(completed.outcome.as_deref(), Some("completed"));
+        assert!(!recover_one(&operation, &state).await.unwrap());
+        recover_pending(&state, None).await.unwrap();
+        assert_eq!(
+          OperationDb::current("Vm", &key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(completed)
+        );
+      })
+      .catch_unwind()
+      .await;
+      if let Some(mut child) = child {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
       }
-    }
-    let scanner_daemon = scanner_daemon.expect(
-      "start the current nanocld through development Compose or prepare_test_ci.sh with the test node and shared state directory before running this regression",
-    );
-    let vm = create_vm(&system).await;
-    let key = vm.spec.vm_key.clone();
-    let mut lock_keys = Vec::new();
-    let result = std::panic::AssertUnwindSafe(async {
-      let (accepted, operation, guard) = accept(&vm, "starting", None, state).await;
-      lock_keys.push(operation.key);
-      assert_eq!(OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap(), operation);
-      assert!(state.inner.task_manager.get_task(&format!("Vm@{key}")).await.is_none());
-      // Acceptance is committed, but no executor was registered or polled.
-      // Releasing the last kernel owner models its interruption at that gap.
-      drop(guard);
-      let settled = tokio::time::timeout(Duration::from_secs(45), async {
-        let mut observations = tokio::time::interval(Duration::from_millis(100));
-        loop {
-          observations.tick().await;
-          let current = OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap();
-          assert_eq!(current.key, operation.key);
-          assert_eq!(current.spec_key, accepted.spec.key);
-          if current.outcome.is_some() { break current; }
+      // No runtime is created by this fixture. Settle any exact pending test
+      // acceptance before deleting its VM, preserving the original panic.
+      let cleanup = async {
+        if let Some(operation) =
+          OperationDb::current("Vm", &key, &state.inner.pool).await?
+          && operation.outcome.is_none()
+        {
+          let guard = utils::operation::abandoned_owner(
+            &operation.owner(),
+            &node,
+            &state.inner.config.state_dir,
+          )?
+          .ok_or_else(|| {
+            conflict("test owner remains live after child exit")
+          })?;
+          VmDb::finish_operation(
+            &operation,
+            ObjPsStatusKind::Stop,
+            "interrupted",
+            json!({"Test": "controller fixture cleanup"}),
+            guard.clone(),
+            &state.inner.pool,
+          )
+          .await?;
+          utils::operation::cleanup_owner(&guard, &state.inner.pool).await?;
         }
-      }).await.unwrap_or_else(|_| panic!("external daemon {scanner_daemon} did not recover the committed operation within 45 seconds; verify it runs the current source and shares the owner file"));
-      assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
-      assert_eq!(settled.diagnostic.as_ref().unwrap()["Runtime"], "absent");
-      let observed = VmDb::transform_read_by_pk(&key, &state.inner.pool).await.unwrap();
-      assert_eq!(observed.spec.key, accepted.spec.key);
-      assert_eq!(observed.status.actual, ObjPsStatusKind::Stop);
-      assert_eq!(observed.status.wanted, ObjPsStatusKind::Stop);
-      assert!(matches!(state.inner.docker_api.inspect_container(&format!("{key}.v"), None).await,
-        Err(bollard_next::errors::Error::DockerResponseServerError { status_code: 404, .. })));
-      assert!(state.inner.task_manager.get_task(&format!("Vm@{key}")).await.is_none());
-      assert_eq!(OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap(), settled);
-    }).catch_unwind().await;
-    cleanup_mutex(&key, state).await;
-    VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
-    cleanup_locks(&lock_keys, state);
-    if let Err(panic) = result {
-      std::panic::resume_unwind(panic);
+        cleanup_mutex(&key, &state).await;
+        VmDb::clear_by_pk(&key, &state.inner.pool).await?;
+        Ok::<(), IoError>(())
+      }
+      .await;
+      if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+      }
+      cleanup.unwrap();
     }
   }
 }

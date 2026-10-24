@@ -1,7 +1,6 @@
 pub mod key;
 pub(crate) mod operation;
 pub mod stream;
-pub(crate) mod vm_reconcile;
 pub mod ws;
 
 pub mod container;
@@ -16,7 +15,7 @@ pub mod system;
 #[cfg(test)]
 pub mod tests {
   use ntex::web::{self, *};
-  use std::env;
+  use std::{env, sync::LazyLock};
 
   use crate::{models::SystemState, services, vars::VERSION};
   use nanocl_stubs::config::DaemonConfig;
@@ -24,6 +23,9 @@ pub mod tests {
   pub use nanocl_utils::ntex::test_client::*;
 
   type Config = fn(&mut ServiceConfig<SystemState>);
+
+  static CONTROLLER_ID: LazyLock<uuid::Uuid> =
+    LazyLock::new(uuid::Uuid::new_v4);
 
   pub struct TestSystem {
     pub state: SystemState,
@@ -46,6 +48,11 @@ pub mod tests {
       .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
     let state_dir = env::var("NANOCL_TEST_STATE_DIR")
       .unwrap_or_else(|_| format!("{home}/.nanocl_dev/state"));
+    // In-process test controllers must not share the external daemon's
+    // exclusive installation lock. Keep their disposable state isolated while
+    // using the existing database and Docker test infrastructure.
+    let state_dir = format!("{state_dir}/test-controllers/{}", *CONTROLLER_ID);
+    std::fs::create_dir_all(&state_dir).unwrap();
     let store_addr = env::var("NANOCL_TEST_STORE_ADDR").unwrap_or_else(|_| {
       "postgresql://root:root@store.nanocl.internal:26258/defaultdb".to_owned()
     });

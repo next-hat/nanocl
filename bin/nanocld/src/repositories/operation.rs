@@ -822,11 +822,26 @@ mod tests {
         .is_none(),
         "cancelled waiter released the worker's flock"
       );
-      assert!(
-        utils::operation::acquire_reconciliation_guard(
-          directory.to_str().unwrap()
-        )
-        .is_err()
+      // A cancelled waiter must not release the installation controller lock
+      // while its blocking database worker can still commit or roll back.
+      use std::os::fd::AsRawFd;
+      let controller_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(directory.join("run/operations.gate"))
+        .unwrap();
+      assert_eq!(
+        unsafe {
+          libc::flock(
+            controller_file.as_raw_fd(),
+            libc::LOCK_EX | libc::LOCK_NB,
+          )
+        },
+        -1
+      );
+      assert_eq!(
+        std::io::Error::last_os_error().kind(),
+        std::io::ErrorKind::WouldBlock
       );
       // A cleanup request enters while acceptance owns the incarnation fence.
       // It must decide from the committed/rolled-back result, never a stale absence.

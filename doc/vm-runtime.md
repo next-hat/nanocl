@@ -74,13 +74,19 @@ An operation is pending while its outcome is null; its terminal outcome is `comp
 
 Replacement acceptance inserts its specification, changes the live specification pointer, records `Updating`, inserts the operation, and changes the authoritative current-operation pointer in one transaction on one connection. Start and deletion commit their pending status and operation association the same way. Any pre-commit failure rolls everything back. Only serialization failures are retried; Docker, QMP, events, and dispatch remain outside transactions. An uncertain commit is preserved for inspection and recovery rather than assumed to be rollback.
 
+The containerized daemon runs as the single controller for its node and persistent mounted state directory. It holds an exclusive kernel lock at `${state_dir}/run/operations.gate` for its entire process lifetime, including runtime teardown. A second controller using the same directory fails before startup. The state directory and node identity must remain stable across daemon replacement; copied state roots do not provide shared ownership protection.
+
 Before acceptance, the owner holds VM lifecycle admission and an exclusive kernel lock at `${state_dir}/run/operations/{operation_uuid}.lock`. The UUID is also the exact distributed mutex token. The file contains bounded immutable identity metadata. Detached acceptance and execution retain both guards if the HTTP caller or TaskManager waiter disconnects. Database workers receive their own guard references, so cancellation of an awaiting future cannot release ownership before the actual transaction and COMMIT finish. Expiry or deletion of the database mutex does not release the kernel lock.
 
 Shared code in `repositories/operation.rs` and `utils/operation.rs` handles retained identity, currentness, queries, owned database work, and file locks/cleanup. VM transactions remain in `repositories/vm_operation.rs`; tasks, QEMU, provisioning, runtime observation, and recovery policy remain VM-specific. Cargo and Job execution are unchanged.
 
 ### Interrupted operations and automatic recovery
 
-After startup inventory, the existing recovery loop scans up to 32 pending VM operations per page every ten seconds. Its cursor advances past unclassifiable owners. Recovery takes the ordinary VM mutation/observation guards, verifies the same node and Linux boot, opens the exact regular owner file without following symlinks, verifies its contents/device/inode, and acquires its exclusive lock nonblockingly. This establishes owner loss only within the configured local filesystem and cooperative single-node protocol. Missing tasks, elapsed time, expired mutexes, changed boot IDs, and missing/replaced files alone never establish abandonment.
+After startup inventory, the daemon recovery loop scans up to 32 pending VM operations per page every ten seconds. Its cursor advances past unclassifiable owners. Recovery takes the ordinary VM mutation/observation guards, verifies the same node, opens the exact regular owner file without following symlinks, verifies its serialized accepted token, and acquires its exclusive lock nonblockingly. Same-boot recovery also requires the recorded device/inode. A live operation's lock prevents takeover even if its database mutex has expired. Missing tasks or elapsed time alone never establish abandonment.
+
+A replacement daemon holding the exclusive controller lock can recover an operation whose recorded owner boot differs from the current boot. The serialized accepted token must still match, and the operation's file lock must be free; a changed boot ID alone is insufficient. Device/inode values can change after a remount, so previous-boot recovery pins the opened file's current identity for safe cleanup while retaining the historical owner metadata. This recovery runs automatically through the same startup/periodic path as same-boot owner loss. Missing files, mismatched tokens, malformed metadata, foreign node identity, and other ambiguous evidence remain pending without altering accepted state. Recovery requires a recorded operation and never invents missing request history.
+
+The separate offline maintenance command and its quiescence-confirmation workflow have been removed. Routine recovery uses the daemon's configured database, Docker connection, node identity, and mounted state without operator-supplied operation UUIDs or credentials.
 
 Recovery verifies the live incarnation and current operation again before writing. It observes the owned Docker runtime and its saved boot revision, immutable container ID, local node, and current run timestamp. It also inventories VM-labeled init, temporary, and renamed containers, including containers with no process row. A running or unknown auxiliary container defers recovery because it may still be provisioning a disk. Wait for it to exit or inspect and explicitly stop it. Recovery does not replay, start, stop, replace, or delete a runtime.
 
@@ -94,42 +100,21 @@ Database/Docker errors, ambiguous ownership, and invalid boot-generation evidenc
 
 For example, an update accepts desired revision B while revision A is running. If graceful shutdown fails, the operation is `failed` and observed status remains `Start`. If its owner crashes before recording the outcome, verified recovery records `interrupted` and `Start`, with A as the observed boot revision and B still desired. Neither case claims B is running. Inspect the revisions/runtime/events, resolve the cause, and submit a fresh update; the new UUID becomes current while the earlier record remains historical. Console access to A still requires both A and B to enable it.
 
-### Offline reconciliation after reboot or missing evidence
-
-When automatic recovery cannot prove owner loss, use `nanocld vm-reconcile`. This command connects to the existing database and Docker; it does not initialize/migrate the store, run startup inventory, start task runners, or replay runtime actions. Mutation performs read-only runtime inspection before settling the operation. Run the same daemon binary/version with the correct existing state root, hostname, database address, and Docker socket. Daemon options precede the subcommand:
-
-```sh
-nanocld --state-dir /var/lib/nanocl --hostname YOUR_NODE \
-  --store-addr postgres://root@YOUR_STORE:26257/nanocl --docker-host /var/run/docker.sock \
-  vm-reconcile --vm-key global.desktop
-```
-
-Inspection prints the exact incarnation, specification, current operation, owner evidence, and prerequisite without specification contents. `RecordedStatus` is database state; `AutomaticRecovery` explains ownership eligibility or its blocker; `RuntimeObservation` is typed evidence from the recorded diagnostic, not a fresh runtime inspection. Before mutation, stop **every daemon and operation owner using that database/runtime**, including processes using alternate or copied state roots. Keep the store and Docker available. Inspect provisioning containers and allow them to finish or explicitly stop them only after assessing their disk writes. A host reboot alone is not this proof when another process or state-root copy could still act.
-
-Repeat using the exact UUIDs from inspection and explicitly attest quiescence:
-
-```sh
-nanocld --state-dir /var/lib/nanocl --hostname YOUR_NODE \
-  --store-addr postgres://root@YOUR_STORE:26257/nanocl --docker-host /var/run/docker.sock \
-  vm-reconcile --vm-key global.desktop --incarnation INCARNATION_UUID \
-  --spec SPECIFICATION_UUID --operation OPERATION_UUID --confirm-quiescent
-```
-
-Daemons retain a shared lock on `${state_dir}/run/operations.gate` for their entire process lifetime. Mutation requires its exclusive lock, refusing an active daemon or worker sharing that root. An existing busy owner file is always refused. This gate cannot detect processes using alternate/copied roots; the explicit operator prerequisite is essential. Missing or free ambiguous regular files can be reconciled only under this exclusive gate and exact target checks; symlinks/nonregular paths remain errors. Never delete an active lock or the gate to bypass refusal. Fix the reported dependency/identity problem, inspect again, and retry.
-
-Reconciliation requires an existing operation and never invents missing request history. A pending transition without its operation is invalid state. Successful reconciliation records a truthful interrupted outcome and observed status, preserving the desired revision. Repeating an exact terminal target returns `AlreadyTerminal`; a successor or changed incarnation/specification is refused. Restart the daemon, inspect its inventory, and explicitly retry the desired action.
-
 ### Ownership-file cleanup and migration
 
-Completion and definitively rejected acceptance attempt exact file cleanup while holding its lock. Cleanup locks the retained incarnation row before deciding whether an operation is absent, fencing any in-flight acceptance transaction. A pending record, database error, unknown commit, live flock, malformed metadata, or identity mismatch preserves the evidence. Terminal records and definitively absent attempts are eligible; cleanup rechecks the exact path/device/inode before unlinking. Free ambiguous files used for offline reconciliation are not silently unlinked.
+Completion and definitively rejected acceptance attempt exact file cleanup while holding its lock. Cleanup locks the retained incarnation row before deciding whether an operation is absent, fencing any in-flight acceptance transaction. A pending record, database error, unknown commit, live flock, malformed metadata, or identity mismatch preserves the evidence. Terminal records and definitively absent attempts are eligible; cleanup rechecks the exact path/device/inode before unlinking. Unknown or corrupt evidence is not silently removed.
 
 The recovery loop also visits at most 32 directory entries per pass with a persistent directory cursor, eventually revisiting eligible files missed by a crash. It never bulk-deletes the directory or removes operation/specification history. Retaining every historical lock file is unnecessary; no history-retention policy is introduced.
 
-The six `2026-10-24` migrations introduce the shared schema directly, with a required incarnation on every newly created VM. They replace the earlier, unmerged PR-only migrations; those migrations were absent from released tags and `nightly` when checked. Deployment requires a fresh cluster recreated from NanoCL Statefiles. There is no old-schema backfill, runtime adoption, or legacy pending-transition reconciliation. A development database that applied an earlier revision of this PR must be recreated with its cluster, not upgraded in place.
+The six `2026-10-24` migrations introduce the shared schema directly, with a required incarnation on every newly created VM. They replace the earlier, unmerged PR-only migrations; those migrations were absent from released tags and `nightly` when checked. Deployment requires a fresh cluster recreated from NanoCL Statefiles. There is no old-schema backfill or runtime adoption. A development database that applied an earlier revision of this PR must be recreated with its cluster, not upgraded in place.
 
 Stop all daemons and operation owners before cluster recreation or schema reversal. Overlapping old/new binaries are unsupported. The down migrations are checked in reverse dependency order: they discard retained operations/incarnations and their associations while preserving specification rows. Reapplying the new schema requires empty VM state. Production deployment uses cluster recreation and Statefile apply rather than an in-place upgrade or downgrade.
 
-Follow-up work remains limited to Cargo control requests with Cargo-specific rollout/readiness outcomes; Job definitions using existing revision storage; and separate Job run identities pinning their revision/results, so short stop/cancel control operations need not remain open for an entire Job execution. No adapters or lifecycle changes for those consumers are part of this PR.
+### Automatic recovery validation
+
+The automatic-recovery correction passed formatting, Clippy, the development-binary build, and focused `cargo make tests` runs in a task-owned Docker engine with fresh state, both DNS/proxy profiles, a two-CPU cap, one Cargo job, and one test thread. The VM filter passed 123 tests, the operation filter passed 21, and the CLI-removal check passed one; these filters overlap. Three subprocess helpers are marked ignored for direct harness execution and are invoked by their parent tests.
+
+The recovery fixture terminates only its newly created child controller, then invokes the production recovery scan. Previous-boot coverage uses simulated boot-identity fixtures, including changed filesystem identity and exact cleanup. No host reboot was performed, no host boot identity was changed, and the installed cluster was untouched. Broader suite validation runs in PR CI rather than repeating the full suite locally.
 
 ## Live resource growth
 

@@ -6,14 +6,15 @@ use std::{
     fd::{AsRawFd, FromRawFd},
     unix::fs::{MetadataExt, OpenOptionsExt},
   },
-  sync::Arc,
+  sync::{Arc, OnceLock},
 };
 
 use nanocl_error::io::{IoError, IoResult};
 
 use crate::models::{
   OperationCleanupCursor, OperationDb, OperationGuard, OperationOwner,
-  OperationOwnerFile, Pool, StateDirectoryGuard,
+  OperationOwnerFile, Pool, StateDirectoryGuard, StateDirectoryLock,
+  StateDirectoryLocks,
 };
 
 const OWNER_FILE_VERSION: u8 = 1;
@@ -86,19 +87,16 @@ fn open_regular(parent: &File, name: &str, flags: i32) -> IoResult<File> {
   let metadata = file.metadata()?;
   if !metadata.is_file() || metadata.nlink() != 1 {
     return Err(evidence_error(
-      "Ownership evidence must be a regular file with one link; inspect the state directory while all controllers are stopped",
+      "Ownership evidence must be a regular file with one link",
     ));
   }
   Ok(file)
 }
 
-fn try_lock(file: &File, exclusive: bool) -> IoResult<bool> {
-  let kind = if exclusive {
-    libc::LOCK_EX
-  } else {
-    libc::LOCK_SH
-  };
-  if unsafe { libc::flock(file.as_raw_fd(), kind | libc::LOCK_NB) } == 0 {
+fn try_lock(file: &File) -> IoResult<bool> {
+  if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) }
+    == 0
+  {
     return Ok(true);
   }
   let error = std::io::Error::last_os_error();
@@ -108,57 +106,40 @@ fn try_lock(file: &File, exclusive: bool) -> IoResult<bool> {
   Err(error.into())
 }
 
-fn acquire_gate(
+/// One controller owns the persistent installation. Repeated acquisitions in
+/// this process share the same open file description, including DB workers.
+pub(crate) fn acquire_daemon_guard(
   state_dir: &str,
-  exclusive: bool,
-  create_root: bool,
 ) -> IoResult<StateDirectoryGuard> {
-  if create_root {
-    std::fs::create_dir_all(state_dir)?;
-  }
-  // Aliases of the trusted configured root are allowed. Descendants are opened
-  // relative to pinned descriptors, without following symlinks.
+  static LOCKS: OnceLock<StateDirectoryLocks> = OnceLock::new();
+  std::fs::create_dir_all(state_dir)?;
+  // Root aliases are permitted; descendants are pinned and never followed.
   let state_dir = std::fs::canonicalize(state_dir)?;
+  let mut locks = LOCKS
+    .get_or_init(Default::default)
+    .lock()
+    .unwrap_or_else(|error| error.into_inner());
+  locks.retain(|_, guard| guard.strong_count() > 0);
+  if let Some(guard) = locks.get(&state_dir).and_then(std::sync::Weak::upgrade)
+  {
+    return Ok(guard);
+  }
   let root = OpenOptions::new()
     .read(true)
     .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
     .open(&state_dir)?;
   let run = open_directory(&root, "run", true)?;
   let file = open_regular(&run, "operations.gate", libc::O_CREAT)?;
-  if !try_lock(&file, exclusive)? {
-    return Err(busy(if exclusive {
-      "A daemon or another maintenance command still holds the state directory; stop all controllers before reconciliation"
-    } else {
-      "Exclusive operation reconciliation is in progress for this state directory"
-    }));
+  if !try_lock(&file)? {
+    return Err(busy(
+      "Another daemon controller owns this persistent state directory",
+    ));
   }
   file.sync_all()?;
   run.sync_all()?;
-  Ok(StateDirectoryGuard {
-    _file: Arc::new(file),
-    root: Arc::new(root),
-    exclusive,
-  })
-}
-
-pub(crate) fn acquire_daemon_guard(
-  state_dir: &str,
-) -> IoResult<StateDirectoryGuard> {
-  acquire_gate(state_dir, false, true)
-}
-
-pub(crate) fn acquire_inspection_guard(
-  state_dir: &str,
-) -> IoResult<StateDirectoryGuard> {
-  acquire_gate(state_dir, false, false)
-}
-
-/// Existing state only. The exclusive gate supplements, rather than replaces,
-/// the operator's quiescence prerequisite for older or foreign-state daemons.
-pub(crate) fn acquire_reconciliation_guard(
-  state_dir: &str,
-) -> IoResult<StateDirectoryGuard> {
-  acquire_gate(state_dir, true, false)
+  let guard = Arc::new(StateDirectoryLock { _file: file, root });
+  locks.insert(state_dir, Arc::downgrade(&guard));
+  Ok(guard)
 }
 
 fn operation_directory(
@@ -189,7 +170,7 @@ fn read_owner(file: &File, key: uuid::Uuid) -> IoResult<OperationOwner> {
     ));
   }
   let payload: OperationOwnerFile = serde_json::from_slice(&bytes).map_err(|_| {
-    evidence_error("Ownership file is incomplete or malformed; use quiescent operator reconciliation")
+    evidence_error("Ownership file is incomplete or malformed; automatic recovery is deferred")
   })?;
   if payload.version != OWNER_FILE_VERSION
     || payload.owner.key != key
@@ -205,13 +186,13 @@ fn read_owner(file: &File, key: uuid::Uuid) -> IoResult<OperationOwner> {
   Ok(payload.owner)
 }
 
-fn file_matches(file: &File, owner: &OperationOwner) -> IoResult<bool> {
+fn file_matches(file: &File, device: i64, inode: i64) -> IoResult<bool> {
   let metadata = file.metadata()?;
   Ok(
     metadata.is_file()
       && metadata.nlink() == 1
-      && metadata.dev() as i64 == owner.lock_device
-      && metadata.ino() as i64 == owner.lock_inode,
+      && metadata.dev() as i64 == device
+      && metadata.ino() as i64 == inode,
   )
 }
 
@@ -243,17 +224,60 @@ pub(crate) fn create_owner_with_gate(
   node_name: &str,
   gate: StateDirectoryGuard,
 ) -> IoResult<(OperationOwner, OperationGuard)> {
+  create_owner_at_boot(
+    key,
+    resource_kind,
+    resource_key,
+    incarnation_key,
+    node_name,
+    gate,
+    boot_id()?,
+  )
+}
+
+/// Simulates previously persisted ownership without changing the host boot ID.
+#[cfg(test)]
+pub(crate) fn create_owner_with_boot_id(
+  key: uuid::Uuid,
+  resource_kind: &str,
+  resource_key: &str,
+  incarnation_key: uuid::Uuid,
+  node_name: &str,
+  state_dir: &str,
+  owner_boot_id: &str,
+) -> IoResult<(OperationOwner, OperationGuard)> {
+  uuid::Uuid::parse_str(owner_boot_id)
+    .map_err(|_| evidence_error("Simulated boot identity is invalid"))?;
+  create_owner_at_boot(
+    key,
+    resource_kind,
+    resource_key,
+    incarnation_key,
+    node_name,
+    acquire_daemon_guard(state_dir)?,
+    owner_boot_id.to_owned(),
+  )
+}
+
+fn create_owner_at_boot(
+  key: uuid::Uuid,
+  resource_kind: &str,
+  resource_key: &str,
+  incarnation_key: uuid::Uuid,
+  node_name: &str,
+  gate: StateDirectoryGuard,
+  owner_boot_id: String,
+) -> IoResult<(OperationOwner, OperationGuard)> {
   if resource_kind.is_empty() || resource_key.is_empty() || node_name.is_empty()
   {
     return Err(evidence_error(
       "Ownership resource and node identities must be nonempty",
     ));
   }
-  let owner_boot_id = boot_id()?;
   let directory = Arc::new(operation_directory(&gate, true)?);
   let mut file =
     open_regular(&directory, &filename(key), libc::O_CREAT | libc::O_EXCL)?;
-  if !try_lock(&file, true)? {
+  if !try_lock(&file)? {
     return Err(busy(
       "New ownership file is locked; acceptance has not started",
     ));
@@ -289,7 +313,8 @@ pub(crate) fn create_owner_with_gate(
     _file: Arc::new(file),
     directory,
     owner: owner.clone(),
-    identity_verified: true,
+    file_device: metadata.dev() as i64,
+    file_inode: metadata.ino() as i64,
     _gate: gate,
   };
   if let Err(error) = written {
@@ -310,95 +335,46 @@ pub(crate) fn abandoned_owner(
 ) -> IoResult<Option<OperationGuard>> {
   if owner.node_name != node_name {
     return Err(evidence_error(
-      "Owner belongs to another node; reconcile on the owning node after confirming controller quiescence",
-    ));
-  }
-  if owner.owner_boot_id != boot_id()? {
-    return Err(evidence_error(
-      "Owner boot differs; automatic takeover is not authorized; use quiescent operator reconciliation",
+      "Owner belongs to another node; automatic recovery is deferred",
     ));
   }
   let gate = acquire_daemon_guard(state_dir)?;
   let directory = Arc::new(operation_directory(&gate, false).map_err(|error| {
-    evidence_error(&format!("Ownership directory unavailable: {error}; use quiescent operator reconciliation"))
+    evidence_error(&format!("Ownership directory unavailable: {error}; automatic recovery is deferred"))
   })?);
-  let file = open_regular(&directory, &filename(owner.key), 0).map_err(|error| {
-    evidence_error(&format!("Ownership file unavailable: {error}; use quiescent operator reconciliation"))
-  })?;
-  if !try_lock(&file, true)? {
+  let file =
+    open_regular(&directory, &filename(owner.key), 0).map_err(|error| {
+      evidence_error(&format!(
+        "Ownership file unavailable: {error}; automatic recovery is deferred"
+      ))
+    })?;
+  if !try_lock(&file)? {
     return Ok(None);
   }
-  if !file_matches(&file, owner)? || read_owner(&file, owner.key)? != *owner {
+  // The controller gate proves installation ownership across a restart. A
+  // remount may change filesystem numbers; the immutable saved token may not.
+  if read_owner(&file, owner.key)? != *owner
+    || (owner.owner_boot_id == boot_id()?
+      && !file_matches(&file, owner.lock_device, owner.lock_inode)?)
+  {
     return Err(evidence_error(
-      "Ownership file was replaced or does not match the accepted token; use quiescent operator reconciliation",
+      "Ownership file was replaced or does not match the accepted token; automatic recovery is deferred",
     ));
   }
+  let metadata = file.metadata()?;
   Ok(Some(OperationGuard {
     _file: Arc::new(file),
     directory,
     owner: owner.clone(),
-    identity_verified: true,
+    file_device: metadata.dev() as i64,
+    file_inode: metadata.ino() as i64,
     _gate: gate,
   }))
 }
 
-/// Offline reconciliation derives its authority from the exclusive gate and
-/// explicit operator quiescence, not from missing/replaced/old-boot evidence.
-/// Even then an existing busy file is an absolute refusal. Free ambiguous files
-/// remain pinned but are ineligible for automatic unlinking.
-pub(crate) fn reconciliation_owner(
-  owner: &OperationOwner,
-  node_name: &str,
-  gate: &StateDirectoryGuard,
-) -> IoResult<Option<OperationGuard>> {
-  if !gate.exclusive {
-    return Err(evidence_error(
-      "Reconciliation requires the exclusive state-directory gate",
-    ));
-  }
-  if owner.node_name != node_name {
-    return Err(evidence_error(
-      "Reconcile with the recorded owner node configuration and explicit controller quiescence",
-    ));
-  }
-  let directory = match operation_directory(gate, false) {
-    Ok(directory) => Arc::new(directory),
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      return Ok(None);
-    }
-    Err(error) => return Err(error),
-  };
-  let file = match open_regular(&directory, &filename(owner.key), 0) {
-    Ok(file) => file,
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      return Ok(None);
-    }
-    Err(error) => {
-      return Err(evidence_error(&format!(
-        "Unsafe ownership path: {error}; inspect it with all controllers stopped"
-      )));
-    }
-  };
-  if !try_lock(&file, true)? {
-    return Err(busy(
-      "Ownership file is still locked by a live process; reconciliation is refused",
-    ));
-  }
-  let identity_verified = file_matches(&file, owner)?
-    && read_owner(&file, owner.key).is_ok_and(|found| found == *owner);
-  Ok(Some(OperationGuard {
-    _file: Arc::new(file),
-    directory,
-    owner: owner.clone(),
-    identity_verified,
-    _gate: gate.clone(),
-  }))
-}
-
 fn unlink_exact(guard: &OperationGuard) -> IoResult<bool> {
-  if !guard.identity_verified
-    || Arc::strong_count(&guard._file) != 1
-    || !file_matches(&guard._file, &guard.owner)?
+  if Arc::strong_count(&guard._file) != 1
+    || !file_matches(&guard._file, guard.file_device, guard.file_inode)?
   {
     return Ok(false);
   }
@@ -420,8 +396,8 @@ fn unlink_exact(guard: &OperationGuard) -> IoResult<bool> {
     return Err(error.into());
   }
   let metadata = unsafe { metadata.assume_init() };
-  if metadata.st_dev as i64 != guard.owner.lock_device
-    || metadata.st_ino as i64 != guard.owner.lock_inode
+  if metadata.st_dev as i64 != guard.file_device
+    || metadata.st_ino as i64 != guard.file_inode
     || metadata.st_mode & libc::S_IFMT != libc::S_IFREG
     || metadata.st_nlink != 1
   {
@@ -446,7 +422,7 @@ pub(crate) async fn cleanup_owner(
   // A direct caller may still share its lease with a queued blocking worker
   // which has not acquired the incarnation row yet. Leave the evidence until
   // every such worker exits; maintenance then obtains a separate free flock.
-  if !guard.identity_verified || Arc::strong_count(&guard._file) != 1 {
+  if Arc::strong_count(&guard._file) != 1 {
     return Ok(false);
   }
   if !OperationDb::owner_file_cleanup_eligible(
@@ -466,6 +442,7 @@ fn cleanup_candidates(
   node_name: &str,
 ) -> IoResult<(Vec<OperationGuard>, bool)> {
   let mut candidates = Vec::new();
+  let current_boot = boot_id()?;
   for _ in 0..CLEANUP_BATCH_SIZE {
     let Some(entry) = cursor.entries.next() else {
       return Ok((candidates, true));
@@ -481,18 +458,23 @@ fn cleanup_candidates(
     };
     let candidate = (|| -> IoResult<Option<OperationGuard>> {
       let file = open_regular(&cursor.directory, &filename(key), 0)?;
-      if !try_lock(&file, true)? {
+      if !try_lock(&file)? {
         return Ok(None);
       }
       let owner = read_owner(&file, key)?;
-      if owner.node_name != node_name || !file_matches(&file, &owner)? {
+      if owner.node_name != node_name
+        || (owner.owner_boot_id == current_boot
+          && !file_matches(&file, owner.lock_device, owner.lock_inode)?)
+      {
         return Ok(None);
       }
+      let metadata = file.metadata()?;
       Ok(Some(OperationGuard {
         _file: Arc::new(file),
         directory: cursor.directory.clone(),
         owner,
-        identity_verified: true,
+        file_device: metadata.dev() as i64,
+        file_inode: metadata.ino() as i64,
         _gate: cursor.gate.clone(),
       }))
     })();
@@ -556,7 +538,7 @@ mod tests {
   use std::{
     collections::HashSet,
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Child, Command, Stdio},
     sync::mpsc,
     time::Duration,
@@ -624,6 +606,56 @@ mod tests {
   }
 
   #[test]
+  #[ignore = "subprocess helper invoked by exclusive controller tests"]
+  fn operation_gate_probe_child() {
+    let state = std::env::var("NANOCL_OPERATION_LOCK_TEST_STATE").unwrap();
+    let gate = acquire_daemon_guard(&state);
+    println!("CONTROLLER_GATE:{}", gate.is_ok());
+  }
+
+  fn assert_other_controller_can_acquire(
+    state: &StateDirectory,
+    expected: bool,
+  ) {
+    let output = Command::new(std::env::current_exe().unwrap())
+      .args([
+        "--exact",
+        "utils::operation::tests::operation_gate_probe_child",
+        "--ignored",
+        "--nocapture",
+      ])
+      .env("NANOCL_OPERATION_LOCK_TEST_STATE", state.path())
+      .output()
+      .unwrap();
+    assert!(
+      output.status.success(),
+      "{}",
+      String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+      String::from_utf8_lossy(&output.stdout)
+        .contains(&format!("CONTROLLER_GATE:{expected}")),
+      "{}",
+      String::from_utf8_lossy(&output.stdout)
+    );
+  }
+
+  #[test]
+  fn controller_gate_is_shared_locally_and_exclusive_between_processes() {
+    let state = StateDirectory::new();
+    let first = acquire_daemon_guard(state.path()).unwrap();
+    let alias = state.0.join(".");
+    let second = acquire_daemon_guard(alias.to_str().unwrap()).unwrap();
+    assert!(Arc::ptr_eq(&first, &second));
+    assert_other_controller_can_acquire(&state, false);
+    drop(first);
+    assert_other_controller_can_acquire(&state, false);
+    drop(second);
+    assert_other_controller_can_acquire(&state, true);
+    assert!(state.0.join("run/operations.gate").exists());
+  }
+
+  #[test]
   #[ignore = "subprocess helper invoked by process_owner_is_live_until_exit"]
   fn operation_lock_child() {
     let path = std::env::var("NANOCL_OPERATION_LOCK_TEST_STATE").unwrap();
@@ -675,12 +707,11 @@ mod tests {
       .recv_timeout(Duration::from_secs(30))
       .expect("child did not publish its held ownership lock");
     reader.join().unwrap();
-    assert!(
-      abandoned_owner(&owner, "owner-test-node", state.path())
-        .unwrap()
-        .is_none()
-    );
-    assert!(acquire_reconciliation_guard(state.path()).is_err());
+    let error = abandoned_owner(&owner, "owner-test-node", state.path())
+      .err()
+      .unwrap();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::WouldBlock);
+    assert_other_controller_can_acquire(&state, false);
     child.0.kill().unwrap();
     child.0.wait().unwrap();
     let recovered = abandoned_owner(&owner, "owner-test-node", state.path())
@@ -705,15 +736,15 @@ mod tests {
         .unwrap()
         .is_none()
     );
-    assert!(acquire_reconciliation_guard(state.path()).is_err());
+    assert_other_controller_can_acquire(&state, false);
     finish.send(()).unwrap();
     worker.join().unwrap();
     let recovered = abandoned_owner(&owner, "owner-test-node", state.path())
       .unwrap()
       .unwrap();
-    assert!(acquire_reconciliation_guard(state.path()).is_err());
+    assert_other_controller_can_acquire(&state, false);
     drop(recovered);
-    assert!(acquire_reconciliation_guard(state.path()).is_ok());
+    assert_other_controller_can_acquire(&state, true);
   }
 
   #[test]
@@ -722,10 +753,11 @@ mod tests {
     let (owner, guard) = state.owner();
     drop(guard);
     assert!(abandoned_owner(&owner, "other-node", state.path()).is_err());
-    let mut old_boot = owner.clone();
-    old_boot.owner_boot_id = uuid::Uuid::new_v4().to_string();
+    let mut wrong_boot_token = owner.clone();
+    wrong_boot_token.owner_boot_id = uuid::Uuid::new_v4().to_string();
     assert!(
-      abandoned_owner(&old_boot, "owner-test-node", state.path()).is_err()
+      abandoned_owner(&wrong_boot_token, "owner-test-node", state.path())
+        .is_err()
     );
     let mut wrong_inode = owner.clone();
     wrong_inode.lock_inode = wrong_inode.lock_inode.wrapping_add(1);
@@ -747,6 +779,63 @@ mod tests {
   }
 
   #[test]
+  fn simulated_previous_boot_recovers_exact_token_and_pins_current_file() {
+    let state = StateDirectory::new();
+    let old_boot = uuid::Uuid::new_v4().to_string();
+    assert_ne!(old_boot, boot_id().unwrap());
+    let (owner, guard) = create_owner_with_boot_id(
+      uuid::Uuid::new_v4(),
+      "Vm",
+      "global.previous-boot",
+      uuid::Uuid::new_v4(),
+      "owner-test-node",
+      state.path(),
+      &old_boot,
+    )
+    .unwrap();
+    assert!(
+      abandoned_owner(&owner, "owner-test-node", state.path())
+        .unwrap()
+        .is_none()
+    );
+    drop(guard);
+    let path = state.lock_path(&owner);
+    let original = path.with_extension("previous-boot");
+    std::fs::rename(&path, &original).unwrap();
+    // Simulate persistent file reappearance with changed filesystem identity.
+    std::fs::copy(&original, &path).unwrap();
+    let recovered = abandoned_owner(&owner, "owner-test-node", state.path())
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.owner, owner);
+    assert_ne!(recovered.file_inode, owner.lock_inode);
+    let pinned = path.with_extension("recovered");
+    std::fs::rename(&path, &pinned).unwrap();
+    std::fs::copy(&original, &path).unwrap();
+    assert!(!unlink_exact(&recovered).unwrap());
+    assert!(
+      path.exists(),
+      "cleanup removed a replacement after recovery"
+    );
+    std::fs::remove_file(&path).unwrap();
+    std::fs::rename(&pinned, &path).unwrap();
+    assert!(unlink_exact(&recovered).unwrap());
+  }
+
+  #[test]
+  fn same_boot_replacement_is_rejected_even_with_identical_saved_token() {
+    let state = StateDirectory::new();
+    let (owner, guard) = state.owner();
+    drop(guard);
+    let path = state.lock_path(&owner);
+    let original = path.with_extension("original");
+    std::fs::rename(&path, &original).unwrap();
+    std::fs::copy(&original, &path).unwrap();
+    assert!(abandoned_owner(&owner, "owner-test-node", state.path()).is_err());
+    assert!(path.exists());
+  }
+
+  #[test]
   fn ownership_paths_reject_redirected_directories_and_files() {
     let state = StateDirectory::new();
     let (owner, guard) = state.owner();
@@ -762,48 +851,15 @@ mod tests {
     std::fs::rename(&path, path.with_extension("old")).unwrap();
     std::os::unix::fs::symlink(path.with_extension("old"), &path).unwrap();
     assert!(abandoned_owner(&owner, "owner-test-node", state.path()).is_err());
+    std::fs::remove_file(&path).unwrap();
+    std::fs::hard_link(path.with_extension("old"), &path).unwrap();
+    assert!(abandoned_owner(&owner, "owner-test-node", state.path()).is_err());
     let run = state.0.join("run");
     let moved = state.0.join("run-original");
     std::fs::rename(&run, &moved).unwrap();
     std::os::unix::fs::symlink(&moved, &run).unwrap();
     assert!(acquire_daemon_guard(state.path()).is_err());
-    assert!(acquire_reconciliation_guard(state.path()).is_err());
-  }
-
-  #[test]
-  fn offline_reconciliation_requires_exclusivity_and_preserves_ambiguous_files()
-  {
-    let state = StateDirectory::new();
-    let (owner, guard) = state.owner();
-    assert!(
-      reconciliation_owner(&owner, "owner-test-node", &guard._gate).is_err()
-    );
-    drop(guard);
-    let gate = acquire_reconciliation_guard(state.path()).unwrap();
-    assert!(acquire_daemon_guard(state.path()).is_err());
-    let exact = reconciliation_owner(&owner, "owner-test-node", &gate)
-      .unwrap()
-      .unwrap();
-    assert!(exact.identity_verified);
-    assert!(reconciliation_owner(&owner, "owner-test-node", &gate).is_err());
-    drop(exact);
-    let path = state.lock_path(&owner);
-    std::fs::write(&path, b"incomplete evidence").unwrap();
-    let ambiguous = reconciliation_owner(&owner, "owner-test-node", &gate)
-      .unwrap()
-      .unwrap();
-    assert!(!ambiguous.identity_verified);
-    assert!(!unlink_exact(&ambiguous).unwrap());
-    assert!(path.exists());
-    drop(ambiguous);
-    std::fs::remove_file(&path).unwrap();
-    assert!(
-      reconciliation_owner(&owner, "owner-test-node", &gate)
-        .unwrap()
-        .is_none()
-    );
-    std::os::unix::fs::symlink(Path::new("missing-evidence"), &path).unwrap();
-    assert!(reconciliation_owner(&owner, "owner-test-node", &gate).is_err());
+    assert_other_controller_can_acquire(&state, false);
   }
 
   #[test]
@@ -826,18 +882,6 @@ mod tests {
     assert!(!path.exists());
     assert!(!unlink_exact(&guard).unwrap());
     assert!(state.0.join("run/operations.gate").exists());
-  }
-
-  #[test]
-  fn inspection_requires_existing_state_and_blocks_exclusive_reconciliation() {
-    let state = StateDirectory::new();
-    let missing = state.0.join("missing");
-    assert!(acquire_inspection_guard(missing.to_str().unwrap()).is_err());
-    assert!(!missing.exists());
-    let inspection = acquire_inspection_guard(state.path()).unwrap();
-    assert!(acquire_reconciliation_guard(state.path()).is_err());
-    drop(inspection);
-    assert!(acquire_reconciliation_guard(state.path()).is_ok());
   }
 
   #[test]
@@ -886,6 +930,22 @@ mod tests {
       .join(filename(uuid::Uuid::new_v4()));
     std::fs::write(&malformed, b"incomplete evidence").unwrap();
     let mut expected = HashSet::new();
+    let (previous_boot, guard) = create_owner_with_boot_id(
+      uuid::Uuid::new_v4(),
+      "Vm",
+      "global.previous-boot-cleanup",
+      uuid::Uuid::new_v4(),
+      "owner-test-node",
+      state.path(),
+      &uuid::Uuid::new_v4().to_string(),
+    )
+    .unwrap();
+    drop(guard);
+    let path = state.lock_path(&previous_boot);
+    let original = path.with_extension("previous-boot");
+    std::fs::rename(&path, &original).unwrap();
+    std::fs::copy(&original, &path).unwrap();
+    expected.insert(previous_boot.key);
     for _ in 0..(CLEANUP_BATCH_SIZE * 2 + 5) {
       let (owner, guard) = state.owner();
       expected.insert(owner.key);

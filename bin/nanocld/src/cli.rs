@@ -8,8 +8,6 @@ use nanocl_stubs::system::SslConfig;
 #[command(author = "Next Hat team <team@next-hat.com>")]
 #[command(version)]
 pub struct Cli {
-  #[command(subcommand)]
-  pub(crate) command: Option<crate::models::DaemonCommand>,
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
   pub hosts: Option<Vec<String>>,
@@ -49,7 +47,6 @@ pub struct Cli {
 impl Default for Cli {
   fn default() -> Self {
     Self {
-      command: None,
       hosts: None,
       docker_host: None,
       store_addr: None,
@@ -69,6 +66,25 @@ impl Default for Cli {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use clap::CommandFactory;
+
+  #[test]
+  fn daemon_cli_has_no_offline_reconciliation_command() {
+    assert!(
+      Cli::try_parse_from([
+        "nanocld",
+        "vm-reconcile",
+        "--vm-key",
+        "global.example",
+      ])
+      .is_err()
+    );
+    let mut command = Cli::command();
+    assert!(command.get_subcommands().next().is_none());
+    let help = command.render_long_help().to_string();
+    assert!(!help.contains("vm-reconcile"));
+    assert!(!help.contains("confirm-quiescent"));
+  }
 
   /// Test cli arguments with default values
   #[test]

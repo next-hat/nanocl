@@ -1,4 +1,9 @@
-use std::{fs::File, sync::Arc};
+use std::{
+  collections::HashMap,
+  fs::File,
+  path::PathBuf,
+  sync::{Arc, Mutex, Weak},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,21 +29,25 @@ pub(crate) struct OperationOwnerFile {
 }
 
 /// A stable state-directory gate. Its pathname is never removed by maintenance.
-#[derive(Clone)]
-pub(crate) struct StateDirectoryGuard {
-  pub(crate) _file: Arc<File>,
-  pub(crate) root: Arc<File>,
-  pub(crate) exclusive: bool,
+pub(crate) struct StateDirectoryLock {
+  pub(crate) _file: File,
+  pub(crate) root: File,
 }
 
-/// Clones retain the same flock and the daemon/maintenance gate. Database
+pub(crate) type StateDirectoryGuard = Arc<StateDirectoryLock>;
+pub(crate) type StateDirectoryLocks =
+  Mutex<HashMap<PathBuf, Weak<StateDirectoryLock>>>;
+
+/// Clones retain the same flock and the installation's controller gate. Database
 /// workers must retain a clone until their actual transaction has finished.
 #[derive(Clone)]
 pub(crate) struct OperationGuard {
   pub(crate) _file: Arc<File>,
   pub(crate) directory: Arc<File>,
   pub(crate) owner: OperationOwner,
-  pub(crate) identity_verified: bool,
+  /// Current filesystem identity, which can differ after a previous boot.
+  pub(crate) file_device: i64,
+  pub(crate) file_inode: i64,
   pub(crate) _gate: StateDirectoryGuard,
 }
 
