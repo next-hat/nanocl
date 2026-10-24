@@ -132,7 +132,7 @@ pub(crate) async fn observe(
 // A daemon can disappear while an init container is still provisioning a disk.
 // Include containers whose Process row was never written, and temporary or
 // renamed VM containers. Their continued execution makes a retry unsafe.
-async fn ensure_auxiliary_stopped(
+pub(super) async fn ensure_auxiliary_stopped(
   vm: &Vm,
   state: &SystemState,
 ) -> IoResult<()> {

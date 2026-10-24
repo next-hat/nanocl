@@ -1293,6 +1293,9 @@ async fn record_task_outcome_owned<G: Send + 'static>(
     let observed =
       tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+        // A failed wait/removal may leave an init container writing the disk.
+        // Do not release admission based only on the main runtime's absence.
+        recovery::ensure_auxiliary_stopped(&vm, state).await?;
         lifecycle::inspect_runtime(&vm, state).await
       })
       .await;
@@ -1537,6 +1540,345 @@ async fn update_unlocked_owned<G: Clone + Send + 'static>(
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[ntex::test]
+  async fn failed_init_wait_and_removal_keep_admission_pending_until_exit() {
+    use crate::models::{
+      DistributedMutexDb, DistributedMutexPartial, NamespaceDb, OperationGuard,
+      SpecDb, SystemStateInner,
+    };
+    use futures::FutureExt;
+    use nanocl_stubs::{
+      system::{ObjPsHealthStatusKind, ObjPsStatusPartial},
+      vm_spec::VmSpecPartial,
+    };
+    use ntex::web;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone)]
+    struct DockerFixture {
+      key: String,
+      namespace: String,
+      running: Arc<Mutex<Option<bool>>>,
+      requests: Arc<Mutex<Vec<String>>>,
+    }
+
+    async fn docker_request(request: web::HttpRequest) -> web::HttpResponse {
+      let fixture = request.app_state::<DockerFixture>().unwrap();
+      let path = request.path();
+      fixture
+        .requests
+        .lock()
+        .unwrap()
+        .push(format!("{} {path}", request.method()));
+      if path.ends_with("/start") {
+        return web::HttpResponse::NoContent().build();
+      }
+      if path.ends_with("/wait")
+        || request.method() == ntex::http::Method::DELETE
+      {
+        return web::HttpResponse::InternalServerError().json(
+          &serde_json::json!({"message": "injected init transport failure"}),
+        );
+      }
+      if path.ends_with("/containers/json") {
+        return web::HttpResponse::Ok()
+          .json(&serde_json::json!([{"Id": "surviving-init"}]));
+      }
+      if path.ends_with("/containers/surviving-init/json") {
+        return web::HttpResponse::Ok().json(&serde_json::json!({
+          "Id": "surviving-init",
+          "Name": format!("/{}.guest-test.init.v", fixture.namespace),
+          "Config": {"Labels": {
+            "io.nanocl.v": fixture.key,
+            "io.nanocl.n": fixture.namespace,
+            "io.nanocl.init-v": "true"
+          }},
+          "State": {"Running": *fixture.running.lock().unwrap()}
+        }));
+      }
+      // The main VM runtime has never been created.
+      web::HttpResponse::NotFound()
+        .json(&serde_json::json!({"message": "No such container"}))
+    }
+
+    async fn candidate(
+      vm: &Vm,
+      state: &SystemState,
+    ) -> (OperationDb, OperationGuard) {
+      let mutex = DistributedMutexDb::create_from(
+        DistributedMutexPartial {
+          action: "start".into(),
+          resource_kind: "Vm".into(),
+          resource_key: vm.spec.vm_key.clone(),
+          node_key: state.inner.config.hostname.clone(),
+          acquired_by: "init-failure-test".into(),
+        },
+        &state.inner.pool,
+      )
+      .await
+      .unwrap();
+      let live = VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+        .await
+        .unwrap()
+        .0;
+      let (owner, guard) = utils::operation::create_owner(
+        mutex.key,
+        "Vm",
+        &vm.spec.vm_key,
+        live.incarnation_key,
+        &state.inner.config.hostname,
+        &state.inner.config.state_dir,
+      )
+      .unwrap();
+      (
+        OperationDb::new(&owner, "Vm", &vm.spec.vm_key, vm.spec.key, "start"),
+        guard,
+      )
+    }
+
+    fn no_routes(_: &mut web::ServiceConfig<SystemState>) {}
+    let system = utils::tests::gen_test_system(no_routes, vars::VERSION).await;
+    let namespace = format!("init-failure-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("{namespace}.guest");
+    let fixture = DockerFixture {
+      key: key.clone(),
+      namespace: namespace.clone(),
+      running: Arc::new(Mutex::new(Some(true))),
+      requests: Default::default(),
+    };
+    let server_fixture = fixture.clone();
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(web::WebAppConfig::new().set_state(server_fixture.clone()))
+        .default_service(web::route().to(docker_request))
+    });
+    let mut config = system.state.inner.config.clone();
+    config.hostname = namespace.clone();
+    let state = SystemState {
+      inner: Arc::new(SystemStateInner {
+        pool: system.state.inner.pool.clone(),
+        docker_api: bollard_next::Docker::connect_with_http(
+          &format!("http://{}", server.addr()),
+          2,
+          bollard_next::API_DEFAULT_VERSION,
+        )
+        .unwrap(),
+        config,
+        task_manager: Default::default(),
+        event_emitter: system.state.inner.event_emitter.clone(),
+        event_emitter_raw: Default::default(),
+        arbiter: ntex::rt::Arbiter::current(),
+      }),
+    };
+    let pool = &state.inner.pool;
+    NamespaceDb::create_from(NamespaceDb::new(&namespace), pool)
+      .await
+      .unwrap();
+    let spec = SpecDb::try_from_vm_partial(
+      &key,
+      vars::VERSION,
+      &VmSpecPartial {
+        name: "guest".into(),
+        image: "/init-failure-test-unused.qcow2".into(),
+        mac_address: Some("02:00:00:00:00:01".into()),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    let vm = VmDb::create_with_spec(
+      &key,
+      "guest",
+      &namespace,
+      spec,
+      ObjPsStatusPartial {
+        key: key.clone(),
+        wanted: ObjPsStatusKind::Stop,
+        prev_wanted: ObjPsStatusKind::Create,
+        actual: ObjPsStatusKind::Stop,
+        prev_actual: ObjPsStatusKind::Create,
+        health: ObjPsHealthStatusKind::Unknown,
+      },
+      pool,
+    )
+    .await
+    .unwrap();
+    let mut owners = Vec::new();
+    let result = std::panic::AssertUnwindSafe(async {
+      let (operation, guard) = candidate(&vm, &state).await;
+      owners.push(operation.owner());
+      let lease = (Arc::new(lifecycle_lock(&key).lock_owned().await), guard);
+      let accepted = VmDb::accept_operation(
+        &vm,
+        None,
+        operation.clone(),
+        lease.clone(),
+        pool,
+      )
+      .await
+      .unwrap();
+      let now = chrono::Utc::now().naive_utc();
+      let init = Process {
+        key: "surviving-init".into(),
+        name: format!("{namespace}.guest-test.init.v"),
+        kind: ProcessKind::Vm,
+        kind_key: key.clone(),
+        node_name: state.inner.config.hostname.clone(),
+        created_at: now,
+        updated_at: now,
+        ip_address: None,
+        data: Default::default(),
+      };
+      let error = start_init_container(&init, &state).await.unwrap_err();
+      let original = error.to_string();
+      assert!(original.contains("injected init transport failure"));
+      assert!(
+        super::super::process::delete_instances_owned(
+          &[init.key],
+          Some(operation.owner()),
+          lease.clone(),
+          &state,
+        )
+        .await
+        .is_err()
+      );
+      for running in [Some(true), None] {
+        *fixture.running.lock().unwrap() = running;
+        let (result, settled) = record_task_outcome_owned(
+          &key,
+          Err(IoError::interrupted("InitContainer", &original)),
+          Some(operation.owner()),
+          lease.clone(),
+          &state,
+        )
+        .await;
+        assert!(result.unwrap_err().to_string().contains(&original));
+        assert!(
+          !settled,
+          "active or unknown init must retain pending admission"
+        );
+        assert_eq!(
+          OperationDb::current("Vm", &key, pool).await.unwrap(),
+          Some(operation.clone())
+        );
+        assert_eq!(
+          VmDb::transform_read_by_pk(&key, pool).await.unwrap().status,
+          accepted.vm.status
+        );
+        assert!(
+          !utils::operation::cleanup_owner(&lease.1, pool)
+            .await
+            .unwrap()
+        );
+      }
+      // The task deletes only its admission mutex; durable pending ownership
+      // must still reject a new request after its executor exits.
+      DistributedMutexDb::del_by_pk(&operation.key, pool)
+        .await
+        .unwrap();
+      drop(lease);
+      let (retry, retry_guard) = candidate(&accepted.vm, &state).await;
+      owners.push(retry.owner());
+      assert!(
+        VmDb::accept_operation(
+          &accepted.vm,
+          None,
+          retry.clone(),
+          retry_guard.clone(),
+          pool
+        )
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("unresolved pending operation")
+      );
+      assert!(
+        utils::operation::cleanup_owner(&retry_guard, pool)
+          .await
+          .unwrap()
+      );
+      DistributedMutexDb::del_by_pk(&retry.key, pool)
+        .await
+        .unwrap();
+      drop(retry_guard);
+      assert!(recovery::recover_one(&operation, &state).await.is_err());
+      *fixture.running.lock().unwrap() = Some(false);
+      assert!(recovery::recover_one(&operation, &state).await.unwrap());
+      let recovered = VmDb::transform_read_by_pk(&key, pool).await.unwrap();
+      assert_eq!(recovered.status.actual, ObjPsStatusKind::Stop);
+      assert_eq!(
+        OperationDb::current("Vm", &key, pool)
+          .await
+          .unwrap()
+          .unwrap()
+          .outcome
+          .as_deref(),
+        Some("interrupted")
+      );
+      let (retry, retry_guard) = candidate(&recovered, &state).await;
+      owners.push(retry.owner());
+      VmDb::accept_operation(
+        &recovered,
+        None,
+        retry.clone(),
+        retry_guard,
+        pool,
+      )
+      .await
+      .unwrap();
+      assert_eq!(
+        OperationDb::current("Vm", &key, pool).await.unwrap(),
+        Some(retry)
+      );
+      let requests = fixture.requests.lock().unwrap();
+      assert!(requests.iter().any(|request| request.contains("/wait")));
+      assert!(
+        requests
+          .iter()
+          .any(|request| request.starts_with("DELETE "))
+      );
+      assert!(
+        requests
+          .iter()
+          .any(|request| request.ends_with(&format!("/{key}.v/json")))
+      );
+      assert!(!requests.iter().any(|request| request.contains("/create")));
+    })
+    .catch_unwind()
+    .await;
+    if let Some(current) = OperationDb::current("Vm", &key, pool).await.unwrap()
+      && current.outcome.is_none()
+    {
+      VmDb::finish_operation(
+        &current,
+        ObjPsStatusKind::Stop,
+        "interrupted",
+        serde_json::Value::Null,
+        (),
+        pool,
+      )
+      .await
+      .unwrap();
+    }
+    for owner in owners {
+      DistributedMutexDb::del_by_pk(&owner.key, pool)
+        .await
+        .unwrap();
+      if let Ok(Some(guard)) = utils::operation::abandoned_owner(
+        &owner,
+        &state.inner.config.hostname,
+        &state.inner.config.state_dir,
+      ) {
+        utils::operation::cleanup_owner(&guard, pool).await.unwrap();
+      }
+    }
+    VmDb::clear_by_pk(&key, pool).await.unwrap();
+    NamespaceDb::del_by_pk(&namespace, pool).await.unwrap();
+    system.state.wait_event_loop().await;
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
+    }
+  }
 
   #[ntex::test]
   async fn vm_start_without_dns_rejects_missing_or_foreign_runtime_generation()
