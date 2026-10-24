@@ -27,10 +27,11 @@ use crate::{
 };
 
 mod lifecycle;
+pub(crate) mod recovery;
 mod resize;
 pub(crate) use lifecycle::{
-  enqueue_lifecycle, lifecycle_lock, restart_with_options, runtime_status,
-  socket_directory, stop_with_options,
+  enqueue_lifecycle, inspect_runtime, lifecycle_lock, restart_with_options,
+  runtime_status, socket_directory, stop_with_options,
 };
 pub(crate) use resize::{resize, runtime_resources};
 
@@ -1157,7 +1158,7 @@ pub(crate) async fn run_task_unlocked(
   key: &str,
   action: NativeEventAction,
   state: &SystemState,
-) -> IoResult<()> {
+) -> (IoResult<()>, bool) {
   let result = match action {
     NativeEventAction::Starting => start_unlocked(key, state).await,
     NativeEventAction::Updating => update_unlocked(key, state).await,
@@ -1167,7 +1168,7 @@ pub(crate) async fn run_task_unlocked(
       "Unsupported VM task action",
     )),
   };
-  record_task_failure(key, result, state).await
+  record_task_outcome(key, result, state).await
 }
 
 // Call while holding the operation's lifecycle guard. The asynchronous task
@@ -1177,6 +1178,14 @@ pub(crate) async fn record_task_failure(
   result: IoResult<()>,
   state: &SystemState,
 ) -> IoResult<()> {
+  record_task_outcome(key, result, state).await.0
+}
+
+pub(crate) async fn record_task_outcome(
+  key: &str,
+  result: IoResult<()>,
+  state: &SystemState,
+) -> (IoResult<()>, bool) {
   if let Err(operation_error) = &result {
     // The requested operation failed, but its old guest may still be running
     // after preflight or an ACPI timeout. Observe the owned runtime under the
@@ -1191,6 +1200,12 @@ pub(crate) async fn record_task_failure(
       Ok(Ok(runtime)) => task_failure_actual(runtime.as_ref()),
       _ => ObjPsStatusKind::Fail,
     };
+    if actual == ObjPsStatusKind::Fail {
+      log::warn!(
+        "VM {key} operation failed: {operation_error}; runtime observation unavailable, retaining pending recovery"
+      );
+      return (result, false);
+    }
     log::warn!(
       "VM {key} operation failed: {operation_error}; observed status: {actual}"
     );
@@ -1198,9 +1213,10 @@ pub(crate) async fn record_task_failure(
       ObjPsStatusDb::update_actual_status(key, &actual, &state.inner.pool).await
     {
       log::warn!("Unable to record failed VM lifecycle status: {error}");
+      return (result, false);
     }
   }
-  result
+  (result, true)
 }
 
 fn task_failure_actual(

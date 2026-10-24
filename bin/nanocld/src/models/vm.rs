@@ -88,6 +88,14 @@ pub(crate) struct VmLifecycleObservationGuard {
   pub _lock: std::sync::Arc<VmLifecycleLock>,
 }
 
+/// The open file description owns a kernel lock until its last clone is gone.
+/// Recovery opens a separate description, so even a second daemon cannot
+/// mistake a live detached acceptance owner for an abandoned operation.
+#[derive(Clone)]
+pub(crate) struct VmOperationGuard {
+  pub(crate) _file: std::sync::Arc<std::fs::File>,
+}
+
 /// Private restart projection for the QEMU generation mounted by Docker.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]

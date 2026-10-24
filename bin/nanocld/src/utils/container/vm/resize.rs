@@ -325,6 +325,14 @@ async fn ready(
   state: &SystemState,
 ) -> IoResult<(Vm, ContainerInspectResponse, VmRuntimeResources)> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if crate::models::VmOperationDb::get(key, &state.inner.pool)
+    .await?
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Err(conflict(
+      "A VM lifecycle operation is awaiting completion or recovery",
+    ));
+  }
   if vm.status.actual != ObjPsStatusKind::Start
     || vm.status.wanted != ObjPsStatusKind::Start
   {

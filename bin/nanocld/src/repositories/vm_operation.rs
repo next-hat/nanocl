@@ -469,3 +469,602 @@ impl VmOperationDb {
     .await
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use nanocl_stubs::{system::ObjPsStatusPartial, vm_spec::VmSpecPartial};
+
+  use crate::{
+    models::{
+      DistributedMutexPartial, NamespaceDb, SystemState, VmOperationOwner,
+    },
+    repositories::generic::{
+      RepositoryCreate, RepositoryDelByPk, RepositoryReadBy, RepositoryUpdate,
+    },
+    utils::tests::{TestSystem, gen_test_system},
+    vars,
+  };
+
+  use super::*;
+
+  fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
+
+  struct Fixture {
+    system: TestSystem,
+    namespace: String,
+    vm: Vm,
+    mutexes: Vec<uuid::Uuid>,
+  }
+
+  impl Fixture {
+    async fn new() -> Self {
+      let system = gen_test_system(no_routes, vars::VERSION).await;
+      let pool = &system.state.inner.pool;
+      let namespace =
+        format!("vm-transaction-{}", uuid::Uuid::new_v4().simple());
+      NamespaceDb::create_from(NamespaceDb::new(&namespace), pool)
+        .await
+        .unwrap();
+      let key = format!("{namespace}.guest");
+      let spec = SpecDb::try_from_vm_partial(
+        &key,
+        vars::VERSION,
+        &VmSpecPartial {
+          name: "guest".to_owned(),
+          image: "/transaction-test-original.qcow2".to_owned(),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+      let spec = SpecDb::create_from(spec, pool).await.unwrap();
+      let status = ObjPsStatusDb::create_from(
+        ObjPsStatusPartial {
+          key: key.clone(),
+          wanted: ObjPsStatusKind::Stop,
+          prev_wanted: ObjPsStatusKind::Create,
+          actual: ObjPsStatusKind::Stop,
+          prev_actual: ObjPsStatusKind::Create,
+          health: ObjPsHealthStatusKind::Unknown,
+        },
+        pool,
+      )
+      .await
+      .unwrap();
+      let vm = VmDb::create_from(
+        VmDb {
+          key: key.clone(),
+          name: "guest".to_owned(),
+          created_at: chrono::Utc::now().naive_utc(),
+          namespace_name: namespace.clone(),
+          status_key: key,
+          spec_key: spec.key,
+        },
+        pool,
+      )
+      .await
+      .unwrap();
+      Self {
+        system,
+        namespace,
+        vm: VmDb::transform((vm, spec, status)).unwrap(),
+        mutexes: Vec::new(),
+      }
+    }
+
+    fn pool(&self) -> &Pool {
+      &self.system.state.inner.pool
+    }
+
+    fn replacement(&self) -> SpecDb {
+      SpecDb::try_from_vm_partial(
+        &self.vm.spec.vm_key,
+        vars::VERSION,
+        &VmSpecPartial {
+          name: "guest".to_owned(),
+          image: "/transaction-test-replacement.qcow2".to_owned(),
+          ..Default::default()
+        },
+      )
+      .unwrap()
+    }
+
+    async fn operation(
+      &mut self,
+      revision: uuid::Uuid,
+      phase: ObjPsStatusKind,
+    ) -> VmOperationDb {
+      let mutex = DistributedMutexDb::create_from(
+        DistributedMutexPartial {
+          action: phase.to_string(),
+          resource_kind: "Vm".to_owned(),
+          resource_key: self.vm.spec.vm_key.clone(),
+          node_key: self.system.state.inner.config.hostname.clone(),
+          acquired_by: "vm-transaction-test".to_owned(),
+        },
+        self.pool(),
+      )
+      .await
+      .unwrap();
+      self.mutexes.push(mutex.key);
+      VmOperationDb::new(
+        &VmOperationOwner {
+          key: mutex.key,
+          node_name: mutex.node_key,
+          owner_boot_id: "transaction-test-boot".to_owned(),
+          lock_device: 1,
+          lock_inode: 2,
+        },
+        &self.vm.spec.vm_key,
+        revision,
+        phase,
+      )
+    }
+
+    async fn cleanup(self) {
+      for mutex in &self.mutexes {
+        DistributedMutexDb::del_by_pk(mutex, self.pool())
+          .await
+          .unwrap();
+      }
+      VmDb::clear_by_pk(&self.vm.spec.vm_key, self.pool())
+        .await
+        .unwrap();
+      NamespaceDb::del_by_pk(&self.namespace, self.pool())
+        .await
+        .unwrap();
+      self.system.state.wait_event_loop().await;
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_acceptance_rolls_back_spec_pointer_and_owner_when_pending_sql_fails()
+   {
+    let mut fixture = Fixture::new().await;
+    let replacement = fixture.replacement();
+    let revision = replacement.key;
+    let operation =
+      fixture.operation(revision, ObjPsStatusKind::Updating).await;
+    let operation_key = operation.key;
+    let error = VmDb::accept_operation_with_pending_write(
+      &fixture.vm,
+      Some(replacement),
+      operation,
+      fixture.pool(),
+      move |conn, key, update| {
+        // Prove the attempted mutations are visible on this transaction's
+        // connection before making the pending-status statement fail.
+        assert_eq!(
+          vms::table
+            .find(key)
+            .select(vms::spec_key)
+            .first::<uuid::Uuid>(conn)?,
+          revision
+        );
+        assert_eq!(
+          vm_operations::table
+            .find(key)
+            .select(vm_operations::key)
+            .first::<uuid::Uuid>(conn)?,
+          operation_key
+        );
+        assert_eq!(update.actual.as_deref(), Some("updating"));
+        diesel::sql_query(
+          "UPDATE object_process_statuses SET actual = NULL WHERE key = $1",
+        )
+        .bind::<diesel::sql_types::Text, _>(key)
+        .execute(conn)?;
+        unreachable!("actual is a NOT NULL column")
+      },
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("actual"), "{error}");
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(current.spec.key, fixture.vm.spec.key);
+    assert_eq!(current.status, fixture.vm.status);
+    let specs =
+      SpecDb::read_by_kind_key(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(specs.len(), 1);
+    assert_eq!(specs[0].key, fixture.vm.spec.key);
+    assert!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .is_none()
+    );
+    // Rejected preparation leaves cleanup to its admission owner, preserving
+    // the mutex until that owner's exact-UUID cleanup runs.
+    assert!(
+      DistributedMutexDb::read_by_pk(&operation_key, fixture.pool())
+        .await
+        .is_ok()
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_acceptance_commits_fixed_revision_pending_status_and_owner() {
+    let mut fixture = Fixture::new().await;
+    let replacement = fixture.replacement();
+    let revision = replacement.key;
+    let operation =
+      fixture.operation(revision, ObjPsStatusKind::Updating).await;
+    let accepted = VmDb::accept_operation(
+      &fixture.vm,
+      Some(replacement),
+      operation.clone(),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(accepted.spec.key, revision);
+    assert_eq!(accepted.spec.image, "/transaction-test-replacement.qcow2");
+    assert_eq!(accepted.status.actual, ObjPsStatusKind::Updating);
+    assert_eq!(accepted.status.prev_actual, ObjPsStatusKind::Stop);
+    assert_eq!(accepted.status.wanted, ObjPsStatusKind::Start);
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(current.spec.key, accepted.spec.key);
+    assert_eq!(current.status, accepted.status);
+    assert_eq!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap(),
+      Some(operation)
+    );
+    assert_eq!(
+      SpecDb::read_by_kind_key(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .len(),
+      2
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_start_acceptance_commits_legacy_mac_in_accepted_revision() {
+    let mut fixture = Fixture::new().await;
+    assert!(fixture.vm.spec.mac_address.is_none());
+    let admission = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    let owner = VmOperationOwner {
+      key: admission.key,
+      node_name: admission.node_name,
+      owner_boot_id: admission.owner_boot_id,
+      lock_device: admission.lock_device,
+      lock_inode: admission.lock_inode,
+    };
+    let accepted = VmDb::prepare_start(
+      &fixture.vm.spec.vm_key,
+      owner,
+      &fixture.system.state,
+    )
+    .await
+    .unwrap();
+    assert_ne!(accepted.spec.key, fixture.vm.spec.key);
+    assert!(accepted.spec.mac_address.is_some());
+    assert_eq!(accepted.status.actual, ObjPsStatusKind::Starting);
+    let operation = VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(operation.key, admission.key);
+    assert_eq!(operation.spec_key, accepted.spec.key);
+    // The executor's legacy backfill path must retain the accepted generation.
+    let runtime_spec =
+      VmDb::ensure_mac_address(&fixture.vm.spec.vm_key, &fixture.system.state)
+        .await
+        .unwrap();
+    assert_eq!(runtime_spec.spec.key, accepted.spec.key);
+    assert_eq!(runtime_spec.spec.mac_address, accepted.spec.mac_address);
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_recovery_and_completion_preserve_same_revision_successor() {
+    let mut fixture = Fixture::new().await;
+    let operation = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    VmDb::accept_operation(
+      &fixture.vm,
+      None,
+      operation.clone(),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert!(
+      operation
+        .finish(
+          ObjPsStatusKind::Stop,
+          "interrupted",
+          serde_json::json!({"runtime": "absent"}),
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    let recovered =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    let successor = fixture
+      .operation(recovered.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    VmDb::accept_operation(&recovered, None, successor.clone(), fixture.pool())
+      .await
+      .unwrap();
+    assert!(
+      !operation
+        .finish(
+          ObjPsStatusKind::Start,
+          "interrupted",
+          serde_json::json!({"stale": true}),
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    assert!(
+      !operation
+        .complete("completed", fixture.pool())
+        .await
+        .unwrap()
+    );
+    assert_eq!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap(),
+      Some(successor.clone())
+    );
+    assert!(
+      DistributedMutexDb::read_by_pk(&successor.key, fixture.pool())
+        .await
+        .is_ok()
+    );
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(current.status.actual, ObjPsStatusKind::Starting);
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_pending_owner_blocks_acceptance_after_mutex_collection() {
+    let mut fixture = Fixture::new().await;
+    let original = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    let accepted = VmDb::accept_operation(
+      &fixture.vm,
+      None,
+      original.clone(),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    DistributedMutexDb::del_by_pk(&original.key, fixture.pool())
+      .await
+      .unwrap();
+    let successor = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    let error = VmDb::accept_operation(
+      &accepted,
+      None,
+      successor.clone(),
+      fixture.pool(),
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("unresolved pending operation"));
+    assert_eq!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap(),
+      Some(original)
+    );
+    assert!(
+      DistributedMutexDb::read_by_pk(&successor.key, fixture.pool())
+        .await
+        .is_ok()
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_observation_preserves_pending_and_completed_same_revision_successors()
+   {
+    let mut fixture = Fixture::new().await;
+    let first = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    VmDb::accept_operation(&fixture.vm, None, first.clone(), fixture.pool())
+      .await
+      .unwrap();
+    assert!(
+      first
+        .finish(
+          ObjPsStatusKind::Stop,
+          "interrupted",
+          serde_json::Value::Null,
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    let snapshot =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    let successor = fixture
+      .operation(snapshot.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    VmDb::accept_operation(&snapshot, None, successor.clone(), fixture.pool())
+      .await
+      .unwrap();
+    assert!(
+      !VmDb::observe_runtime_status(
+        &snapshot,
+        Some(first.key),
+        ObjPsStatusKind::Fail,
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    assert!(
+      successor
+        .finish(
+          ObjPsStatusKind::Stop,
+          "interrupted",
+          serde_json::Value::Null,
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(current.spec.key, snapshot.spec.key);
+    assert_eq!(
+      current.status, snapshot.status,
+      "the completed successor restored identical status values"
+    );
+    assert!(
+      !VmDb::observe_runtime_status(
+        &snapshot,
+        Some(first.key),
+        ObjPsStatusKind::Fail,
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    // A fresh observation associated with the latest completed operation works.
+    assert!(
+      VmDb::observe_runtime_status(
+        &current,
+        Some(successor.key),
+        ObjPsStatusKind::Start,
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    assert_eq!(
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .status
+        .actual,
+      ObjPsStatusKind::Start
+    );
+    assert_eq!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .unwrap()
+        .key,
+      successor.key
+    );
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_recovery_settles_crash_after_runtime_status_before_completion() {
+    let mut fixture = Fixture::new().await;
+    let operation = fixture
+      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
+      .await;
+    VmDb::accept_operation(
+      &fixture.vm,
+      None,
+      operation.clone(),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    ObjPsStatusDb::update_pk(
+      &fixture.vm.spec.vm_key,
+      ObjPsStatusUpdate {
+        actual: Some(ObjPsStatusKind::Start.to_string()),
+        ..Default::default()
+      },
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let observation = serde_json::json!({"container_id": "owned-container", "spec_key": operation.spec_key, "running": true});
+    let resize_error = utils::container::vm::runtime_resources(
+      &fixture.vm.spec.vm_key,
+      &fixture.system.state,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+      resize_error
+        .to_string()
+        .contains("awaiting completion or recovery")
+    );
+    assert_eq!(
+      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap(),
+      Some(operation.clone())
+    );
+    assert!(
+      operation
+        .finish(
+          ObjPsStatusKind::Start,
+          "interrupted",
+          observation.clone(),
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    assert!(
+      !operation
+        .finish(
+          ObjPsStatusKind::Stop,
+          "interrupted",
+          serde_json::Value::Null,
+          fixture.pool()
+        )
+        .await
+        .unwrap()
+    );
+    let settled = VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
+    assert_eq!(settled.observation, Some(observation));
+    assert!(
+      DistributedMutexDb::read_by_pk(&operation.key, fixture.pool())
+        .await
+        .is_err()
+    );
+    let vm =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(vm.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(vm.status.wanted, ObjPsStatusKind::Start);
+    fixture.cleanup().await;
+  }
+}

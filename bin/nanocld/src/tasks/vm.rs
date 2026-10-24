@@ -14,7 +14,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{DistributedMutexDb, EventDb, SystemState, VmDb},
+  models::{
+    DistributedMutexDb, EventDb, SystemState, VmDb, VmOperationDb,
+    VmOperationOwner,
+  },
   repositories::generic::*,
   utils, vars,
 };
@@ -24,13 +27,14 @@ use super::generic::*;
 // Acceptance owns both locks before polling the desired/status mutation. The
 // detached owner hands them directly to the registered task, so disconnects or
 // event delivery failures cannot strand a live pending transition.
-pub(crate) async fn accept_task<F>(
+pub(crate) async fn accept_task<P, F>(
   key: &str,
   action: NativeEventAction,
   state: &SystemState,
-  prepare: F,
+  prepare: P,
 ) -> HttpResult<Vm>
 where
+  P: FnOnce(VmOperationOwner) -> F + 'static,
   F: Future<Output = HttpResult<Vm>> + 'static,
 {
   let mutex_action = match action {
@@ -47,14 +51,15 @@ where
   .await
 }
 
-async fn accept_task_with_acquisition<F, A>(
+async fn accept_task_with_acquisition<P, F, A>(
   key: &str,
   action: NativeEventAction,
   state: &SystemState,
-  prepare: F,
+  prepare: P,
   acquire: A,
 ) -> HttpResult<Vm>
 where
+  P: FnOnce(VmOperationOwner) -> F + 'static,
   F: Future<Output = HttpResult<Vm>> + 'static,
   A: Future<Output = IoResult<DistributedMutexDb>> + 'static,
 {
@@ -78,7 +83,21 @@ where
         return;
       }
     };
-    let vm = match prepare.await {
+    let (owner, owner_guard) =
+      match utils::container::vm::recovery::create_owner(mutex.key, &state) {
+        Ok(owner) => owner,
+        Err(error) => {
+          if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
+            log::error!(
+              "VM acceptance cleanup failed: {key} {}: {cleanup}",
+              mutex.key
+            );
+          }
+          let _ = reply.send(Err(error.into()));
+          return;
+        }
+      };
+    let vm = match prepare(owner.clone()).await {
       Ok(vm) => vm,
       Err(error) => {
         if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
@@ -93,6 +112,8 @@ where
     };
     let revision = vm.spec.key;
     let operation = mutex.key;
+    let accepted_operation =
+      owner.operation(&key, revision, &action.to_string());
     let task_state = state.clone();
     let task_action = action.clone();
     let task_vm = vm.clone();
@@ -102,23 +123,57 @@ where
     let (start, ready) = tokio::sync::oneshot::channel();
     let task = Box::pin(async move {
       let _guard = guard;
+      let _owner_guard = owner_guard;
       // The task is registered before its acceptance notification, but cannot
       // finish before subscribers have been told it was registered.
       let _ = ready.await;
-      let result = async {
-        let current = match VmDb::transform_read_by_pk(&key, &task_state.inner.pool).await {
-          Ok(current) => current,
-          Err(error) => return utils::container::vm::record_task_failure(&key, Err(error), &task_state).await,
-        };
-        if current.spec.key != revision {
+      let admission = async {
+        let accepted = VmOperationDb::get(&key, &task_state.inner.pool).await?;
+        let current =
+          VmDb::transform_read_by_pk(&key, &task_state.inner.pool).await?;
+        if current.spec.key != revision
+          || accepted.as_ref() != Some(&accepted_operation)
+        {
           return Err(IoError::interrupted(
             "VM task",
             "Accepted VM specification was replaced before execution",
           ));
         }
-        log::debug!("Executing VM task: {key} {task_action} operation={operation} revision={revision}");
-        utils::container::vm::run_task_unlocked(&key, task_action, &task_state).await
-      }.await;
+        Ok(())
+      }
+      .await;
+      let (result, settled) = match admission {
+        Ok(()) => {
+          log::debug!(
+            "Executing VM task: {key} {task_action} operation={operation} revision={revision}"
+          );
+          utils::container::vm::run_task_unlocked(
+            &key,
+            task_action,
+            &task_state,
+          )
+          .await
+        }
+        Err(error) => (Err(error), false),
+      };
+      // Runtime helpers settle ordinary outcomes under this same owner. A
+      // still-pending row is retained for evidence-based recovery after exit.
+      if settled
+        && let Err(error) = accepted_operation
+          .complete(
+            if result.is_ok() {
+              "completed"
+            } else {
+              "failed"
+            },
+            &task_state.inner.pool,
+          )
+          .await
+      {
+        log::error!(
+          "VM operation completion persistence failed: {key} operation={operation}: {error}"
+        );
+      }
       let cleanup = VmDb::delete_mutex(&operation, &task_state).await;
       result.and(cleanup)
     });
@@ -337,7 +392,7 @@ mod tests {
           "update" => NativeEventAction::Updating,
           _ => NativeEventAction::Destroying,
         };
-        let rejected = accept_task(&key, phase_action, state, async {
+        let rejected = accept_task(&key, phase_action, state, |_| async {
           panic!("another owner's mutex must prevent acceptance mutation");
         })
         .await;
@@ -395,7 +450,7 @@ mod tests {
         &key,
         action,
         state,
-        async move {
+        move |_| async move {
           prepare_polled.set(true);
           ObjPsStatusDb::update_actual_status(
             &prepare_key,
@@ -484,26 +539,129 @@ mod tests {
     );
   }
 
+  async fn acceptance_fixture(state: &SystemState) -> Vm {
+    use crate::objects::generic::ObjCreate;
+    VmDb::fn_create_obj(
+      &crate::models::VmObjCreateIn {
+        namespace: "global".into(),
+        version: vars::VERSION.into(),
+        spec: nanocl_stubs::vm_spec::VmSpecPartial {
+          name: format!("acceptance-{}", uuid::Uuid::new_v4().simple()),
+          // A missing bind source may be created as a directory by Docker.
+          // A path below a character device deterministically rejects creation.
+          image: "/dev/null/nanocl-acceptance-test.img".into(),
+          cloud_init: Some(false),
+          host_config: Some(nanocl_stubs::vm_spec::VmHostConfig {
+            runtime_network: Some("bridge".into()),
+            ..Default::default()
+          }),
+          ..Default::default()
+        },
+      },
+      state,
+    )
+    .await
+    .unwrap()
+  }
+
+  #[ntex::test]
+  async fn rejected_vm_transaction_registers_no_executor_and_releases_only_its_admission()
+   {
+    use diesel::RunQueryDsl;
+    let system = utils::tests::gen_default_test_system().await;
+    let state = &system.state;
+    let vm = acceptance_fixture(state).await;
+    let key = vm.spec.vm_key.clone();
+    let original = ObjPsStatusDb::read_by_pk(&key, &state.inner.pool)
+      .await
+      .unwrap();
+    let spec = crate::models::SpecDb::try_from_vm_partial(
+      &key,
+      &vm.spec.version,
+      &nanocl_stubs::vm_spec::VmSpecPartial::from(vm.spec.clone()),
+    )
+    .unwrap();
+    let revision = spec.key;
+    let foreign_key =
+      format!("global.other-admission-{}", uuid::Uuid::new_v4());
+    let foreign = VmDb::create_mutex(&foreign_key, "update", state)
+      .await
+      .unwrap();
+    let prepare_state = state.clone();
+    let expected = vm.clone();
+    let error = accept_task(&key, NativeEventAction::Updating, state, move |owner| async move {
+      let operation = VmOperationDb::new(&owner, &expected.spec.vm_key, revision, ObjPsStatusKind::Updating);
+      Ok(VmDb::accept_operation_with_pending_write(&expected, Some(spec), operation,
+        &prepare_state.inner.pool, |conn, key, _| {
+          diesel::sql_query("UPDATE object_process_statuses SET actual = NULL WHERE key = $1")
+            .bind::<diesel::sql_types::Text,_>(key).execute(conn)?;
+          unreachable!("pending status is NOT NULL")
+        }).await?)
+    }).await.unwrap_err();
+    assert!(error.to_string().to_ascii_lowercase().contains("null"));
+    assert_eq!(
+      VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap()
+        .spec
+        .key,
+      vm.spec.key
+    );
+    let after = ObjPsStatusDb::read_by_pk(&key, &state.inner.pool)
+      .await
+      .unwrap();
+    assert_eq!(after.actual, original.actual);
+    assert_eq!(after.wanted, original.wanted);
+    assert_eq!(after.updated_at, original.updated_at);
+    assert!(
+      crate::models::SpecDb::read_by_pk(&revision, &state.inner.pool)
+        .await
+        .is_err()
+    );
+    assert!(
+      VmOperationDb::get(&key, &state.inner.pool)
+        .await
+        .unwrap()
+        .is_none()
+    );
+    assert!(
+      state
+        .inner
+        .task_manager
+        .get_task(&format!("Vm@{key}"))
+        .await
+        .is_none()
+    );
+    assert!(
+      DistributedMutexDb::get_lock(&VmDb::get_kind(), &key, &state.inner.pool)
+        .await
+        .is_err()
+    );
+    assert_eq!(
+      DistributedMutexDb::read_by_pk(&foreign.key, &state.inner.pool)
+        .await
+        .unwrap()
+        .key,
+      foreign.key
+    );
+    let guard = utils::container::vm::lifecycle_lock(&key)
+      .try_lock_owned()
+      .await
+      .unwrap();
+    drop(guard);
+    VmDb::delete_mutex(&foreign.key, state).await.unwrap();
+    VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+  }
+
   #[ntex::test]
   async fn disconnected_vm_acceptance_finishes_owned_setup_and_recovery() {
     use futures::StreamExt;
     use nanocl_stubs::system::EventCondition;
     let system = utils::tests::gen_default_test_system().await;
     let state = &system.state;
-    let key = format!("global.vm-disconnect-test-{}", uuid::Uuid::new_v4());
-    ObjPsStatusDb::create_from(
-      ObjPsStatusPartial {
-        key: key.clone(),
-        actual: ObjPsStatusKind::Stop,
-        wanted: ObjPsStatusKind::Stop,
-        prev_actual: ObjPsStatusKind::Stop,
-        prev_wanted: ObjPsStatusKind::Stop,
-        health: ObjPsHealthStatusKind::Unknown,
-      },
-      &state.inner.pool,
-    )
-    .await
-    .unwrap();
+    let vm = acceptance_fixture(state).await;
+    let key = vm.spec.vm_key.clone();
+    let revision = vm.spec.key;
     let mut registration = state
       .subscribe_raw(Some(vec![EventCondition {
         actor_key: Some(key.clone()),
@@ -514,56 +672,58 @@ mod tests {
       }]))
       .await
       .unwrap();
-    let (acquiring, acquisition_entered) = tokio::sync::oneshot::channel();
-    let (release, acquire_gate) = tokio::sync::oneshot::channel();
+    let (committed, commit_seen) = tokio::sync::oneshot::channel();
+    let (release, gate) = tokio::sync::oneshot::channel();
     let request_key = key.clone();
     let request_state = state.clone();
-    let acquire_key = key.clone();
-    let acquire_state = state.clone();
-    let prepare_key = key.clone();
     let prepare_state = state.clone();
     let caller = ntex::rt::spawn(async move {
-      accept_task_with_acquisition(
+      accept_task(
         &request_key,
         NativeEventAction::Starting,
         &request_state,
-        async move {
-          let status = ObjPsStatusDb::update_actual_status(
-            &prepare_key,
-            &ObjPsStatusKind::Starting,
+        move |owner| async move {
+          let operation = VmOperationDb::new(
+            &owner,
+            &vm.spec.vm_key,
+            vm.spec.key,
+            ObjPsStatusKind::Starting,
+          );
+          let accepted = VmDb::accept_operation(
+            &vm,
+            None,
+            operation,
             &prepare_state.inner.pool,
           )
-          .await;
-          status?;
-          let vm = Vm {
-            namespace_name: "global".to_owned(),
-            spec: nanocl_stubs::vm_spec::VmSpec {
-              vm_key: prepare_key,
-              key: uuid::Uuid::new_v4(),
-              ..Default::default()
-            },
-            status: nanocl_stubs::system::ObjPsStatus {
-              actual: ObjPsStatusKind::Starting,
-              ..Default::default()
-            },
-            ..Default::default()
-          };
-          // Deliberately omit the VM row: execution must reconcile this accepted
-          // transition after its initial read fails, without creating a runtime.
-          Ok(vm)
-        },
-        async move {
-          acquiring.send(()).unwrap();
-          acquire_gate.await.unwrap();
-          VmDb::create_mutex(&acquire_key, "start", &acquire_state).await
+          .await?;
+          committed.send(()).unwrap();
+          gate.await.unwrap();
+          Ok(accepted)
         },
       )
       .await
     });
-    acquisition_entered.await.unwrap();
+    commit_seen.await.unwrap();
     caller.cancel();
-    // The HTTP-side future is gone, but its detached acceptance owner still
-    // excludes new mutations until setup and failure recovery are complete.
+    let operation = VmOperationDb::get(&key, &state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(operation.spec_key, revision);
+    assert_eq!(operation.phase, "starting");
+    assert!(
+      state
+        .inner
+        .task_manager
+        .get_task(&format!("Vm@{key}"))
+        .await
+        .is_none()
+    );
+    assert!(
+      !utils::container::vm::recovery::recover_one(&operation, state)
+        .await
+        .unwrap()
+    );
     assert!(
       utils::container::vm::lifecycle_lock(&key)
         .try_lock_owned()
@@ -575,21 +735,20 @@ mod tests {
         .await
         .unwrap()
         .actual,
-      ObjPsStatusKind::Stop.to_string()
+      "starting"
     );
     release.send(()).unwrap();
-    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
       loop {
         let bytes = registration.next().await.unwrap().unwrap();
         if bytes.is_empty() {
           continue;
         }
         let event: Event = serde_json::from_slice(&bytes).unwrap();
-        if event.kind == EventKind::Normal
-          && event.action == NativeEventAction::Starting.to_string()
-          && event.actor.as_ref().and_then(|actor| actor.key.as_deref())
-            == Some(key.as_str())
-        {
+        if event.kind == EventKind::Normal && event.action == "starting" {
+          let metadata = event.metadata.unwrap();
+          assert_eq!(metadata["Operation"], serde_json::json!(operation.key));
+          assert_eq!(metadata["SpecKey"], serde_json::json!(revision));
           break;
         }
       }
@@ -601,26 +760,60 @@ mod tests {
     })
     .await
     .unwrap();
+    let completed = VmOperationDb::get(&key, &state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(completed.key, operation.key);
+    assert_eq!(completed.spec_key, revision);
+    // The invalid bind source fails execution after the exact accepted revision
+    // was checked; normal failure reconciliation observes no running runtime.
+    assert_eq!(completed.outcome.as_deref(), Some("failed"));
     assert_eq!(
       ObjPsStatusDb::read_by_pk(&key, &state.inner.pool)
         .await
         .unwrap()
         .actual,
-      ObjPsStatusKind::Fail.to_string()
+      "stop"
     );
-    let missing =
+    assert!(
       DistributedMutexDb::get_lock(&VmDb::get_kind(), &key, &state.inner.pool)
         .await
-        .unwrap_err();
-    assert_eq!(missing.inner.kind(), std::io::ErrorKind::NotFound);
+        .is_err()
+    );
     let guard = utils::container::vm::lifecycle_lock(&key)
       .try_lock_owned()
       .await
       .unwrap();
-    drop(guard);
-    ObjPsStatusDb::del_by_pk(&key, &state.inner.pool)
+    let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool)
       .await
       .unwrap();
+    if let Some(runtime) = utils::container::vm::inspect_runtime(&vm, state)
+      .await
+      .unwrap()
+    {
+      assert_eq!(runtime.state.and_then(|state| state.running), Some(false));
+    }
+    drop(guard);
+    utils::container::vm::delete(&key, state).await.unwrap();
+    assert!(
+      utils::container::vm::inspect_runtime(&vm, state)
+        .await
+        .unwrap()
+        .is_none()
+    );
+    assert!(
+      crate::models::ProcessDb::read_by_kind_key(&key, None, &state.inner.pool)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    std::fs::remove_file(
+      std::path::Path::new(&state.inner.config.state_dir)
+        .join("run/vm-operations")
+        .join(format!("{}.lock", operation.key)),
+    )
+    .unwrap();
   }
 
   #[ntex::test]

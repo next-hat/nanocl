@@ -181,7 +181,7 @@ fn validate_process_owner(
   Ok(())
 }
 
-pub(super) async fn inspect_runtime(
+pub(crate) async fn inspect_runtime(
   vm: &Vm,
   state: &SystemState,
 ) -> IoResult<Option<ContainerInspectResponse>> {
@@ -462,6 +462,14 @@ async fn run_lifecycle(
   state: &SystemState,
 ) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if crate::models::VmOperationDb::get(key, &state.inner.pool)
+    .await?
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Err(conflict(
+      "A VM lifecycle operation is awaiting completion or recovery",
+    ));
+  }
   if let Some(expected) = expected_id {
     let runtime = inspect_runtime(&vm, state)
       .await?
