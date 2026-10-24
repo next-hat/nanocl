@@ -246,6 +246,7 @@ pub(crate) async fn recover_one(
   }
   let action = match candidate.action.as_str() {
     "start" => NativeEventAction::Starting,
+    "restart" => NativeEventAction::Restart,
     "update" => NativeEventAction::Updating,
     "delete" => NativeEventAction::Destroying,
     _ => return Err(conflict("Unsupported pending phase")),
@@ -399,6 +400,7 @@ mod tests {
     .unwrap();
     let action = match phase {
       "starting" => "start",
+      "restart" => "restart",
       "updating" => "update",
       "destroying" => "delete",
       _ => panic!("invalid phase"),
@@ -442,6 +444,276 @@ mod tests {
       .await;
     assert!(response.status().is_success());
     response.json::<Vm>().await.unwrap()
+  }
+
+  #[ntex::test]
+  async fn interrupted_restart_recovers_stopped_runtime_and_allows_normal_retry()
+   {
+    use crate::{
+      models::{NamespaceDb, VmObjCreateIn},
+      objects::generic::ObjCreate,
+    };
+    use ntex::web;
+    use std::sync::Mutex;
+
+    #[derive(Clone)]
+    struct DockerFixture {
+      vm: Vm,
+      running: Arc<Mutex<bool>>,
+      requests: Arc<Mutex<Vec<String>>>,
+    }
+
+    async fn docker_request(request: web::HttpRequest) -> web::HttpResponse {
+      let fixture = request.app_state::<DockerFixture>().unwrap();
+      let path = request.path();
+      fixture
+        .requests
+        .lock()
+        .unwrap()
+        .push(format!("{} {path}", request.method()));
+      if path.ends_with("/containers/restart-runtime/start")
+        && request.method() == ntex::http::Method::POST
+      {
+        *fixture.running.lock().unwrap() = true;
+        return web::HttpResponse::NoContent().build();
+      }
+      if request.method() == ntex::http::Method::GET {
+        if path.ends_with("/containers/json") {
+          return web::HttpResponse::Ok()
+            .json(&json!([{"Id": "restart-runtime"}]));
+        }
+        if path.ends_with("/containers/restart-runtime/json")
+          || path.ends_with(&format!(
+            "/containers/{}.v/json",
+            fixture.vm.spec.vm_key
+          ))
+        {
+          let running = *fixture.running.lock().unwrap();
+          return web::HttpResponse::Ok().json(&json!({
+            "Id": "restart-runtime",
+            "Name": format!("/{}.v", fixture.vm.spec.vm_key),
+            "Config": {"Labels": {
+              "io.nanocl.v": fixture.vm.spec.vm_key,
+              "io.nanocl.n": fixture.vm.namespace_name,
+              "io.nanocl.vm-spec": fixture.vm.spec.key.to_string()
+            }},
+            "State": {
+              "Running": running,
+              "StartedAt": if running {"2026-01-02T00:00:00Z"} else {"2026-01-01T00:00:00Z"}
+            }
+          }));
+        }
+      }
+      web::HttpResponse::InternalServerError()
+        .json(&json!({"message": "Unexpected Docker request in restart recovery fixture"}))
+    }
+
+    fn no_routes(_: &mut web::ServiceConfig<SystemState>) {}
+    let system =
+      crate::utils::tests::gen_test_system(no_routes, crate::vars::VERSION)
+        .await;
+    let namespace =
+      format!("restart-recovery-{}", uuid::Uuid::new_v4().simple());
+    NamespaceDb::create_from(
+      NamespaceDb::new(&namespace),
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    let vm = VmDb::fn_create_obj(
+      &VmObjCreateIn {
+        namespace: namespace.clone(),
+        version: crate::vars::VERSION.into(),
+        spec: VmSpecPartial {
+          name: "guest".into(),
+          image: "/restart-recovery-test-unused.qcow2".into(),
+          cloud_init: Some(false),
+          ..Default::default()
+        },
+      },
+      &system.state,
+    )
+    .await
+    .unwrap();
+    let key = vm.spec.vm_key.clone();
+    let fixture = DockerFixture {
+      vm: vm.clone(),
+      running: Default::default(),
+      requests: Default::default(),
+    };
+    let server_fixture = fixture.clone();
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(web::WebAppConfig::new().set_state(server_fixture.clone()))
+        .default_service(web::route().to(docker_request))
+    });
+    let state = test_state(
+      &system.state,
+      &namespace,
+      system.state.inner.pool.clone(),
+      bollard_next::Docker::connect_with_http(
+        &format!("http://{}", server.addr()),
+        2,
+        bollard_next::API_DEFAULT_VERSION,
+      )
+      .unwrap(),
+    );
+    let mut lock_keys = Vec::new();
+    let result = std::panic::AssertUnwindSafe(async {
+      // Model controller loss after restart committed Starting but before its
+      // Docker start request. The real runtime is still stopped.
+      let (accepted, operation, guard) =
+        accept(&vm, "restart", None, &state).await;
+      lock_keys.push(operation.key);
+      assert_eq!(accepted.status.actual, ObjPsStatusKind::Starting);
+      assert!(
+        !recover_one(&operation, &state).await.unwrap(),
+        "a live owner cannot be recovered"
+      );
+      // Collection of the admission mutex still cannot override the durable
+      // pending operation, even through the ordinary restart entry point.
+      DistributedMutexDb::del_by_pk(&operation.key, &state.inner.pool)
+        .await
+        .unwrap();
+      let rejected =
+        super::super::restart_with_options(&key, &Default::default(), &state)
+          .await
+          .unwrap_err();
+      assert_eq!(rejected.inner.kind(), std::io::ErrorKind::WouldBlock);
+      assert_eq!(
+        OperationDb::current("Vm", &key, &state.inner.pool)
+          .await
+          .unwrap(),
+        Some(operation.clone())
+      );
+      assert_eq!(
+        VmDb::transform_read_by_pk(&key, &state.inner.pool)
+          .await
+          .unwrap()
+          .status,
+        accepted.status
+      );
+      drop(guard);
+      assert!(recover_pending(&state, None).await.unwrap().is_none());
+      let recovered = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(recovered.status.actual, ObjPsStatusKind::Stop);
+      assert_eq!(recovered.status.wanted, ObjPsStatusKind::Stop);
+      let interrupted = OperationDb::current("Vm", &key, &state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+      assert_eq!(interrupted.key, operation.key);
+      assert_eq!(interrupted.outcome.as_deref(), Some("interrupted"));
+      assert_eq!(
+        interrupted.diagnostic.as_ref().unwrap()["Runtime"],
+        "stopped"
+      );
+      assert!(!*fixture.running.lock().unwrap());
+      assert!(
+        fixture
+          .requests
+          .lock()
+          .unwrap()
+          .iter()
+          .all(|request| request.starts_with("GET ")),
+        "recovery must only observe the stopped runtime"
+      );
+      // An explicit ordinary retry may now start exactly the inspected runtime.
+      super::super::restart_with_options(&key, &Default::default(), &state)
+        .await
+        .unwrap();
+      state
+        .inner
+        .task_manager
+        .wait_task(&format!("Vm@{key}"))
+        .await;
+      let completed = OperationDb::current("Vm", &key, &state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+      lock_keys.push(completed.key);
+      assert_ne!(completed.key, operation.key);
+      assert_eq!(completed.action, "restart");
+      assert_eq!(completed.outcome.as_deref(), Some("completed"));
+      let running = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(running.status.actual, ObjPsStatusKind::Start);
+      assert_eq!(running.status.wanted, ObjPsStatusKind::Start);
+
+      // This fixture cannot provide QMP shutdown. A graceful restart must fail
+      // without falling back to a Docker power mutation, preserving both the
+      // observed runtime and its restored wanted status.
+      let error =
+        super::super::restart_with_options(&key, &Default::default(), &state)
+          .await
+          .unwrap_err();
+      assert!(error.to_string().contains("required managed QMP interface"));
+      state
+        .inner
+        .task_manager
+        .wait_task(&format!("Vm@{key}"))
+        .await;
+      let failed = OperationDb::current("Vm", &key, &state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+      lock_keys.push(failed.key);
+      assert_ne!(failed.key, completed.key);
+      assert_eq!(failed.action, "restart");
+      assert_eq!(failed.outcome.as_deref(), Some("failed"));
+      let preserved = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(preserved.status.actual, ObjPsStatusKind::Start);
+      assert_eq!(preserved.status.wanted, ObjPsStatusKind::Start);
+      assert!(*fixture.running.lock().unwrap());
+      let mutations = fixture
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|request| !request.starts_with("GET "))
+        .cloned()
+        .collect::<Vec<_>>();
+      assert_eq!(mutations.len(), 1);
+      assert!(mutations[0].ends_with("/containers/restart-runtime/start"));
+    })
+    .catch_unwind()
+    .await;
+    state
+      .inner
+      .task_manager
+      .wait_task(&format!("Vm@{key}"))
+      .await;
+    if let Some(current) = OperationDb::current("Vm", &key, &state.inner.pool)
+      .await
+      .unwrap()
+      && current.outcome.is_none()
+    {
+      VmDb::finish_operation(
+        &current,
+        ObjPsStatusKind::Stop,
+        "interrupted",
+        Value::Null,
+        (),
+        &state.inner.pool,
+      )
+      .await
+      .unwrap();
+    }
+    cleanup_mutex(&key, &state).await;
+    VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+    NamespaceDb::del_by_pk(&namespace, &state.inner.pool)
+      .await
+      .unwrap();
+    cleanup_locks(&lock_keys, &state);
+    system.state.wait_event_loop().await;
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
+    }
   }
 
   // Real database acceptance and Docker inspection, without starting QEMU.

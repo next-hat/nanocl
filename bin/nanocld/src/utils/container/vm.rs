@@ -34,7 +34,7 @@ pub(crate) mod recovery;
 mod resize;
 pub(crate) use lifecycle::{
   enqueue_lifecycle, inspect_runtime, lifecycle_lock, restart_with_options,
-  runtime_status, socket_directory, stop_with_options,
+  run_restart_owned, runtime_status, socket_directory, stop_with_options,
 };
 pub(crate) use resize::{resize, runtime_resources};
 
