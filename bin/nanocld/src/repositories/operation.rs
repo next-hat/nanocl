@@ -257,6 +257,7 @@ pub(crate) fn delete_exact_mutex(
   Ok(())
 }
 
+#[cfg(test)]
 impl ResourceIncarnationDb {
   pub(crate) async fn get(
     key: uuid::Uuid,
@@ -321,6 +322,7 @@ impl OperationDb {
     .await
   }
 
+  #[cfg(test)]
   pub(crate) async fn current_for_incarnation(
     key: uuid::Uuid,
     pool: &Pool,
