@@ -200,6 +200,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    vm_operations (vm_key) {
+        vm_key -> Text,
+        key -> Uuid,
+        spec_key -> Uuid,
+        node_name -> Text,
+        phase -> Text,
+        owner_boot_id -> Text,
+        lock_device -> Int8,
+        lock_inode -> Int8,
+        outcome -> Nullable<Text>,
+        observation -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     vms (key) {
         key -> Varchar,
         name -> Varchar,
@@ -223,6 +238,7 @@ diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
 diesel::joinable!(vm_images -> nodes (node_name));
+diesel::joinable!(vm_operations -> vms (vm_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
@@ -245,5 +261,6 @@ diesel::allow_tables_to_appear_in_same_query!(
   secrets,
   specs,
   vm_images,
+  vm_operations,
   vms,
 );

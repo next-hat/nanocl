@@ -1,0 +1,1 @@
+DROP INDEX vm_operations_pending_node_idx;

@@ -14,5 +14,6 @@ mod resource_kind;
 mod secret;
 mod spec;
 mod vm;
+mod vm_operation;
 
 pub mod generic;
