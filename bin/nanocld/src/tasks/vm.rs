@@ -87,7 +87,12 @@ where
     let live = match VmDb::read_by_pk(&key, &state.inner.pool).await {
       Ok((live, _, _)) => live,
       Err(error) => {
-        let _ = VmDb::delete_mutex(&mutex.key, &state).await;
+        if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
+          log::error!(
+            "VM acceptance cleanup failed: {key} {}: {cleanup}",
+            mutex.key
+          );
+        }
         let _ = reply.send(Err(error.into()));
         return;
       }
@@ -121,7 +126,12 @@ where
         match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
         {
           Ok(true) => {
-            let _ = VmDb::delete_mutex(&mutex.key, &state).await;
+            if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
+              log::error!(
+                "VM acceptance cleanup failed: {key} {}: {cleanup}",
+                mutex.key
+              );
+            }
           }
           Ok(false) => {}
           Err(cleanup) => {
