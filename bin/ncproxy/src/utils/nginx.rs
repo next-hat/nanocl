@@ -368,19 +368,32 @@ async fn wait_for_worker(
   })?
 }
 
+fn nginx_command(args: &[&str], conf_path: &str) -> Command {
+  // nginx -t opens/creates its PID file without writing a PID. Route that
+  // check to /dev/null so validation cannot leave an empty runtime PID file,
+  // including when the check is cancelled or fails.
+  let pid_path = if args.contains(&"-t") {
+    "/dev/null"
+  } else {
+    NGINX_PID_PATH
+  };
+  let mut command = Command::new("nginx");
+  command
+    .args(args)
+    .arg("-g")
+    .arg(format!("pid {pid_path};"))
+    .arg("-c")
+    .arg(conf_path)
+    .stdin(Stdio::null())
+    .kill_on_drop(true);
+  command
+}
+
 async fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
-  let output = timeout(
-    COMMAND_TIMEOUT,
-    Command::new("nginx")
-      .args(args)
-      .arg("-c")
-      .arg(conf_path)
-      .stdin(Stdio::null())
-      .kill_on_drop(true)
-      .output(),
-  )
-  .await
-  .map_err(|_| IoError::other("exec", "nginx command timed out"))??;
+  let output =
+    timeout(COMMAND_TIMEOUT, nginx_command(args, conf_path).output())
+      .await
+      .map_err(|_| IoError::other("exec", "nginx command timed out"))??;
   if output.status.success() {
     return Ok(());
   }
@@ -393,13 +406,9 @@ async fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
 async fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
   let status = timeout(
     COMMAND_TIMEOUT,
-    Command::new("nginx")
-      .arg("-c")
-      .arg(conf_path)
-      .stdin(Stdio::null())
+    nginx_command(&[], conf_path)
       .stdout(Stdio::null())
       .stderr(Stdio::null())
-      .kill_on_drop(true)
       .status(),
   )
   .await
@@ -1045,6 +1054,44 @@ mod tests {
     fn drop(&mut self) {
       let _ = std::fs::remove_dir_all(&self.0);
     }
+  }
+
+  #[test]
+  fn config_checks_isolate_the_pid_path_from_start_and_reload() {
+    const CONF: &str = "/var/lib/ncproxy/nginx.conf";
+    for (args, expected) in [
+      (&["-t"][..], vec!["-t", "-g", "pid /dev/null;", "-c", CONF]),
+      (&[][..], vec!["-g", "pid /run/nginx.pid;", "-c", CONF]),
+      (
+        &["-s", "reload"][..],
+        vec!["-s", "reload", "-g", "pid /run/nginx.pid;", "-c", CONF],
+      ),
+    ] {
+      let command = nginx_command(args, CONF);
+      let command = command.as_std();
+      assert_eq!(command.get_program(), "nginx");
+      let actual = command
+        .get_args()
+        .map(|arg| arg.to_str().unwrap())
+        .collect::<Vec<_>>();
+      assert_eq!(actual, expected);
+      if args.is_empty() {
+        let title = format!("nginx: master process nginx {}", actual.join(" "));
+        assert!(is_master_title(title.as_bytes(), CONF));
+      }
+    }
+    let rendered = CONF_TEMPLATE
+      .compile(&liquid::object!({
+        "nginx_dir": "/etc/nginx",
+        "state_dir": "/tmp/ncproxy",
+        "health_generation": GENERATION,
+      }))
+      .unwrap();
+    assert!(
+      !rendered
+        .lines()
+        .any(|line| line.trim_start().starts_with("pid "))
+    );
   }
 
   #[ntex::test]

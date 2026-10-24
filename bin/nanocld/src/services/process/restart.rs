@@ -119,7 +119,11 @@ pub async fn restart_processes(
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
-  if kind == ProcessKind::Cargo {
+  if kind == ProcessKind::Vm {
+    utils::container::vm::enqueue_lifecycle(&key, None, true, state)
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+  } else if kind == ProcessKind::Cargo {
     enqueue_cargo_restart(&key, &state).await?;
   } else {
     utils::container::process::restart_instances(&key, &kind, &state).await?;
@@ -145,6 +149,21 @@ pub async fn restart_process(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
+  let runtime = state
+    .inner
+    .docker_api
+    .inspect_container(&name, None)
+    .await?;
+  if let Some(key) = super::managed_vm_runtime_key(&runtime, false)? {
+    let id = runtime
+      .id
+      .as_deref()
+      .ok_or_else(|| HttpError::conflict("VM runtime has no container ID"))?;
+    utils::container::vm::enqueue_lifecycle(&key, Some(id), true, state)
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+    return Ok(web::HttpResponse::Accepted().build());
+  }
   state
     .inner
     .docker_api

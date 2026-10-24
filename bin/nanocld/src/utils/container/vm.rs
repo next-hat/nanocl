@@ -1,4 +1,9 @@
 use std::collections::HashMap;
+use std::os::{
+  fd::{AsRawFd, FromRawFd},
+  unix::fs::{FileTypeExt, OpenOptionsExt, PermissionsExt},
+};
+use std::path::{Path, PathBuf};
 
 use bollard_next::{
   container::{Config, StartContainerOptions, WaitContainerOptions},
@@ -6,19 +11,28 @@ use bollard_next::{
 };
 use futures::StreamExt;
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
   generic::ImagePullPolicy,
   process::{Process, ProcessKind},
-  system::NativeEventAction,
+  system::{NativeEventAction, ObjPsStatusKind},
   vm::Vm,
+  vm_spec::VmCloudInitUserData,
 };
 
 use crate::{
-  models::{ProcessDb, SystemState, VmDb},
+  models::{ObjPsStatusDb, ProcessDb, SystemState, VmDb},
   repositories::generic::*,
   utils, vars,
 };
+
+mod lifecycle;
+mod resize;
+pub(crate) use lifecycle::{
+  enqueue_lifecycle, lifecycle_lock, restart_with_options, runtime_status,
+  socket_directory, stop_with_options,
+};
+pub(crate) use resize::{resize, runtime_resources};
 
 fn network_modes(vm: &Vm) -> Vec<String> {
   let mut modes = vec![super::network::resolve_network_mode(
@@ -31,7 +45,737 @@ fn network_modes(vm: &Vm) -> Vec<String> {
 }
 
 async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
-  super::network::ensure_networks(network_modes(vm), state).await
+  let mode = super::network::resolve_network_mode(
+    vm.spec.host_config.runtime_network.clone(),
+  );
+  validate_network_mode(&mode)?;
+  super::network::ensure_networks(network_modes(vm), state).await?;
+  let network =
+    inspect_runtime_network(&mode, &state.inner.config.docker_host).await?;
+  validate_link_net_iface(
+    vm.spec.host_config.link_net_iface.as_deref(),
+    network.options.as_ref(),
+  )
+}
+
+// The pinned Docker model predates EnableIPv4. Read the same configured Unix
+// transport once so an explicitly configured subnet cannot hide disabled IPv4.
+async fn inspect_runtime_network(
+  mode: &str,
+  docker_host: &str,
+) -> IoResult<bollard_next::models::Network> {
+  let socket = docker_host.replacen("unix://", "", 1);
+  let cfg = ntex::SharedCfg::new("vm-network-inspect").add(
+    ntex::client::ClientConfig::new()
+      .set_response_timeout(ntex::time::Millis::from_secs(120))
+      .set_response_payload_timeout(ntex::time::Millis::from_secs(120)),
+  );
+  let client = ntex::client::Client::builder()
+    .connector(async move |cfg: &ntex::SharedCfg, _| {
+      Ok(
+        ntex::rt::unix_connect(&socket, cfg.clone())
+          .await
+          .map_err(ntex::connect::ConnectError::from)?,
+      )
+    })
+    .build(cfg);
+  let mut url = url::Url::parse("http://localhost/networks/").unwrap();
+  url.path_segments_mut().unwrap().pop_if_empty().push(mode);
+  tokio::time::timeout(std::time::Duration::from_secs(120), async {
+    let response = client
+      .get(url.as_str())
+      .send()
+      .await
+      .map_err(|err| IoError::other("VM network", &err.to_string()))?;
+    if !response.status().is_success() {
+      return Err(IoError::other(
+        "VM network",
+        &format!(
+          "Docker network inspection returned HTTP {}",
+          response.status()
+        ),
+      ));
+    }
+    let document = response
+      .json::<serde_json::Value>()
+      .limit(8 * 1024 * 1024)
+      .await
+      .map_err(|err| IoError::invalid_data("VM network", &err.to_string()))?;
+    parse_runtime_network(document)
+  })
+  .await
+  .map_err(|_| {
+    IoError::with_context(
+      "VM network",
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "Docker network inspection timed out",
+      ),
+    )
+  })?
+}
+
+fn parse_runtime_network(
+  document: serde_json::Value,
+) -> IoResult<bollard_next::models::Network> {
+  match document.get("EnableIPv4") {
+    None | Some(serde_json::Value::Bool(true)) => {}
+    Some(serde_json::Value::Bool(false)) => {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "VM networking requires IPv4 to be enabled",
+      ));
+    }
+    _ => {
+      return Err(IoError::invalid_data(
+        "VM network",
+        "Invalid Docker EnableIPv4 value",
+      ));
+    }
+  }
+  let network = serde_json::from_value(document)?;
+  validate_runtime_network(&network)?;
+  Ok(network)
+}
+
+fn validate_runtime_network(
+  network: &bollard_next::models::Network,
+) -> IoResult<()> {
+  if network.driver.as_deref() != Some("bridge")
+    || network.internal == Some(true)
+    || network.enable_ipv6 == Some(true)
+  {
+    return Err(IoError::invalid_input(
+      "VM network",
+      "VM networking requires an external IPv4-only Docker bridge network",
+    ));
+  }
+  let configs = network
+    .ipam
+    .as_ref()
+    .and_then(|ipam| ipam.config.as_deref())
+    .filter(|configs| !configs.is_empty())
+    .ok_or_else(|| {
+      IoError::invalid_input(
+        "VM network",
+        "VM networking requires an IPv4 IPAM subnet",
+      )
+    })?;
+  // Docker may have multiple address pools; each possible assignment must
+  // meet the runtime contract before an update removes the existing VM.
+  for config in configs {
+    let subnet = config
+      .subnet
+      .as_deref()
+      .and_then(|subnet| subnet.parse::<ipnet::Ipv4Net>().ok())
+      .ok_or_else(|| {
+        IoError::invalid_input(
+          "VM network",
+          "Invalid or missing IPv4 IPAM subnet",
+        )
+      })?;
+    if subnet.contains(&std::net::Ipv4Addr::new(169, 254, 254, 1)) {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "Docker subnet overlaps the private DHCP helper 169.254.254.1",
+      ));
+    }
+    if !(1..=30).contains(&subnet.prefix_len()) {
+      return Err(IoError::invalid_input(
+        "VM network",
+        "VM networking requires an IPv4 subnet prefix between 1 and 30",
+      ));
+    }
+  }
+  Ok(())
+}
+
+fn validate_link_net_iface(
+  interface: Option<&str>,
+  options: Option<&HashMap<String, String>>,
+) -> IoResult<()> {
+  let Some(interface) = interface else {
+    return Ok(());
+  };
+  let prefix = options
+    .and_then(|options| {
+      options.get("com.docker.network.container_iface_prefix")
+    })
+    .map(String::as_str)
+    .filter(|prefix| !prefix.is_empty())
+    .unwrap_or("eth");
+  // Each VM starts with one endpoint in its own Docker network namespace.
+  let expected = format!("{prefix}0");
+  if interface != expected {
+    return Err(IoError::invalid_input(
+      "VM network",
+      &format!(
+        "LinkNetIface must match the Docker uplink {expected}; omit it for automatic discovery"
+      ),
+    ));
+  }
+  Ok(())
+}
+
+fn validate_network_mode(mode: &str) -> IoResult<()> {
+  if mode.is_empty()
+    || matches!(mode, "host" | "none" | "default")
+    || mode.starts_with("container:")
+  {
+    return Err(IoError::invalid_input(
+      "VM network",
+      "VMs require a dedicated container network namespace on a Docker bridge",
+    ));
+  }
+  Ok(())
+}
+
+/// Validate VM-specific constraints before accepting a desired spec or touching
+/// its currently running container. Init containers retain their own modes.
+pub(crate) fn validate_spec(
+  spec: &nanocl_stubs::vm_spec::VmSpecPartial,
+) -> IoResult<()> {
+  validate_host_config(&spec.host_config.clone().unwrap_or_default())?;
+  let user_data = cloud_init_user_data(spec.cloud_init_user_data.as_ref())?;
+  let generated = spec.cloud_init.unwrap_or(true) && user_data.is_none();
+  validate_cloud_init_user(generated, spec.user.as_deref())?;
+  validate_cloud_init_credentials(
+    generated,
+    spec.password.as_deref(),
+    spec.ssh_key.as_deref(),
+  )
+}
+
+fn cloud_init_user_data(
+  data: Option<&VmCloudInitUserData>,
+) -> IoResult<Option<String>> {
+  let Some(data) = data else {
+    return Ok(None);
+  };
+  let data = match data {
+    VmCloudInitUserData::Reset => return Ok(None),
+    VmCloudInitUserData::Raw(data) => data.clone(),
+    VmCloudInitUserData::CloudConfig(config) => {
+      // JSON is a YAML subset. This preserves typed values without treating
+      // user strings as YAML syntax or changing raw user-data formatting.
+      format!("#cloud-config\n{}\n", serde_json::to_string(config)?)
+    }
+  };
+  if data.len() > 65_536 || data.contains('\0') {
+    return Err(IoError::invalid_input(
+      "VM provisioning",
+      "CloudInitUserData must render to at most 65536 UTF-8 bytes without NUL characters",
+    ));
+  }
+  Ok(Some(data))
+}
+
+fn validate_cloud_init_user(enabled: bool, user: Option<&str>) -> IoResult<()> {
+  if !enabled {
+    return Ok(());
+  }
+  // Match the runtime's ${USER:-cloud} fallback and account-name contract.
+  let user = user.filter(|user| !user.is_empty()).unwrap_or("cloud");
+  if !user.bytes().enumerate().all(|(index, character)| {
+    character.is_ascii_lowercase()
+      || character == b'_'
+      || (index > 0 && (character.is_ascii_digit() || character == b'-'))
+  }) {
+    return Err(IoError::invalid_input(
+      "VM provisioning",
+      "User must start with a lowercase ASCII letter or underscore and contain only lowercase ASCII letters, digits, underscores or hyphens when CloudInit is enabled",
+    ));
+  }
+  Ok(())
+}
+
+fn validate_cloud_init_credentials(
+  enabled: bool,
+  password: Option<&str>,
+  ssh_key: Option<&str>,
+) -> IoResult<()> {
+  if !enabled {
+    return Ok(());
+  }
+  for (field, value) in [("Password", password), ("SshKey", ssh_key)] {
+    if value.is_some_and(|value| value.contains(['\r', '\n'])) {
+      return Err(IoError::invalid_input(
+        "VM provisioning",
+        &format!(
+          "{field} must not contain carriage returns or newlines when generated cloud-init is enabled"
+        ),
+      ));
+    }
+  }
+  Ok(())
+}
+
+fn validate_host_config(
+  config: &nanocl_stubs::vm_spec::VmHostConfig,
+) -> IoResult<()> {
+  resize::configured_resources(config)?;
+  validate_network_mode(&super::network::resolve_network_mode(
+    config.runtime_network.clone(),
+  ))?;
+  for (field, interface) in [
+    ("LinkNetIface", config.link_net_iface.as_deref()),
+    ("NetIface", config.net_iface.as_deref()),
+  ] {
+    if let Some(interface) = interface
+      && (interface.is_empty()
+        || interface.len() > 15
+        || interface == "lo"
+        || !interface
+          .bytes()
+          .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-')))
+    {
+      return Err(IoError::invalid_input(
+        "VM network",
+        &format!(
+          "{field} must be a non-loopback interface name containing letters, digits, underscores or hyphens"
+        ),
+      ));
+    }
+  }
+  if let Some(servers) = &config.dns {
+    if servers.is_empty()
+      || servers.iter().any(|server| {
+        server
+          .parse::<std::net::Ipv4Addr>()
+          .map(|ip| {
+            ip.is_unspecified()
+              || ip.is_multicast()
+              || ip == std::net::Ipv4Addr::new(169, 254, 254, 1)
+          })
+          .unwrap_or(true)
+      })
+    {
+      return Err(IoError::invalid_input(
+        "VM DNS",
+        "Dns must contain IPv4 resolvers other than the private DHCP helper 169.254.254.1",
+      ));
+    }
+  }
+  Ok(())
+}
+
+fn runtime_sysctls() -> HashMap<String, String> {
+  let mut sysctls = HashMap::from([("net.ipv4.ip_forward".into(), "1".into())]);
+  for scope in ["all", "default"] {
+    for (setting, value) in [
+      ("proxy_arp", "1"),
+      ("accept_local", "1"),
+      ("arp_ignore", "1"),
+      ("send_redirects", "0"),
+      ("rp_filter", "0"),
+    ] {
+      sysctls.insert(format!("net.ipv4.conf.{scope}.{setting}"), value.into());
+    }
+  }
+  sysctls
+}
+
+fn runtime_networking(
+  mode: String,
+) -> bollard_next::container::NetworkingConfig<String> {
+  // Unlike conf.default, endpoint options apply to the already-created veth.
+  // Docker replaces IFNAME with the endpoint's actual interface name.
+  let settings = [
+    "proxy_arp=1",
+    "accept_local=1",
+    "arp_ignore=1",
+    "send_redirects=0",
+    "rp_filter=0",
+  ]
+  .map(|setting| format!("net.ipv4.conf.IFNAME.{setting}"))
+  .join(",");
+  bollard_next::container::NetworkingConfig {
+    endpoints_config: HashMap::from([(
+      mode,
+      bollard_next::models::EndpointSettings {
+        driver_opts: Some(HashMap::from([(
+          "com.docker.network.endpoint.sysctls".into(),
+          settings,
+        )])),
+        ..Default::default()
+      },
+    )]),
+  }
+}
+
+async fn ensure_runtime_image(
+  vm: &Vm,
+  state: &SystemState,
+) -> IoResult<String> {
+  let image = vm
+    .spec
+    .host_config
+    .runtime
+    .clone()
+    .unwrap_or_else(|| vars::vm_runtime(vars::CHANNEL).to_owned());
+  super::image::download(
+    &image,
+    None,
+    ImagePullPolicy::IfNotPresent,
+    vm,
+    state,
+  )
+  .await?;
+  let inspect = state
+    .inner
+    .docker_api
+    .inspect_image(&image)
+    .await
+    .map_err(|err| err.map_err_context(|| "VM runtime"))?;
+  let labels = inspect
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref());
+  validate_runtime_labels(vm, labels)?;
+  Ok(image)
+}
+
+fn validate_runtime_labels(
+  vm: &Vm,
+  labels: Option<&HashMap<String, String>>,
+) -> IoResult<()> {
+  if labels
+    .and_then(|labels| labels.get("io.nanocl.vm-resize"))
+    .map(String::as_str)
+    != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "The image must implement io.nanocl.vm-resize=1; select the matching nanocl-qemu runtime",
+    ));
+  }
+  let supported = labels
+    .and_then(|labels| labels.get("io.nanocl.vm-runtime-api"))
+    .map(String::as_str)
+    == Some("0.19");
+  if !supported {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "The image must implement io.nanocl.vm-runtime-api=0.19; build or select the matching nanocl-qemu runtime",
+    ));
+  }
+  if labels
+    .and_then(|labels| labels.get("io.nanocl.vm-qmp"))
+    .map(String::as_str)
+    != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "The image must implement io.nanocl.vm-qmp=1; pull and select the matching nanocl-qemu runtime",
+    ));
+  }
+  if vm.spec.cloud_init.unwrap_or(true)
+    && vm.spec.cloud_init_user_data.is_some()
+    && labels
+      .and_then(|labels| labels.get("io.nanocl.vm-cloud-init-user-data"))
+      .map(String::as_str)
+      != Some("1")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "CloudInitUserData requires an image with io.nanocl.vm-cloud-init-user-data=1; select the matching nanocl-qemu runtime",
+    ));
+  }
+  Ok(())
+}
+
+fn runtime_env(vm: &Vm, disable_keygen: bool) -> IoResult<Vec<String>> {
+  validate_host_config(&vm.spec.host_config)?;
+  let user_data = cloud_init_user_data(vm.spec.cloud_init_user_data.as_ref())?;
+  let generated = vm.spec.cloud_init.unwrap_or(true) && user_data.is_none();
+  validate_cloud_init_user(generated, vm.spec.user.as_deref())?;
+  validate_cloud_init_credentials(
+    generated,
+    vm.spec.password.as_deref(),
+    vm.spec.ssh_key.as_deref(),
+  )?;
+  let mac = vm.spec.mac_address.as_deref().ok_or_else(|| {
+    IoError::invalid_input("VM MAC", "A persisted MAC address is required")
+  })?;
+  let mut envs = vec![
+    "NANOCL_MANAGED_RESOURCES=true".to_owned(),
+    format!("MAC={mac}"),
+    "NANOCL_NETWORK_MODE=bridge".to_owned(),
+    format!("CLOUD_INIT={}", vm.spec.cloud_init.unwrap_or(true)),
+    format!("CONSOLE={}", vm.spec.console.unwrap_or(false)),
+    format!("DELETE_SSH_KEY={disable_keygen}"),
+    format!("INSTANCE_ID={}", vm.spec.vm_key),
+  ];
+  if let Some(interface) = &vm.spec.host_config.link_net_iface {
+    envs.push(format!("DEFAULT_INTERFACE={interface}"));
+  }
+  if let Some(interface) = &vm.spec.host_config.net_iface {
+    envs.push(format!("FROM_NETWORK={interface}"));
+  }
+  if let Some(servers) = &vm.spec.host_config.dns {
+    envs.push(format!("DNS={}", servers.join(",")));
+  }
+  if vm.spec.cloud_init.unwrap_or(true) {
+    if let Some(data) = user_data {
+      envs.push(format!("CLOUD_INIT_USER_DATA={data}"));
+    } else {
+      for (key, value) in [
+        ("USER", &vm.spec.user),
+        ("PASSWORD", &vm.spec.password),
+        ("SSH_KEY", &vm.spec.ssh_key),
+      ] {
+        if let Some(value) = value {
+          envs.push(format!("{key}={value}"));
+        }
+      }
+    }
+  }
+  Ok(envs)
+}
+
+fn console_directory(vm: &Vm, state_dir: &str) -> IoResult<PathBuf> {
+  // Resource keys come from the API; check again before using one as a path.
+  let key = &vm.spec.vm_key;
+  if key.is_empty()
+    || key == "."
+    || key == ".."
+    || key.contains(['/', '\\', '\0'])
+  {
+    return Err(IoError::invalid_input("VM runtime", "Invalid VM key"));
+  }
+  let path = std::fs::canonicalize(state_dir)?
+    .join("run/vms")
+    .join(key)
+    .join(vm.spec.key.to_string());
+  Ok(path)
+}
+
+/// Pin the socket inode before connecting. The short procfs path avoids the
+/// sockaddr_un limit without changing persistent VM directory identities.
+pub(crate) fn open_runtime_socket(
+  directory: &Path,
+  name: &str,
+) -> IoResult<(std::fs::File, PathBuf)> {
+  let name = match name {
+    "qmp.sock" => c"qmp.sock",
+    "console.sock" => c"console.sock",
+    _ => {
+      return Err(IoError::invalid_input(
+        "VM socket",
+        "Invalid managed socket name",
+      ));
+    }
+  };
+  if std::fs::canonicalize(directory)? != directory {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM socket directory must not redirect through symlinks",
+    ));
+  }
+  let parent = std::fs::OpenOptions::new()
+    .read(true)
+    .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+    .open(directory)?;
+  if parent.metadata()?.permissions().mode() & 0o077 != 0 {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM socket directory must be private",
+    ));
+  }
+  // musl includes O_PATH in O_ACCMODE, which OpenOptions masks out. Open
+  // relative to the held directory descriptor without losing that flag.
+  // SAFETY: parent is live, name is a fixed NUL-terminated basename, and these
+  // flags do not create a file or require a variadic mode argument.
+  let fd = unsafe {
+    libc::openat(
+      parent.as_raw_fd(),
+      name.as_ptr(),
+      libc::O_PATH | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+    )
+  };
+  if fd < 0 {
+    return Err(std::io::Error::last_os_error().into());
+  }
+  // SAFETY: openat returned a fresh owned descriptor, transferred exactly once.
+  let socket = unsafe { std::fs::File::from_raw_fd(fd) };
+  if !socket.metadata()?.file_type().is_socket() {
+    return Err(IoError::invalid_input(
+      "VM socket",
+      "VM control path must be a Unix socket",
+    ));
+  }
+  let path = PathBuf::from(format!("/proc/self/fd/{}", socket.as_raw_fd()));
+  Ok((socket, path))
+}
+
+async fn prepare_console_directory(
+  vm: &Vm,
+  state_dir: &str,
+) -> IoResult<PathBuf> {
+  tokio::fs::create_dir_all(state_dir).await?;
+  let path = console_directory(vm, state_dir)?;
+  let mut parent = tokio::fs::canonicalize(state_dir).await?;
+  for component in ["run", "vms", &vm.spec.vm_key, &vm.spec.key.to_string()] {
+    let directory = parent.join(component);
+    match tokio::fs::create_dir(&directory).await {
+      Ok(()) => {}
+      Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {}
+      Err(err) => return Err(err.into()),
+    }
+    if tokio::fs::canonicalize(&directory).await? != directory
+      || !tokio::fs::metadata(&directory).await?.is_dir()
+    {
+      return Err(IoError::invalid_input(
+        "VM console",
+        "Console directory must not redirect through symlinks",
+      ));
+    }
+    parent = directory;
+  }
+  tokio::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700))
+    .await?;
+  // The daemon's state directory is mounted at the same path on the Docker host.
+  if parent != path {
+    return Err(IoError::invalid_input(
+      "VM console",
+      "Console state directory must be an absolute canonical path",
+    ));
+  }
+  Ok(path)
+}
+
+async fn remove_console_directory(vm: &Vm, state_dir: &str) -> IoResult<()> {
+  let path = match console_directory(vm, state_dir) {
+    Ok(path) => path,
+    Err(err) if err.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(err) => return Err(err),
+  };
+  match tokio::fs::canonicalize(&path).await {
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+    Ok(canonical) if canonical != path => {
+      return Err(IoError::invalid_input(
+        "VM console",
+        "Refusing redirected console cleanup",
+      ));
+    }
+    Ok(_) => {}
+  }
+  for socket in ["console.sock", "qmp.sock", "resources.json"] {
+    match tokio::fs::remove_file(path.join(socket)).await {
+      Ok(()) => {}
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+      Err(err) => return Err(err.into()),
+    }
+  }
+  // Atomic resource writes can leave an owned temporary file after a daemon
+  // crash. Remove only that exact generated filename shape, never recurse.
+  let mut entries = tokio::fs::read_dir(&path).await?;
+  while let Some(entry) = entries.next_entry().await? {
+    let name = entry.file_name();
+    if name
+      .to_str()
+      .and_then(|name| name.strip_prefix("resources-"))
+      .and_then(|name| name.strip_suffix(".tmp"))
+      .and_then(|name| uuid::Uuid::parse_str(name).ok())
+      .is_some()
+    {
+      tokio::fs::remove_file(entry.path()).await?;
+    }
+  }
+  tokio::fs::remove_dir(&path).await?;
+  // Other generations can still exist. Only remove an empty VM directory.
+  if let Some(parent) = path.parent() {
+    let _ = tokio::fs::remove_dir(parent).await;
+  }
+  Ok(())
+}
+
+async fn cleanup_process_consoles(
+  vm: &Vm,
+  processes: &[Process],
+  state: &SystemState,
+) -> IoResult<()> {
+  for process in processes {
+    let Some(labels) = process
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.labels.as_ref())
+    else {
+      continue;
+    };
+    if process.kind != ProcessKind::Vm
+      || process.kind_key != vm.spec.vm_key
+      || labels.get("io.nanocl.v") != Some(&vm.spec.vm_key)
+    {
+      continue;
+    }
+    let Some(generation) = labels
+      .get("io.nanocl.vm-spec")
+      .and_then(|key| uuid::Uuid::parse_str(key).ok())
+    else {
+      continue;
+    };
+    let mut old_vm = vm.clone();
+    old_vm.spec.key = generation;
+    remove_console_directory(&old_vm, &state.inner.config.state_dir).await?;
+  }
+  Ok(())
+}
+
+/// Include generations left by failed creates or externally removed containers,
+/// which no longer have a process row. Never recurse into arbitrary entries.
+async fn cleanup_all_consoles(vm: &Vm, state_dir: &str) -> IoResult<()> {
+  // Resolve the configured root before enumerating only owned generations.
+  let key = &vm.spec.vm_key;
+  if key.is_empty()
+    || matches!(key.as_str(), "." | "..")
+    || key.contains(['/', '\\', '\0'])
+  {
+    return Err(IoError::invalid_input("VM console", "Invalid VM key"));
+  }
+  let root = match tokio::fs::canonicalize(state_dir).await {
+    Ok(root) => root,
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+  };
+  let parent = root.join("run/vms").join(key);
+  match tokio::fs::canonicalize(&parent).await {
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+    Ok(canonical) if canonical != parent => {
+      return Err(IoError::invalid_input(
+        "VM console",
+        "Refusing redirected console cleanup",
+      ));
+    }
+    Ok(_) => {}
+  }
+  let mut entries = tokio::fs::read_dir(&parent).await?;
+  while let Some(entry) = entries.next_entry().await? {
+    let name = entry.file_name();
+    let Some(generation) = name
+      .to_str()
+      .and_then(|value| uuid::Uuid::parse_str(value).ok())
+    else {
+      continue;
+    };
+    if name != generation.to_string().as_str() {
+      continue;
+    }
+    let mut old_vm = vm.clone();
+    old_vm.spec.key = generation;
+    remove_console_directory(&old_vm, state_dir).await?;
+  }
+  match tokio::fs::remove_dir(&parent).await {
+    Ok(()) => {}
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+    Err(err) => return Err(err.into()),
+  }
+  Ok(())
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -51,15 +795,121 @@ fn vm_process_role(process_name: &str, runtime_name: &str) -> VmProcessRole {
   }
 }
 
-fn runtime_delete_targets(
-  runtime_keys: Vec<String>,
-  runtime_name: &str,
-) -> Vec<String> {
-  if runtime_keys.is_empty() {
-    vec![runtime_name.to_owned()]
-  } else {
-    runtime_keys
+fn owned_runtime_id(
+  vm: &Vm,
+  inspect: &bollard_next::models::ContainerInspectResponse,
+) -> IoResult<String> {
+  let labels = inspect
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref());
+  if inspect.name.as_deref() != Some(&format!("/{}.v", vm.spec.vm_key))
+    || labels.and_then(|labels| labels.get("io.nanocl.v"))
+      != Some(&vm.spec.vm_key)
+    || labels.and_then(|labels| labels.get("io.nanocl.n"))
+      != Some(&vm.namespace_name)
+    || labels
+      .and_then(|labels| labels.get("io.nanocl.init-v"))
+      .map(String::as_str)
+      == Some("true")
+  {
+    return Err(IoError::invalid_input(
+      "VM runtime",
+      "Refusing to remove a runtime with a different owner",
+    ));
   }
+  inspect
+    .id
+    .clone()
+    .filter(|id| !id.is_empty())
+    .ok_or_else(|| {
+      IoError::invalid_input("VM runtime", "The runtime has no Docker identity")
+    })
+}
+
+async fn inspect_owned_runtime(
+  vm: &Vm,
+  state: &SystemState,
+) -> IoResult<Option<(String, bollard_next::models::ContainerInspectResponse)>>
+{
+  match state
+    .inner
+    .docker_api
+    .inspect_container(&format!("{}.v", vm.spec.vm_key), None)
+    .await
+  {
+    Ok(inspect) => {
+      let id = owned_runtime_id(vm, &inspect)?;
+      Ok(Some((id, inspect)))
+    }
+    Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    }) => Ok(None),
+    Err(err) => Err(*err.map_err_context(|| "VM runtime")),
+  }
+}
+
+// The request holds the lifecycle guard. Reject checks based on the current
+// assigned endpoint before persisting either a desired revision or transition.
+// A replacement's newly assigned address is still checked by the runtime.
+pub(crate) async fn validate_replacement_spec(
+  vm: &Vm,
+  spec: &nanocl_stubs::vm_spec::VmSpecPartial,
+  state: &SystemState,
+) -> IoResult<()> {
+  if spec
+    .host_config
+    .as_ref()
+    .and_then(|config| config.dns.as_ref())
+    .is_none()
+  {
+    return Ok(());
+  }
+  if let Some(runtime) = lifecycle::inspect_runtime(vm, state).await? {
+    let mut candidate = vm.clone();
+    candidate.spec.host_config = spec.host_config.clone().unwrap_or_default();
+    validate_runtime_dns(&candidate, &runtime)?;
+  }
+  Ok(())
+}
+
+// Docker assigns fresh endpoint addresses at start. Check an existing assigned
+// address before a destructive update; the runtime still validates any newly
+// allocated address before launching the guest.
+fn validate_runtime_dns(
+  vm: &Vm,
+  inspect: &bollard_next::models::ContainerInspectResponse,
+) -> IoResult<()> {
+  let Some(servers) = vm.spec.host_config.dns.as_ref() else {
+    return Ok(());
+  };
+  let mode = super::network::resolve_network_mode(
+    vm.spec.host_config.runtime_network.clone(),
+  );
+  let networks = inspect
+    .network_settings
+    .as_ref()
+    .and_then(|settings| settings.networks.as_ref());
+  let address = networks
+    .and_then(|networks| {
+      networks.get(&mode).or_else(|| {
+        networks
+          .values()
+          .find(|endpoint| endpoint.network_id.as_deref() == Some(&mode))
+      })
+    })
+    .and_then(|endpoint| endpoint.ip_address.as_deref())
+    .filter(|address| !address.is_empty());
+  if address
+    .is_some_and(|address| servers.iter().any(|server| server == address))
+  {
+    return Err(IoError::invalid_input(
+      "VM DNS",
+      "Dns must not point back to the VM's assigned IPv4 address",
+    ));
+  }
+  Ok(())
 }
 
 async fn create_init_container(
@@ -80,7 +930,7 @@ async fn create_init_container(
       .host_config
       .runtime
       .clone()
-      .unwrap_or_else(|| vars::VM_RUNTIME.to_owned())
+      .unwrap_or_else(|| vars::vm_runtime(vars::CHANNEL).to_owned())
   });
   init_container.image = Some(image.clone());
   super::image::download(
@@ -163,14 +1013,26 @@ pub async fn create_instance(
   disable_keygen: bool,
   state: &SystemState,
 ) -> IoResult<Process> {
+  let vm = VmDb::ensure_mac_address(&vm.spec.vm_key, state)
+    .await
+    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
+  let vm = &vm;
+  let envs = runtime_env(vm, disable_keygen)?;
   // Ensure runtime and optional init networks before either container exists.
   ensure_networks(vm, state).await?;
+  let image = ensure_runtime_image(vm, state).await?;
   let mut labels: HashMap<String, String> = HashMap::new();
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   labels.insert("io.nanocl.not-init-c".to_owned(), "true".to_owned());
-  let mut args: Vec<String> =
-    vec!["-hda".into(), vm.spec.image.clone(), "--nographic".into()];
+  labels.insert("io.nanocl.vm-spec".to_owned(), vm.spec.key.to_string());
+  labels.insert("io.nanocl.vm-qmp".to_owned(), "1".to_owned());
+  labels.insert("io.nanocl.vm-resize".to_owned(), "1".to_owned());
+  labels.insert(
+    "io.nanocl.vm-console".to_owned(),
+    vm.spec.console.unwrap_or(false).to_string(),
+  );
+  let mut args: Vec<String> = vec!["-hda".into(), vm.spec.image.clone()];
   let host_config = vm.spec.host_config.clone();
   let kvm = host_config.kvm.unwrap_or_default();
   let mut devices = vec![DeviceMapping {
@@ -188,60 +1050,44 @@ pub async fn create_instance(
     });
     log::debug!("KVM enabled /dev/kvm mapped");
   }
-  let cpu = host_config.cpu;
-  let cpu = if cpu > 0 { cpu.to_string() } else { "1".into() };
-  let cpu = cpu.clone();
-  args.push("-smp".into());
-  args.push(cpu.clone());
-  let memory = host_config.memory;
-  let memory = if memory > 0 {
-    format!("{memory}M")
-  } else {
-    "512M".into()
-  };
-  args.push("-m".into());
-  args.push(memory);
-  let mut envs: Vec<String> = Vec::new();
-  let net_iface = vm
-    .spec
-    .host_config
-    .net_iface
-    .clone()
-    .unwrap_or("ens3".into());
-  let link_net_iface = vm
-    .spec
-    .host_config
-    .link_net_iface
-    .clone()
-    .unwrap_or("eth0".into());
-  envs.push(format!("DEFAULT_INTERFACE={link_net_iface}"));
-  envs.push(format!("FROM_NETWORK={net_iface}"));
-  envs.push(format!("DELETE_SSH_KEY={disable_keygen}"));
-  if let Some(user) = &vm.spec.user {
-    envs.push(format!("USER={user}"));
+  let mut binds = vec![format!("{}:{}", vm.spec.image, vm.spec.image)];
+  // A lost process row must not let a failed create rewrite a live runtime's
+  // restart projection before Docker rejects the duplicate container name.
+  if inspect_owned_runtime(vm, state).await?.is_some() {
+    return Err(IoError::with_context(
+      "VM create",
+      std::io::Error::new(
+        std::io::ErrorKind::WouldBlock,
+        "VM runtime already exists",
+      ),
+    ));
   }
-  if let Some(password) = &vm.spec.password {
-    envs.push(format!("PASSWORD={password}"));
-  }
-  if let Some(ssh_key) = &vm.spec.ssh_key {
-    envs.push(format!("SSH_KEY={ssh_key}"));
-  }
-  let image = match &vm.spec.host_config.runtime {
-    Some(runtime) => runtime.to_owned(),
-    None => vars::VM_RUNTIME.to_owned(),
-  };
-  if let Some(init_container) = &vm.spec.init_container {
-    let process = create_init_container(vm, init_container, state).await?;
-    start_init_container(&process, state).await?;
-  }
-  super::image::download(
-    &image,
-    None,
-    ImagePullPolicy::IfNotPresent,
-    vm,
-    state,
+  let directory =
+    prepare_console_directory(vm, &state.inner.config.state_dir).await?;
+  resize::write_resources(
+    &directory,
+    &resize::configured_resources(&host_config)?,
   )
   .await?;
+  binds.push(format!("{}:/run/nanocl-vm", directory.display()));
+  // Complete all fallible runtime preparation before creating an init process.
+  let init_process = if let Some(init_container) = &vm.spec.init_container {
+    let process = create_init_container(vm, init_container, state).await?;
+    if let Err(err) = start_init_container(&process, state).await {
+      if let Err(cleanup) =
+        super::process::delete_instances(&[process.key], state).await
+      {
+        log::warn!("Unable to remove failed VM init container: {cleanup}");
+      }
+      return Err(err);
+    }
+    Some(process.key)
+  } else {
+    None
+  };
+  let network_mode = super::network::resolve_network_mode(
+    vm.spec.host_config.runtime_network.clone(),
+  );
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -253,39 +1099,139 @@ pub async fn create_instance(
     attach_stdin: Some(true),
     attach_stdout: Some(true),
     open_stdin: Some(true),
+    networking_config: Some(runtime_networking(network_mode.clone())),
     host_config: Some(HostConfig {
-      network_mode: Some(super::network::resolve_network_mode(
-        vm.spec.host_config.runtime_network.clone(),
-      )),
-      binds: Some(vec![format!("{}:{}", vm.spec.image, vm.spec.image)]),
+      network_mode: Some(network_mode),
+      binds: Some(binds),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
+      sysctls: Some(runtime_sysctls()),
       ..Default::default()
     }),
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  let process = super::process::create(
+  let result = super::process::create(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,
     &spec,
     state,
   )
-  .await?;
-  Ok(process)
+  .await;
+  if result.is_err() {
+    if let Some(init_key) = init_process
+      && let Err(cleanup) =
+        super::process::delete_instances(&[init_key], state).await
+    {
+      log::warn!(
+        "Unable to remove VM init container after runtime create failure: {cleanup}"
+      );
+    }
+    // A name-conflict can mean a live runtime exists without its process row.
+    // Never unlink its socket (or its mounted directory) on a create error.
+    if matches!(
+      state.inner.docker_api.inspect_container(&name, None).await,
+      Err(bollard_next::errors::Error::DockerResponseServerError {
+        status_code: 404,
+        ..
+      })
+    ) {
+      let _ = remove_console_directory(vm, &state.inner.config.state_dir).await;
+    }
+  }
+  result
 }
 
 /// Start VM instance
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = start_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+// Acceptance hands both lifecycle and distributed ownership to the task.
+// This entry point must only be called while that lifecycle guard is held.
+pub(crate) async fn run_task_unlocked(
+  key: &str,
+  action: NativeEventAction,
+  state: &SystemState,
+) -> IoResult<()> {
+  let result = match action {
+    NativeEventAction::Starting => start_unlocked(key, state).await,
+    NativeEventAction::Updating => update_unlocked(key, state).await,
+    NativeEventAction::Destroying => delete_unlocked(key, state).await,
+    _ => Err(IoError::invalid_input(
+      "VM task",
+      "Unsupported VM task action",
+    )),
+  };
+  record_task_failure(key, result, state).await
+}
+
+// Call while holding the operation's lifecycle guard. The asynchronous task
+// error callback runs after release and must not overwrite a newer operation.
+pub(crate) async fn record_task_failure(
+  key: &str,
+  result: IoResult<()>,
+  state: &SystemState,
+) -> IoResult<()> {
+  if let Err(operation_error) = &result {
+    // The requested operation failed, but its old guest may still be running
+    // after preflight or an ACPI timeout. Observe the owned runtime under the
+    // same guard; task error events retain the operation's failure explanation.
+    let observed =
+      tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+        lifecycle::inspect_runtime(&vm, state).await
+      })
+      .await;
+    let actual = match observed {
+      Ok(Ok(runtime)) => task_failure_actual(runtime.as_ref()),
+      _ => ObjPsStatusKind::Fail,
+    };
+    log::warn!(
+      "VM {key} operation failed: {operation_error}; observed status: {actual}"
+    );
+    if let Err(error) =
+      ObjPsStatusDb::update_actual_status(key, &actual, &state.inner.pool).await
+    {
+      log::warn!("Unable to record failed VM lifecycle status: {error}");
+    }
+  }
+  result
+}
+
+fn task_failure_actual(
+  runtime: Option<&bollard_next::models::ContainerInspectResponse>,
+) -> ObjPsStatusKind {
+  match runtime {
+    None => ObjPsStatusKind::Stop,
+    Some(runtime) => {
+      match runtime.state.as_ref().and_then(|state| state.running) {
+        Some(true) => ObjPsStatusKind::Start,
+        Some(false) => ObjPsStatusKind::Stop,
+        None => ObjPsStatusKind::Fail,
+      }
+    }
+  }
+}
+
+async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   ensure_networks(&vm, state).await?;
   let processes =
     ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
       .await?;
-  if processes.is_empty() {
+  let runtime_name = format!("{}.v", vm.spec.vm_key);
+  if !processes.iter().any(|process| process.name == runtime_name) {
     create_instance(&vm, true, state).await?;
+  }
+  if vm.spec.host_config.dns.is_some()
+    && let Some((_, inspect)) = inspect_owned_runtime(&vm, state).await?
+  {
+    validate_runtime_dns(&vm, &inspect)?;
   }
   super::process::start_instances(
     &vm.spec.vm_key,
@@ -300,17 +1246,32 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete VM instance and the VM itself from the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = delete_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
-  super::process::delete_instances(
-    &processes
-      .into_iter()
-      .map(|p| p.key)
-      .collect::<Vec<String>>(),
-    state,
-  )
-  .await?;
+  let mut targets = processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>();
+  // A Docker runtime can survive a failed process-row write or reconciliation.
+  // Verify its owner and use its immutable ID before releasing the VM identity.
+  if let Some((id, _)) = inspect_owned_runtime(&vm, state).await? {
+    if !targets.contains(&id) {
+      targets.push(id);
+    }
+  }
+  lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
+  super::process::delete_instances(&targets, state).await?;
+  if inspect_owned_runtime(&vm, state).await?.is_some() {
+    return Err(IoError::interrupted(
+      "VM runtime",
+      "The runtime still exists after deletion",
+    ));
+  }
+  cleanup_all_consoles(&vm, &state.inner.config.state_dir).await?;
   VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
   state
     .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
@@ -321,14 +1282,25 @@ pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
 /// Update the VM
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
-  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+  let _guard = lifecycle_lock(key).lock_owned().await;
+  let result = update_unlocked(key, state).await;
+  record_task_failure(key, result, state).await
+}
+
+async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
+  let vm = VmDb::ensure_mac_address(key, state)
+    .await
+    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
   // Fail before deleting the existing VM runtime.
   ensure_networks(&vm, state).await?;
+  validate_spec(&vm.spec.clone().into())?;
+  ensure_runtime_image(&vm, state).await?;
+  prepare_console_directory(&vm, &state.inner.config.state_dir).await?;
   let runtime_name = format!("{}.v", &vm.spec.vm_key);
   let old_processes =
     ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
       .await?;
-  let old_runtime_keys = old_processes
+  let mut old_runtime_keys = old_processes
     .iter()
     .filter(|process| {
       vm_process_role(&process.name, &runtime_name) == VmProcessRole::Runtime
@@ -342,8 +1314,17 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     })
     .map(|process| process.key.clone())
     .collect::<Vec<_>>();
-  let runtime_targets = runtime_delete_targets(old_runtime_keys, &runtime_name);
-  super::process::delete_instances(&runtime_targets, state).await?;
+  if let Some((id, inspect)) = inspect_owned_runtime(&vm, state).await? {
+    validate_runtime_dns(&vm, &inspect)?;
+    if !old_runtime_keys.contains(&id) {
+      old_runtime_keys.push(id);
+    }
+  }
+  lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
+  super::process::delete_instances(&old_runtime_keys, state).await?;
+  if let Err(err) = cleanup_process_consoles(&vm, &old_processes, state).await {
+    log::warn!("Unable to clean previous VM console directory: {err}");
+  }
   create_instance(&vm, false, state).await?;
   super::process::start_instances(key, &ProcessKind::Vm, true, state).await?;
   if !old_init_keys.is_empty()
@@ -362,6 +1343,523 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[test]
+  fn failed_vm_operation_preserves_observed_runtime_state() {
+    let mut runtime: bollard_next::models::ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({"State": {"Running": true}}))
+        .unwrap();
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Start);
+    runtime.state.as_mut().unwrap().running = Some(false);
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Stop);
+    runtime.state.as_mut().unwrap().running = None;
+    assert_eq!(task_failure_actual(Some(&runtime)), ObjPsStatusKind::Fail);
+    assert_eq!(task_failure_actual(None), ObjPsStatusKind::Stop);
+  }
+
+  #[test]
+  fn vm_endpoint_sysctls_apply_to_the_actual_uplink() {
+    let config = runtime_networking("vm-network".into());
+    let endpoint = &config.endpoints_config["vm-network"];
+    let options = endpoint.driver_opts.as_ref().unwrap();
+    let settings = &options["com.docker.network.endpoint.sysctls"];
+    for setting in [
+      "proxy_arp=1",
+      "accept_local=1",
+      "arp_ignore=1",
+      "send_redirects=0",
+      "rp_filter=0",
+    ] {
+      assert!(
+        settings
+          .split(',')
+          .any(|value| value == format!("net.ipv4.conf.IFNAME.{setting}"))
+      );
+    }
+    assert_eq!(settings.split(',').count(), 5);
+  }
+
+  #[test]
+  fn vm_network_inspect_rejects_disabled_ipv4_even_with_an_explicit_subnet() {
+    let enabled = serde_json::json!({
+      "Driver": "bridge", "EnableIPv4": true, "EnableIPv6": false,
+      "Internal": false, "IPAM": { "Config": [{ "Subnet": "192.0.2.0/24" }] }
+    });
+    assert!(parse_runtime_network(enabled.clone()).is_ok());
+    let mut legacy = enabled.clone();
+    legacy.as_object_mut().unwrap().remove("EnableIPv4");
+    assert!(parse_runtime_network(legacy).is_ok());
+    for flag in [
+      serde_json::json!(false),
+      serde_json::json!("true"),
+      serde_json::Value::Null,
+    ] {
+      let mut disabled = enabled.clone();
+      disabled["EnableIPv4"] = flag;
+      assert!(parse_runtime_network(disabled).is_err());
+    }
+    let mut unsafe_network = enabled;
+    unsafe_network["Driver"] = serde_json::json!("overlay");
+    assert!(parse_runtime_network(unsafe_network).is_err());
+  }
+
+  #[ntex::test]
+  async fn vm_directories_accept_long_names_and_canonical_state_aliases() {
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-directory-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let target = root.join("state");
+    std::fs::create_dir(&target).unwrap();
+    let alias = root.join("alias");
+    std::os::unix::fs::symlink(&target, &alias).unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let relative = PathBuf::from("../".repeat(cwd.components().count() - 1))
+      .join(target.strip_prefix("/").unwrap());
+    let mut vm = Vm::default();
+    vm.spec.vm_key = format!("global.{}", "long-valid-vm-name".repeat(6));
+    let expected = target
+      .join("run/vms")
+      .join(&vm.spec.vm_key)
+      .join(vm.spec.key.to_string());
+    assert!(expected.join("console.sock").as_os_str().len() > 108);
+    for state_dir in [&target, &alias, &relative] {
+      let directory =
+        prepare_console_directory(&vm, state_dir.to_str().unwrap())
+          .await
+          .unwrap();
+      assert_eq!(directory, expected);
+      assert_eq!(
+        std::fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
+        0o700
+      );
+      std::fs::write(directory.join("resources.json"), "{}").unwrap();
+      cleanup_all_consoles(&vm, state_dir.to_str().unwrap())
+        .await
+        .unwrap();
+      assert!(!directory.exists());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[ntex::test]
+  async fn vm_directories_reject_symlinks_below_the_configured_root() {
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-directory-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let outside = root.join("outside");
+    std::fs::create_dir(&outside).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join("run")).unwrap();
+    let mut vm = Vm::default();
+    vm.spec.vm_key = "global.test".into();
+    assert!(
+      prepare_console_directory(&vm, root.to_str().unwrap())
+        .await
+        .is_err()
+    );
+    assert!(!outside.join("vms").exists());
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn vm_socket_descriptor_pins_inode_and_rejects_redirects() {
+    use std::os::unix::net::{UnixListener, UnixStream};
+    let root = std::env::temp_dir()
+      .join(format!("nanocl-vm-socket-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let directory = root.join("long-directory".repeat(8));
+    std::fs::create_dir(&directory).unwrap();
+    std::fs::set_permissions(
+      &directory,
+      std::fs::Permissions::from_mode(0o700),
+    )
+    .unwrap();
+    let listener = UnixListener::bind(root.join("socket")).unwrap();
+    let original = directory.join("console.sock");
+    std::fs::rename(root.join("socket"), &original).unwrap();
+    let (socket, pinned) =
+      open_runtime_socket(&directory, "console.sock").unwrap();
+    // SAFETY: socket owns a live descriptor; both commands only read its flags.
+    let (open_flags, descriptor_flags) = unsafe {
+      (
+        libc::fcntl(socket.as_raw_fd(), libc::F_GETFL),
+        libc::fcntl(socket.as_raw_fd(), libc::F_GETFD),
+      )
+    };
+    assert!(open_flags >= 0 && descriptor_flags >= 0);
+    assert_ne!(open_flags & libc::O_PATH, 0);
+    assert_ne!(descriptor_flags & libc::FD_CLOEXEC, 0);
+    assert!(original.as_os_str().len() > 108);
+    assert!(pinned.as_os_str().len() < 108);
+    std::fs::rename(&original, directory.join("old.sock")).unwrap();
+    std::os::unix::fs::symlink("/dev/null", &original).unwrap();
+    let _client = UnixStream::connect(pinned).unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    assert!(open_runtime_socket(&directory, "../socket").is_err());
+    std::fs::remove_file(&original).unwrap();
+    std::fs::write(&original, "not a socket").unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    std::fs::set_permissions(
+      &directory,
+      std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    assert!(open_runtime_socket(&directory, "console.sock").is_err());
+    drop((socket, listener));
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn vm_guest_interface_is_validated_and_forwarded_separately_from_uplink() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.host_config.net_iface = Some("guest0".into());
+    vm.spec.host_config.link_net_iface = Some("eth0".into());
+    let env = runtime_env(&vm, false).unwrap();
+    assert!(env.contains(&"FROM_NETWORK=guest0".into()));
+    assert!(env.contains(&"DEFAULT_INTERFACE=eth0".into()));
+    for invalid in
+      ["", "lo", "too-long-interface", "guest 0", "x\ny", "guest:0"]
+    {
+      vm.spec.host_config.net_iface = Some(invalid.into());
+      assert!(runtime_env(&vm, false).is_err());
+    }
+  }
+
+  fn bridge_network(subnets: &[&str]) -> bollard_next::models::Network {
+    bollard_next::models::Network {
+      driver: Some("bridge".into()),
+      internal: Some(false),
+      enable_ipv6: Some(false),
+      ipam: Some(bollard_next::models::Ipam {
+        config: Some(
+          subnets
+            .iter()
+            .map(|subnet| bollard_next::models::IpamConfig {
+              subnet: Some((*subnet).into()),
+              ..Default::default()
+            })
+            .collect(),
+        ),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn vm_runtime_network_rejects_private_dhcp_helper_overlap() {
+    for subnet in [
+      "169.254.0.0/16",
+      "169.254.254.0/24",
+      "169.254.254.0/30",
+      "169.254.254.1/32",
+    ] {
+      let error =
+        validate_runtime_network(&bridge_network(&[subnet])).unwrap_err();
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      assert!(error.to_string().contains("169.254.254.1"));
+    }
+    assert!(
+      validate_runtime_network(&bridge_network(&[
+        "192.0.2.0/24",
+        "169.254.0.0/16",
+      ]))
+      .is_err()
+    );
+  }
+
+  #[test]
+  fn vm_runtime_network_accepts_adjacent_ipv4_subnets() {
+    for subnet in [
+      "169.254.253.0/24",
+      "169.254.255.0/24",
+      "169.254.254.4/30",
+      "172.29.222.0/24",
+    ] {
+      assert!(validate_runtime_network(&bridge_network(&[subnet])).is_ok());
+    }
+    assert!(
+      validate_runtime_network(&bridge_network(&[
+        "192.0.2.0/24",
+        "198.51.100.0/24",
+      ]))
+      .is_ok()
+    );
+  }
+
+  #[test]
+  fn vm_runtime_network_requires_supported_ipv4_ipam() {
+    for subnets in [
+      vec![],
+      vec![""],
+      vec!["invalid-cidr"],
+      vec!["192.0.2.0/33"],
+      vec!["2001:db8::/64"],
+      vec!["192.0.2.0/31"],
+      vec!["192.0.2.1/32"],
+    ] {
+      assert!(validate_runtime_network(&bridge_network(&subnets)).is_err());
+    }
+    let valid = bridge_network(&["192.0.2.0/24"]);
+    let mut network = valid.clone();
+    network.ipam = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.ipam.as_mut().unwrap().config = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.ipam.as_mut().unwrap().config.as_mut().unwrap()[0].subnet = None;
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.driver = Some("overlay".into());
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid.clone();
+    network.internal = Some(true);
+    assert!(validate_runtime_network(&network).is_err());
+    network = valid;
+    network.enable_ipv6 = Some(true);
+    assert!(validate_runtime_network(&network).is_err());
+  }
+
+  #[test]
+  fn vm_custom_user_data_preserves_raw_and_renders_structured_config() {
+    let raw = "#cloud-config\nwrite_files:\n  - content: 'é $HOME'\n\n";
+    assert_eq!(cloud_init_user_data(None).unwrap(), None);
+    for raw in [raw, ""] {
+      assert_eq!(
+        cloud_init_user_data(Some(&VmCloudInitUserData::Raw(raw.into())))
+          .unwrap(),
+        Some(raw.to_owned())
+      );
+    }
+    let config = serde_json::json!({
+      "users": [{"name": "custom", "lock_passwd": true}],
+      "write_files": [{"path": "/tmp/example", "content": "yes\n$HOME\né"}],
+      "runcmd": [["sh", "-c", "echo done"]]
+    });
+    let data: VmCloudInitUserData =
+      serde_json::from_value(config.clone()).unwrap();
+    let rendered = cloud_init_user_data(Some(&data)).unwrap().unwrap();
+    assert!(rendered.starts_with("#cloud-config\n"));
+    assert_eq!(
+      serde_yaml::from_str::<serde_json::Value>(&rendered).unwrap(),
+      config
+    );
+  }
+
+  #[test]
+  fn vm_custom_user_data_is_bounded_and_errors_hide_contents() {
+    assert!(
+      cloud_init_user_data(Some(&VmCloudInitUserData::Raw("é".repeat(32_768))))
+        .is_ok()
+    );
+    for raw in ["é".repeat(32_769), "private-secret\0payload".to_owned()] {
+      let error = cloud_init_user_data(Some(&VmCloudInitUserData::Raw(raw)))
+        .unwrap_err()
+        .to_string();
+      assert!(error.contains("65536"));
+      assert!(!error.contains("private-secret"));
+    }
+    let oversized: VmCloudInitUserData = serde_json::from_value(
+      serde_json::json!({"write_files": [{"content": "x".repeat(65_536)}]}),
+    )
+    .unwrap();
+    assert!(cloud_init_user_data(Some(&oversized)).is_err());
+    let mut vm = Vm::default();
+    vm.spec.cloud_init = Some(false);
+    vm.spec.cloud_init_user_data = Some(oversized);
+    assert!(validate_spec(&vm.spec.into()).is_err());
+  }
+
+  #[test]
+  fn vm_custom_user_data_replaces_defaults_and_requires_runtime_support() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.user = Some("ignored invalid user".into());
+    vm.spec.password = Some("ignored password".into());
+    vm.spec.ssh_key = Some("ignored key".into());
+    vm.spec.cloud_init_user_data =
+      Some(VmCloudInitUserData::Raw(String::new()));
+    assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+    let env = runtime_env(&vm, false).unwrap();
+    assert!(env.contains(&"CLOUD_INIT_USER_DATA=".into()));
+    assert!(env.contains(&format!("INSTANCE_ID={}", vm.spec.vm_key)));
+    for key in ["USER=", "PASSWORD=", "SSH_KEY="] {
+      assert!(!env.iter().any(|value| value.starts_with(key)));
+    }
+    let mut labels = HashMap::from([
+      ("io.nanocl.vm-runtime-api".into(), "0.19".into()),
+      ("io.nanocl.vm-qmp".into(), "1".into()),
+      ("io.nanocl.vm-resize".into(), "1".into()),
+    ]);
+    assert!(validate_runtime_labels(&vm, None).is_err());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
+    labels.insert("io.nanocl.vm-cloud-init-user-data".into(), "1".into());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+    labels.remove("io.nanocl.vm-resize");
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_err());
+    labels.insert("io.nanocl.vm-resize".into(), "1".into());
+    labels.remove("io.nanocl.vm-cloud-init-user-data");
+    vm.spec.cloud_init = Some(false);
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+    assert!(
+      !runtime_env(&vm, false)
+        .unwrap()
+        .iter()
+        .any(|value| value.starts_with("CLOUD_INIT_USER_DATA="))
+    );
+    vm.spec.cloud_init = None;
+    vm.spec.cloud_init_user_data = None;
+    assert!(runtime_env(&vm, false).is_err());
+    assert!(validate_runtime_labels(&vm, Some(&labels)).is_ok());
+  }
+
+  #[test]
+  fn vm_runtime_link_interface_matches_docker_network_prefix() {
+    assert!(validate_link_net_iface(None, None).is_ok());
+    assert!(validate_link_net_iface(Some("eth0"), None).is_ok());
+    assert!(validate_link_net_iface(Some("eth1"), None).is_err());
+    let options = HashMap::from([(
+      "com.docker.network.container_iface_prefix".to_owned(),
+      "vm".to_owned(),
+    )]);
+    assert!(validate_link_net_iface(None, Some(&options)).is_ok());
+    assert!(validate_link_net_iface(Some("vm0"), Some(&options)).is_ok());
+    assert!(validate_link_net_iface(Some("eth0"), Some(&options)).is_err());
+
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    assert!(
+      !runtime_env(&vm, false)
+        .unwrap()
+        .iter()
+        .any(|item| item.starts_with("DEFAULT_INTERFACE="))
+    );
+    vm.spec.host_config.link_net_iface = Some("vm0".into());
+    assert!(
+      runtime_env(&vm, false)
+        .unwrap()
+        .contains(&"DEFAULT_INTERFACE=vm0".into())
+    );
+  }
+
+  #[test]
+  fn vm_runtime_validates_user_only_when_cloud_init_is_enabled() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    for user in [None, Some(""), Some("cloud"), Some("_guest-123")] {
+      vm.spec.user = user.map(str::to_owned);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(runtime_env(&vm, false).is_ok());
+    }
+    for user in [
+      "Alice",
+      "1guest",
+      "-guest",
+      "guest.name",
+      "guest name",
+      "guést",
+      "guest\nname",
+    ] {
+      vm.spec.user = Some(user.to_owned());
+      for enabled in [None, Some(true)] {
+        vm.spec.cloud_init = enabled;
+        assert!(validate_spec(&vm.spec.clone().into()).is_err());
+        assert!(runtime_env(&vm, false).is_err());
+      }
+      vm.spec.cloud_init = Some(false);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(
+        !runtime_env(&vm, false)
+          .unwrap()
+          .iter()
+          .any(|item| item.starts_with("USER="))
+      );
+    }
+  }
+
+  #[test]
+  fn vm_generated_cloud_init_rejects_multiline_credentials_without_secrets() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    for value in [None, Some(""), Some("normal credential: 'value'")] {
+      vm.spec.password = value.map(str::to_owned);
+      vm.spec.ssh_key = value.map(str::to_owned);
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      assert!(runtime_env(&vm, false).is_ok());
+    }
+    for field in ["Password", "SshKey"] {
+      for separator in ['\r', '\n'] {
+        let secret = format!("private-credential{separator}must-not-leak");
+        vm.spec.password = (field == "Password").then(|| secret.clone());
+        vm.spec.ssh_key = (field == "SshKey").then(|| secret.clone());
+        for enabled in [None, Some(true)] {
+          vm.spec.cloud_init = enabled;
+          for error in [
+            validate_spec(&vm.spec.clone().into()).unwrap_err(),
+            runtime_env(&vm, false).unwrap_err(),
+          ] {
+            assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+            assert!(error.to_string().contains(field));
+            let diagnostics = format!("{error} {error:?}");
+            assert!(!diagnostics.contains("private-credential"));
+            assert!(!diagnostics.contains("must-not-leak"));
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn vm_ignored_cloud_init_credentials_allow_multiline_values() {
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.password = Some("ignored\r\npassword".into());
+    vm.spec.ssh_key = Some("ignored\r\nkey".into());
+    for (enabled, data) in [
+      (Some(false), None),
+      (None, Some(VmCloudInitUserData::Raw(String::new()))),
+      (Some(true), Some(VmCloudInitUserData::Raw(String::new()))),
+    ] {
+      vm.spec.cloud_init = enabled;
+      vm.spec.cloud_init_user_data = data;
+      assert!(validate_spec(&vm.spec.clone().into()).is_ok());
+      let env = runtime_env(&vm, false).unwrap();
+      assert!(!env.iter().any(|value| {
+        value.starts_with("PASSWORD=") || value.starts_with("SSH_KEY=")
+      }));
+    }
+  }
+
+  #[test]
+  fn vm_runtime_requires_isolated_network_and_persisted_identity() {
+    for mode in ["host", "none", "", "default", "container:other"] {
+      assert!(validate_network_mode(mode).is_err());
+    }
+    for mode in ["bridge", "nanoclbr0", "vm-test"] {
+      assert!(validate_network_mode(mode).is_ok());
+    }
+    assert!(runtime_env(&Vm::default(), true).is_err());
+    let mut vm = Vm::default();
+    vm.spec.mac_address = Some("02:00:00:00:00:01".into());
+    vm.spec.cloud_init = Some(false);
+    vm.spec.console = Some(true);
+    vm.spec.password = Some("must-not-pass".into());
+    vm.spec.host_config.dns = Some(vec!["192.0.2.53".into()]);
+    let env = runtime_env(&vm, false).unwrap();
+    assert!(env.contains(&"MAC=02:00:00:00:00:01".into()));
+    assert!(env.contains(&"CLOUD_INIT=false".into()));
+    assert!(env.contains(&"CONSOLE=true".into()));
+    assert!(env.contains(&"DNS=192.0.2.53".into()));
+    assert!(!env.iter().any(|item| item.starts_with("PASSWORD=")));
+    for invalid in ["1.1.1.1\nport=0", "169.254.254.1"] {
+      vm.spec.host_config.dns = Some(vec![invalid.into()]);
+      assert!(runtime_env(&vm, false).is_err());
+    }
+    vm.spec.host_config.dns = None;
+    vm.spec.host_config.link_net_iface = Some("eth0.1".into());
+    assert!(runtime_env(&vm, false).is_err());
+  }
 
   fn container_on(network: &str) -> Config {
     Config {
@@ -427,14 +1925,74 @@ mod tests {
   }
 
   #[test]
-  fn vm_update_prefers_ids_but_keeps_an_orphan_name_fallback() {
-    assert_eq!(
-      runtime_delete_targets(vec!["runtime-id".to_owned()], "global.ubuntu.v"),
-      vec!["runtime-id".to_owned()]
-    );
-    assert_eq!(
-      runtime_delete_targets(Vec::new(), "global.ubuntu.v"),
-      vec!["global.ubuntu.v".to_owned()]
-    );
+  fn vm_dns_preflight_rejects_its_assigned_address_on_the_selected_network() {
+    let mut vm = Vm::default();
+    vm.spec.host_config.runtime_network = Some("vm-network".into());
+    vm.spec.host_config.dns =
+      Some(vec!["192.0.2.53".into(), "192.0.2.7".into()]);
+    let mut inspect: bollard_next::models::ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "NetworkSettings": {"Networks": {"vm-network": {
+          "NetworkID": "network-id", "IPAddress": "192.0.2.7"
+        }}}
+      }))
+      .unwrap();
+    let error = validate_runtime_dns(&vm, &inspect).unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("assigned IPv4 address"));
+    vm.spec.host_config.runtime_network = Some("network-id".into());
+    assert!(validate_runtime_dns(&vm, &inspect).is_err());
+
+    vm.spec.host_config.runtime_network = Some("other-network".into());
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    vm.spec.host_config.runtime_network = Some("vm-network".into());
+    vm.spec.host_config.dns = Some(vec!["192.0.2.53".into()]);
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+
+    // An unassigned endpoint does not reveal the IP Docker will allocate on
+    // start. The runtime must perform the final check against that address.
+    vm.spec.host_config.dns = Some(vec!["192.0.2.7".into()]);
+    inspect
+      .network_settings
+      .as_mut()
+      .unwrap()
+      .networks
+      .as_mut()
+      .unwrap()
+      .get_mut("vm-network")
+      .unwrap()
+      .ip_address = Some(String::new());
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    inspect.network_settings = None;
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+    vm.spec.host_config.dns = None;
+    assert!(validate_runtime_dns(&vm, &inspect).is_ok());
+  }
+
+  #[test]
+  fn vm_runtime_cleanup_requires_matching_owner_and_immutable_id() {
+    let vm = Vm::default();
+    let mut inspect = bollard_next::models::ContainerInspectResponse {
+      id: Some("runtime-id".into()),
+      name: Some(format!("/{}.v", vm.spec.vm_key)),
+      config: Some(bollard_next::models::ContainerConfig {
+        labels: Some(HashMap::from([
+          ("io.nanocl.v".into(), vm.spec.vm_key.clone()),
+          ("io.nanocl.n".into(), vm.namespace_name.clone()),
+        ])),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    assert_eq!(owned_runtime_id(&vm, &inspect).unwrap(), "runtime-id");
+    inspect
+      .config
+      .as_mut()
+      .unwrap()
+      .labels
+      .as_mut()
+      .unwrap()
+      .insert("io.nanocl.v".into(), "other.vm".into());
+    assert!(owned_runtime_id(&vm, &inspect).is_err());
   }
 }

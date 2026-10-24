@@ -42,14 +42,16 @@ pub mod tests {
     let home = env::var("HOME").expect("Failed to get home dir");
     let docker_host = env::var("DOCKER_SOCKET_PATH")
       .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
+    let state_dir = env::var("NANOCL_TEST_STATE_DIR")
+      .unwrap_or_else(|_| format!("{home}/.nanocl_dev/state"));
+    let store_addr = env::var("NANOCL_TEST_STORE_ADDR").unwrap_or_else(|_| {
+      "postgresql://root:root@store.nanocl.internal:26258/defaultdb".to_owned()
+    });
     let config = DaemonConfig {
-      state_dir: format!("{home}/.nanocl_dev/state"),
+      state_dir,
       docker_host,
       hostname: "nanocl.internal".to_owned(),
-      store_addr: Some(
-        "postgresql://root:root@store.nanocl.internal:26258/defaultdb"
-          .to_owned(),
-      ),
+      store_addr: Some(store_addr),
       ..Default::default()
     };
     let state = SystemState::new(&config).await.unwrap();

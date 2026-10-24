@@ -123,10 +123,13 @@ impl RawEventEmitter {
 
   /// Send an event to all clients
   pub fn emit(&self, e: &Event) -> IoResult<()> {
-    let inner = Arc::clone(&self.inner);
-    let clients = inner.lock()?.clients.clone();
-    let mut new_clients = Vec::new();
     let msg = e.try_to_bytes()?;
+    // Acceptance notifications and the system event loop can publish from
+    // different arbiters. Keep delivery and condition progress atomic with
+    // subscriptions and connection cleanup; try_send never blocks.
+    let mut inner = self.inner.lock()?;
+    let clients = std::mem::take(&mut inner.clients);
+    let mut new_clients = Vec::new();
     for client in clients {
       let _ = client.0.try_send(msg.clone());
       let conditions = client.1.clone().unwrap_or_default();
@@ -144,8 +147,6 @@ impl RawEventEmitter {
         new_clients.push(client_ptr);
       }
     }
-    let inner = Arc::clone(&self.inner);
-    let mut inner = inner.lock()?;
     inner.clients = new_clients;
     Ok(())
   }

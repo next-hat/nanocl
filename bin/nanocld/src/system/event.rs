@@ -355,21 +355,28 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
       };
       let state = state_ptr.clone();
       let key = actor.key.clone().unwrap_or_default();
-      if let Err(err) = DistributedMutexDb::del_lock(
-        &actor.kind.to_string(),
-        &key,
-        &state.inner.pool,
-      )
-      .await
+      // VM tasks release only the mutex they acquired, including on failure.
+      // A generic resource-key cleanup could delete a subsequent operation's lock.
+      if actor.kind != EventActorKind::Vm
+        && let Err(err) = DistributedMutexDb::del_lock(
+          &actor.kind.to_string(),
+          &key,
+          &state.inner.pool,
+        )
+        .await
       {
         log::error!("Failed to release lock for {} {key}: {err}", actor.kind);
       }
-      ObjPsStatusDb::update_actual_status(
-        &key,
-        &ObjPsStatusKind::Fail,
-        &state.inner.pool,
-      )
-      .await?;
+      // VM operations record failure/observed state under their lifecycle
+      // guard. This later callback must not overwrite a newer operation.
+      if actor.kind != EventActorKind::Vm {
+        ObjPsStatusDb::update_actual_status(
+          &key,
+          &ObjPsStatusKind::Fail,
+          &state.inner.pool,
+        )
+        .await?;
+      }
       state_ptr.emit_error_native_action(&actor, action, Some(err.to_string()));
       Ok(())
     })

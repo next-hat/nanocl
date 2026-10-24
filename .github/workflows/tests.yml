@@ -98,7 +98,7 @@ jobs:
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v24.3.8
           docker pull ghcr.io/next-hat/metrsd:0.5.4
-          docker pull ghcr.io/next-hat/nanocl-qemu:8.0.2.0
+          docker pull ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
           docker pull ghcr.io/next-hat/nanocl-get-started:latest
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ghcr.io/next-hat/nanocl-dev:dev -f ./scripts/dev.Dockerfile .
           docker compose -f ./tests/docker-compose.yaml up -d

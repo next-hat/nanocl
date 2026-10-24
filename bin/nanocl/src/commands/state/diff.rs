@@ -26,8 +26,10 @@ use crate::{
     StateDiff, StateDiffItem, StateDiffOpts, StateDiffSnapshot, StateRef,
   },
   utils::{
-    cargo::cargo_spec_from_revision, process::resource_key,
-    state_diff::diff_item, state_diff_pager,
+    cargo::cargo_spec_from_revision,
+    process::resource_key,
+    state_diff::{diff_item, validate_vm_identity},
+    state_diff_pager,
   },
 };
 
@@ -420,6 +422,15 @@ pub(super) async fn exec_state_diff(
         Some(value) => value.clone(),
         None => inspect_object(&cli_conf.client, &kind, &name).await?,
       };
+      if kind == "vm" {
+        validate_vm_identity(
+          after.get("MacAddress").and_then(Value::as_str),
+          before
+            .as_ref()
+            .and_then(|value| value.get("MacAddress"))
+            .and_then(Value::as_str),
+        )?;
+      }
       let reason = if before.is_some() && kind == "job" {
         Some("apply recreates existing jobs")
       } else if before.is_some()

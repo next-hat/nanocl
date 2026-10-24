@@ -15,5 +15,27 @@ pub const COMMIT_ID: &str = env!("GIT_HASH");
 pub const CHANNEL: &str = env!("CHANNEL");
 /// Controller
 pub const CONTROLLER_NAME: &str = "nanocl.io/core";
-/// Default Virtual Machine runtime
-pub const VM_RUNTIME: &str = "ghcr.io/next-hat/nanocl-qemu:8.0.2.0";
+/// Select the VM runtime from the daemon's existing release channel.
+pub fn vm_runtime(channel: &str) -> &'static str {
+  match channel {
+    "nightly" => "ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly",
+    _ => "ghcr.io/next-hat/nanocl-qemu:8.0.5.0",
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn vm_runtime_uses_the_daemon_release_channel() {
+    assert_eq!(
+      super::vm_runtime("nightly"),
+      "ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly"
+    );
+    for channel in ["stable", "custom"] {
+      assert_eq!(
+        super::vm_runtime(channel),
+        "ghcr.io/next-hat/nanocl-qemu:8.0.5.0"
+      );
+    }
+  }
+}

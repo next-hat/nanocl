@@ -23,7 +23,7 @@ use nanocld_client::{
     resource_key::ResourceKey,
     system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
-    vm_spec::VmSpecPartial,
+    vm_spec::{VmCloudInitUserData, VmSpecPartial, VmSpecUpdate},
   },
 };
 
@@ -31,7 +31,7 @@ use crate::{
   config::CliConfig,
   models::{
     GenericDefaultOpts, VmArg, VmCommand, VmCompactRow, VmCreateOpts,
-    VmPatchOpts, VmRow, VmRunOpts,
+    VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
   },
   utils,
 };
@@ -93,6 +93,43 @@ async fn wait_vm_state(
   Ok(waiter)
 }
 
+fn read_cloud_init_user_data(reader: impl Read) -> IoResult<String> {
+  const MAX_BYTES: usize = 64 * 1024;
+  let mut data = Vec::new();
+  reader
+    .take((MAX_BYTES + 1) as u64)
+    .read_to_end(&mut data)
+    .map_err(|_| {
+      IoError::invalid_input("Cloud-init user-data", "Unable to read file")
+    })?;
+  if data.len() > MAX_BYTES {
+    return Err(IoError::invalid_input(
+      "Cloud-init user-data",
+      "File exceeds the 64 KiB limit",
+    ));
+  }
+  if data.contains(&0) {
+    return Err(IoError::invalid_input(
+      "Cloud-init user-data",
+      "File must not contain NUL bytes",
+    ));
+  }
+  String::from_utf8(data).map_err(|_| {
+    IoError::invalid_input("Cloud-init user-data", "File must be UTF-8")
+  })
+}
+
+fn load_cloud_init_user_data(path: Option<&str>) -> IoResult<Option<String>> {
+  path
+    .map(|path| {
+      let file = std::fs::File::open(path).map_err(|err| {
+        err.map_err_context(|| "Unable to open cloud-init user-data file")
+      })?;
+      read_cloud_init_user_data(file)
+    })
+    .transpose()
+}
+
 /// Function executed when running `nanocl vm create`
 /// It will create a new virtual machine but not start it
 pub async fn exec_vm_create(
@@ -104,7 +141,10 @@ pub async fn exec_vm_create(
   let mut options = options.clone();
   let image_full_path = utils::path::resolve_full_path(&options.image)?;
   options.image = image_full_path;
-  let vm = options.clone().into();
+  let mut vm: VmSpecPartial = options.clone().into();
+  vm.cloud_init_user_data =
+    load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
+      .map(VmCloudInitUserData::Raw);
   let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
   Ok(())
@@ -122,7 +162,10 @@ pub async fn exec_vm_run(
   let mut options = options.clone();
   let image_full_path = utils::path::resolve_full_path(&options.image)?;
   options.image = image_full_path;
-  let vm: VmSpecPartial = options.clone().into();
+  let mut vm: VmSpecPartial = options.clone().into();
+  vm.cloud_init_user_data =
+    load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
+      .map(VmCloudInitUserData::Raw);
   let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
   let waiter =
     wait_vm_state(&vm.spec.vm_key, NativeEventAction::Start, client).await?;
@@ -152,9 +195,15 @@ pub async fn exec_vm_patch(
   options: &VmPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let mut vm: VmSpecUpdate = options.clone().into();
+  vm.cloud_init_user_data = if options.clear_cloud_init_user_data {
+    Some(VmCloudInitUserData::Reset)
+  } else {
+    load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
+      .map(VmCloudInitUserData::Raw)
+  };
   let waiter =
     wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
-  let vm = options.clone().into();
   client.patch_vm(&options.key, &vm).await?;
   waiter.await.map_err(|err| {
     IoError::interrupted("wait_process_state", &err.to_string())
@@ -167,6 +216,45 @@ fn vm_process_name(key: &str) -> IoResult<String> {
     .parse::<ResourceKey>()
     .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
   Ok(format!("{key}.v"))
+}
+
+async fn exec_vm_lifecycle(
+  client: &NanocldClient,
+  options: &VmLifecycleOpts,
+  restart: bool,
+) -> IoResult<()> {
+  let request = options.into();
+  let request = &request;
+  run_vm_lifecycle(&options.keys, |key| async move {
+    if restart {
+      client.restart_vm(key, request).await.map(|_| ())
+    } else {
+      client.stop_vm(key, request).await.map(|_| ())
+    }
+    .map_err(IoError::from)
+  })
+  .await
+}
+
+async fn run_vm_lifecycle<'a, F, Fut>(
+  keys: &'a [String],
+  mut action: F,
+) -> IoResult<()>
+where
+  F: FnMut(&'a str) -> Fut,
+  Fut: std::future::Future<Output = IoResult<()>>,
+{
+  let mut first_error = None;
+  for key in keys {
+    match action(key).await {
+      Ok(()) => println!("{key}"),
+      Err(error) => {
+        eprintln!("{key}: {error}");
+        first_error.get_or_insert(error);
+      }
+    }
+  }
+  first_error.map_or(Ok(()), Err)
 }
 
 /// Function executed when running `nanocl vm attach`
@@ -281,7 +369,35 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
     VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
     VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
-    VmCommand::Stop(opts) => VmArg::exec_stop(client, opts).await,
+    VmCommand::Stop(opts) => exec_vm_lifecycle(client, opts, false).await,
+    VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,
+    VmCommand::Status { key } => {
+      let status = client.vm_status(key).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&status)
+          .map_err(|err| err.map_err_context(|| "VM runtime status"))?
+      );
+      Ok(())
+    }
+    VmCommand::Resize(options) => {
+      let resources = client.resize_vm(&options.key, &options.into()).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&resources)
+          .map_err(|err| err.map_err_context(|| "VM resources"))?
+      );
+      Ok(())
+    }
+    VmCommand::Resources { key } => {
+      let resources = client.vm_resources(key).await?;
+      println!(
+        "{}",
+        serde_json::to_string_pretty(&resources)
+          .map_err(|err| err.map_err_context(|| "VM resources"))?
+      );
+      Ok(())
+    }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
     VmCommand::Attach { key } => {
@@ -300,7 +416,68 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
 
 #[cfg(test)]
 mod tests {
-  use super::vm_process_name;
+  use super::{
+    load_cloud_init_user_data, read_cloud_init_user_data, run_vm_lifecycle,
+    vm_process_name,
+  };
+  use nanocl_error::io::IoError;
+
+  #[test]
+  fn vm_lifecycle_attempts_all_keys_and_returns_first_failure() {
+    let keys =
+      ["global.first", "global.second", "global.third"].map(String::from);
+    let mut attempted = Vec::new();
+    let result = futures::executor::block_on(run_vm_lifecycle(&keys, |key| {
+      attempted.push(key.to_owned());
+      std::future::ready(if key == "global.first" || key == "global.third" {
+        Err(IoError::other("VM lifecycle", key))
+      } else {
+        Ok(())
+      })
+    }));
+    assert_eq!(attempted, keys);
+    assert_eq!(result.unwrap_err().inner.to_string(), "global.first");
+    let mut completed = 0;
+    futures::executor::block_on(run_vm_lifecycle(&keys, |_| {
+      completed += 1;
+      std::future::ready(Ok(()))
+    }))
+    .unwrap();
+    assert_eq!(completed, keys.len());
+  }
+
+  #[test]
+  fn vm_cloud_init_user_data_preserves_raw_utf8_and_empty_input() {
+    let data = "#cloud-config\r\nwrite_files:\n- content: café '$HOME'\\n\n";
+    assert_eq!(read_cloud_init_user_data(data.as_bytes()).unwrap(), data);
+    assert_eq!(read_cloud_init_user_data(&b""[..]).unwrap(), "");
+    assert_eq!(load_cloud_init_user_data(None).unwrap(), None);
+    let script = "#!/bin/sh\nprintf '%s' custom > /etc/provisioned";
+    assert_eq!(
+      read_cloud_init_user_data(script.as_bytes()).unwrap(),
+      script
+    );
+  }
+
+  #[test]
+  fn vm_cloud_init_user_data_enforces_byte_limit_and_redacts_invalid_data() {
+    let data = "é".repeat(32 * 1024);
+    assert_eq!(read_cloud_init_user_data(data.as_bytes()).unwrap(), data);
+    let too_large = format!("{data}x");
+    let error = read_cloud_init_user_data(too_large.as_bytes()).unwrap_err();
+    assert!(error.to_string().contains("64 KiB"));
+    assert!(!error.to_string().contains(&data));
+    let mut oversized = std::io::Cursor::new(vec![b'x'; 128 * 1024]);
+    assert!(read_cloud_init_user_data(&mut oversized).is_err());
+    assert_eq!(oversized.position(), 64 * 1024 + 1);
+    for data in [
+      &b"sensitive-user-data\0"[..],
+      &b"sensitive-user-data\xff"[..],
+    ] {
+      let error = read_cloud_init_user_data(data).unwrap_err().to_string();
+      assert!(!error.contains("sensitive-user-data"));
+    }
+  }
 
   #[test]
   fn vm_attach_maps_canonical_key_to_runtime_process_name() {

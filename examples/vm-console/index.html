@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NanoCL VM console</title>
+<style>
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; color: #eee; background: #242424; font: 16px system-ui; }
+  header { padding: .75rem 1rem; display: flex; align-items: center; gap: 1rem; }
+  button { padding: .35rem .7rem; }
+  #screen { flex: 1; overflow: hidden; }
+</style>
+<header><strong>NanoCL VM console</strong><span id="status">Connecting…</span><button id="disconnect">Disconnect</button></header>
+<main id="screen"></main>
+<script type="module" src="/client.js"></script>
+</html>

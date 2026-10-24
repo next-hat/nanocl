@@ -40,6 +40,9 @@ pub use distributed_mutex::*;
 mod vm;
 pub use vm::*;
 
+mod qmp;
+pub(crate) use qmp::*;
+
 mod resource;
 pub use resource::*;
 

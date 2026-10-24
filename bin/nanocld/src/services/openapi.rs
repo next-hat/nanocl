@@ -98,6 +98,12 @@ impl Modify for VersionModifier {
     vm::count_vm,
     vm::list_vm_history,
     vm::patch_vm,
+    vm::console_vm,
+    vm::stop_vm,
+    vm::restart_vm,
+    vm::vm_status,
+    vm::resize_vm,
+    vm::vm_resources,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,
@@ -185,6 +191,165 @@ mod tests {
   }
 
   #[test]
+  fn generated_openapi_exposes_vm_resize_and_limits() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/resize", "/vms/{key}/resources"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in [
+      "VmResizeOptions",
+      "VmResources",
+      "VmHostConfig",
+      "VmHostConfigUpdate",
+    ] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    assert_eq!(
+      generated["paths"]["/vms/{key}/resize"]["post"]["requestBody"]["required"],
+      true
+    );
+    assert_eq!(
+      generated["components"]["schemas"]["VmResources"]["properties"]["Persistent"]
+        ["type"],
+      "boolean"
+    );
+    for field in ["MaxCpu", "MaxMemory"] {
+      assert!(
+        generated["components"]["schemas"]["VmHostConfig"]["properties"][field]
+          .is_object()
+      );
+      assert!(
+        !generated["components"]["schemas"]["VmHostConfig"]["required"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|item| item == field)
+      );
+    }
+    assert_eq!(
+      find_schema_reference(
+        &generated["components"]["schemas"]["VmSpecUpdate"]["properties"]["HostConfig"]
+      ),
+      Some("#/components/schemas/VmHostConfigUpdate")
+    );
+    assert!(
+      generated["components"]["schemas"]["VmHostConfigUpdate"]["required"]
+        .as_array()
+        .is_none_or(Vec::is_empty)
+    );
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_lifecycle() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart", "/vms/{key}/status"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in ["VmLifecycleOptions", "VmRuntimeStatus"] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart"] {
+      let operation = &generated["paths"][path]["post"];
+      assert_eq!(
+        operation["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/VmLifecycleOptions"
+      );
+      assert_eq!(operation["requestBody"]["required"], true);
+      assert!(operation["responses"]["504"].is_object());
+      assert!(operation["responses"].get("403").is_none());
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_cloud_init_user_data() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    let schemas = &generated["components"]["schemas"];
+    let user_data = &schemas["VmCloudInitUserData"];
+    assert_eq!(user_data["oneOf"][0]["type"], "string");
+    assert_eq!(
+      user_data["oneOf"][1]["$ref"],
+      "#/components/schemas/CloudInit26_2"
+    );
+    assert_eq!(
+      checked_in["components"]["schemas"]["VmCloudInitUserData"],
+      *user_data
+    );
+    for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+      assert_eq!(checked_in["components"]["schemas"][name], schemas[name]);
+    }
+    let cloud_init: Vec<_> = schemas
+      .as_object()
+      .unwrap()
+      .iter()
+      .filter(|(name, _)| name.starts_with("CloudInit26_2"))
+      .collect();
+    assert_eq!(cloud_init.len(), 77);
+    for (name, schema) in cloud_init {
+      assert_eq!(checked_in["components"]["schemas"][name], *schema, "{name}");
+      assert_local_schema_references(&generated, schema);
+    }
+    for document in [&generated, &checked_in] {
+      for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+        let schema = &document["components"]["schemas"][name];
+        let property = &schema["properties"]["CloudInitUserData"];
+        assert_eq!(
+          find_schema_reference(property),
+          Some("#/components/schemas/VmCloudInitUserData")
+        );
+        assert!(!schema["required"].as_array().is_some_and(|items| {
+          items.iter().any(|item| item == "CloudInitUserData")
+        }));
+      }
+    }
+  }
+
+  fn assert_local_schema_references(
+    document: &serde_json::Value,
+    value: &serde_json::Value,
+  ) {
+    match value {
+      serde_json::Value::Array(items) => {
+        for item in items {
+          assert_local_schema_references(document, item);
+        }
+      }
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get("$ref") {
+          let reference = reference.as_str().unwrap();
+          // Both the docs and VS Code Statefile converter require local
+          // component references, including references nested in cloud-config.
+          assert!(reference.starts_with("#/components/schemas/"));
+          assert!(document.pointer(&reference[1..]).is_some(), "{reference}");
+        }
+        for child in object.values() {
+          assert_local_schema_references(document, child);
+        }
+      }
+      _ => {}
+    }
+  }
+
+  #[test]
   fn generated_openapi_uses_closed_flattened_container_spec() {
     let document =
       serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI must serialize");
@@ -250,10 +415,13 @@ mod tests {
 
   #[test]
   fn checked_in_swagger_matches_generated_openapi() {
-    let generated = generated_openapi_yaml();
+    // Schema extension maps do not guarantee YAML key order. Compare every
+    // value in the parsed document while preserving array order and types.
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
     assert_eq!(
-      generated,
-      include_str!("../../specs/swagger.yaml"),
+      generated, checked_in,
       "run the ignored regenerate_checked_in_swagger test"
     );
   }

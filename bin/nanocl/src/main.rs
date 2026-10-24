@@ -1059,7 +1059,9 @@ mod tests {
     assert_cli_ok!("vm", "ls");
     assert_cli_ok!("vm", "inspect", VM_KEY);
     assert_cli_ok!("vm", "start", VM_KEY);
-    assert_cli_ok!("vm", "stop", VM_KEY);
+    // This CLI smoke test checks runtime lifecycle without waiting for the
+    // guest OS to boot and handle ACPI. Graceful shutdown has separate probes.
+    assert_cli_ok!("vm", "stop", VM_KEY, "--force");
     assert_cli_ok!("vm", "rm", "-y", VM_KEY);
     assert_cli_ok!(
       "vm",
@@ -1067,6 +1069,7 @@ mod tests {
       "test-cli-vm",
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
+    assert_cli_ok!("vm", "stop", VM_KEY, "--force");
     assert_cli_ok!("vm", "rm", "-y", VM_KEY);
   }
 
