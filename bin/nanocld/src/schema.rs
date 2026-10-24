@@ -182,6 +182,7 @@ diesel::table! {
         version -> Varchar,
         data -> Jsonb,
         metadata -> Nullable<Jsonb>,
+        incarnation_key -> Nullable<Uuid>,
     }
 }
 
@@ -200,17 +201,32 @@ diesel::table! {
 }
 
 diesel::table! {
-    vm_operations (vm_key) {
-        vm_key -> Text,
+    resource_incarnations (key) {
         key -> Uuid,
+        resource_kind -> Text,
+        resource_key -> Text,
+        created_at -> Timestamptz,
+        deleted_at -> Nullable<Timestamptz>,
+        current_operation_key -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
+    operations (key) {
+        key -> Uuid,
+        incarnation_key -> Uuid,
+        resource_kind -> Text,
+        resource_key -> Text,
+        action -> Text,
         spec_key -> Uuid,
         node_name -> Text,
-        phase -> Text,
         owner_boot_id -> Text,
         lock_device -> Int8,
         lock_inode -> Int8,
+        accepted_at -> Timestamptz,
+        completed_at -> Nullable<Timestamptz>,
         outcome -> Nullable<Text>,
-        observation -> Nullable<Jsonb>,
+        diagnostic -> Nullable<Jsonb>,
     }
 }
 
@@ -222,6 +238,7 @@ diesel::table! {
         namespace_name -> Varchar,
         status_key -> Varchar,
         spec_key -> Uuid,
+        incarnation_key -> Uuid,
     }
 }
 
@@ -238,7 +255,10 @@ diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
 diesel::joinable!(vm_images -> nodes (node_name));
-diesel::joinable!(vm_operations -> vms (vm_key));
+diesel::joinable!(operations -> resource_incarnations (incarnation_key));
+diesel::joinable!(operations -> specs (spec_key));
+diesel::joinable!(specs -> resource_incarnations (incarnation_key));
+diesel::joinable!(vms -> resource_incarnations (incarnation_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
@@ -261,6 +281,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   secrets,
   specs,
   vm_images,
-  vm_operations,
+  operations,
+  resource_incarnations,
   vms,
 );

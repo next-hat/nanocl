@@ -7,7 +7,7 @@ use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
   resource_key::ResourceKey,
   system::{
-    NativeEventAction, ObjPsHealthStatusKind, ObjPsStatus, ObjPsStatusKind,
+    NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind,
     ObjPsStatusPartial,
   },
   vm::{Vm, VmInspect},
@@ -16,8 +16,9 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    ObjPsStatusDb, ProcessDb, SpecDb, SystemState, VmDb, VmObjCreateIn,
-    VmObjPatchIn, VmObjPutIn, VmOperationDb, VmOperationOwner,
+    AcceptedVmOperation, OperationDb, OperationOwner, ProcessDb, SpecDb,
+    SystemState, VmDb, VmObjCreateIn, VmObjPatchIn, VmObjPutIn,
+    VmOperationLease,
   },
   repositories::generic::*,
   utils,
@@ -137,9 +138,10 @@ impl VmDb {
   /// can mount a generation. A rejected start must not commit that backfill.
   pub(crate) async fn prepare_start(
     key: &str,
-    owner: VmOperationOwner,
+    owner: OperationOwner,
+    lease: VmOperationLease,
     state: &SystemState,
-  ) -> HttpResult<Vm> {
+  ) -> HttpResult<AcceptedVmOperation> {
     let _guard = mac_allocation_lock().lock().await;
     let vm = Self::transform_read_by_pk(key, &state.inner.pool).await?;
     let replacement = if let Some(address) = &vm.spec.mac_address {
@@ -152,11 +154,16 @@ impl VmDb {
       Some(SpecDb::try_from_vm_partial(key, &vm.spec.version, &spec)?)
     };
     let revision = replacement.as_ref().map_or(vm.spec.key, |spec| spec.key);
-    let operation =
-      VmOperationDb::new(&owner, key, revision, ObjPsStatusKind::Starting);
+    let operation = OperationDb::new(&owner, "Vm", key, revision, "start");
     Ok(
-      Self::accept_operation(&vm, replacement, operation, &state.inner.pool)
-        .await?,
+      Self::accept_operation(
+        &vm,
+        replacement,
+        operation,
+        lease,
+        &state.inner.pool,
+      )
+      .await?,
     )
   }
 
@@ -167,8 +174,9 @@ impl VmDb {
     pk: &str,
     obj: &VmObjPutIn,
     state: &SystemState,
-    owner: VmOperationOwner,
-  ) -> HttpResult<Vm> {
+    owner: OperationOwner,
+    lease: VmOperationLease,
+  ) -> HttpResult<AcceptedVmOperation> {
     let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let mut spec = obj.spec.clone();
     spec.cloud_init_user_data =
@@ -183,17 +191,14 @@ impl VmDb {
     )?);
     utils::container::vm::validate_replacement_spec(&vm, &spec, state).await?;
     let replacement = SpecDb::try_from_vm_partial(pk, &obj.version, &spec)?;
-    let operation = VmOperationDb::new(
-      &owner,
-      pk,
-      replacement.key,
-      ObjPsStatusKind::Updating,
-    );
+    let operation =
+      OperationDb::new(&owner, "Vm", pk, replacement.key, "update");
     Ok(
       VmDb::accept_operation(
         &vm,
         Some(replacement),
         operation,
+        lease,
         &state.inner.pool,
       )
       .await?,
@@ -204,6 +209,14 @@ impl VmDb {
   /// persists an ordinary spec revision without requesting a lifecycle task.
   pub async fn ensure_mac_address(
     key: &str,
+    state: &SystemState,
+  ) -> HttpResult<Vm> {
+    Self::ensure_mac_address_owned(key, (), state).await
+  }
+
+  pub(crate) async fn ensure_mac_address_owned<G: Send + 'static>(
+    key: &str,
+    keepalive: G,
     state: &SystemState,
   ) -> HttpResult<Vm> {
     let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
@@ -227,7 +240,16 @@ impl VmDb {
     let version = vm.spec.version.clone();
     let mut spec = VmSpecPartial::from(vm.spec);
     spec.mac_address = Some(address);
-    Ok(VmDb::update_from_spec(key, &spec, &version, &state.inner.pool).await?)
+    Ok(
+      VmDb::update_from_spec_owned(
+        key,
+        &spec,
+        &version,
+        keepalive,
+        &state.inner.pool,
+      )
+      .await?,
+    )
   }
 }
 
@@ -276,24 +298,16 @@ impl ObjCreate for VmDb {
       prev_actual: ObjPsStatusKind::Create,
       health: ObjPsHealthStatusKind::Unknown,
     };
-    let status: ObjPsStatus =
-      ObjPsStatusDb::create_from(status, &state.inner.pool)
-        .await?
-        .try_into()?;
     let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, &vm)?;
-    let spec = SpecDb::create_from(new_spec, &state.inner.pool)
-      .await?
-      .try_to_vm_spec()?;
-    let new_item = VmDb {
-      key: vm_key.to_owned(),
-      name: vm.name.clone(),
-      created_at: chrono::Utc::now().naive_utc(),
-      namespace_name: namespace.clone(),
-      spec_key: spec.key,
-      status_key: vm_key,
-    };
-    let item = VmDb::create_from(new_item, &state.inner.pool).await?;
-    let vm = item.with_spec(&(spec, status));
+    let vm = VmDb::create_with_spec(
+      &vm_key,
+      &vm.name,
+      namespace,
+      new_spec,
+      status,
+      &state.inner.pool,
+    )
+    .await?;
     Ok(vm)
   }
 }
@@ -317,20 +331,17 @@ impl ObjDelByPk for VmDb {
       pk,
       NativeEventAction::Destroying,
       state,
-      move |owner| async move {
+      move |owner, lease| async move {
         let vm =
           Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
-        let operation = VmOperationDb::new(
-          &owner,
-          &key,
-          vm.spec.key,
-          ObjPsStatusKind::Destroying,
-        );
+        let operation =
+          OperationDb::new(&owner, "Vm", &key, vm.spec.key, "delete");
         Ok(
           Self::accept_operation(
             &vm,
             None,
             operation,
+            lease,
             &prepare_state.inner.pool,
           )
           .await?,
@@ -368,9 +379,9 @@ impl ObjPutByPk for VmDb {
       pk,
       NativeEventAction::Updating,
       state,
-      move |owner| async move {
+      move |owner, lease| async move {
         let _guard = mac_allocation_lock().lock().await;
-        Self::put_spec_unlocked(&key, &obj, &prepare_state, owner).await
+        Self::put_spec_unlocked(&key, &obj, &prepare_state, owner, lease).await
       },
     )
     .await
@@ -404,8 +415,8 @@ impl ObjPatchByPk for VmDb {
       pk,
       NativeEventAction::Updating,
       state,
-      move |owner| async move {
-        Self::prepare_patch(&key, &obj, &prepare_state, owner).await
+      move |owner, lease| async move {
+        Self::prepare_patch(&key, &obj, &prepare_state, owner, lease).await
       },
     )
     .await
@@ -425,8 +436,9 @@ impl VmDb {
     pk: &str,
     obj: &VmObjPatchIn,
     state: &SystemState,
-    owner: VmOperationOwner,
-  ) -> HttpResult<Vm> {
+    owner: OperationOwner,
+    lease: VmOperationLease,
+  ) -> HttpResult<AcceptedVmOperation> {
     let _guard = mac_allocation_lock().lock().await;
     let spec = &obj.spec;
     let version = &obj.version;
@@ -488,7 +500,7 @@ impl VmDb {
       spec: vm_partial,
       version: version.to_owned(),
     };
-    Self::put_spec_unlocked(pk, obj, state, owner).await
+    Self::put_spec_unlocked(pk, obj, state, owner, lease).await
   }
 }
 

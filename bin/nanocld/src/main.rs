@@ -42,6 +42,21 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(config) => config,
   };
+  if let Some(models::DaemonCommand::VmReconcile(command)) = &args.command {
+    match utils::vm_reconcile::run(command, &config).await {
+      Ok(report) => println!("{}", serde_json::to_string_pretty(&report)?),
+      Err(error) => error.print_and_exit(),
+    }
+    return Ok(());
+  }
+  // Keep the shared gate for the process lifetime, including runtime teardown
+  // after the HTTP server stops. The kernel closes it when the process exits.
+  let daemon_guard =
+    match utils::operation::acquire_daemon_guard(&config.state_dir) {
+      Ok(guard) => guard,
+      Err(error) => error.print_and_exit(),
+    };
+  std::mem::forget(daemon_guard);
   // Boot internal dependencies (database, event bus, etc...)
   let daemon_state = match system::init(&config).await {
     Err(err) => {

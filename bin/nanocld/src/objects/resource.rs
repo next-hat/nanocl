@@ -53,8 +53,12 @@ impl ObjDelByPk for ResourceDb {
     }
     ResourceDb::del_by_pk(&resource.spec.resource_key, &state.inner.pool)
       .await?;
-    SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.inner.pool)
-      .await?;
+    SpecDb::del_by_kind_key(
+      "Resource",
+      &resource.spec.resource_key,
+      &state.inner.pool,
+    )
+    .await?;
     Ok(resource)
   }
 }

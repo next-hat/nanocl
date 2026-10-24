@@ -113,8 +113,8 @@ pub async fn emit_starting(
       kind_key,
       NativeEventAction::Starting,
       state,
-      move |owner| async move {
-        VmDb::prepare_start(&key, owner, &prepare_state).await
+      move |owner, lease| async move {
+        VmDb::prepare_start(&key, owner, lease, &prepare_state).await
       },
     )
     .await?;

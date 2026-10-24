@@ -13,7 +13,7 @@ use futures::StreamExt;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
-  generic::ImagePullPolicy,
+  generic::{GenericClause, GenericFilter, ImagePullPolicy},
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
   vm::Vm,
@@ -21,7 +21,10 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{ObjPsStatusDb, ProcessDb, SystemState, VmDb},
+  models::{
+    ObjPsStatusDb, OperationDb, OperationOwner, ProcessDb, SpecDb, SystemState,
+    VmDb, VmOperationLease,
+  },
   repositories::generic::*,
   utils, vars,
 };
@@ -828,6 +831,50 @@ fn owned_runtime_id(
     })
 }
 
+/// A retained revision belongs to exactly one VM lifetime, including after a
+/// name is deleted and reused. Names and revision existence are not authority.
+pub(crate) async fn validate_generation(
+  vm: &Vm,
+  generation: uuid::Uuid,
+  state: &SystemState,
+) -> IoResult<SpecDb> {
+  let (live, _, _) =
+    VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  let spec = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
+  if live.spec_key != vm.spec.key
+    || spec.kind_name != "Vm"
+    || spec.kind_key != vm.spec.vm_key
+    || spec.incarnation_key != Some(live.incarnation_key)
+  {
+    return Err(IoError::invalid_data(
+      "VM runtime",
+      "Runtime specification belongs to another resource incarnation",
+    ));
+  }
+  Ok(spec)
+}
+
+async fn validate_runtime_generation(
+  vm: &Vm,
+  runtime: &bollard_next::models::ContainerInspectResponse,
+  state: &SystemState,
+) -> IoResult<()> {
+  let generation = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref())
+    .and_then(|labels| labels.get("io.nanocl.vm-spec"))
+    .and_then(|value| uuid::Uuid::parse_str(value).ok())
+    .ok_or_else(|| {
+      IoError::invalid_data(
+        "VM runtime",
+        "Runtime specification generation is missing or invalid",
+      )
+    })?;
+  validate_generation(vm, generation, state).await?;
+  Ok(())
+}
+
 async fn inspect_owned_runtime(
   vm: &Vm,
   state: &SystemState,
@@ -841,6 +888,7 @@ async fn inspect_owned_runtime(
   {
     Ok(inspect) => {
       let id = owned_runtime_id(vm, &inspect)?;
+      validate_runtime_generation(vm, &inspect, state).await?;
       Ok(Some((id, inspect)))
     }
     Err(bollard_next::errors::Error::DockerResponseServerError {
@@ -913,9 +961,11 @@ fn validate_runtime_dns(
   Ok(())
 }
 
-async fn create_init_container(
+async fn create_init_container<G: Clone + Send + 'static>(
   vm: &Vm,
   init_container: &Config,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
   let mut init_container = init_container.clone();
@@ -954,11 +1004,13 @@ async fn create_init_container(
   let short_id = utils::key::generate_short_id(6);
   let name =
     format!("{}.{}-{}.init.v", vm.namespace_name, vm.spec.name, short_id);
-  let process = super::process::create(
+  let process = super::process::create_owned(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,
     &init_container,
+    owner,
+    keepalive,
     state,
   )
   .await?;
@@ -1007,16 +1059,36 @@ async fn start_init_container(
   Ok(())
 }
 
-/// Create a VM instance
-///
-pub async fn create_instance(
+async fn runtime_vm<G: Send + 'static>(
+  key: &str,
+  owner: &Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<Vm> {
+  if owner.is_some() {
+    let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+    if vm.spec.mac_address.is_none() {
+      return Err(IoError::invalid_data(
+        "VM MAC",
+        "Accepted revision has no MAC address; refusing to change it during execution",
+      ));
+    }
+    return Ok(vm);
+  }
+  VmDb::ensure_mac_address_owned(key, keepalive, state)
+    .await
+    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))
+}
+
+async fn create_instance_owned<G: Clone + Send + 'static>(
   vm: &Vm,
   disable_keygen: bool,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
-  let vm = VmDb::ensure_mac_address(&vm.spec.vm_key, state)
-    .await
-    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
+  let vm =
+    runtime_vm(&vm.spec.vm_key, &owner, keepalive.clone(), state).await?;
   let vm = &vm;
   let envs = runtime_env(vm, disable_keygen)?;
   // Ensure runtime and optional init networks before either container exists.
@@ -1073,10 +1145,22 @@ pub async fn create_instance(
   binds.push(format!("{}:/run/nanocl-vm", directory.display()));
   // Complete all fallible runtime preparation before creating an init process.
   let init_process = if let Some(init_container) = &vm.spec.init_container {
-    let process = create_init_container(vm, init_container, state).await?;
+    let process = create_init_container(
+      vm,
+      init_container,
+      owner.clone(),
+      keepalive.clone(),
+      state,
+    )
+    .await?;
     if let Err(err) = start_init_container(&process, state).await {
-      if let Err(cleanup) =
-        super::process::delete_instances(&[process.key], state).await
+      if let Err(cleanup) = super::process::delete_instances_owned(
+        &[process.key],
+        owner.clone(),
+        keepalive.clone(),
+        state,
+      )
+      .await
       {
         log::warn!("Unable to remove failed VM init container: {cleanup}");
       }
@@ -1112,18 +1196,25 @@ pub async fn create_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  let result = super::process::create(
+  let result = super::process::create_owned(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,
     &spec,
+    owner.clone(),
+    keepalive.clone(),
     state,
   )
   .await;
   if result.is_err() {
     if let Some(init_key) = init_process
-      && let Err(cleanup) =
-        super::process::delete_instances(&[init_key], state).await
+      && let Err(cleanup) = super::process::delete_instances_owned(
+        &[init_key],
+        owner,
+        keepalive,
+        state,
+      )
+      .await
     {
       log::warn!(
         "Unable to remove VM init container after runtime create failure: {cleanup}"
@@ -1147,9 +1238,11 @@ pub async fn create_instance(
 /// Start VM instance
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = start_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = start_unlocked_owned(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
 // Acceptance hands both lifecycle and distributed ownership to the task.
@@ -1157,33 +1250,51 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 pub(crate) async fn run_task_unlocked(
   key: &str,
   action: NativeEventAction,
+  operation: &OperationDb,
+  lease: &VmOperationLease,
   state: &SystemState,
 ) -> (IoResult<()>, bool) {
   let result = match action {
-    NativeEventAction::Starting => start_unlocked(key, state).await,
-    NativeEventAction::Updating => update_unlocked(key, state).await,
-    NativeEventAction::Destroying => delete_unlocked(key, state).await,
+    NativeEventAction::Starting => {
+      start_unlocked_owned(key, Some(operation.owner()), lease.clone(), state)
+        .await
+    }
+    NativeEventAction::Updating => {
+      update_unlocked_owned(key, Some(operation.owner()), lease.clone(), state)
+        .await
+    }
+    NativeEventAction::Destroying => {
+      delete_unlocked(key, Some(operation), lease.clone(), state).await
+    }
     _ => Err(IoError::invalid_input(
       "VM task",
       "Unsupported VM task action",
     )),
   };
-  record_task_outcome(key, result, state).await
+  record_task_outcome_owned(
+    key,
+    result,
+    Some(operation.owner()),
+    lease.clone(),
+    state,
+  )
+  .await
 }
 
-// Call while holding the operation's lifecycle guard. The asynchronous task
-// error callback runs after release and must not overwrite a newer operation.
-pub(crate) async fn record_task_failure(
-  key: &str,
-  result: IoResult<()>,
-  state: &SystemState,
-) -> IoResult<()> {
-  record_task_outcome(key, result, state).await.0
-}
-
+#[cfg(test)]
 pub(crate) async fn record_task_outcome(
   key: &str,
   result: IoResult<()>,
+  state: &SystemState,
+) -> (IoResult<()>, bool) {
+  record_task_outcome_owned(key, result, None, (), state).await
+}
+
+async fn record_task_outcome_owned<G: Send + 'static>(
+  key: &str,
+  result: IoResult<()>,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> (IoResult<()>, bool) {
   if let Err(operation_error) = &result {
@@ -1209,8 +1320,14 @@ pub(crate) async fn record_task_outcome(
     log::warn!(
       "VM {key} operation failed: {operation_error}; observed status: {actual}"
     );
-    if let Err(error) =
-      ObjPsStatusDb::update_actual_status(key, &actual, &state.inner.pool).await
+    if let Err(error) = ObjPsStatusDb::update_actual_status_owned(
+      key,
+      &actual,
+      owner,
+      keepalive,
+      &state.inner.pool,
+    )
+    .await
     {
       log::warn!("Unable to record failed VM lifecycle status: {error}");
       return (result, false);
@@ -1234,25 +1351,41 @@ fn task_failure_actual(
   }
 }
 
-async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
+fn vm_process_filter() -> GenericFilter {
+  GenericFilter::new()
+    .r#where("kind", GenericClause::Eq(ProcessKind::Vm.to_string()))
+}
+
+async fn start_unlocked_owned<G: Clone + Send + 'static>(
+  key: &str,
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
   ensure_networks(&vm, state).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
-      .await?;
+  let processes = ProcessDb::read_by_kind_key(
+    &vm.spec.vm_key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let runtime_name = format!("{}.v", vm.spec.vm_key);
   if !processes.iter().any(|process| process.name == runtime_name) {
-    create_instance(&vm, true, state).await?;
+    create_instance_owned(&vm, true, owner.clone(), keepalive.clone(), state)
+      .await?;
   }
   if vm.spec.host_config.dns.is_some()
     && let Some((_, inspect)) = inspect_owned_runtime(&vm, state).await?
   {
     validate_runtime_dns(&vm, &inspect)?;
   }
-  super::process::start_instances(
+  super::process::start_instances_owned(
     &vm.spec.vm_key,
     &ProcessKind::Vm,
     true,
+    owner,
+    keepalive,
     state,
   )
   .await?;
@@ -1262,15 +1395,26 @@ async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete VM instance and the VM itself from the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = delete_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = delete_unlocked(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
-async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
+async fn delete_unlocked<G: Clone + Send + 'static>(
+  key: &str,
+  operation: Option<&OperationDb>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(
+    key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let mut targets = processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>();
   // A Docker runtime can survive a failed process-row write or reconciliation.
   // Verify its owner and use its immutable ID before releasing the VM identity.
@@ -1280,7 +1424,13 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     }
   }
   lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
-  super::process::delete_instances(&targets, state).await?;
+  super::process::delete_instances_owned(
+    &targets,
+    operation.map(OperationDb::owner),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if inspect_owned_runtime(&vm, state).await?.is_some() {
     return Err(IoError::interrupted(
       "VM runtime",
@@ -1288,7 +1438,17 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     ));
   }
   cleanup_all_consoles(&vm, &state.inner.config.state_dir).await?;
-  VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  if let Some(operation) = operation {
+    if !VmDb::delete_operation(operation, keepalive, &state.inner.pool).await? {
+      return Err(IoError::interrupted(
+        "VM deletion",
+        "Accepted operation is no longer current",
+      ));
+    }
+  } else {
+    VmDb::clear_by_pk_owned(&vm.spec.vm_key, keepalive, &state.inner.pool)
+      .await?;
+  }
   state
     .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
     .await;
@@ -1298,24 +1458,32 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 /// Update the VM
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = update_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = update_unlocked_owned(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
-async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
-  let vm = VmDb::ensure_mac_address(key, state)
-    .await
-    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
+async fn update_unlocked_owned<G: Clone + Send + 'static>(
+  key: &str,
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
+  let vm = runtime_vm(key, &owner, keepalive.clone(), state).await?;
   // Fail before deleting the existing VM runtime.
   ensure_networks(&vm, state).await?;
   validate_spec(&vm.spec.clone().into())?;
   ensure_runtime_image(&vm, state).await?;
   prepare_console_directory(&vm, &state.inner.config.state_dir).await?;
   let runtime_name = format!("{}.v", &vm.spec.vm_key);
-  let old_processes =
-    ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
-      .await?;
+  let old_processes = ProcessDb::read_by_kind_key(
+    &vm.spec.vm_key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let mut old_runtime_keys = old_processes
     .iter()
     .filter(|process| {
@@ -1337,15 +1505,35 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     }
   }
   lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
-  super::process::delete_instances(&old_runtime_keys, state).await?;
+  super::process::delete_instances_owned(
+    &old_runtime_keys,
+    owner.clone(),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if let Err(err) = cleanup_process_consoles(&vm, &old_processes, state).await {
     log::warn!("Unable to clean previous VM console directory: {err}");
   }
-  create_instance(&vm, false, state).await?;
-  super::process::start_instances(key, &ProcessKind::Vm, true, state).await?;
+  create_instance_owned(&vm, false, owner.clone(), keepalive.clone(), state)
+    .await?;
+  super::process::start_instances_owned(
+    key,
+    &ProcessKind::Vm,
+    true,
+    owner.clone(),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if !old_init_keys.is_empty()
-    && let Err(err) =
-      super::process::delete_instances(&old_init_keys, state).await
+    && let Err(err) = super::process::delete_instances_owned(
+      &old_init_keys,
+      owner,
+      keepalive,
+      state,
+    )
+    .await
   {
     // The replacement is already running. Do not turn successful replacement
     // into a failed update solely because cleanup of exited init containers

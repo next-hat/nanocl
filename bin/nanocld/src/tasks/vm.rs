@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, sync::Arc};
 
 use nanocl_error::{
   http::{HttpError, HttpResult},
@@ -15,8 +15,8 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    DistributedMutexDb, EventDb, SystemState, VmDb, VmOperationDb,
-    VmOperationOwner,
+    AcceptedVmOperation, DistributedMutexDb, EventDb, OperationDb,
+    OperationOwner, SystemState, VmDb, VmOperationLease,
   },
   repositories::generic::*,
   utils, vars,
@@ -34,8 +34,8 @@ pub(crate) async fn accept_task<P, F>(
   prepare: P,
 ) -> HttpResult<Vm>
 where
-  P: FnOnce(VmOperationOwner) -> F + 'static,
-  F: Future<Output = HttpResult<Vm>> + 'static,
+  P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
+  F: Future<Output = HttpResult<AcceptedVmOperation>> + 'static,
 {
   let mutex_action = match action {
     NativeEventAction::Starting => "start",
@@ -59,14 +59,15 @@ async fn accept_task_with_acquisition<P, F, A>(
   acquire: A,
 ) -> HttpResult<Vm>
 where
-  P: FnOnce(VmOperationOwner) -> F + 'static,
-  F: Future<Output = HttpResult<Vm>> + 'static,
+  P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
+  F: Future<Output = HttpResult<AcceptedVmOperation>> + 'static,
   A: Future<Output = IoResult<DistributedMutexDb>> + 'static,
 {
   let guard = utils::container::vm::lifecycle_lock(key)
     .try_lock_owned()
     .await
     .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+  let guard = Arc::new(guard);
   let key = key.to_owned();
   let state = state.clone();
   let (reply, accepted) = tokio::sync::oneshot::channel();
@@ -83,22 +84,23 @@ where
         return;
       }
     };
-    let (owner, owner_guard) =
-      match utils::container::vm::recovery::create_owner(mutex.key, &state) {
-        Ok(owner) => owner,
-        Err(error) => {
-          if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
-            log::error!(
-              "VM acceptance cleanup failed: {key} {}: {cleanup}",
-              mutex.key
-            );
-          }
-          let _ = reply.send(Err(error.into()));
-          return;
-        }
-      };
-    let vm = match prepare(owner.clone()).await {
-      Ok(vm) => vm,
+    let live = match VmDb::read_by_pk(&key, &state.inner.pool).await {
+      Ok((live, _, _)) => live,
+      Err(error) => {
+        let _ = VmDb::delete_mutex(&mutex.key, &state).await;
+        let _ = reply.send(Err(error.into()));
+        return;
+      }
+    };
+    let (owner, owner_guard) = match utils::operation::create_owner(
+      mutex.key,
+      "Vm",
+      &key,
+      live.incarnation_key,
+      &state.inner.config.hostname,
+      &state.inner.config.state_dir,
+    ) {
+      Ok(owner) => owner,
       Err(error) => {
         if let Err(cleanup) = VmDb::delete_mutex(&mutex.key, &state).await {
           log::error!(
@@ -106,14 +108,34 @@ where
             mutex.key
           );
         }
+        let _ = reply.send(Err(error.into()));
+        return;
+      }
+    };
+    let lease = (guard, owner_guard);
+    let accepted_operation = match prepare(owner, lease.clone()).await {
+      Ok(accepted) => accepted,
+      Err(error) => {
+        // Fence against a blocking acceptance transaction before treating
+        // absence as rollback. Unknown or committed state stays recoverable.
+        match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
+        {
+          Ok(true) => {
+            let _ = VmDb::delete_mutex(&mutex.key, &state).await;
+          }
+          Ok(false) => {}
+          Err(cleanup) => {
+            log::warn!("VM acceptance cleanup deferred: {key}: {cleanup}")
+          }
+        }
         let _ = reply.send(Err(error));
         return;
       }
     };
+    let vm = accepted_operation.vm;
+    let accepted_operation = accepted_operation.operation;
     let revision = vm.spec.key;
-    let operation = mutex.key;
-    let accepted_operation =
-      owner.operation(&key, revision, &action.to_string());
+    let operation = accepted_operation.key;
     let task_state = state.clone();
     let task_action = action.clone();
     let task_vm = vm.clone();
@@ -121,17 +143,20 @@ where
     let error_action = action.clone();
     let error_actor: EventActor = vm.clone().into();
     let (start, ready) = tokio::sync::oneshot::channel();
-    let task = Box::pin(async move {
-      let _guard = guard;
-      let _owner_guard = owner_guard;
+    let task = owned_executor(async move {
+      let lease = lease;
       // The task is registered before its acceptance notification, but cannot
       // finish before subscribers have been told it was registered.
       let _ = ready.await;
       let admission = async {
-        let accepted = VmOperationDb::get(&key, &task_state.inner.pool).await?;
+        let accepted =
+          OperationDb::current("Vm", &key, &task_state.inner.pool).await?;
         let current =
           VmDb::transform_read_by_pk(&key, &task_state.inner.pool).await?;
-        if current.spec.key != revision
+        let (live, _, _) =
+          VmDb::read_by_pk(&key, &task_state.inner.pool).await?;
+        if live.incarnation_key != accepted_operation.incarnation_key
+          || current.spec.key != revision
           || accepted.as_ref() != Some(&accepted_operation)
         {
           return Err(IoError::interrupted(
@@ -150,6 +175,8 @@ where
           utils::container::vm::run_task_unlocked(
             &key,
             task_action,
+            &accepted_operation,
+            &lease,
             &task_state,
           )
           .await
@@ -159,13 +186,19 @@ where
       // Runtime helpers settle ordinary outcomes under this same owner. A
       // still-pending row is retained for evidence-based recovery after exit.
       if settled
-        && let Err(error) = accepted_operation
-          .complete(
+        && let Err(error) = VmDb::complete_operation(
+            &accepted_operation,
             if result.is_ok() {
               "completed"
             } else {
               "failed"
             },
+            result.as_ref().err().map(|_| serde_json::json!({
+              "Failure": "VM execution failed; inspect the corresponding VM error event",
+              "Operation": operation,
+              "Stage": "runtime-execution"
+            })),
+            lease.clone(),
             &task_state.inner.pool,
           )
           .await
@@ -173,6 +206,11 @@ where
         log::error!(
           "VM operation completion persistence failed: {key} operation={operation}: {error}"
         );
+      }
+      if let Err(error) =
+        utils::operation::cleanup_owner(&lease.1, &task_state.inner.pool).await
+      {
+        log::warn!("VM owner file cleanup deferred: {key}: {error}");
       }
       let cleanup = VmDb::delete_mutex(&operation, &task_state).await;
       result.and(cleanup)
@@ -207,6 +245,22 @@ where
       "VM task acceptance owner stopped unexpectedly",
     )
   })?
+}
+
+// TaskManager owns only this waiter. Cancelling it cannot drop the execution
+// lease while a runtime helper is awaiting a blocking database write.
+fn owned_executor(
+  future: impl Future<Output = IoResult<()>> + 'static,
+) -> ObjTaskFuture {
+  let (send, receive) = tokio::sync::oneshot::channel();
+  ntex::rt::spawn(async move {
+    let _ = send.send(future.await);
+  });
+  Box::pin(async move {
+    receive.await.map_err(|_| {
+      IoError::interrupted("VM task", "Execution owner stopped unexpectedly")
+    })?
+  })
 }
 
 fn report_task_error(
@@ -333,6 +387,80 @@ mod tests {
   use super::*;
 
   #[ntex::test]
+  async fn cancelled_vm_waiter_retains_executor_ownership_until_completion() {
+    let key = format!("global.vm-waiter-{}", uuid::Uuid::new_v4());
+    let directory =
+      std::env::temp_dir().join(format!("vm-waiter-{}", uuid::Uuid::new_v4()));
+    let lifecycle = std::sync::Arc::new(
+      utils::container::vm::lifecycle_lock(&key)
+        .try_lock_owned()
+        .await
+        .unwrap(),
+    );
+    let (owner, guard) = utils::operation::create_owner(
+      uuid::Uuid::new_v4(),
+      "Vm",
+      &key,
+      uuid::Uuid::new_v4(),
+      "test-node",
+      directory.to_str().unwrap(),
+    )
+    .unwrap();
+    let (entered, started) = tokio::sync::oneshot::channel();
+    let (release, proceed) = tokio::sync::oneshot::channel();
+    let (finished, completed) = tokio::sync::oneshot::channel();
+    let task = owned_executor(async move {
+      let lease = (lifecycle, guard);
+      entered.send(()).unwrap();
+      proceed.await.unwrap();
+      drop(lease);
+      finished.send(()).unwrap();
+      Ok(())
+    });
+    let manager = crate::models::TaskManager::default();
+    manager
+      .add_task(&key, NativeEventAction::Updating, task, |_| async {
+        Ok(())
+      })
+      .await;
+    started.await.unwrap();
+    manager.remove_task(&key).await;
+    assert!(manager.get_task(&key).await.is_none());
+    assert!(
+      utils::container::vm::lifecycle_lock(&key)
+        .try_lock_owned()
+        .await
+        .is_err()
+    );
+    assert!(
+      utils::operation::abandoned_owner(
+        &owner,
+        "test-node",
+        directory.to_str().unwrap()
+      )
+      .unwrap()
+      .is_none()
+    );
+    release.send(()).unwrap();
+    completed.await.unwrap();
+    assert!(
+      utils::container::vm::lifecycle_lock(&key)
+        .try_lock_owned()
+        .await
+        .is_ok()
+    );
+    let recovered = utils::operation::abandoned_owner(
+      &owner,
+      "test-node",
+      directory.to_str().unwrap(),
+    )
+    .unwrap();
+    assert!(recovered.is_some());
+    drop(recovered);
+    std::fs::remove_dir_all(directory).unwrap();
+  }
+
+  #[ntex::test]
   async fn failed_vm_task_acquisition_preserves_the_active_owner() {
     let system = utils::tests::gen_default_test_system().await;
     let state = &system.state;
@@ -392,7 +520,7 @@ mod tests {
           "update" => NativeEventAction::Updating,
           _ => NativeEventAction::Destroying,
         };
-        let rejected = accept_task(&key, phase_action, state, |_| async {
+        let rejected = accept_task(&key, phase_action, state, |_, _| async {
           panic!("another owner's mutex must prevent acceptance mutation");
         })
         .await;
@@ -450,7 +578,7 @@ mod tests {
         &key,
         action,
         state,
-        move |_| async move {
+        move |_, _| async move {
           prepare_polled.set(true);
           ObjPsStatusDb::update_actual_status(
             &prepare_key,
@@ -575,7 +703,7 @@ mod tests {
     let original = ObjPsStatusDb::read_by_pk(&key, &state.inner.pool)
       .await
       .unwrap();
-    let spec = crate::models::SpecDb::try_from_vm_partial(
+    let mut spec = crate::models::SpecDb::try_from_vm_partial(
       &key,
       &vm.spec.version,
       &nanocl_stubs::vm_spec::VmSpecPartial::from(vm.spec.clone()),
@@ -589,9 +717,10 @@ mod tests {
       .unwrap();
     let prepare_state = state.clone();
     let expected = vm.clone();
-    let error = accept_task(&key, NativeEventAction::Updating, state, move |owner| async move {
-      let operation = VmOperationDb::new(&owner, &expected.spec.vm_key, revision, ObjPsStatusKind::Updating);
-      Ok(VmDb::accept_operation_with_pending_write(&expected, Some(spec), operation,
+    let error = accept_task(&key, NativeEventAction::Updating, state, move |owner, lease| async move {
+      spec.incarnation_key = Some(owner.incarnation_key);
+      let operation = OperationDb::new(&owner, "Vm", &expected.spec.vm_key, revision, "update");
+      Ok(VmDb::accept_operation_with_pending_write(&expected, Some(spec), operation, lease,
         &prepare_state.inner.pool, |conn, key, _| {
           diesel::sql_query("UPDATE object_process_statuses SET actual = NULL WHERE key = $1")
             .bind::<diesel::sql_types::Text,_>(key).execute(conn)?;
@@ -619,7 +748,7 @@ mod tests {
         .is_err()
     );
     assert!(
-      VmOperationDb::get(&key, &state.inner.pool)
+      OperationDb::current("Vm", &key, &state.inner.pool)
         .await
         .unwrap()
         .is_none()
@@ -682,17 +811,19 @@ mod tests {
         &request_key,
         NativeEventAction::Starting,
         &request_state,
-        move |owner| async move {
-          let operation = VmOperationDb::new(
+        move |owner, lease| async move {
+          let operation = OperationDb::new(
             &owner,
+            "Vm",
             &vm.spec.vm_key,
             vm.spec.key,
-            ObjPsStatusKind::Starting,
+            "start",
           );
           let accepted = VmDb::accept_operation(
             &vm,
             None,
             operation,
+            lease,
             &prepare_state.inner.pool,
           )
           .await?;
@@ -705,12 +836,12 @@ mod tests {
     });
     commit_seen.await.unwrap();
     caller.cancel();
-    let operation = VmOperationDb::get(&key, &state.inner.pool)
+    let operation = OperationDb::current("Vm", &key, &state.inner.pool)
       .await
       .unwrap()
       .unwrap();
     assert_eq!(operation.spec_key, revision);
-    assert_eq!(operation.phase, "starting");
+    assert_eq!(operation.action, "start");
     assert!(
       state
         .inner
@@ -760,7 +891,7 @@ mod tests {
     })
     .await
     .unwrap();
-    let completed = VmOperationDb::get(&key, &state.inner.pool)
+    let completed = OperationDb::current("Vm", &key, &state.inner.pool)
       .await
       .unwrap()
       .unwrap();
@@ -808,12 +939,12 @@ mod tests {
         .unwrap()
         .is_empty()
     );
-    std::fs::remove_file(
-      std::path::Path::new(&state.inner.config.state_dir)
-        .join("run/vm-operations")
-        .join(format!("{}.lock", operation.key)),
-    )
-    .unwrap();
+    assert!(
+      !std::path::Path::new(&state.inner.config.state_dir)
+        .join("run/operations")
+        .join(format!("{}.lock", operation.key))
+        .exists()
+    );
   }
 
   #[ntex::test]

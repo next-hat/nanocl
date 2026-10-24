@@ -27,7 +27,18 @@ pub struct VmDb {
   pub status_key: String,
   /// The spec key reference
   pub spec_key: uuid::Uuid,
+  /// Immutable identity retained after this live definition is deleted.
+  pub incarnation_key: uuid::Uuid,
 }
+
+#[derive(Debug)]
+pub(crate) struct AcceptedVmOperation {
+  pub vm: nanocl_stubs::vm::Vm,
+  pub operation: super::OperationDb,
+}
+
+pub(crate) type VmOperationLease =
+  (std::sync::Arc<VmLifecycleGuard>, super::OperationGuard);
 
 /// This structure is used to update a vm in the database.
 #[derive(Debug, Default, AsChangeset)]
@@ -86,14 +97,6 @@ pub(crate) struct VmLifecycleGuard {
 pub(crate) struct VmLifecycleObservationGuard {
   pub _observation: tokio::sync::OwnedMutexGuard<()>,
   pub _lock: std::sync::Arc<VmLifecycleLock>,
-}
-
-/// The open file description owns a kernel lock until its last clone is gone.
-/// Recovery opens a separate description, so even a second daemon cannot
-/// mistake a live detached acceptance owner for an abandoned operation.
-#[derive(Clone)]
-pub(crate) struct VmOperationGuard {
-  pub(crate) _file: std::sync::Arc<std::fs::File>,
 }
 
 /// Private restart projection for the QEMU generation mounted by Docker.

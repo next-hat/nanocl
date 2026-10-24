@@ -6,12 +6,12 @@ use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
-  process::Process,
+  process::{Process, ProcessPartial},
 };
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, Pool, ProcessDb, ProcessUpdateDb},
+  models::{ColumnType, OperationOwner, Pool, ProcessDb, ProcessUpdateDb},
   schema::processes,
 };
 
@@ -110,6 +110,61 @@ impl RepositoryReadByTransform for ProcessDb {
 }
 
 impl ProcessDb {
+  pub(crate) async fn create_owned<G: Send + 'static>(
+    item: &ProcessPartial,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    let item = Self::from(item);
+    if owner.as_ref().is_some_and(|owner| {
+      item.kind != owner.resource_kind
+        || item.kind_key != owner.resource_key
+        || item.node_name != owner.node_name
+    }) {
+      return Err(
+        super::operation::conflict(
+          "Process does not belong to its operation owner",
+        )
+        .into(),
+      );
+    }
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      Ok(
+        diesel::insert_into(processes::table)
+          .values(&item)
+          .get_result(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn delete_owned<G: Send + 'static>(
+    key: &str,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let key = key.to_owned();
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      if let Some(owner) = &expected_owner
+        && let Some(process) =
+          processes::table.find(&key).first::<Self>(conn).optional()?
+        && (process.kind != owner.resource_kind
+          || process.kind_key != owner.resource_key
+          || process.node_name != owner.node_name)
+      {
+        return Err(super::operation::conflict(
+          "Process does not belong to its operation owner",
+        ));
+      }
+      diesel::delete(processes::table.find(&key)).execute(conn)?;
+      Ok(())
+    })
+    .await
+  }
+
   /// Read network owners independently of the displayed page and its filters.
   pub async fn read_network_owners(
     targets: &[(String, String)],

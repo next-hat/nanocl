@@ -1,0 +1,1 @@
+ALTER TABLE vms ALTER COLUMN incarnation_key DROP NOT NULL;

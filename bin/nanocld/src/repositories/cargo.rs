@@ -287,7 +287,7 @@ impl CargoDb {
   /// Delete a cargo and it's relations (Spec, ObjPsStatus).
   pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
     CargoDb::del_by_pk(pk, pool).await?;
-    SpecDb::del_by_kind_key(pk, pool).await?;
+    SpecDb::del_by_kind_key("Cargo", pk, pool).await?;
     ObjPsStatusDb::del_by_pk(pk, pool).await?;
     Ok(())
   }

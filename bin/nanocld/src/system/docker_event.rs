@@ -18,8 +18,8 @@ use nanocl_stubs::system::{
 
 use crate::{
   models::{
-    CargoDb, CargoReplicaDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb, SpecDb,
-    SystemState, VmDb, VmLifecycleObservationGuard, VmOperationDb,
+    CargoDb, CargoReplicaDb, ObjPsStatusDb, OperationDb, ProcessDb,
+    ProcessUpdateDb, SystemState, VmDb, VmLifecycleObservationGuard,
   },
   repositories::generic::*,
   utils, vars,
@@ -150,7 +150,8 @@ async fn handle_vm_runtime_exit(
   state: &SystemState,
   _guard: VmLifecycleObservationGuard,
 ) -> IoResult<()> {
-  let operation = VmOperationDb::get(key, &state.inner.pool).await?;
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
   if operation
     .as_ref()
     .is_some_and(|operation| operation.outcome.is_none())
@@ -159,6 +160,13 @@ async fn handle_vm_runtime_exit(
   }
   // A contended event is checked only after the operation releases its lock.
   // The VM may have restarted, changed desired state, or been deleted by then.
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
   let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
     Ok(vm) => vm,
     Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
@@ -190,8 +198,10 @@ async fn handle_vm_runtime_exit(
   }
   if !VmDb::observe_runtime_status(
     &vm,
+    live.incarnation_key,
     operation.map(|operation| operation.key),
     ObjPsStatusKind::Fail,
+    guard,
     &state.inner.pool,
   )
   .await?
@@ -213,13 +223,21 @@ async fn handle_vm_runtime_start(
   state: &SystemState,
   _guard: VmLifecycleObservationGuard,
 ) -> IoResult<()> {
-  let operation = VmOperationDb::get(key, &state.inner.pool).await?;
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
   if operation
     .as_ref()
     .is_some_and(|operation| operation.outcome.is_none())
   {
     return Ok(());
   }
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
   let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
     Ok(vm) => vm,
     Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
@@ -253,14 +271,13 @@ async fn handle_vm_runtime_start(
   let Some(generation) = generation else {
     return Ok(());
   };
-  let spec = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
-  if spec.kind_name != "Vm" || spec.kind_key != key {
-    return Ok(());
-  }
+  utils::container::vm::validate_generation(&vm, generation, state).await?;
   VmDb::observe_runtime_status(
     &vm,
+    live.incarnation_key,
     operation.map(|operation| operation.key),
     ObjPsStatusKind::Start,
+    guard,
     &state.inner.pool,
   )
   .await?;
@@ -1338,8 +1355,8 @@ mod tests {
    {
     use crate::{
       models::{
-        DistributedMutexDb, DistributedMutexPartial, SystemStateInner,
-        VmObjCreateIn, VmOperationOwner,
+        DistributedMutexDb, DistributedMutexPartial, OperationOwner,
+        SystemStateInner, VmObjCreateIn,
       },
       objects::generic::ObjCreate,
     };
@@ -1401,21 +1418,38 @@ mod tests {
         .await
         .unwrap();
         mutex_key = Some(mutex.key);
-        let operation = VmOperationDb::new(
-          &VmOperationOwner {
+        let (live, _, _) =
+          VmDb::read_by_pk(key, &state.inner.pool).await.unwrap();
+        let operation = OperationDb::new(
+          &OperationOwner {
             key: mutex.key,
+            resource_kind: "Vm".into(),
+            resource_key: key.clone(),
+            incarnation_key: live.incarnation_key,
             node_name: mutex.node_key,
             owner_boot_id: "event-test-boot".to_owned(),
             lock_device: 1,
             lock_inode: 2,
           },
+          "Vm",
           key,
           vm.spec.key,
-          phase.clone(),
+          match phase {
+            ObjPsStatusKind::Starting => "start",
+            ObjPsStatusKind::Updating => "update",
+            ObjPsStatusKind::Destroying => "delete",
+            _ => unreachable!(),
+          },
         );
-        VmDb::accept_operation(&vm, None, operation.clone(), &state.inner.pool)
-          .await
-          .unwrap();
+        VmDb::accept_operation(
+          &vm,
+          None,
+          operation.clone(),
+          (),
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
         DistributedMutexDb::del_by_pk(&operation.key, &state.inner.pool)
           .await
           .unwrap();
@@ -1470,7 +1504,9 @@ mod tests {
         assert_eq!(after.prev_actual, before.prev_actual);
         assert_eq!(after.updated_at, before.updated_at);
         assert_eq!(
-          VmOperationDb::get(key, &state.inner.pool).await.unwrap(),
+          OperationDb::current("Vm", key, &state.inner.pool)
+            .await
+            .unwrap(),
           Some(operation)
         );
       })
@@ -1479,6 +1515,24 @@ mod tests {
       if let Some(mutex_key) = mutex_key {
         let _ =
           DistributedMutexDb::del_by_pk(&mutex_key, &state.inner.pool).await;
+      }
+      if let Some(operation) =
+        OperationDb::current("Vm", key, &state.inner.pool)
+          .await
+          .unwrap()
+      {
+        if operation.outcome.is_none() {
+          VmDb::finish_operation(
+            &operation,
+            ObjPsStatusKind::Stop,
+            "interrupted",
+            serde_json::json!({"TestCleanup": true}),
+            (),
+            &state.inner.pool,
+          )
+          .await
+          .unwrap();
+        }
       }
       VmDb::clear_by_pk(key, &state.inner.pool).await.unwrap();
       if let Err(panic) = result {

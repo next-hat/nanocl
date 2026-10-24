@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use crate::{
-  models::{SpecDb, SystemState},
+  models::{SystemState, VmDb},
   utils,
 };
 
@@ -26,7 +26,7 @@ pub async fn list_vm_history(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
-  let histories = SpecDb::read_by_kind_key(key.as_str(), &state.inner.pool)
+  let histories = VmDb::history(key.as_str(), &state.inner.pool)
     .await?
     .into_iter()
     .map(|i| i.try_to_vm_spec())

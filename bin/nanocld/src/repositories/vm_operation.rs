@@ -1,112 +1,46 @@
 use diesel::prelude::*;
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 use nanocl_stubs::{
   system::{ObjPsHealthStatusKind, ObjPsStatusKind},
   vm::Vm,
 };
 
+use super::{
+  generic::RepositoryReadByTransform,
+  operation::{
+    self, TransactionResult, conflict, run_query_owned, transaction,
+  },
+};
 use crate::{
   models::{
-    DistributedMutexDb, ObjPsStatusDb, ObjPsStatusUpdate, Pool, SpecDb, VmDb,
-    VmOperationDb, VmOperationTransactionError,
+    AcceptedVmOperation, DistributedMutexDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    OperationDb, Pool, SpecDb, VmDb,
   },
   schema::{
-    distributed_mutexes, object_process_statuses, specs, vm_operations, vms,
+    distributed_mutexes, object_process_statuses, operations,
+    resource_incarnations, specs, vms,
   },
-  utils,
 };
-
-use super::generic::RepositoryReadByTransform;
-
-type TransactionResult<T> = Result<T, VmOperationTransactionError>;
-
-async fn run_query<T, F>(pool: &Pool, query: F) -> IoResult<T>
-where
-  T: Send + 'static,
-  F: FnOnce(&mut PgConnection) -> IoResult<T> + Send + 'static,
-{
-  let pool = pool.clone();
-  ntex::rt::spawn_blocking(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    query(&mut conn)
-  })
-  .await
-  .map_err(|error| {
-    IoError::interrupted("VM operation database query", &error.to_string())
-  })?
-}
-
-// CockroachDB may abort a serializable transaction even with row locks. Only
-// retry database serialization failures; these closures contain no runtime,
-// executor, event or freshly generated operation/specification identities.
-fn transaction<T>(
-  conn: &mut PgConnection,
-  mut query: impl FnMut(&mut PgConnection) -> TransactionResult<T>,
-) -> IoResult<T> {
-  for attempt in 0..3 {
-    let result = conn
-      .build_transaction()
-      .serializable()
-      .run::<_, VmOperationTransactionError, _>(&mut query);
-    match result {
-      Err(VmOperationTransactionError::Database(
-        diesel::result::Error::DatabaseError(
-          diesel::result::DatabaseErrorKind::SerializationFailure,
-          _,
-        ),
-      )) if attempt < 2 => continue,
-      result => return result.map_err(Into::into),
-    }
-  }
-  unreachable!("bounded transaction loop returns its last result")
-}
 
 fn pending_phase(phase: &str) -> bool {
   matches!(phase, "starting" | "updating" | "destroying")
 }
-
-fn conflict(message: &str) -> VmOperationTransactionError {
-  IoError::with_context(
-    "VM operation acceptance",
-    std::io::Error::new(std::io::ErrorKind::WouldBlock, message),
-  )
-  .into()
-}
-
-fn same_operation(current: &VmOperationDb, expected: &VmOperationDb) -> bool {
-  current.key == expected.key
-    && current.vm_key == expected.vm_key
-    && current.spec_key == expected.spec_key
-    && current.phase == expected.phase
-    && current.node_name == expected.node_name
-    && current.owner_boot_id == expected.owner_boot_id
-    && current.lock_device == expected.lock_device
-    && current.lock_inode == expected.lock_inode
-    && current.outcome.is_none()
-}
-
-fn delete_exact_mutex(
-  conn: &mut PgConnection,
-  operation: &VmOperationDb,
-) -> TransactionResult<()> {
-  diesel::delete(
-    distributed_mutexes::table
-      .find(operation.key)
-      .filter(distributed_mutexes::resource_kind.eq("Vm"))
-      .filter(distributed_mutexes::resource_key.eq(&operation.vm_key))
-      .filter(distributed_mutexes::node_key.eq(&operation.node_name)),
-  )
-  .execute(conn)?;
-  Ok(())
+fn phase(action: &str) -> TransactionResult<&'static str> {
+  match action {
+    "start" => Ok("starting"),
+    "update" => Ok("updating"),
+    "delete" => Ok("destroying"),
+    _ => Err(conflict("Unsupported VM operation action")),
+  }
 }
 
 fn accept_on_conn<F>(
   conn: &mut PgConnection,
   expected: &Vm,
   replacement: Option<&SpecDb>,
-  operation: &VmOperationDb,
+  operation: &OperationDb,
   write_pending: &mut F,
-) -> TransactionResult<Vm>
+) -> TransactionResult<AcceptedVmOperation>
 where
   F: FnMut(
     &mut PgConnection,
@@ -114,6 +48,8 @@ where
     ObjPsStatusUpdate,
   ) -> diesel::QueryResult<ObjPsStatusDb>,
 {
+  // Identity is always first: ownership-file maintenance uses the same fence.
+  let identity = operation::lock_incarnation(conn, operation.incarnation_key)?;
   let mut vm = vms::table
     .find(&expected.spec.vm_key)
     .for_update()
@@ -122,32 +58,20 @@ where
     .find(&vm.status_key)
     .for_update()
     .first::<ObjPsStatusDb>(conn)?;
-  if vm.spec_key != expected.spec.key {
-    return Err(conflict("VM specification changed during acceptance"));
-  }
-  let previous_operation = vm_operations::table
-    .find(&vm.key)
-    .for_update()
-    .first::<VmOperationDb>(conn)
-    .optional()?;
-  if previous_operation.is_some_and(|operation| operation.outcome.is_none())
-    || pending_phase(&status.actual)
-  {
-    return Err(conflict("VM has an unresolved pending operation"));
-  }
-  let accepted_spec_key = replacement.map_or(vm.spec_key, |spec| spec.key);
-  if operation.vm_key != vm.key
-    || operation.spec_key != accepted_spec_key
-    || !pending_phase(&operation.phase)
-    || operation.outcome.is_some()
-    || operation.observation.is_some()
+  if vm.incarnation_key != identity.key
+    || vm.spec_key != expected.spec.key
+    || operation.resource_kind != "Vm"
+    || operation.resource_key != vm.key
+    || operation.spec_key != replacement.map_or(vm.spec_key, |spec| spec.key)
   {
     return Err(conflict(
-      "VM operation does not identify the accepted revision",
+      "VM incarnation or specification changed during acceptance",
     ));
   }
-  // A TTL expiry cannot replace a pending durable operation. The admission
-  // still has to own its exact mutex when committing a new operation.
+  if pending_phase(&status.actual) {
+    return Err(conflict("VM has an unresolved pending operation"));
+  }
+  let pending = phase(&operation.action)?;
   let mutex = distributed_mutexes::table
     .find(operation.key)
     .for_update()
@@ -156,33 +80,38 @@ where
     || mutex.resource_key != vm.key
     || mutex.node_key != operation.node_name
   {
-    return Err(conflict("VM operation does not own its distributed mutex"));
+    return Err(conflict("VM operation does not own its exact mutex"));
   }
   let spec = match replacement {
     Some(spec) => {
-      if spec.kind_name != "Vm" || spec.kind_key != vm.key {
+      if spec.kind_name != "Vm"
+        || spec.kind_key != vm.key
+        || spec
+          .incarnation_key
+          .is_some_and(|key| key != vm.incarnation_key)
+      {
         return Err(conflict(
-          "Replacement specification belongs to another VM",
+          "Replacement specification belongs to another incarnation",
         ));
       }
       let revision = spec.try_to_vm_spec()?;
-      diesel::insert_into(specs::table)
-        .values(spec)
-        .execute(conn)?;
+      let mut spec = spec.clone();
+      spec.incarnation_key = Some(vm.incarnation_key);
+      let spec = diesel::insert_into(specs::table)
+        .values(&spec)
+        .get_result::<SpecDb>(conn)?;
       vm = diesel::update(vms::table.find(&vm.key))
         .set((vms::spec_key.eq(spec.key), vms::name.eq(revision.name)))
         .get_result(conn)?;
-      spec.clone()
+      spec
     }
     None => specs::table.find(vm.spec_key).first::<SpecDb>(conn)?,
   };
-  // Replacement of a completed row and the pending phase are covered by the
-  // same rollback boundary as the immutable specification and current pointer.
-  diesel::delete(vm_operations::table.find(&vm.key)).execute(conn)?;
-  diesel::insert_into(vm_operations::table)
-    .values(operation)
-    .execute(conn)?;
-  let wanted = if operation.phase == "destroying" {
+  if spec.incarnation_key != Some(vm.incarnation_key) {
+    return Err(conflict("Accepted specification has another incarnation"));
+  }
+  operation::accept_on_conn(conn, &identity, operation)?;
+  let wanted = if operation.action == "delete" {
     ObjPsStatusKind::Destroy
   } else {
     ObjPsStatusKind::Start
@@ -193,29 +122,93 @@ where
     ObjPsStatusUpdate {
       wanted: Some(wanted.to_string()),
       prev_wanted: Some(status.wanted),
-      actual: Some(operation.phase.clone()),
+      actual: Some(pending.into()),
       prev_actual: Some(status.actual),
       health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
     },
   )?;
-  // Conversion is fallible, so do it before committing as well.
-  Ok(VmDb::transform((vm, spec, status))?)
+  Ok(AcceptedVmOperation {
+    vm: VmDb::transform((vm, spec, status))?,
+    operation: operation.clone(),
+  })
 }
 
 impl VmDb {
-  /// Apply a Docker observation only if no accepted operation or status change
-  /// intervened since inspection. The operation UUID also detects a successor
-  /// that completed with the same specification and the same status values.
-  pub(crate) async fn observe_runtime_status(
+  pub(crate) async fn accept_operation<G: Send + 'static>(
     expected: &Vm,
+    replacement: Option<SpecDb>,
+    operation: OperationDb,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<AcceptedVmOperation> {
+    Self::accept_operation_with_pending_write(
+      expected,
+      replacement,
+      operation,
+      keepalive,
+      pool,
+      |conn, key, update| {
+        diesel::update(object_process_statuses::table.find(key))
+          .set(update)
+          .get_result(conn)
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn accept_operation_with_pending_write<F, G>(
+    expected: &Vm,
+    replacement: Option<SpecDb>,
+    operation: OperationDb,
+    keepalive: G,
+    pool: &Pool,
+    mut write_pending: F,
+  ) -> IoResult<AcceptedVmOperation>
+  where
+    G: Send + 'static,
+    F: FnMut(
+        &mut PgConnection,
+        &str,
+        ObjPsStatusUpdate,
+      ) -> diesel::QueryResult<ObjPsStatusDb>
+      + Send
+      + 'static,
+  {
+    let expected = expected.clone();
+    run_query_owned(pool, keepalive, move |conn| {
+      transaction(conn, |conn| {
+        accept_on_conn(
+          conn,
+          &expected,
+          replacement.as_ref(),
+          &operation,
+          &mut write_pending,
+        )
+      })
+    })
+    .await
+  }
+
+  pub(crate) async fn observe_runtime_status<G: Send + 'static>(
+    expected: &Vm,
+    expected_incarnation: uuid::Uuid,
     expected_operation: Option<uuid::Uuid>,
     actual: ObjPsStatusKind,
+    keepalive: G,
     pool: &Pool,
   ) -> IoResult<bool> {
     let expected = expected.clone();
     let actual = actual.to_string();
-    run_query(pool, move |conn| {
+    run_query_owned(pool, keepalive, move |conn| {
       transaction(conn, |conn| {
+        let identity = operation::lock_incarnation(conn, expected_incarnation)?;
+        if identity.deleted_at.is_some()
+          || identity.resource_kind != "Vm"
+          || identity.resource_key != expected.spec.vm_key
+          || identity.current_operation_key != expected_operation
+        {
+          return Ok(false);
+        }
         let Some(vm) = vms::table
           .find(&expected.spec.vm_key)
           .for_update()
@@ -228,17 +221,18 @@ impl VmDb {
           .find(&vm.status_key)
           .for_update()
           .first::<ObjPsStatusDb>(conn)?;
-        let operation = vm_operations::table
-          .find(&vm.key)
-          .for_update()
-          .first::<VmOperationDb>(conn)
-          .optional()?;
-        if vm.spec_key != expected.spec.key
-          || operation.as_ref().map(|operation| operation.key)
-            != expected_operation
-          || operation
-            .as_ref()
-            .is_some_and(|operation| operation.outcome.is_none())
+        if let Some(key) = identity.current_operation_key
+          && operations::table
+            .find(key)
+            .for_update()
+            .first::<OperationDb>(conn)?
+            .outcome
+            .is_none()
+        {
+          return Ok(false);
+        }
+        if vm.incarnation_key != expected_incarnation
+          || vm.spec_key != expected.spec.key
           || nanocl_stubs::system::ObjPsStatus::try_from(status.clone())?
             != expected.status
           || status.actual == actual
@@ -258,147 +252,47 @@ impl VmDb {
     .await
   }
 
-  /// Commit the desired revision, pending phase and durable owner together.
-  /// The caller keeps its lifecycle and operation-file locks through dispatch.
-  pub(crate) async fn accept_operation(
-    expected: &Vm,
-    replacement: Option<SpecDb>,
-    operation: VmOperationDb,
-    pool: &Pool,
-  ) -> IoResult<Vm> {
-    Self::accept_operation_with_pending_write(
-      expected,
-      replacement,
-      operation,
-      pool,
-      |conn, key, update| {
-        diesel::update(object_process_statuses::table.find(key))
-          .set(update)
-          .get_result(conn)
-      },
-    )
-    .await
-  }
-
-  pub(crate) async fn accept_operation_with_pending_write<F>(
-    expected: &Vm,
-    replacement: Option<SpecDb>,
-    operation: VmOperationDb,
-    pool: &Pool,
-    mut write_pending: F,
-  ) -> IoResult<Vm>
-  where
-    F: FnMut(
-        &mut PgConnection,
-        &str,
-        ObjPsStatusUpdate,
-      ) -> diesel::QueryResult<ObjPsStatusDb>
-      + Send
-      + 'static,
-  {
-    let expected = expected.clone();
-    run_query(pool, move |conn| {
-      transaction(conn, |conn| {
-        accept_on_conn(
-          conn,
-          &expected,
-          replacement.as_ref(),
-          &operation,
-          &mut write_pending,
-        )
-      })
-    })
-    .await
-  }
-}
-
-impl VmOperationDb {
-  pub(crate) async fn get(vm_key: &str, pool: &Pool) -> IoResult<Option<Self>> {
-    let vm_key = vm_key.to_owned();
-    run_query(pool, move |conn| {
-      vm_operations::table
-        .find(vm_key)
-        .first::<Self>(conn)
-        .optional()
-        .map_err(|error| {
-          IoError::from(VmOperationTransactionError::from(error))
-        })
-    })
-    .await
-  }
-
-  /// Keyset pagination lets unknown owners remain pending without starving
-  /// later candidates during bounded recovery passes.
-  pub(crate) async fn pending_for_node(
-    node: &str,
-    after: Option<&str>,
-    limit: i64,
-    pool: &Pool,
-  ) -> IoResult<Vec<Self>> {
-    let node = node.to_owned();
-    let after = after.map(str::to_owned);
-    run_query(pool, move |conn| {
-      let mut query = vm_operations::table
-        .filter(vm_operations::node_name.eq(node))
-        .filter(vm_operations::outcome.is_null())
-        .into_boxed();
-      if let Some(after) = after {
-        query = query.filter(vm_operations::vm_key.gt(after));
-      }
-      query
-        .order(vm_operations::vm_key.asc())
-        .limit(limit.clamp(1, 128))
-        .load::<Self>(conn)
-        .map_err(|error| {
-          IoError::from(VmOperationTransactionError::from(error))
-        })
-    })
-    .await
-  }
-
-  /// Recover only the exact abandoned pending revision, retaining its runtime
-  /// evidence while atomically releasing only that operation's mutex.
-  pub(crate) async fn finish(
-    &self,
+  pub(crate) async fn finish_operation<G: Send + 'static>(
+    operation: &OperationDb,
     actual: ObjPsStatusKind,
     outcome: &str,
-    observation: serde_json::Value,
+    diagnostic: serde_json::Value,
+    keepalive: G,
     pool: &Pool,
   ) -> IoResult<bool> {
-    let operation = self.clone();
+    let operation = operation.clone();
     let actual = actual.to_string();
     let outcome = outcome.to_owned();
-    run_query(pool, move |conn| {
+    run_query_owned(pool, keepalive, move |conn| {
       transaction(conn, |conn| {
         if pending_phase(&actual) {
           return Err(conflict(
-            "Recovery outcome must leave the pending phase",
+            "Recovery must leave the pending runtime phase",
           ));
         }
+        let Some(identity) = operation::lock_current(conn, &operation)? else {
+          return Ok(false);
+        };
+        if identity.deleted_at.is_some() || operation.resource_kind != "Vm" {
+          return Ok(false);
+        }
         let Some(vm) = vms::table
-          .find(&operation.vm_key)
+          .find(&operation.resource_key)
           .for_update()
           .first::<VmDb>(conn)
           .optional()?
         else {
           return Ok(false);
         };
+        if vm.incarnation_key != operation.incarnation_key
+          || vm.spec_key != operation.spec_key
+        {
+          return Ok(false);
+        }
         let status = object_process_statuses::table
           .find(&vm.status_key)
           .for_update()
           .first::<ObjPsStatusDb>(conn)?;
-        let current = vm_operations::table
-          .find(&vm.key)
-          .for_update()
-          .first::<Self>(conn)
-          .optional()?;
-        if vm.spec_key != operation.spec_key
-          || !current
-            .as_ref()
-            .is_some_and(|current| same_operation(current, &operation))
-        {
-          return Ok(false);
-        }
         diesel::update(object_process_statuses::table.find(&vm.status_key))
           .set(ObjPsStatusUpdate {
             wanted: Some(actual.clone()),
@@ -408,61 +302,178 @@ impl VmOperationDb {
             health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
           })
           .execute(conn)?;
-        diesel::update(vm_operations::table.find(&vm.key))
-          .set((
-            vm_operations::outcome.eq(&outcome),
-            vm_operations::observation.eq(&observation),
-          ))
-          .execute(conn)?;
-        delete_exact_mutex(conn, &operation)?;
+        operation::complete_on_conn(
+          conn,
+          &operation,
+          &outcome,
+          Some(&diagnostic),
+        )?;
         Ok(true)
       })
     })
     .await
   }
 
-  /// Executor completion keeps the runtime's terminal status. A failure that
-  /// still has a pending phase is left recoverable after the live owner exits.
-  pub(crate) async fn complete(
-    &self,
+  pub(crate) async fn complete_operation<G: Send + 'static>(
+    operation: &OperationDb,
     outcome: &str,
+    diagnostic: Option<serde_json::Value>,
+    keepalive: G,
     pool: &Pool,
   ) -> IoResult<bool> {
-    let operation = self.clone();
+    let operation = operation.clone();
     let outcome = outcome.to_owned();
-    run_query(pool, move |conn| {
+    run_query_owned(pool, keepalive, move |conn| {
       transaction(conn, |conn| {
+        let Some(identity) = operation::lock_current(conn, &operation)? else {
+          return Ok(false);
+        };
+        if identity.deleted_at.is_some() || operation.resource_kind != "Vm" {
+          return Ok(false);
+        }
         let Some(vm) = vms::table
-          .find(&operation.vm_key)
+          .find(&operation.resource_key)
           .for_update()
           .first::<VmDb>(conn)
           .optional()?
         else {
-          // Successful deletion cascades the operation row, not its mutex.
-          delete_exact_mutex(conn, &operation)?;
-          return Ok(true);
+          return Ok(false);
+        };
+        if vm.incarnation_key != operation.incarnation_key
+          || vm.spec_key != operation.spec_key
+        {
+          return Ok(false);
+        }
+        let status = object_process_statuses::table
+          .find(&vm.status_key)
+          .for_update()
+          .first::<ObjPsStatusDb>(conn)?;
+        if pending_phase(&status.actual) {
+          return Ok(false);
+        }
+        operation::complete_on_conn(
+          conn,
+          &operation,
+          &outcome,
+          diagnostic.as_ref(),
+        )?;
+        Ok(true)
+      })
+    })
+    .await
+  }
+
+  /// Runtime removal precedes this transaction. The exact delete operation,
+  /// retained identity and live definition are settled together.
+  pub(crate) async fn delete_operation<G: Send + 'static>(
+    operation: &OperationDb,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let operation = operation.clone();
+    run_query_owned(pool, keepalive, move |conn| {
+      transaction(conn, |conn| {
+        let Some(identity) = operation::lock_current(conn, &operation)? else {
+          return Ok(false);
+        };
+        if identity.deleted_at.is_some()
+          || operation.resource_kind != "Vm"
+          || operation.action != "delete"
+        {
+          return Ok(false);
+        }
+        let Some(vm) = vms::table
+          .find(&operation.resource_key)
+          .for_update()
+          .first::<VmDb>(conn)
+          .optional()?
+        else {
+          return Ok(false);
+        };
+        if vm.incarnation_key != operation.incarnation_key
+          || vm.spec_key != operation.spec_key
+        {
+          return Ok(false);
+        }
+        diesel::delete(vms::table.find(&vm.key)).execute(conn)?;
+        diesel::delete(object_process_statuses::table.find(&vm.status_key))
+          .execute(conn)?;
+        diesel::update(resource_incarnations::table.find(identity.key))
+          .set(
+            resource_incarnations::deleted_at
+              .eq(chrono::Utc::now().naive_utc()),
+          )
+          .execute(conn)?;
+        operation::complete_on_conn(conn, &operation, "completed", None)?;
+        Ok(true)
+      })
+    })
+    .await
+  }
+
+  /// An offline operator records a new reconciliation request; this does not
+  /// manufacture ownership evidence for the legacy transition being repaired.
+  pub(crate) async fn reconcile_legacy<G: Send + 'static>(
+    expected: &Vm,
+    expected_incarnation: uuid::Uuid,
+    operation: OperationDb,
+    actual: ObjPsStatusKind,
+    diagnostic: serde_json::Value,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let expected = expected.clone();
+    let actual = actual.to_string();
+    run_query_owned(pool, keepalive, move |conn| {
+      transaction(conn, |conn| {
+        let identity = operation::lock_incarnation(conn, expected_incarnation)?;
+        if identity.deleted_at.is_some()
+          || identity.current_operation_key.is_some()
+          || identity.resource_kind != "Vm"
+          || identity.resource_key != expected.spec.vm_key
+          || operation.incarnation_key != expected_incarnation
+          || operation.spec_key != expected.spec.key
+          || operation.action != "reconcile"
+          || pending_phase(&actual)
+        {
+          return Ok(false);
+        }
+        let Some(vm) = vms::table
+          .find(&expected.spec.vm_key)
+          .for_update()
+          .first::<VmDb>(conn)
+          .optional()?
+        else {
+          return Ok(false);
         };
         let status = object_process_statuses::table
           .find(&vm.status_key)
           .for_update()
           .first::<ObjPsStatusDb>(conn)?;
-        let current = vm_operations::table
-          .find(&vm.key)
-          .for_update()
-          .first::<Self>(conn)
-          .optional()?;
-        if vm.spec_key != operation.spec_key
-          || pending_phase(&status.actual)
-          || !current
-            .as_ref()
-            .is_some_and(|current| same_operation(current, &operation))
+        if vm.incarnation_key != expected_incarnation
+          || vm.spec_key != expected.spec.key
+          || nanocl_stubs::system::ObjPsStatus::try_from(status.clone())?
+            != expected.status
+          || !pending_phase(&status.actual)
         {
           return Ok(false);
         }
-        diesel::update(vm_operations::table.find(&vm.key))
-          .set(vm_operations::outcome.eq(&outcome))
+        operation::accept_on_conn(conn, &identity, &operation)?;
+        diesel::update(object_process_statuses::table.find(&vm.status_key))
+          .set(ObjPsStatusUpdate {
+            wanted: Some(actual.clone()),
+            prev_wanted: Some(status.wanted),
+            actual: Some(actual.clone()),
+            prev_actual: Some(status.actual),
+            health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
+          })
           .execute(conn)?;
-        delete_exact_mutex(conn, &operation)?;
+        operation::complete_on_conn(
+          conn,
+          &operation,
+          "interrupted",
+          Some(&diagnostic),
+        )?;
         Ok(true)
       })
     })
@@ -472,20 +483,22 @@ impl VmOperationDb {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::{system::ObjPsStatusPartial, vm_spec::VmSpecPartial};
-
+  use super::*;
   use crate::{
     models::{
-      DistributedMutexPartial, NamespaceDb, SystemState, VmOperationOwner,
+      DistributedMutexPartial, NamespaceDb, OperationOwner,
+      ResourceIncarnationDb, SystemState,
     },
     repositories::generic::{
       RepositoryCreate, RepositoryDelByPk, RepositoryReadBy, RepositoryUpdate,
     },
-    utils::tests::{TestSystem, gen_test_system},
+    utils::{
+      self,
+      tests::{TestSystem, gen_test_system},
+    },
     vars,
   };
-
-  use super::*;
+  use nanocl_stubs::{system::ObjPsStatusPartial, vm_spec::VmSpecPartial};
 
   fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
 
@@ -493,7 +506,19 @@ mod tests {
     system: TestSystem,
     namespace: String,
     vm: Vm,
+    incarnation: uuid::Uuid,
     mutexes: Vec<uuid::Uuid>,
+  }
+
+  fn stopped(key: &str) -> ObjPsStatusPartial {
+    ObjPsStatusPartial {
+      key: key.into(),
+      wanted: ObjPsStatusKind::Stop,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Stop,
+      prev_actual: ObjPsStatusKind::Create,
+      health: ObjPsHealthStatusKind::Unknown,
+    }
   }
 
   impl Fixture {
@@ -510,43 +535,32 @@ mod tests {
         &key,
         vars::VERSION,
         &VmSpecPartial {
-          name: "guest".to_owned(),
-          image: "/transaction-test-original.qcow2".to_owned(),
+          name: "guest".into(),
+          image: "/transaction-test-original.qcow2".into(),
           ..Default::default()
         },
       )
       .unwrap();
-      let spec = SpecDb::create_from(spec, pool).await.unwrap();
-      let status = ObjPsStatusDb::create_from(
-        ObjPsStatusPartial {
-          key: key.clone(),
-          wanted: ObjPsStatusKind::Stop,
-          prev_wanted: ObjPsStatusKind::Create,
-          actual: ObjPsStatusKind::Stop,
-          prev_actual: ObjPsStatusKind::Create,
-          health: ObjPsHealthStatusKind::Unknown,
-        },
+      let vm = VmDb::create_with_spec(
+        &key,
+        "guest",
+        &namespace,
+        spec,
+        stopped(&key),
         pool,
       )
       .await
       .unwrap();
-      let vm = VmDb::create_from(
-        VmDb {
-          key: key.clone(),
-          name: "guest".to_owned(),
-          created_at: chrono::Utc::now().naive_utc(),
-          namespace_name: namespace.clone(),
-          status_key: key,
-          spec_key: spec.key,
-        },
-        pool,
-      )
-      .await
-      .unwrap();
+      let incarnation = VmDb::read_by_pk(&key, pool)
+        .await
+        .unwrap()
+        .0
+        .incarnation_key;
       Self {
         system,
         namespace,
-        vm: VmDb::transform((vm, spec, status)).unwrap(),
+        vm,
+        incarnation,
         mutexes: Vec::new(),
       }
     }
@@ -560,8 +574,8 @@ mod tests {
         &self.vm.spec.vm_key,
         vars::VERSION,
         &VmSpecPartial {
-          name: "guest".to_owned(),
-          image: "/transaction-test-replacement.qcow2".to_owned(),
+          name: "guest".into(),
+          image: "/transaction-test-replacement.qcow2".into(),
           ..Default::default()
         },
       )
@@ -571,44 +585,83 @@ mod tests {
     async fn operation(
       &mut self,
       revision: uuid::Uuid,
-      phase: ObjPsStatusKind,
-    ) -> VmOperationDb {
+      action: &str,
+    ) -> OperationDb {
       let mutex = DistributedMutexDb::create_from(
         DistributedMutexPartial {
-          action: phase.to_string(),
-          resource_kind: "Vm".to_owned(),
+          action: action.into(),
+          resource_kind: "Vm".into(),
           resource_key: self.vm.spec.vm_key.clone(),
           node_key: self.system.state.inner.config.hostname.clone(),
-          acquired_by: "vm-transaction-test".to_owned(),
+          acquired_by: "vm-transaction-test".into(),
         },
         self.pool(),
       )
       .await
       .unwrap();
       self.mutexes.push(mutex.key);
-      VmOperationDb::new(
-        &VmOperationOwner {
+      OperationDb::new(
+        &OperationOwner {
           key: mutex.key,
+          resource_kind: "Vm".into(),
+          resource_key: self.vm.spec.vm_key.clone(),
+          incarnation_key: self.incarnation,
           node_name: mutex.node_key,
-          owner_boot_id: "transaction-test-boot".to_owned(),
+          owner_boot_id: "transaction-test-boot".into(),
           lock_device: 1,
           lock_inode: 2,
         },
+        "Vm",
         &self.vm.spec.vm_key,
         revision,
-        phase,
+        action,
       )
     }
 
+    async fn current(&self) -> OperationDb {
+      OperationDb::current("Vm", &self.vm.spec.vm_key, self.pool())
+        .await
+        .unwrap()
+        .unwrap()
+    }
+
+    async fn settle(&self, operation: &OperationDb) {
+      assert!(
+        VmDb::finish_operation(
+          operation,
+          ObjPsStatusKind::Stop,
+          "interrupted",
+          serde_json::Value::Null,
+          (),
+          self.pool()
+        )
+        .await
+        .unwrap()
+      );
+    }
+
     async fn cleanup(self) {
+      if let Some(current) =
+        OperationDb::current("Vm", &self.vm.spec.vm_key, self.pool())
+          .await
+          .unwrap()
+        && current.outcome.is_none()
+      {
+        self.settle(&current).await;
+      }
       for mutex in &self.mutexes {
         DistributedMutexDb::del_by_pk(mutex, self.pool())
           .await
           .unwrap();
       }
-      VmDb::clear_by_pk(&self.vm.spec.vm_key, self.pool())
+      if VmDb::read_by_pk(&self.vm.spec.vm_key, self.pool())
         .await
-        .unwrap();
+        .is_ok()
+      {
+        VmDb::clear_by_pk(&self.vm.spec.vm_key, self.pool())
+          .await
+          .unwrap();
+      }
       NamespaceDb::del_by_pk(&self.namespace, self.pool())
         .await
         .unwrap();
@@ -622,17 +675,16 @@ mod tests {
     let mut fixture = Fixture::new().await;
     let replacement = fixture.replacement();
     let revision = replacement.key;
-    let operation =
-      fixture.operation(revision, ObjPsStatusKind::Updating).await;
+    let operation = fixture.operation(revision, "update").await;
     let operation_key = operation.key;
+    let incarnation = fixture.incarnation;
     let error = VmDb::accept_operation_with_pending_write(
       &fixture.vm,
       Some(replacement),
       operation,
+      (),
       fixture.pool(),
       move |conn, key, update| {
-        // Prove the attempted mutations are visible on this transaction's
-        // connection before making the pending-status statement fail.
         assert_eq!(
           vms::table
             .find(key)
@@ -641,11 +693,18 @@ mod tests {
           revision
         );
         assert_eq!(
-          vm_operations::table
-            .find(key)
-            .select(vm_operations::key)
+          operations::table
+            .find(operation_key)
+            .select(operations::spec_key)
             .first::<uuid::Uuid>(conn)?,
-          operation_key
+          revision
+        );
+        assert_eq!(
+          resource_incarnations::table
+            .find(incarnation)
+            .select(resource_incarnations::current_operation_key)
+            .first::<Option<uuid::Uuid>>(conn)?,
+          Some(operation_key)
         );
         assert_eq!(update.actual.as_deref(), Some("updating"));
         diesel::sql_query(
@@ -665,20 +724,27 @@ mod tests {
         .unwrap();
     assert_eq!(current.spec.key, fixture.vm.spec.key);
     assert_eq!(current.status, fixture.vm.status);
-    let specs =
-      SpecDb::read_by_kind_key(&fixture.vm.spec.vm_key, fixture.pool())
+    assert_eq!(
+      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
         .await
-        .unwrap();
-    assert_eq!(specs.len(), 1);
-    assert_eq!(specs[0].key, fixture.vm.spec.key);
+        .unwrap()
+        .len(),
+      1
+    );
     assert!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+      OperationDb::get(operation_key, fixture.pool())
         .await
         .unwrap()
         .is_none()
     );
-    // Rejected preparation leaves cleanup to its admission owner, preserving
-    // the mutex until that owner's exact-UUID cleanup runs.
+    assert_eq!(
+      ResourceIncarnationDb::get(incarnation, fixture.pool())
+        .await
+        .unwrap()
+        .unwrap()
+        .current_operation_key,
+      None
+    );
     assert!(
       DistributedMutexDb::read_by_pk(&operation_key, fixture.pool())
         .await
@@ -692,35 +758,35 @@ mod tests {
     let mut fixture = Fixture::new().await;
     let replacement = fixture.replacement();
     let revision = replacement.key;
-    let operation =
-      fixture.operation(revision, ObjPsStatusKind::Updating).await;
+    let operation = fixture.operation(revision, "update").await;
     let accepted = VmDb::accept_operation(
       &fixture.vm,
       Some(replacement),
       operation.clone(),
+      (),
       fixture.pool(),
     )
     .await
     .unwrap();
-    assert_eq!(accepted.spec.key, revision);
-    assert_eq!(accepted.spec.image, "/transaction-test-replacement.qcow2");
-    assert_eq!(accepted.status.actual, ObjPsStatusKind::Updating);
-    assert_eq!(accepted.status.prev_actual, ObjPsStatusKind::Stop);
-    assert_eq!(accepted.status.wanted, ObjPsStatusKind::Start);
+    assert_eq!(accepted.vm.spec.key, revision);
+    assert_eq!(
+      accepted.vm.spec.image,
+      "/transaction-test-replacement.qcow2"
+    );
+    assert_eq!(accepted.vm.status.actual, ObjPsStatusKind::Updating);
+    assert_eq!(accepted.vm.status.prev_actual, ObjPsStatusKind::Stop);
+    assert_eq!(accepted.vm.status.wanted, ObjPsStatusKind::Start);
     let current =
       VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
         .await
         .unwrap();
-    assert_eq!(current.spec.key, accepted.spec.key);
-    assert_eq!(current.status, accepted.status);
+    assert_eq!(current.spec.key, accepted.vm.spec.key);
+    assert_eq!(current.status, accepted.vm.status);
+    // Stored PostgreSQL timestamps and the returned accepted identity are exact.
+    assert_eq!(accepted.operation, operation);
+    assert_eq!(fixture.current().await, accepted.operation);
     assert_eq!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap(),
-      Some(operation)
-    );
-    assert_eq!(
-      SpecDb::read_by_kind_key(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
         .await
         .unwrap()
         .len(),
@@ -733,123 +799,125 @@ mod tests {
   async fn vm_start_acceptance_commits_legacy_mac_in_accepted_revision() {
     let mut fixture = Fixture::new().await;
     assert!(fixture.vm.spec.mac_address.is_none());
-    let admission = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
-    let owner = VmOperationOwner {
-      key: admission.key,
-      node_name: admission.node_name,
-      owner_boot_id: admission.owner_boot_id,
-      lock_device: admission.lock_device,
-      lock_inode: admission.lock_inode,
-    };
+    let admission = fixture.operation(fixture.vm.spec.key, "start").await;
+    let dir = std::env::temp_dir()
+      .join(format!("nanocl-start-{}", uuid::Uuid::new_v4()));
+    let (owner, guard) = utils::operation::create_owner(
+      admission.key,
+      "Vm",
+      &fixture.vm.spec.vm_key,
+      fixture.incarnation,
+      &admission.node_name,
+      dir.to_str().unwrap(),
+    )
+    .unwrap();
+    let lifecycle = std::sync::Arc::new(
+      utils::container::vm::lifecycle_lock(&fixture.vm.spec.vm_key)
+        .lock_owned()
+        .await,
+    );
     let accepted = VmDb::prepare_start(
       &fixture.vm.spec.vm_key,
       owner,
+      (lifecycle, guard.clone()),
       &fixture.system.state,
     )
     .await
     .unwrap();
-    assert_ne!(accepted.spec.key, fixture.vm.spec.key);
-    assert!(accepted.spec.mac_address.is_some());
-    assert_eq!(accepted.status.actual, ObjPsStatusKind::Starting);
-    let operation = VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-      .await
-      .unwrap()
-      .unwrap();
+    assert_ne!(accepted.vm.spec.key, fixture.vm.spec.key);
+    assert!(accepted.vm.spec.mac_address.is_some());
+    assert_eq!(accepted.vm.status.actual, ObjPsStatusKind::Starting);
+    let operation = fixture.current().await;
     assert_eq!(operation.key, admission.key);
-    assert_eq!(operation.spec_key, accepted.spec.key);
-    // The executor's legacy backfill path must retain the accepted generation.
+    assert_eq!(operation.spec_key, accepted.vm.spec.key);
     let runtime_spec =
       VmDb::ensure_mac_address(&fixture.vm.spec.vm_key, &fixture.system.state)
         .await
         .unwrap();
-    assert_eq!(runtime_spec.spec.key, accepted.spec.key);
-    assert_eq!(runtime_spec.spec.mac_address, accepted.spec.mac_address);
+    assert_eq!(runtime_spec.spec.key, accepted.vm.spec.key);
+    assert_eq!(runtime_spec.spec.mac_address, accepted.vm.spec.mac_address);
+    fixture.settle(&operation).await;
+    assert!(
+      utils::operation::cleanup_owner(&guard, fixture.pool())
+        .await
+        .unwrap()
+    );
+    drop(guard);
+    std::fs::remove_dir_all(dir).unwrap();
     fixture.cleanup().await;
   }
 
   #[ntex::test]
   async fn vm_recovery_and_completion_preserve_same_revision_successor() {
     let mut fixture = Fixture::new().await;
-    let operation = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
+    let first = fixture.operation(fixture.vm.spec.key, "start").await;
     VmDb::accept_operation(
       &fixture.vm,
       None,
-      operation.clone(),
+      first.clone(),
+      (),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    fixture.settle(&first).await;
+    let recovered =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    let successor = fixture.operation(recovered.spec.key, "start").await;
+    VmDb::accept_operation(
+      &recovered,
+      None,
+      successor.clone(),
+      (),
       fixture.pool(),
     )
     .await
     .unwrap();
     assert!(
-      operation
-        .finish(
-          ObjPsStatusKind::Stop,
-          "interrupted",
-          serde_json::json!({"runtime": "absent"}),
-          fixture.pool()
-        )
-        .await
-        .unwrap()
-    );
-    let recovered =
-      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap();
-    let successor = fixture
-      .operation(recovered.spec.key, ObjPsStatusKind::Starting)
-      .await;
-    VmDb::accept_operation(&recovered, None, successor.clone(), fixture.pool())
+      !VmDb::finish_operation(
+        &first,
+        ObjPsStatusKind::Start,
+        "interrupted",
+        serde_json::json!({"stale":true}),
+        (),
+        fixture.pool()
+      )
       .await
-      .unwrap();
+      .unwrap()
+    );
     assert!(
-      !operation
-        .finish(
-          ObjPsStatusKind::Start,
-          "interrupted",
-          serde_json::json!({"stale": true}),
-          fixture.pool()
-        )
+      !VmDb::complete_operation(&first, "completed", None, (), fixture.pool())
         .await
         .unwrap()
     );
-    assert!(
-      !operation
-        .complete("completed", fixture.pool())
-        .await
-        .unwrap()
-    );
-    assert_eq!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap(),
-      Some(successor.clone())
-    );
+    assert_eq!(fixture.current().await, successor);
     assert!(
       DistributedMutexDb::read_by_pk(&successor.key, fixture.pool())
         .await
         .is_ok()
     );
-    let current =
+    assert_eq!(
       VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
         .await
-        .unwrap();
-    assert_eq!(current.status.actual, ObjPsStatusKind::Starting);
+        .unwrap()
+        .status
+        .actual,
+      ObjPsStatusKind::Starting
+    );
     fixture.cleanup().await;
   }
 
   #[ntex::test]
   async fn vm_pending_owner_blocks_acceptance_after_mutex_collection() {
     let mut fixture = Fixture::new().await;
-    let original = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
+    let original = fixture.operation(fixture.vm.spec.key, "start").await;
     let accepted = VmDb::accept_operation(
       &fixture.vm,
       None,
       original.clone(),
+      (),
       fixture.pool(),
     )
     .await
@@ -857,28 +925,27 @@ mod tests {
     DistributedMutexDb::del_by_pk(&original.key, fixture.pool())
       .await
       .unwrap();
-    let successor = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
+    let successor = fixture.operation(fixture.vm.spec.key, "start").await;
     let error = VmDb::accept_operation(
-      &accepted,
+      &accepted.vm,
       None,
       successor.clone(),
+      (),
       fixture.pool(),
     )
     .await
     .unwrap_err();
     assert!(error.to_string().contains("unresolved pending operation"));
-    assert_eq!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap(),
-      Some(original)
-    );
+    assert_eq!(fixture.current().await, original);
     assert!(
       DistributedMutexDb::read_by_pk(&successor.key, fixture.pool())
         .await
         .is_ok()
+    );
+    assert!(
+      VmDb::clear_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .is_err()
     );
     fixture.cleanup().await;
   }
@@ -887,54 +954,44 @@ mod tests {
   async fn vm_observation_preserves_pending_and_completed_same_revision_successors()
    {
     let mut fixture = Fixture::new().await;
-    let first = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
-    VmDb::accept_operation(&fixture.vm, None, first.clone(), fixture.pool())
-      .await
-      .unwrap();
-    assert!(
-      first
-        .finish(
-          ObjPsStatusKind::Stop,
-          "interrupted",
-          serde_json::Value::Null,
-          fixture.pool()
-        )
-        .await
-        .unwrap()
-    );
+    let first = fixture.operation(fixture.vm.spec.key, "start").await;
+    VmDb::accept_operation(
+      &fixture.vm,
+      None,
+      first.clone(),
+      (),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    fixture.settle(&first).await;
     let snapshot =
       VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
         .await
         .unwrap();
-    let successor = fixture
-      .operation(snapshot.spec.key, ObjPsStatusKind::Starting)
-      .await;
-    VmDb::accept_operation(&snapshot, None, successor.clone(), fixture.pool())
-      .await
-      .unwrap();
+    let successor = fixture.operation(snapshot.spec.key, "start").await;
+    VmDb::accept_operation(
+      &snapshot,
+      None,
+      successor.clone(),
+      (),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
     assert!(
       !VmDb::observe_runtime_status(
         &snapshot,
+        fixture.incarnation,
         Some(first.key),
         ObjPsStatusKind::Fail,
+        (),
         fixture.pool()
       )
       .await
       .unwrap()
     );
-    assert!(
-      successor
-        .finish(
-          ObjPsStatusKind::Stop,
-          "interrupted",
-          serde_json::Value::Null,
-          fixture.pool()
-        )
-        .await
-        .unwrap()
-    );
+    fixture.settle(&successor).await;
     let current =
       VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
         .await
@@ -942,58 +999,60 @@ mod tests {
     assert_eq!(current.spec.key, snapshot.spec.key);
     assert_eq!(
       current.status, snapshot.status,
-      "the completed successor restored identical status values"
+      "completed successor restored identical status"
     );
     assert!(
       !VmDb::observe_runtime_status(
         &snapshot,
+        fixture.incarnation,
         Some(first.key),
         ObjPsStatusKind::Fail,
+        (),
         fixture.pool()
       )
       .await
       .unwrap()
     );
-    // A fresh observation associated with the latest completed operation works.
     assert!(
       VmDb::observe_runtime_status(
         &current,
+        fixture.incarnation,
         Some(successor.key),
         ObjPsStatusKind::Start,
+        (),
         fixture.pool()
       )
       .await
       .unwrap()
     );
-    assert_eq!(
-      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+    assert_eq!(fixture.current().await.key, successor.key);
+    let history =
+      OperationDb::history("Vm", fixture.incarnation, None, 1, fixture.pool())
         .await
-        .unwrap()
-        .status
-        .actual,
-      ObjPsStatusKind::Start
-    );
-    assert_eq!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap()
-        .unwrap()
-        .key,
-      successor.key
-    );
+        .unwrap();
+    assert_eq!(history[0].key, first.key);
+    let next = OperationDb::history(
+      "Vm",
+      fixture.incarnation,
+      Some((history[0].accepted_at, history[0].key)),
+      1,
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(next[0].key, successor.key);
     fixture.cleanup().await;
   }
 
   #[ntex::test]
   async fn vm_recovery_settles_crash_after_runtime_status_before_completion() {
     let mut fixture = Fixture::new().await;
-    let operation = fixture
-      .operation(fixture.vm.spec.key, ObjPsStatusKind::Starting)
-      .await;
+    let operation = fixture.operation(fixture.vm.spec.key, "start").await;
     VmDb::accept_operation(
       &fixture.vm,
       None,
       operation.clone(),
+      (),
       fixture.pool(),
     )
     .await
@@ -1008,52 +1067,46 @@ mod tests {
     )
     .await
     .unwrap();
-    let observation = serde_json::json!({"container_id": "owned-container", "spec_key": operation.spec_key, "running": true});
-    let resize_error = utils::container::vm::runtime_resources(
+    let observation = serde_json::json!({"container_id":"owned-container","spec_key":operation.spec_key,"running":true});
+    let error = utils::container::vm::runtime_resources(
       &fixture.vm.spec.vm_key,
       &fixture.system.state,
     )
     .await
     .unwrap_err();
     assert!(
-      resize_error
+      error
         .to_string()
         .contains("awaiting completion or recovery")
     );
-    assert_eq!(
-      VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
-        .await
-        .unwrap(),
-      Some(operation.clone())
-    );
+    assert_eq!(fixture.current().await, operation);
     assert!(
-      operation
-        .finish(
-          ObjPsStatusKind::Start,
-          "interrupted",
-          observation.clone(),
-          fixture.pool()
-        )
-        .await
-        .unwrap()
-    );
-    assert!(
-      !operation
-        .finish(
-          ObjPsStatusKind::Stop,
-          "interrupted",
-          serde_json::Value::Null,
-          fixture.pool()
-        )
-        .await
-        .unwrap()
-    );
-    let settled = VmOperationDb::get(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::finish_operation(
+        &operation,
+        ObjPsStatusKind::Start,
+        "interrupted",
+        observation.clone(),
+        (),
+        fixture.pool()
+      )
       .await
       .unwrap()
-      .unwrap();
+    );
+    assert!(
+      !VmDb::finish_operation(
+        &operation,
+        ObjPsStatusKind::Stop,
+        "interrupted",
+        serde_json::Value::Null,
+        (),
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    let settled = fixture.current().await;
     assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
-    assert_eq!(settled.observation, Some(observation));
+    assert_eq!(settled.diagnostic, Some(observation));
     assert!(
       DistributedMutexDb::read_by_pk(&operation.key, fixture.pool())
         .await
@@ -1065,6 +1118,158 @@ mod tests {
         .unwrap();
     assert_eq!(vm.status.actual, ObjPsStatusKind::Start);
     assert_eq!(vm.status.wanted, ObjPsStatusKind::Start);
+    fixture.cleanup().await;
+  }
+
+  #[ntex::test]
+  async fn vm_deletion_retains_history_and_recreation_has_a_new_incarnation() {
+    let mut fixture = Fixture::new().await;
+    let replacement = fixture.replacement();
+    let accepted_revision = replacement.key;
+    let update = fixture.operation(accepted_revision, "update").await;
+    VmDb::accept_operation(
+      &fixture.vm,
+      Some(replacement),
+      update.clone(),
+      (),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    fixture.settle(&update).await;
+    let before_delete =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    let deletion = fixture.operation(before_delete.spec.key, "delete").await;
+    VmDb::accept_operation(
+      &before_delete,
+      None,
+      deletion.clone(),
+      (),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert!(
+      VmDb::delete_operation(&deletion, (), fixture.pool())
+        .await
+        .unwrap()
+    );
+    assert!(
+      VmDb::read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .is_err()
+    );
+    let identity =
+      ResourceIncarnationDb::get(fixture.incarnation, fixture.pool())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(identity.deleted_at.is_some());
+    assert_eq!(identity.current_operation_key, Some(deletion.key));
+    let history = OperationDb::history(
+      "Vm",
+      fixture.incarnation,
+      None,
+      128,
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].key, update.key);
+    assert_eq!(history[1].key, deletion.key);
+    assert_eq!(history[1].outcome.as_deref(), Some("completed"));
+    let retained = SpecDb::read_by_pk(&accepted_revision, fixture.pool())
+      .await
+      .unwrap();
+    assert_eq!(retained.incarnation_key, Some(fixture.incarnation));
+    assert_eq!(
+      retained.try_to_vm_spec().unwrap().image,
+      "/transaction-test-replacement.qcow2"
+    );
+    assert_eq!(
+      OperationDb::current_for_incarnation(fixture.incarnation, fixture.pool())
+        .await
+        .unwrap()
+        .unwrap()
+        .key,
+      deletion.key
+    );
+    let new_spec = fixture.replacement();
+    let recreated = VmDb::create_with_spec(
+      &fixture.vm.spec.vm_key,
+      "guest",
+      &fixture.namespace,
+      new_spec,
+      stopped(&fixture.vm.spec.vm_key),
+      fixture.pool(),
+    )
+    .await
+    .unwrap();
+    let new_incarnation =
+      VmDb::read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .0
+        .incarnation_key;
+    assert_ne!(new_incarnation, fixture.incarnation);
+    assert!(
+      OperationDb::current("Vm", &fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .is_none()
+    );
+    assert_eq!(
+      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap()
+        .len(),
+      1
+    );
+    assert!(
+      OperationDb::history("Vm", new_incarnation, None, 128, fixture.pool())
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(
+      !VmDb::delete_operation(&deletion, (), fixture.pool())
+        .await
+        .unwrap()
+    );
+    assert!(
+      !VmDb::finish_operation(
+        &update,
+        ObjPsStatusKind::Fail,
+        "failed",
+        serde_json::Value::Null,
+        (),
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    assert!(
+      !VmDb::observe_runtime_status(
+        &before_delete,
+        fixture.incarnation,
+        Some(deletion.key),
+        ObjPsStatusKind::Fail,
+        (),
+        fixture.pool()
+      )
+      .await
+      .unwrap()
+    );
+    let current =
+      VmDb::transform_read_by_pk(&fixture.vm.spec.vm_key, fixture.pool())
+        .await
+        .unwrap();
+    assert_eq!(current.spec.key, recreated.spec.key);
+    assert_eq!(current.status, recreated.status);
+    fixture.incarnation = new_incarnation;
     fixture.cleanup().await;
   }
 }

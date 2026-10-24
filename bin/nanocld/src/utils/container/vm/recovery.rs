@@ -1,14 +1,10 @@
-use std::{
-  ffi::CString,
-  fs::{File, OpenOptions},
-  os::{
-    fd::{AsRawFd, FromRawFd},
-    unix::fs::{MetadataExt, OpenOptionsExt},
-  },
-  sync::Arc,
-  time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
+use crate::{
+  models::{OperationDb, ProcessDb, SystemState, VmDb},
+  repositories::generic::*,
+  utils,
+};
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   process::ProcessKind,
@@ -17,191 +13,11 @@ use nanocl_stubs::{
 };
 use serde_json::{Value, json};
 
-use crate::{
-  models::{
-    ProcessDb, SpecDb, SystemState, VmDb, VmOperationDb, VmOperationGuard,
-    VmOperationOwner,
-  },
-  repositories::generic::*,
-};
-
 fn conflict(message: &str) -> IoError {
   IoError::invalid_data("VM operation recovery", message)
 }
 
-fn boot_id() -> IoResult<String> {
-  let value = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
-  let value = value.trim();
-  uuid::Uuid::parse_str(value)
-    .map_err(|_| conflict("Linux boot identity is invalid"))?;
-  Ok(value.to_owned())
-}
-
-// Canonical state-root aliases are intentional. Every component below that
-// trusted root is opened without following symlinks and stays pinned by a fd.
-fn operation_directory(state_dir: &str, create: bool) -> IoResult<File> {
-  let root = std::fs::canonicalize(state_dir)?;
-  let mut directory = OpenOptions::new()
-    .read(true)
-    .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-    .open(root)?;
-  for name in ["run", "vm-operations"] {
-    let name = CString::new(name).unwrap();
-    if create {
-      let result =
-        unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700) };
-      if result != 0 {
-        let error = std::io::Error::last_os_error();
-        if error.kind() != std::io::ErrorKind::AlreadyExists {
-          return Err(error.into());
-        }
-      }
-      directory.sync_all()?;
-    }
-    let fd = unsafe {
-      libc::openat(
-        directory.as_raw_fd(),
-        name.as_ptr(),
-        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
-      )
-    };
-    if fd < 0 {
-      return Err(std::io::Error::last_os_error().into());
-    }
-    directory = unsafe { File::from_raw_fd(fd) };
-  }
-  Ok(directory)
-}
-
-fn lock_file(
-  directory: &File,
-  key: uuid::Uuid,
-  create: bool,
-) -> IoResult<File> {
-  let name = CString::new(format!("{key}.lock")).unwrap();
-  let flags = libc::O_RDWR
-    | libc::O_NOFOLLOW
-    | libc::O_CLOEXEC
-    | if create {
-      libc::O_CREAT | libc::O_EXCL
-    } else {
-      0
-    };
-  let fd =
-    unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o600) };
-  if fd < 0 {
-    return Err(std::io::Error::last_os_error().into());
-  }
-  let file = unsafe { File::from_raw_fd(fd) };
-  if !file.metadata()?.is_file() {
-    return Err(conflict("Operation lock is not a regular file"));
-  }
-  Ok(file)
-}
-
-fn try_lock(file: &File) -> IoResult<bool> {
-  if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) }
-    == 0
-  {
-    return Ok(true);
-  }
-  let error = std::io::Error::last_os_error();
-  if error.kind() == std::io::ErrorKind::WouldBlock {
-    return Ok(false);
-  }
-  Err(error.into())
-}
-
-pub(crate) fn create_owner(
-  key: uuid::Uuid,
-  state: &SystemState,
-) -> IoResult<(VmOperationOwner, VmOperationGuard)> {
-  create_owner_at(
-    key,
-    &state.inner.config.hostname,
-    &state.inner.config.state_dir,
-  )
-}
-
-fn create_owner_at(
-  key: uuid::Uuid,
-  node_name: &str,
-  state_dir: &str,
-) -> IoResult<(VmOperationOwner, VmOperationGuard)> {
-  let owner_boot_id = boot_id()?;
-  let directory = operation_directory(state_dir, true)?;
-  let file = lock_file(&directory, key, true)?;
-  if !try_lock(&file)? {
-    return Err(conflict("New operation lock is already owned"));
-  }
-  let metadata = file.metadata()?;
-  file.sync_all()?;
-  directory.sync_all()?;
-  let owner = VmOperationOwner {
-    key,
-    node_name: node_name.to_owned(),
-    owner_boot_id,
-    lock_device: metadata.dev() as i64,
-    lock_inode: metadata.ino() as i64,
-  };
-  Ok((
-    owner,
-    VmOperationGuard {
-      _file: Arc::new(file),
-    },
-  ))
-}
-
-fn abandoned_owner(
-  operation: &VmOperationDb,
-  node_name: &str,
-  state_dir: &str,
-) -> IoResult<Option<VmOperationGuard>> {
-  // Missing files, foreign nodes, and changed boot identities do not establish
-  // that an owner on another filesystem/process namespace has stopped.
-  if operation.node_name != node_name || operation.owner_boot_id != boot_id()? {
-    return Ok(None);
-  }
-  let directory = match operation_directory(state_dir, false) {
-    Ok(directory) => directory,
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      return Ok(None);
-    }
-    Err(error) => return Err(error),
-  };
-  let file = match lock_file(&directory, operation.key, false) {
-    Ok(file) => file,
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      return Ok(None);
-    }
-    Err(error) => return Err(error),
-  };
-  let metadata = file.metadata()?;
-  if metadata.dev() as i64 != operation.lock_device
-    || metadata.ino() as i64 != operation.lock_inode
-    || !try_lock(&file)?
-  {
-    return Ok(None);
-  }
-  Ok(Some(VmOperationGuard {
-    _file: Arc::new(file),
-  }))
-}
-
-fn same_operation(left: &VmOperationDb, right: &VmOperationDb) -> bool {
-  left.vm_key == right.vm_key
-    && left.key == right.key
-    && left.spec_key == right.spec_key
-    && left.phase == right.phase
-    && left.node_name == right.node_name
-    && left.owner_boot_id == right.owner_boot_id
-    && left.lock_device == right.lock_device
-    && left.lock_inode == right.lock_inode
-    && left.outcome.is_none()
-    && right.outcome.is_none()
-}
-
-async fn observe(
+pub(crate) async fn observe(
   vm: &Vm,
   state: &SystemState,
 ) -> IoResult<(ObjPsStatusKind, Value)> {
@@ -263,10 +79,7 @@ async fn observe(
     .ok_or_else(|| {
       conflict("Runtime specification generation is missing or invalid")
     })?;
-  let boot = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
-  if boot.kind_name != "Vm" || boot.kind_key != vm.spec.vm_key {
-    return Err(conflict("Runtime specification belongs to another object"));
-  }
+  super::validate_generation(vm, generation, state).await?;
   let running = runtime
     .state
     .as_ref()
@@ -391,11 +204,11 @@ async fn ensure_auxiliary_stopped(
 /// or deletes a runtime. Do not timeout the final database write: its blocking
 /// worker must finish before the file and lifecycle guards can be released.
 pub(crate) async fn recover_one(
-  candidate: &VmOperationDb,
+  candidate: &OperationDb,
   state: &SystemState,
 ) -> IoResult<bool> {
-  let lifecycle = super::lifecycle_lock(&candidate.vm_key);
-  let _lifecycle = match tokio::time::timeout(
+  let lifecycle = super::lifecycle_lock(&candidate.resource_key);
+  let lifecycle_guard = match tokio::time::timeout(
     Duration::from_millis(50),
     lifecycle.try_lock_owned(),
   )
@@ -404,31 +217,37 @@ pub(crate) async fn recover_one(
     Ok(Ok(guard)) => guard,
     _ => return Ok(false),
   };
-  let Some(_owner) = abandoned_owner(
-    candidate,
+  let Some(current) =
+    OperationDb::current("Vm", &candidate.resource_key, &state.inner.pool)
+      .await?
+  else {
+    return Ok(false);
+  };
+  if candidate != &current || candidate.outcome.is_some() {
+    return Ok(false);
+  }
+  let Some(owner_guard) = utils::operation::abandoned_owner(
+    &candidate.owner(),
     &state.inner.config.hostname,
     &state.inner.config.state_dir,
   )?
   else {
     return Ok(false);
   };
-  let Some(current) =
-    VmOperationDb::get(&candidate.vm_key, &state.inner.pool).await?
-  else {
-    return Ok(false);
-  };
-  if !same_operation(candidate, &current) {
-    return Ok(false);
-  }
   let vm =
-    VmDb::transform_read_by_pk(&candidate.vm_key, &state.inner.pool).await?;
-  if vm.spec.key != candidate.spec_key {
+    VmDb::transform_read_by_pk(&candidate.resource_key, &state.inner.pool)
+      .await?;
+  let (live, _, _) =
+    VmDb::read_by_pk(&candidate.resource_key, &state.inner.pool).await?;
+  if live.incarnation_key != candidate.incarnation_key
+    || vm.spec.key != candidate.spec_key
+  {
     return Ok(false);
   }
-  let action = match candidate.phase.as_str() {
-    "starting" => NativeEventAction::Starting,
-    "updating" => NativeEventAction::Updating,
-    "destroying" => NativeEventAction::Destroying,
+  let action = match candidate.action.as_str() {
+    "start" => NativeEventAction::Starting,
+    "update" => NativeEventAction::Updating,
+    "delete" => NativeEventAction::Destroying,
     _ => return Err(conflict("Unsupported pending phase")),
   };
   let (actual, mut observation) =
@@ -441,13 +260,26 @@ pub(crate) async fn recover_one(
     "The accepted operation lost its owner; no automatic replay was attempted"
   );
   observation["Operation"] = json!(candidate.key);
-  observation["Phase"] = json!(candidate.phase);
-  let finished = current
-    .finish(actual, "interrupted", observation, &state.inner.pool)
-    .await?;
+  observation["Phase"] = json!(candidate.action);
+  let lease = (Arc::new(lifecycle_guard), owner_guard);
+  let finished = VmDb::finish_operation(
+    &current,
+    actual,
+    "interrupted",
+    observation,
+    lease.clone(),
+    &state.inner.pool,
+  )
+  .await?;
+  if finished
+    && let Err(error) =
+      utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
+  {
+    log::warn!("VM owner cleanup deferred after recovery: {error}");
+  }
   if finished {
     state.emit_error_native_action(&vm, action,
-      Some(format!("VM operation {} ({}) was interrupted; observed runtime reconciled without replay. Inspect the VM and explicitly retry the request", candidate.key, candidate.phase)));
+      Some(format!("VM operation {} ({}) was interrupted; observed runtime reconciled without replay. Inspect the VM and explicitly retry the request", candidate.key, candidate.action)));
   }
   Ok(finished)
 }
@@ -457,11 +289,22 @@ pub(crate) async fn recover_one(
 pub(crate) fn spawn(state: &SystemState) {
   let state = state.clone();
   ntex::rt::spawn(async move {
-    let mut after: Option<String> = None;
+    let mut after: Option<uuid::Uuid> = None;
+    let mut cleanup_cursor = None;
     loop {
-      match recover_pending(&state, after.as_deref()).await {
+      match recover_pending(&state, after).await {
         Ok(cursor) => after = cursor,
         Err(error) => log::warn!("VM recovery scan deferred: {error}"),
+      }
+      if let Err(error) = utils::operation::maintenance_step(
+        &state.inner.config.state_dir,
+        &state.inner.config.hostname,
+        &mut cleanup_cursor,
+        &state.inner.pool,
+      )
+      .await
+      {
+        log::warn!("Operation owner maintenance deferred: {error}");
       }
       ntex::time::sleep(Duration::from_secs(10)).await;
     }
@@ -470,9 +313,10 @@ pub(crate) fn spawn(state: &SystemState) {
 
 pub(crate) async fn recover_pending(
   state: &SystemState,
-  after: Option<&str>,
-) -> IoResult<Option<String>> {
-  let candidates = VmOperationDb::pending_for_node(
+  after: Option<uuid::Uuid>,
+) -> IoResult<Option<uuid::Uuid>> {
+  let candidates = OperationDb::pending_for_node(
+    "Vm",
     &state.inner.config.hostname,
     after,
     32,
@@ -480,13 +324,13 @@ pub(crate) async fn recover_pending(
   )
   .await?;
   let cursor = if candidates.len() == 32 {
-    candidates.last().map(|operation| operation.vm_key.clone())
+    candidates.last().map(|operation| operation.key)
   } else {
     None
   };
   for candidate in candidates {
     if let Err(error) = recover_one(&candidate, state).await {
-      log::warn!("VM {} recovery deferred: {error}", candidate.vm_key);
+      log::warn!("VM {} recovery deferred: {error}", candidate.resource_key);
     }
   }
   Ok(cursor)
@@ -496,136 +340,11 @@ pub(crate) async fn recover_pending(
 mod tests {
   use super::*;
   use crate::models::{
-    DistributedMutexDb, DistributedMutexPartial, Pool, SystemStateInner,
+    DistributedMutexDb, DistributedMutexPartial, OperationGuard, Pool, SpecDb,
+    SystemStateInner,
   };
   use futures::FutureExt;
   use nanocl_stubs::vm_spec::{VmHostConfig, VmSpecPartial};
-
-  struct LockDirectory(std::path::PathBuf);
-
-  impl LockDirectory {
-    fn new() -> Self {
-      let path = std::env::temp_dir()
-        .join(format!("nanocl-vm-owner-{}", uuid::Uuid::new_v4()));
-      std::fs::create_dir(&path).unwrap();
-      Self(path)
-    }
-
-    fn path(&self) -> &str {
-      self.0.to_str().unwrap()
-    }
-  }
-
-  impl Drop for LockDirectory {
-    fn drop(&mut self) {
-      let _ = std::fs::remove_dir_all(&self.0);
-    }
-  }
-
-  #[test]
-  fn vm_operation_lock_preserves_live_owner_and_all_clones() {
-    let directory = LockDirectory::new();
-    let key = uuid::Uuid::new_v4();
-    let (owner, guard) =
-      create_owner_at(key, "local", directory.path()).unwrap();
-    let operation =
-      owner.operation("global.owner", uuid::Uuid::new_v4(), "starting");
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    let detached = guard.clone();
-    drop(guard);
-    // No mutex row or TaskManager entry is consulted. The last detached owner
-    // remains authoritative regardless of TTL or registration stage.
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    assert_eq!(
-      detached._file.metadata().unwrap().ino() as i64,
-      owner.lock_inode
-    );
-    drop(detached);
-    let recovered = abandoned_owner(&operation, "local", directory.path())
-      .unwrap()
-      .unwrap();
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    drop(recovered);
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_some()
-    );
-  }
-
-  #[test]
-  fn vm_operation_lock_rejects_missing_replaced_and_foreign_identity() {
-    let directory = LockDirectory::new();
-    let (owner, guard) =
-      create_owner_at(uuid::Uuid::new_v4(), "local", directory.path()).unwrap();
-    let operation =
-      owner.operation("global.owner", uuid::Uuid::new_v4(), "updating");
-    drop(guard);
-    assert!(
-      abandoned_owner(&operation, "foreign", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    for field in ["boot", "device", "inode"] {
-      let mut changed = operation.clone();
-      match field {
-        "boot" => changed.owner_boot_id = uuid::Uuid::new_v4().to_string(),
-        "device" => changed.lock_device ^= 1,
-        "inode" => changed.lock_inode ^= 1,
-        _ => unreachable!(),
-      }
-      assert!(
-        abandoned_owner(&changed, "local", directory.path())
-          .unwrap()
-          .is_none(),
-        "{field}"
-      );
-    }
-    let path = directory
-      .0
-      .join("run/vm-operations")
-      .join(format!("{}.lock", owner.key));
-    std::fs::rename(&path, path.with_extension("old")).unwrap();
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    let (_, successor) =
-      create_owner_at(owner.key, "local", directory.path()).unwrap();
-    drop(successor);
-    assert!(
-      abandoned_owner(&operation, "local", directory.path())
-        .unwrap()
-        .is_none()
-    );
-    std::fs::remove_file(&path).unwrap();
-    std::os::unix::fs::symlink(path.with_extension("old"), &path).unwrap();
-    assert!(abandoned_owner(&operation, "local", directory.path()).is_err());
-  }
-
-  #[test]
-  fn vm_operation_lock_rejects_redirected_directories() {
-    let directory = LockDirectory::new();
-    let target = LockDirectory::new();
-    std::os::unix::fs::symlink(&target.0, directory.0.join("run")).unwrap();
-    assert!(
-      create_owner_at(uuid::Uuid::new_v4(), "local", directory.path()).is_err()
-    );
-    assert_eq!(std::fs::read_dir(&target.0).unwrap().count(), 0);
-  }
 
   fn test_state(
     state: &SystemState,
@@ -653,7 +372,7 @@ mod tests {
     phase: &str,
     replacement: Option<SpecDb>,
     state: &SystemState,
-  ) -> (Vm, VmOperationDb, VmOperationGuard) {
+  ) -> (Vm, OperationDb, OperationGuard) {
     let mutex = DistributedMutexDb::create_from(
       DistributedMutexPartial {
         action: phase.to_owned(),
@@ -666,21 +385,41 @@ mod tests {
     )
     .await
     .unwrap();
-    let (owner, guard) = create_owner(mutex.key, state).unwrap();
-    let operation = owner.operation(
+    let (live, _, _) = VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+      .await
+      .unwrap();
+    let (owner, guard) = utils::operation::create_owner(
+      mutex.key,
+      "Vm",
+      &vm.spec.vm_key,
+      live.incarnation_key,
+      &state.inner.config.hostname,
+      &state.inner.config.state_dir,
+    )
+    .unwrap();
+    let action = match phase {
+      "starting" => "start",
+      "updating" => "update",
+      "destroying" => "delete",
+      _ => panic!("invalid phase"),
+    };
+    let operation = OperationDb::new(
+      &owner,
+      "Vm",
       &vm.spec.vm_key,
       replacement.as_ref().map_or(vm.spec.key, |spec| spec.key),
-      phase,
+      action,
     );
     let accepted = VmDb::accept_operation(
       vm,
       replacement,
       operation.clone(),
+      guard.clone(),
       &state.inner.pool,
     )
     .await
     .unwrap();
-    (accepted, operation, guard)
+    (accepted.vm, accepted.operation, guard)
   }
 
   async fn create_vm(system: &crate::utils::tests::TestSystem) -> Vm {
@@ -710,7 +449,7 @@ mod tests {
   #[ntex::test]
   async fn vm_recovery_committed_pending_retries_dependencies_and_preserves_successor()
    {
-    use diesel::{PgConnection, r2d2::ConnectionManager};
+    use diesel::r2d2::ConnectionManager;
     let system = crate::utils::tests::gen_default_test_system().await;
     let node = format!("recovery-test-{}", uuid::Uuid::new_v4());
     let state = test_state(
@@ -727,14 +466,52 @@ mod tests {
         let (accepted, operation, guard) =
           accept(&vm, phase, None, &state).await;
         lock_keys.push(operation.key);
-        // A detached owner has no TaskManager entry yet. Removing its expired
-        // mutex cannot change its kernel ownership or authorize recovery.
-        DistributedMutexDb::del_by_pk(&operation.key, &state.inner.pool)
+        // Expire this exact row and run the daemon GC predicate. Neither the
+        // expired timestamp nor physical removal releases the kernel owner.
+        use diesel::prelude::*;
+        let operation_key = operation.key;
+        crate::repositories::operation::run_query_owned(
+          &state.inner.pool,
+          guard.clone(),
+          move |conn| {
+            diesel::update(
+              crate::schema::distributed_mutexes::table.find(operation_key),
+            )
+            .set(
+              crate::schema::distributed_mutexes::expires_at
+                .eq(chrono::Utc::now() - chrono::Duration::seconds(1)),
+            )
+            .execute(conn)
+            .map_err(|error| {
+              IoError::other("Recovery test expiry", &error.to_string())
+            })?;
+            Ok(())
+          },
+        )
+        .await
+        .unwrap();
+        let filter = nanocl_stubs::generic::GenericFilter::new()
+          .r#where(
+            "expires_at",
+            nanocl_stubs::generic::GenericClause::Le(
+              chrono::Utc::now().to_rfc3339(),
+            ),
+          )
+          .r#where(
+            "key",
+            nanocl_stubs::generic::GenericClause::Eq(operation.key.to_string()),
+          );
+        DistributedMutexDb::del_by(&filter, &state.inner.pool)
           .await
           .unwrap();
+        assert!(
+          DistributedMutexDb::get_lock("Vm", &key, &state.inner.pool)
+            .await
+            .is_err()
+        );
         assert!(!recover_one(&operation, &state).await.unwrap());
         assert_eq!(
-          VmOperationDb::get(&key, &state.inner.pool)
+          OperationDb::current("Vm", &key, &state.inner.pool)
             .await
             .unwrap()
             .unwrap(),
@@ -767,7 +544,7 @@ mod tests {
         assert!(!settled);
         assert_eq!(result.unwrap_err().to_string(), primary_message);
         assert_eq!(
-          VmOperationDb::get(&key, &state.inner.pool)
+          OperationDb::current("Vm", &key, &state.inner.pool)
             .await
             .unwrap()
             .unwrap(),
@@ -788,7 +565,7 @@ mod tests {
           .min_idle(Some(0))
           .max_size(1)
           .connection_timeout(Duration::from_millis(50))
-          .build_unchecked(ConnectionManager::<PgConnection>::new(
+          .build_unchecked(ConnectionManager::<diesel::PgConnection>::new(
             "invalid-recovery-test-connection-string",
           ));
         let unavailable_db = test_state(
@@ -799,7 +576,7 @@ mod tests {
         );
         assert!(recover_one(&operation, &unavailable_db).await.is_err());
         assert_eq!(
-          VmOperationDb::get(&key, &state.inner.pool)
+          OperationDb::current("Vm", &key, &state.inner.pool)
             .await
             .unwrap()
             .unwrap(),
@@ -821,16 +598,16 @@ mod tests {
           .unwrap();
         assert_eq!(vm.status.actual, ObjPsStatusKind::Stop);
         assert_eq!(vm.status.wanted, ObjPsStatusKind::Stop);
-        let settled = VmOperationDb::get(&key, &state.inner.pool)
+        let settled = OperationDb::current("Vm", &key, &state.inner.pool)
           .await
           .unwrap()
           .unwrap();
         assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
-        assert_eq!(settled.observation.as_ref().unwrap()["Runtime"], "absent");
+        assert_eq!(settled.diagnostic.as_ref().unwrap()["Runtime"], "absent");
         assert!(!recover_one(&operation, &state).await.unwrap());
         recover_pending(&state, None).await.unwrap();
         assert_eq!(
-          VmOperationDb::get(&key, &state.inner.pool)
+          OperationDb::current("Vm", &key, &state.inner.pool)
             .await
             .unwrap()
             .unwrap(),
@@ -842,7 +619,7 @@ mod tests {
         lock_keys.push(successor.key);
         assert!(!recover_one(&operation, &state).await.unwrap());
         assert_eq!(
-          VmOperationDb::get(&key, &state.inner.pool)
+          OperationDb::current("Vm", &key, &state.inner.pool)
             .await
             .unwrap()
             .unwrap(),
@@ -870,6 +647,54 @@ mod tests {
           .unwrap();
         assert_eq!(vm.spec.key, next_vm.spec.key);
       }
+      // Retained boot revisions remain readable after deletion, but cannot
+      // authorize runtime control for a newly created VM using the same name.
+      let old = VmDb::read_by_pk(&key, &state.inner.pool).await.unwrap().0;
+      let history = OperationDb::current("Vm", &key, &state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+      VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+      use crate::objects::generic::ObjCreate;
+      let recreated = VmDb::fn_create_obj(
+        &crate::models::VmObjCreateIn {
+          namespace: vm.namespace_name.clone(),
+          version: vm.spec.version.clone(),
+          spec: VmSpecPartial::from(vm.spec.clone()),
+        },
+        &state,
+      )
+      .await
+      .unwrap();
+      let new = VmDb::read_by_pk(&key, &state.inner.pool).await.unwrap().0;
+      assert_ne!(new.incarnation_key, old.incarnation_key);
+      let retained = SpecDb::read_by_pk(&old.spec_key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(retained.incarnation_key, Some(old.incarnation_key));
+      assert!(
+        super::super::validate_generation(&recreated, old.spec_key, &state)
+          .await
+          .is_err()
+      );
+      assert!(!recover_one(&history, &state).await.unwrap());
+      assert!(
+        OperationDb::current("Vm", &key, &state.inner.pool)
+          .await
+          .unwrap()
+          .is_none()
+      );
+      assert_eq!(
+        OperationDb::get(history.key, &state.inner.pool)
+          .await
+          .unwrap(),
+        Some(history)
+      );
+      let unchanged = VmDb::transform_read_by_pk(&key, &state.inner.pool)
+        .await
+        .unwrap();
+      assert_eq!(unchanged.spec.key, recreated.spec.key);
+      assert_eq!(unchanged.status, recreated.status);
     })
     .catch_unwind()
     .await;
@@ -895,9 +720,11 @@ mod tests {
   fn cleanup_locks(keys: &[uuid::Uuid], state: &SystemState) {
     for key in keys {
       let path = std::path::Path::new(&state.inner.config.state_dir)
-        .join("run/vm-operations")
+        .join("run/operations")
         .join(format!("{key}.lock"));
-      std::fs::remove_file(path).unwrap();
+      if let Err(error) = std::fs::remove_file(path) {
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+      }
     }
   }
 
@@ -914,11 +741,11 @@ mod tests {
     use std::collections::HashMap;
 
     async fn recover_with_retries(
-      operation: &VmOperationDb,
+      operation: &OperationDb,
       state: &SystemState,
     ) -> IoResult<bool> {
       let before =
-        VmDb::transform_read_by_pk(&operation.vm_key, &state.inner.pool)
+        VmDb::transform_read_by_pk(&operation.resource_key, &state.inner.pool)
           .await
           .unwrap();
       let specification = serde_json::to_value(&before.spec).unwrap();
@@ -934,8 +761,8 @@ mod tests {
             // This isolated fixture still has valid, unowned file evidence;
             // an admission deferral must not hide a changed or live owner.
             assert!(
-              abandoned_owner(
-                operation,
+              utils::operation::abandoned_owner(
+                &operation.owner(),
                 &state.inner.config.hostname,
                 &state.inner.config.state_dir,
               )
@@ -955,16 +782,22 @@ mod tests {
         // Production retries deferred scans. Verify each unsuccessful attempt
         // preserves acceptance exactly before allowing at most two retries.
         assert_eq!(
-          VmOperationDb::get(&operation.vm_key, &state.inner.pool)
-            .await
-            .unwrap()
-            .as_ref(),
+          OperationDb::current(
+            "Vm",
+            &operation.resource_key,
+            &state.inner.pool
+          )
+          .await
+          .unwrap()
+          .as_ref(),
           Some(operation)
         );
-        let current =
-          VmDb::transform_read_by_pk(&operation.vm_key, &state.inner.pool)
-            .await
-            .unwrap();
+        let current = VmDb::transform_read_by_pk(
+          &operation.resource_key,
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
         assert_eq!(serde_json::to_value(&current.spec).unwrap(), specification);
         assert_eq!(current.status, before.status);
         if !retry || attempts == 3 {
@@ -1061,7 +894,7 @@ mod tests {
         "a live init without a Process row must block retry"
       );
       assert_eq!(
-        VmOperationDb::get(&key, &state.inner.pool)
+        OperationDb::current("Vm", &key, &state.inner.pool)
           .await
           .unwrap()
           .unwrap(),
@@ -1138,12 +971,12 @@ mod tests {
       assert_ne!(current.spec.key, vm.spec.key);
       assert_eq!(current.status.actual, ObjPsStatusKind::Start);
       assert_eq!(current.status.wanted, ObjPsStatusKind::Start);
-      let settled = VmOperationDb::get(&key, &state.inner.pool)
+      let settled = OperationDb::current("Vm", &key, &state.inner.pool)
         .await
         .unwrap()
         .unwrap();
       assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
-      let observation = settled.observation.unwrap();
+      let observation = settled.diagnostic.unwrap();
       assert_eq!(observation["Specification"], json!(vm.spec.key));
       assert_eq!(observation["AcceptedGenerationObserved"], false);
       assert_eq!(observation["ContainerId"], created.id);
@@ -1185,11 +1018,11 @@ mod tests {
       assert_eq!(current.status.actual, ObjPsStatusKind::Stop);
       assert_eq!(current.status.wanted, ObjPsStatusKind::Stop);
       assert_eq!(
-        VmOperationDb::get(&key, &state.inner.pool)
+        OperationDb::current("Vm", &key, &state.inner.pool)
           .await
           .unwrap()
           .unwrap()
-          .observation
+          .diagnostic
           .unwrap()["Runtime"],
         "stopped"
       );
@@ -1333,7 +1166,7 @@ mod tests {
     let result = std::panic::AssertUnwindSafe(async {
       let (accepted, operation, guard) = accept(&vm, "starting", None, state).await;
       lock_keys.push(operation.key);
-      assert_eq!(VmOperationDb::get(&key, &state.inner.pool).await.unwrap().unwrap(), operation);
+      assert_eq!(OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap(), operation);
       assert!(state.inner.task_manager.get_task(&format!("Vm@{key}")).await.is_none());
       // Acceptance is committed, but no executor was registered or polled.
       // Releasing the last kernel owner models its interruption at that gap.
@@ -1342,14 +1175,14 @@ mod tests {
         let mut observations = tokio::time::interval(Duration::from_millis(100));
         loop {
           observations.tick().await;
-          let current = VmOperationDb::get(&key, &state.inner.pool).await.unwrap().unwrap();
+          let current = OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap();
           assert_eq!(current.key, operation.key);
           assert_eq!(current.spec_key, accepted.spec.key);
           if current.outcome.is_some() { break current; }
         }
       }).await.unwrap_or_else(|_| panic!("external daemon {scanner_daemon} did not recover the committed operation within 45 seconds; verify it runs the current source and shares the owner file"));
       assert_eq!(settled.outcome.as_deref(), Some("interrupted"));
-      assert_eq!(settled.observation.as_ref().unwrap()["Runtime"], "absent");
+      assert_eq!(settled.diagnostic.as_ref().unwrap()["Runtime"], "absent");
       let observed = VmDb::transform_read_by_pk(&key, &state.inner.pool).await.unwrap();
       assert_eq!(observed.spec.key, accepted.spec.key);
       assert_eq!(observed.status.actual, ObjPsStatusKind::Stop);
@@ -1357,7 +1190,7 @@ mod tests {
       assert!(matches!(state.inner.docker_api.inspect_container(&format!("{key}.v"), None).await,
         Err(bollard_next::errors::Error::DockerResponseServerError { status_code: 404, .. })));
       assert!(state.inner.task_manager.get_task(&format!("Vm@{key}")).await.is_none());
-      assert_eq!(VmOperationDb::get(&key, &state.inner.pool).await.unwrap().unwrap(), settled);
+      assert_eq!(OperationDb::current("Vm", &key, &state.inner.pool).await.unwrap().unwrap(), settled);
     }).catch_unwind().await;
     cleanup_mutex(&key, state).await;
     VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();

@@ -1,5 +1,6 @@
 use std::{
-  io::ErrorKind, os::unix::fs::PermissionsExt, path::Path, time::Duration,
+  io::ErrorKind, os::unix::fs::PermissionsExt, path::Path, sync::Arc,
+  time::Duration,
 };
 
 use bollard_next::models::{ContainerInspectResponse, MountPointTypeEnum};
@@ -17,8 +18,8 @@ use tokio::{
 use super::lifecycle;
 use crate::{
   models::{
-    QmpBlockNode, QmpClient, QmpMemoryDevice, SpecDb, SystemState, VmDb,
-    VmRuntimeResources,
+    QmpBlockNode, QmpClient, QmpMemoryDevice, SystemState, VmDb,
+    VmLifecycleGuard, VmRuntimeResources,
   },
   repositories::generic::*,
 };
@@ -172,12 +173,7 @@ pub(crate) async fn validate_boot_spec(
   if generation == vm.spec.key {
     return Ok(vm.spec.clone());
   }
-  let spec = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
-  if spec.kind_name != "Vm" || spec.kind_key != vm.spec.vm_key {
-    return Err(conflict(
-      "Runtime boot specification belongs to another object",
-    ));
-  }
+  let spec = super::validate_generation(vm, generation, state).await?;
   let boot = spec.try_to_vm_spec()?;
   if !same_boot_spec(&vm.spec, &boot) {
     return Err(conflict("VM has a pending replacement specification"));
@@ -325,7 +321,7 @@ async fn ready(
   state: &SystemState,
 ) -> IoResult<(Vm, ContainerInspectResponse, VmRuntimeResources)> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
-  if crate::models::VmOperationDb::get(key, &state.inner.pool)
+  if crate::models::OperationDb::current("Vm", key, &state.inner.pool)
     .await?
     .is_some_and(|operation| operation.outcome.is_none())
   {
@@ -406,6 +402,7 @@ async fn persist(
   vm: &Vm,
   runtime: &ContainerInspectResponse,
   current: &VmRuntimeResources,
+  guard: Arc<VmLifecycleGuard>,
   state: &SystemState,
 ) -> IoResult<()> {
   let directory =
@@ -418,10 +415,11 @@ async fn persist(
     let config = spec.host_config.as_mut().expect("VmSpec has HostConfig");
     config.cpu = current.cpu;
     config.memory = current.memory;
-    VmDb::update_from_spec(
+    VmDb::update_from_spec_owned(
       &vm.spec.vm_key,
       &spec,
       &vm.spec.version,
+      guard,
       &state.inner.pool,
     )
     .await?;
@@ -432,6 +430,7 @@ async fn persist(
 async fn run_resize(
   key: &str,
   options: &VmResizeOptions,
+  guard: Arc<VmLifecycleGuard>,
   state: &SystemState,
 ) -> IoResult<VmResources> {
   let (vm, runtime, maxima) = ready(key, state).await?;
@@ -514,7 +513,7 @@ async fn run_resize(
   drop(client);
   match result {
     Ok((observed, disk_size)) => {
-      persist(&vm, &runtime, &observed, state).await.map_err(|_| conflict("Resources changed but persistence failed; inspect resources and retry the same targets"))?;
+      persist(&vm, &runtime, &observed, guard.clone(), state).await.map_err(|_| conflict("Resources changed but persistence failed; inspect resources and retry the same targets"))?;
       state
         .emit_normal_native_action_sync(&vm, NativeEventAction::Update)
         .await;
@@ -557,7 +556,7 @@ async fn run_resize(
         drop(client);
         // Attempt persistence even if cleanup could not be confirmed; neither
         // a slow DB nor a DB error should prevent the earlier bounded cleanup.
-        persist(&vm, &runtime, &observed, state).await?;
+        persist(&vm, &runtime, &observed, guard.clone(), state).await?;
         cleanup?;
         Ok::<_, IoError>(())
       }
@@ -588,14 +587,14 @@ pub(crate) async fn resize(
   options
     .validate()
     .map_err(|error| IoError::invalid_input("VM resize", &error))?;
-  let guard = super::lifecycle_lock(key).try_lock_owned().await?;
+  let guard = Arc::new(super::lifecycle_lock(key).try_lock_owned().await?);
   let key = key.to_owned();
   let options = options.clone();
   let state = state.clone();
   let (tx, rx) = tokio::sync::oneshot::channel();
   // Client disconnection must not interrupt mutation reconciliation/persistence.
   ntex::rt::spawn(async move {
-    let result = run_resize(&key, &options, &state).await;
+    let result = run_resize(&key, &options, guard.clone(), &state).await;
     drop(guard);
     let _ = tx.send(result);
   });

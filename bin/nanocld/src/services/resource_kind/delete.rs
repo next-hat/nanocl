@@ -29,6 +29,6 @@ pub async fn delete_resource_kind(
   let key = format!("{}/{}", path.1, path.2);
   ResourceKindDb::read_by_pk(&key, &state.inner.pool).await?;
   ResourceKindDb::del_by_pk(&key, &state.inner.pool).await?;
-  SpecDb::del_by_kind_key(&key, &state.inner.pool).await?;
+  SpecDb::del_by_kind_key("ResourceKind", &key, &state.inner.pool).await?;
   Ok(web::HttpResponse::Accepted().into())
 }

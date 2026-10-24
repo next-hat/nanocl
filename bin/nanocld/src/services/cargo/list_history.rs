@@ -26,11 +26,11 @@ pub async fn list_cargo_history(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
-  let histories = SpecDb::read_by_kind_key(key.as_str(), &state.inner.pool)
-    .await?
-    .into_iter()
-    .filter(|history| history.kind_name == "Cargo")
-    .map(|e| e.try_to_cargo_spec_revision())
-    .collect::<IoResult<Vec<_>>>()?;
+  let histories =
+    SpecDb::read_by_kind_key("Cargo", key.as_str(), &state.inner.pool)
+      .await?
+      .into_iter()
+      .map(|e| e.try_to_cargo_spec_revision())
+      .collect::<IoResult<Vec<_>>>()?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }

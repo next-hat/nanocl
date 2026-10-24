@@ -10,7 +10,9 @@ use nanocl_stubs::{
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, ObjPsStatusDb, ObjPsStatusUpdate, Pool},
+  models::{
+    ColumnType, ObjPsStatusDb, ObjPsStatusUpdate, OperationOwner, Pool,
+  },
   schema::object_process_statuses,
 };
 
@@ -90,6 +92,73 @@ impl RepositoryReadBy for ObjPsStatusDb {
 }
 
 impl ObjPsStatusDb {
+  pub(crate) async fn update_owned<G: Send + 'static>(
+    key: &str,
+    update: ObjPsStatusUpdate,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    if owner
+      .as_ref()
+      .is_some_and(|owner| owner.resource_key != key)
+    {
+      return Err(
+        super::operation::conflict(
+          "Status does not belong to its operation owner",
+        )
+        .into(),
+      );
+    }
+    let key = key.to_owned();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      Ok(
+        diesel::update(object_process_statuses::table.find(&key))
+          .set(&update)
+          .get_result(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn update_actual_status_owned<G: Send + 'static>(
+    key: &str,
+    status: &ObjPsStatusKind,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    if owner
+      .as_ref()
+      .is_some_and(|owner| owner.resource_key != key)
+    {
+      return Err(
+        super::operation::conflict(
+          "Status does not belong to its operation owner",
+        )
+        .into(),
+      );
+    }
+    let key = key.to_owned();
+    let status = status.to_string();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let current = object_process_statuses::table
+        .find(&key)
+        .first::<Self>(conn)?;
+      if current.actual != status {
+        diesel::update(object_process_statuses::table.find(&key))
+          .set(ObjPsStatusUpdate {
+            actual: Some(status.clone()),
+            prev_actual: Some(current.actual),
+            ..Default::default()
+          })
+          .execute(conn)?;
+      }
+      Ok(())
+    })
+    .await
+  }
+
   pub async fn update_actual_status(
     key: &str,
     status: &ObjPsStatusKind,
