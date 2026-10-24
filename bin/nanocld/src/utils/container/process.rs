@@ -12,10 +12,7 @@ use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
 };
 
-use crate::{
-  models::{ObjPsStatusDb, ProcessDb, SystemState},
-  repositories::generic::*,
-};
+use crate::models::{ObjPsStatusDb, OperationOwner, ProcessDb, SystemState};
 
 /// Create a process (container) based on the kind and the item
 pub async fn create(
@@ -23,6 +20,18 @@ pub async fn create(
   name: &str,
   kind_key: &str,
   item: &Config,
+  state: &SystemState,
+) -> IoResult<Process> {
+  create_owned(kind, name, kind_key, item, None, (), state).await
+}
+
+pub(crate) async fn create_owned<G: Clone + Send + 'static>(
+  kind: &ProcessKind,
+  name: &str,
+  kind_key: &str,
+  item: &Config,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
   let mut config = item.clone();
@@ -83,8 +92,13 @@ pub async fn create(
         })?,
       ),
     };
-    let process =
-      ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
+    let process = ProcessDb::create_owned(
+      &new_instance,
+      owner.clone(),
+      keepalive.clone(),
+      &state.inner.pool,
+    )
+    .await?;
     Process::try_from(process)
       .map_err(|err| err.map_err_context(|| "CreateProcess"))
   }
@@ -101,7 +115,13 @@ pub async fn create(
         }),
       )
       .await;
-    let _ = ProcessDb::del_by_pk(&process_key, &state.inner.pool).await;
+    let _ = ProcessDb::delete_owned(
+      &process_key,
+      owner,
+      keepalive,
+      &state.inner.pool,
+    )
+    .await;
   }
   result
 }
@@ -110,6 +130,16 @@ pub async fn create(
 pub async fn delete_instance(
   pk: &str,
   opts: Option<RemoveContainerOptions>,
+  state: &SystemState,
+) -> IoResult<()> {
+  delete_instance_owned(pk, opts, None, (), state).await
+}
+
+pub(crate) async fn delete_instance_owned<G: Send + 'static>(
+  pk: &str,
+  opts: Option<RemoveContainerOptions>,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<()> {
   match state.inner.docker_api.remove_container(pk, opts).await {
@@ -136,7 +166,7 @@ pub async fn delete_instance(
       }
     },
   };
-  ProcessDb::del_by_pk(pk, &state.inner.pool).await?;
+  ProcessDb::delete_owned(pk, owner, keepalive, &state.inner.pool).await?;
   Ok(())
 }
 
@@ -145,15 +175,26 @@ pub async fn delete_instances(
   instances: &[String],
   state: &SystemState,
 ) -> IoResult<()> {
+  delete_instances_owned(instances, None, (), state).await
+}
+
+pub(crate) async fn delete_instances_owned<G: Clone + Send + 'static>(
+  instances: &[String],
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
   instances
     .iter()
     .map(|id| async {
-      delete_instance(
+      delete_instance_owned(
         id,
         Some(RemoveContainerOptions {
           force: true,
           ..Default::default()
         }),
+        owner.clone(),
+        keepalive.clone(),
         state,
       )
       .await
@@ -230,10 +271,12 @@ pub async fn stop_instances(
 /// Start the group of process for a kind key
 /// Eg: (job, cargo, vm, etc.)
 /// When finished, a event is emitted to the system
-pub async fn start_instances(
+pub(crate) async fn start_instances_owned<G: Send + 'static>(
   kind_key: &str,
   kind: &ProcessKind,
   emit_event: bool,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<()> {
   let filter = GenericFilter::new().r#where(
@@ -246,6 +289,11 @@ pub async fn start_instances(
       }
     })),
   );
+  let filter = if *kind == ProcessKind::Vm {
+    filter.r#where("kind", GenericClause::Eq(kind.to_string()))
+  } else {
+    filter
+  };
   let processes =
     ProcessDb::read_by_kind_key(kind_key, Some(filter), &state.inner.pool)
       .await?;
@@ -265,9 +313,11 @@ pub async fn start_instances(
       .map_err(|err| err.map_err_context(|| "StartProcess"))?;
   }
   if emit_event {
-    ObjPsStatusDb::update_actual_status(
+    ObjPsStatusDb::update_actual_status_owned(
       kind_key,
       &ObjPsStatusKind::Start,
+      owner,
+      keepalive,
       &state.inner.pool,
     )
     .await?;

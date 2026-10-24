@@ -329,7 +329,8 @@ pub async fn console_vm(
   // Replacement may have failed before the old guest exited. Console access
   // follows that owned boot generation, independently of resize compatibility.
   let generation = runtime_generation(&runtime)?;
-  let boot = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
+  let boot =
+    utils::container::vm::validate_generation(&vm, generation, state).await?;
   let boot_vm = validate_runtime(
     &vm,
     &boot,

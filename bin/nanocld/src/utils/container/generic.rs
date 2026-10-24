@@ -113,25 +113,8 @@ pub async fn emit_starting(
       kind_key,
       NativeEventAction::Starting,
       state,
-      async move {
-        let mut vm =
-          VmDb::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
-        let current =
-          ObjPsStatusDb::read_by_pk(&key, &prepare_state.inner.pool).await?;
-        vm.status = ObjPsStatusDb::update_pk(
-          &key,
-          ObjPsStatusUpdate {
-            wanted: Some(ObjPsStatusKind::Start.to_string()),
-            prev_wanted: Some(current.wanted),
-            actual: Some(ObjPsStatusKind::Starting.to_string()),
-            prev_actual: Some(current.actual),
-            health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-          },
-          &prepare_state.inner.pool,
-        )
-        .await?
-        .try_into()?;
-        Ok(vm)
+      move |owner, lease| async move {
+        VmDb::prepare_start(&key, owner, lease, &prepare_state).await
       },
     )
     .await?;

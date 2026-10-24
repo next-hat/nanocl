@@ -13,7 +13,13 @@ pub(crate) fn validate_vm_identity(
   desired: Option<&str>,
   current: Option<&str>,
 ) -> IoResult<()> {
-  if let (Some(desired), Some(current)) = (desired, current)
+  let current = current.ok_or_else(|| {
+    IoError::invalid_input(
+      "VM specification",
+      "Existing VM has no MacAddress; recreate the cluster from Nanocl statefiles",
+    )
+  })?;
+  if let Some(desired) = desired
     && !desired.eq_ignore_ascii_case(current)
   {
     return Err(IoError::invalid_input(
@@ -538,6 +544,20 @@ mod tests {
       .is_err()
     );
     validate_vm_identity(None, Some("02:00:00:00:00:01")).unwrap();
+    assert!(validate_vm_identity(None, None).is_err());
+    assert!(validate_vm_identity(Some("02:00:00:00:00:01"), None).is_err());
+    let created = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      None,
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(created.action, StateDiffAction::Create);
+    assert!(created.after.unwrap().get("MacAddress").is_none());
   }
 
   #[test]

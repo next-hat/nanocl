@@ -82,8 +82,13 @@ impl RepositoryReadBy for SpecDb {
 }
 
 impl SpecDb {
-  pub async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
+  pub async fn del_by_kind_key(
+    kind: &str,
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<()> {
     let filter = GenericFilter::new()
+      .r#where("kind_name", GenericClause::Eq(kind.to_owned()))
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
     SpecDb::del_by(&filter, pool).await
   }
@@ -100,10 +105,12 @@ impl SpecDb {
   }
 
   pub async fn read_by_kind_key(
+    kind: &str,
     key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<SpecDb>> {
     let filter = GenericFilter::new()
+      .r#where("kind_name", GenericClause::Eq(kind.to_owned()))
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
     SpecDb::read_by(&filter, pool).await
   }
@@ -117,6 +124,7 @@ impl SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "Cargo".to_owned(),
+      incarnation_key: None,
       kind_key: key.to_owned(),
       version: version.to_owned(),
       data: serde_json::to_value(item)?,
@@ -133,6 +141,7 @@ impl SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "Vm".to_owned(),
+      incarnation_key: None,
       kind_key: key.to_owned(),
       version: version.to_owned(),
       data: serde_json::to_value(item)?,

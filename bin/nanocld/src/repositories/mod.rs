@@ -8,11 +8,13 @@ mod namespace;
 mod network;
 mod node;
 mod object_process_status;
+pub(crate) mod operation;
 mod process;
 mod resource;
 mod resource_kind;
 mod secret;
 mod spec;
 mod vm;
+mod vm_operation;
 
 pub mod generic;

@@ -40,6 +40,13 @@ pub use distributed_mutex::*;
 mod vm;
 pub use vm::*;
 
+mod operation;
+pub(crate) use operation::*;
+mod operation_owner;
+pub(crate) use operation_owner::*;
+mod vm_reconcile;
+pub(crate) use vm_reconcile::*;
+
 mod qmp;
 pub(crate) use qmp::*;
 

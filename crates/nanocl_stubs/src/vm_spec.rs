@@ -257,11 +257,7 @@ pub struct VmHostConfig {
   /// Container network used by the VM runtime.
   #[cfg_attr(
     feature = "serde",
-    serde(
-      rename = "NetworkMode",
-      alias = "RuntimeNetwork",
-      skip_serializing_if = "Option::is_none"
-    )
+    serde(rename = "NetworkMode", skip_serializing_if = "Option::is_none")
   )]
   pub runtime_network: Option<String>,
   /// Use host tun device
@@ -401,7 +397,6 @@ pub struct VmHostConfigUpdate {
     serde(
       default,
       rename = "NetworkMode",
-      alias = "RuntimeNetwork",
       deserialize_with = "deserialize_optional_update",
       skip_serializing_if = "Option::is_none"
     )
@@ -517,7 +512,7 @@ pub struct VmSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub init_container: Option<Config>,
-  /// Enable cloud-init provisioning (default: true for compatibility).
+  /// Enable cloud-init provisioning (default: true).
   /// Guest networking uses DHCP independently of this setting.
   #[cfg_attr(
     feature = "serde",
@@ -652,8 +647,7 @@ pub struct VmSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub console: Option<bool>,
-  /// Stable MAC identity. An existing address cannot be changed; this may
-  /// supply an address for a legacy VM that does not have one yet.
+  /// Stable MAC identity. If supplied, it must match the existing address.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -743,7 +737,7 @@ pub struct VmSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub init_container: Option<Config>,
-  /// Enable cloud-init provisioning (default: true for compatibility).
+  /// Enable cloud-init provisioning (default: true).
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -833,6 +827,54 @@ impl From<VmSpec> for VmSpecPartial {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vm_network_mode_uses_current_json_and_statefile_field() {
+    let host = serde_json::json!({
+      "Cpu": 2, "Memory": 1024, "NetworkMode": "private-vms"
+    });
+    let config: VmHostConfig = serde_json::from_value(host.clone()).unwrap();
+    assert_eq!(config.runtime_network.as_deref(), Some("private-vms"));
+    assert_eq!(serde_json::to_value(config).unwrap(), host);
+    let state: crate::statefile::Statefile = serde_yaml::from_str(
+      "ApiVersion: v0.19.0\nVirtualMachines:\n- Name: guest\n  Image: /vm.qcow2\n  HostConfig:\n    Cpu: 2\n    Memory: 1024\n    NetworkMode: private-vms\n",
+    ).unwrap();
+    assert_eq!(
+      state.virtual_machines.unwrap()[0]
+        .host_config
+        .as_ref()
+        .unwrap()
+        .runtime_network
+        .as_deref(),
+      Some("private-vms")
+    );
+    let payload =
+      serde_json::json!({"HostConfig": {"NetworkMode": "private-vms"}});
+    let patch: VmSpecUpdate = serde_json::from_value(payload.clone()).unwrap();
+    assert_eq!(serde_json::to_value(patch).unwrap(), payload);
+    let patch: VmSpecUpdate =
+      serde_yaml::from_str("HostConfig:\n  NetworkMode: private-vms\n")
+        .unwrap();
+    assert_eq!(
+      patch.host_config.unwrap().runtime_network,
+      Some(Some("private-vms".into()))
+    );
+    assert!(
+      serde_json::from_value::<VmHostConfig>(serde_json::json!({
+        "Cpu": 2, "Memory": 1024, "RuntimeNetwork": "private-vms"
+      }))
+      .is_err()
+    );
+    assert!(
+      serde_json::from_value::<VmSpecUpdate>(serde_json::json!({
+        "HostConfig": {"RuntimeNetwork": "private-vms"}
+      }))
+      .is_err()
+    );
+    assert!(serde_yaml::from_str::<crate::statefile::Statefile>(
+      "ApiVersion: v0.19.0\nVirtualMachines:\n- Name: guest\n  Image: /vm.qcow2\n  HostConfig:\n    Cpu: 2\n    Memory: 1024\n    RuntimeNetwork: private-vms\n",
+    ).is_err());
+  }
 
   #[test]
   fn vm_host_patch_rejects_null_required_resources() {
@@ -936,12 +978,12 @@ mod tests {
   }
 
   #[test]
-  fn vm_host_config_resize_limits_preserve_legacy_defaults_and_wire_values() {
-    let legacy: VmHostConfig =
+  fn vm_host_config_resize_limits_preserve_defaults_and_wire_values() {
+    let defaults: VmHostConfig =
       serde_json::from_value(serde_json::json!({"Cpu": 2, "Memory": 1024}))
         .unwrap();
-    assert_eq!(legacy.max_cpu, None);
-    assert_eq!(legacy.max_memory, None);
+    assert_eq!(defaults.max_cpu, None);
+    assert_eq!(defaults.max_memory, None);
     let configured: VmHostConfig = serde_json::from_value(serde_json::json!({"Cpu": 2, "Memory": 1024, "MaxCpu": 8, "MaxMemory": 8192})).unwrap();
     assert_eq!(configured.max_cpu, Some(8));
     assert_eq!(configured.max_memory, Some(8192));
@@ -955,13 +997,13 @@ mod tests {
 
   #[test]
   fn vm_optional_provisioning_and_console_preserve_wire_values() {
-    let legacy: VmSpecPartial = serde_json::from_value(serde_json::json!({
-      "Name": "legacy", "Image": "/vm.qcow2"
+    let defaults: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "guest", "Image": "/vm.qcow2"
     }))
     .unwrap();
-    assert_eq!(legacy.cloud_init, None);
-    assert_eq!(legacy.cloud_init_user_data, None);
-    assert_eq!(legacy.console, None);
+    assert_eq!(defaults.cloud_init, None);
+    assert_eq!(defaults.cloud_init_user_data, None);
+    assert_eq!(defaults.console, None);
     let spec: VmSpecPartial = serde_json::from_value(serde_json::json!({
       "Name": "plain", "Image": "/vm.qcow2", "CloudInit": false,
       "Console": true, "MacAddress": "02:00:00:00:00:01"

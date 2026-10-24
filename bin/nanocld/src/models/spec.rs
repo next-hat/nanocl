@@ -22,4 +22,6 @@ pub struct SpecDb {
   pub data: serde_json::Value,
   /// Metadata (user defined) of the resource kind version
   pub metadata: Option<serde_json::Value>,
+  /// Consumer incarnation when adopted by shared operation bookkeeping.
+  pub incarnation_key: Option<uuid::Uuid>,
 }

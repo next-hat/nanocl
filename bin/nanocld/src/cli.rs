@@ -8,6 +8,8 @@ use nanocl_stubs::system::SslConfig;
 #[command(author = "Next Hat team <team@next-hat.com>")]
 #[command(version)]
 pub struct Cli {
+  #[command(subcommand)]
+  pub(crate) command: Option<crate::models::DaemonCommand>,
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
   pub hosts: Option<Vec<String>>,
@@ -47,6 +49,7 @@ pub struct Cli {
 impl Default for Cli {
   fn default() -> Self {
     Self {
+      command: None,
       hosts: None,
       docker_host: None,
       store_addr: None,

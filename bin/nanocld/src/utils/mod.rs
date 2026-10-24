@@ -1,5 +1,7 @@
 pub mod key;
+pub(crate) mod operation;
 pub mod stream;
+pub(crate) mod vm_reconcile;
 pub mod ws;
 
 pub mod container;

@@ -234,6 +234,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   utils::system::register_namespace("global", &system_state).await?;
   utils::system::register_namespace("system", &system_state).await?;
   let system_ptr = system_state.clone();
+  let recovery_state = system_state.clone();
   rt::spawn(async move {
     let fut = async move {
       utils::system::sync_processes(&system_ptr).await?;
@@ -242,6 +243,8 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     if let Err(err) = fut.await {
       log::warn!("boot::init: {err}");
     }
+    // Recovery also retries when the initial runtime inventory was unavailable.
+    utils::container::vm::recovery::spawn(&recovery_state);
     Ok::<_, IoError>(())
   });
   super::docker_event::analyze(&system_state);

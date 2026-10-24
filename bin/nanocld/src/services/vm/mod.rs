@@ -229,7 +229,9 @@ mod tests {
 
     let spec = VmSpecPartial {
       name: NAME.to_owned(),
-      image: "/tmp/namespace-test-vm.img".to_owned(),
+      // A missing bind source can become a directory and briefly start a
+      // runtime without QMP. A character-device parent prevents that race.
+      image: "/dev/null/namespace-test-vm.img".to_owned(),
       ..Default::default()
     };
     for namespace in [None, Some(NAMESPACE)] {

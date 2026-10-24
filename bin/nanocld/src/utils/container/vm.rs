@@ -13,7 +13,7 @@ use futures::StreamExt;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_stubs::{
-  generic::ImagePullPolicy,
+  generic::{GenericClause, GenericFilter, ImagePullPolicy},
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsStatusKind},
   vm::Vm,
@@ -21,16 +21,20 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{ObjPsStatusDb, ProcessDb, SystemState, VmDb},
+  models::{
+    ObjPsStatusDb, OperationDb, OperationOwner, ProcessDb, SpecDb, SystemState,
+    VmDb, VmOperationLease,
+  },
   repositories::generic::*,
   utils, vars,
 };
 
 mod lifecycle;
+pub(crate) mod recovery;
 mod resize;
 pub(crate) use lifecycle::{
-  enqueue_lifecycle, lifecycle_lock, restart_with_options, runtime_status,
-  socket_directory, stop_with_options,
+  enqueue_lifecycle, inspect_runtime, lifecycle_lock, restart_with_options,
+  runtime_status, socket_directory, stop_with_options,
 };
 pub(crate) use resize::{resize, runtime_resources};
 
@@ -827,6 +831,50 @@ fn owned_runtime_id(
     })
 }
 
+/// A retained revision belongs to exactly one VM lifetime, including after a
+/// name is deleted and reused. Names and revision existence are not authority.
+pub(crate) async fn validate_generation(
+  vm: &Vm,
+  generation: uuid::Uuid,
+  state: &SystemState,
+) -> IoResult<SpecDb> {
+  let (live, _, _) =
+    VmDb::read_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  let spec = SpecDb::read_by_pk(&generation, &state.inner.pool).await?;
+  if live.spec_key != vm.spec.key
+    || spec.kind_name != "Vm"
+    || spec.kind_key != vm.spec.vm_key
+    || spec.incarnation_key != Some(live.incarnation_key)
+  {
+    return Err(IoError::invalid_data(
+      "VM runtime",
+      "Runtime specification belongs to another resource incarnation",
+    ));
+  }
+  Ok(spec)
+}
+
+async fn validate_runtime_generation(
+  vm: &Vm,
+  runtime: &bollard_next::models::ContainerInspectResponse,
+  state: &SystemState,
+) -> IoResult<()> {
+  let generation = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref())
+    .and_then(|labels| labels.get("io.nanocl.vm-spec"))
+    .and_then(|value| uuid::Uuid::parse_str(value).ok())
+    .ok_or_else(|| {
+      IoError::invalid_data(
+        "VM runtime",
+        "Runtime specification generation is missing or invalid",
+      )
+    })?;
+  validate_generation(vm, generation, state).await?;
+  Ok(())
+}
+
 async fn inspect_owned_runtime(
   vm: &Vm,
   state: &SystemState,
@@ -840,6 +888,7 @@ async fn inspect_owned_runtime(
   {
     Ok(inspect) => {
       let id = owned_runtime_id(vm, &inspect)?;
+      validate_runtime_generation(vm, &inspect, state).await?;
       Ok(Some((id, inspect)))
     }
     Err(bollard_next::errors::Error::DockerResponseServerError {
@@ -912,9 +961,11 @@ fn validate_runtime_dns(
   Ok(())
 }
 
-async fn create_init_container(
+async fn create_init_container<G: Clone + Send + 'static>(
   vm: &Vm,
   init_container: &Config,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
   let mut init_container = init_container.clone();
@@ -953,11 +1004,13 @@ async fn create_init_container(
   let short_id = utils::key::generate_short_id(6);
   let name =
     format!("{}.{}-{}.init.v", vm.namespace_name, vm.spec.name, short_id);
-  let process = super::process::create(
+  let process = super::process::create_owned(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,
     &init_container,
+    owner,
+    keepalive,
     state,
   )
   .await?;
@@ -1006,16 +1059,25 @@ async fn start_init_container(
   Ok(())
 }
 
-/// Create a VM instance
-///
-pub async fn create_instance(
+async fn runtime_vm(key: &str, state: &SystemState) -> IoResult<Vm> {
+  let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if vm.spec.mac_address.is_none() {
+    return Err(IoError::invalid_data(
+      "VM MAC",
+      "VM specification has no persisted MAC address",
+    ));
+  }
+  Ok(vm)
+}
+
+async fn create_instance_owned<G: Clone + Send + 'static>(
   vm: &Vm,
   disable_keygen: bool,
+  owner: Option<OperationOwner>,
+  keepalive: G,
   state: &SystemState,
 ) -> IoResult<Process> {
-  let vm = VmDb::ensure_mac_address(&vm.spec.vm_key, state)
-    .await
-    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
+  let vm = runtime_vm(&vm.spec.vm_key, state).await?;
   let vm = &vm;
   let envs = runtime_env(vm, disable_keygen)?;
   // Ensure runtime and optional init networks before either container exists.
@@ -1072,10 +1134,22 @@ pub async fn create_instance(
   binds.push(format!("{}:/run/nanocl-vm", directory.display()));
   // Complete all fallible runtime preparation before creating an init process.
   let init_process = if let Some(init_container) = &vm.spec.init_container {
-    let process = create_init_container(vm, init_container, state).await?;
+    let process = create_init_container(
+      vm,
+      init_container,
+      owner.clone(),
+      keepalive.clone(),
+      state,
+    )
+    .await?;
     if let Err(err) = start_init_container(&process, state).await {
-      if let Err(cleanup) =
-        super::process::delete_instances(&[process.key], state).await
+      if let Err(cleanup) = super::process::delete_instances_owned(
+        &[process.key],
+        owner.clone(),
+        keepalive.clone(),
+        state,
+      )
+      .await
       {
         log::warn!("Unable to remove failed VM init container: {cleanup}");
       }
@@ -1111,18 +1185,25 @@ pub async fn create_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  let result = super::process::create(
+  let result = super::process::create_owned(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,
     &spec,
+    owner.clone(),
+    keepalive.clone(),
     state,
   )
   .await;
   if result.is_err() {
     if let Some(init_key) = init_process
-      && let Err(cleanup) =
-        super::process::delete_instances(&[init_key], state).await
+      && let Err(cleanup) = super::process::delete_instances_owned(
+        &[init_key],
+        owner,
+        keepalive,
+        state,
+      )
+      .await
     {
       log::warn!(
         "Unable to remove VM init container after runtime create failure: {cleanup}"
@@ -1146,9 +1227,11 @@ pub async fn create_instance(
 /// Start VM instance
 ///
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = start_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = start_unlocked_owned(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
 // Acceptance hands both lifecycle and distributed ownership to the task.
@@ -1156,27 +1239,53 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
 pub(crate) async fn run_task_unlocked(
   key: &str,
   action: NativeEventAction,
+  operation: &OperationDb,
+  lease: &VmOperationLease,
   state: &SystemState,
-) -> IoResult<()> {
+) -> (IoResult<()>, bool) {
   let result = match action {
-    NativeEventAction::Starting => start_unlocked(key, state).await,
-    NativeEventAction::Updating => update_unlocked(key, state).await,
-    NativeEventAction::Destroying => delete_unlocked(key, state).await,
+    NativeEventAction::Starting => {
+      start_unlocked_owned(key, Some(operation.owner()), lease.clone(), state)
+        .await
+    }
+    NativeEventAction::Updating => {
+      update_unlocked_owned(key, Some(operation.owner()), lease.clone(), state)
+        .await
+    }
+    NativeEventAction::Destroying => {
+      delete_unlocked(key, Some(operation), lease.clone(), state).await
+    }
     _ => Err(IoError::invalid_input(
       "VM task",
       "Unsupported VM task action",
     )),
   };
-  record_task_failure(key, result, state).await
+  record_task_outcome_owned(
+    key,
+    result,
+    Some(operation.owner()),
+    lease.clone(),
+    state,
+  )
+  .await
 }
 
-// Call while holding the operation's lifecycle guard. The asynchronous task
-// error callback runs after release and must not overwrite a newer operation.
-pub(crate) async fn record_task_failure(
+#[cfg(test)]
+pub(crate) async fn record_task_outcome(
   key: &str,
   result: IoResult<()>,
   state: &SystemState,
-) -> IoResult<()> {
+) -> (IoResult<()>, bool) {
+  record_task_outcome_owned(key, result, None, (), state).await
+}
+
+async fn record_task_outcome_owned<G: Send + 'static>(
+  key: &str,
+  result: IoResult<()>,
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> (IoResult<()>, bool) {
   if let Err(operation_error) = &result {
     // The requested operation failed, but its old guest may still be running
     // after preflight or an ACPI timeout. Observe the owned runtime under the
@@ -1191,16 +1300,29 @@ pub(crate) async fn record_task_failure(
       Ok(Ok(runtime)) => task_failure_actual(runtime.as_ref()),
       _ => ObjPsStatusKind::Fail,
     };
+    if actual == ObjPsStatusKind::Fail {
+      log::warn!(
+        "VM {key} operation failed: {operation_error}; runtime observation unavailable, retaining pending recovery"
+      );
+      return (result, false);
+    }
     log::warn!(
       "VM {key} operation failed: {operation_error}; observed status: {actual}"
     );
-    if let Err(error) =
-      ObjPsStatusDb::update_actual_status(key, &actual, &state.inner.pool).await
+    if let Err(error) = ObjPsStatusDb::update_actual_status_owned(
+      key,
+      &actual,
+      owner,
+      keepalive,
+      &state.inner.pool,
+    )
+    .await
     {
       log::warn!("Unable to record failed VM lifecycle status: {error}");
+      return (result, false);
     }
   }
-  result
+  (result, true)
 }
 
 fn task_failure_actual(
@@ -1218,25 +1340,42 @@ fn task_failure_actual(
   }
 }
 
-async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
-  let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+fn vm_process_filter() -> GenericFilter {
+  GenericFilter::new()
+    .r#where("kind", GenericClause::Eq(ProcessKind::Vm.to_string()))
+}
+
+async fn start_unlocked_owned<G: Clone + Send + 'static>(
+  key: &str,
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
+  let vm = runtime_vm(key, state).await?;
   ensure_networks(&vm, state).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
-      .await?;
+  let processes = ProcessDb::read_by_kind_key(
+    &vm.spec.vm_key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let runtime_name = format!("{}.v", vm.spec.vm_key);
   if !processes.iter().any(|process| process.name == runtime_name) {
-    create_instance(&vm, true, state).await?;
+    create_instance_owned(&vm, true, owner.clone(), keepalive.clone(), state)
+      .await?;
   }
+  let runtime = inspect_owned_runtime(&vm, state).await?;
   if vm.spec.host_config.dns.is_some()
-    && let Some((_, inspect)) = inspect_owned_runtime(&vm, state).await?
+    && let Some((_, inspect)) = runtime
   {
     validate_runtime_dns(&vm, &inspect)?;
   }
-  super::process::start_instances(
+  super::process::start_instances_owned(
     &vm.spec.vm_key,
     &ProcessKind::Vm,
     true,
+    owner,
+    keepalive,
     state,
   )
   .await?;
@@ -1246,15 +1385,26 @@ async fn start_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 /// Delete VM instance and the VM itself from the database
 ///
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = delete_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = delete_unlocked(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
-async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
+async fn delete_unlocked<G: Clone + Send + 'static>(
+  key: &str,
+  operation: Option<&OperationDb>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(
+    key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let mut targets = processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>();
   // A Docker runtime can survive a failed process-row write or reconciliation.
   // Verify its owner and use its immutable ID before releasing the VM identity.
@@ -1264,7 +1414,13 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     }
   }
   lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
-  super::process::delete_instances(&targets, state).await?;
+  super::process::delete_instances_owned(
+    &targets,
+    operation.map(OperationDb::owner),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if inspect_owned_runtime(&vm, state).await?.is_some() {
     return Err(IoError::interrupted(
       "VM runtime",
@@ -1272,7 +1428,17 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     ));
   }
   cleanup_all_consoles(&vm, &state.inner.config.state_dir).await?;
-  VmDb::clear_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  if let Some(operation) = operation {
+    if !VmDb::delete_operation(operation, keepalive, &state.inner.pool).await? {
+      return Err(IoError::interrupted(
+        "VM deletion",
+        "Accepted operation is no longer current",
+      ));
+    }
+  } else {
+    VmDb::clear_by_pk_owned(&vm.spec.vm_key, keepalive, &state.inner.pool)
+      .await?;
+  }
   state
     .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
     .await;
@@ -1282,24 +1448,32 @@ async fn delete_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 /// Update the VM
 ///
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
-  let _guard = lifecycle_lock(key).lock_owned().await;
-  let result = update_unlocked(key, state).await;
-  record_task_failure(key, result, state).await
+  let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
+  let result = update_unlocked_owned(key, None, guard.clone(), state).await;
+  record_task_outcome_owned(key, result, None, guard, state)
+    .await
+    .0
 }
 
-async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
-  let vm = VmDb::ensure_mac_address(key, state)
-    .await
-    .map_err(|err| IoError::invalid_input("VM MAC", &err.to_string()))?;
+async fn update_unlocked_owned<G: Clone + Send + 'static>(
+  key: &str,
+  owner: Option<OperationOwner>,
+  keepalive: G,
+  state: &SystemState,
+) -> IoResult<()> {
+  let vm = runtime_vm(key, state).await?;
   // Fail before deleting the existing VM runtime.
   ensure_networks(&vm, state).await?;
   validate_spec(&vm.spec.clone().into())?;
   ensure_runtime_image(&vm, state).await?;
   prepare_console_directory(&vm, &state.inner.config.state_dir).await?;
   let runtime_name = format!("{}.v", &vm.spec.vm_key);
-  let old_processes =
-    ProcessDb::read_by_kind_key(&vm.spec.vm_key, None, &state.inner.pool)
-      .await?;
+  let old_processes = ProcessDb::read_by_kind_key(
+    &vm.spec.vm_key,
+    Some(vm_process_filter()),
+    &state.inner.pool,
+  )
+  .await?;
   let mut old_runtime_keys = old_processes
     .iter()
     .filter(|process| {
@@ -1321,15 +1495,35 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
     }
   }
   lifecycle::stop_runtime(&vm, &Default::default(), state).await?;
-  super::process::delete_instances(&old_runtime_keys, state).await?;
+  super::process::delete_instances_owned(
+    &old_runtime_keys,
+    owner.clone(),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if let Err(err) = cleanup_process_consoles(&vm, &old_processes, state).await {
     log::warn!("Unable to clean previous VM console directory: {err}");
   }
-  create_instance(&vm, false, state).await?;
-  super::process::start_instances(key, &ProcessKind::Vm, true, state).await?;
+  create_instance_owned(&vm, false, owner.clone(), keepalive.clone(), state)
+    .await?;
+  super::process::start_instances_owned(
+    key,
+    &ProcessKind::Vm,
+    true,
+    owner.clone(),
+    keepalive.clone(),
+    state,
+  )
+  .await?;
   if !old_init_keys.is_empty()
-    && let Err(err) =
-      super::process::delete_instances(&old_init_keys, state).await
+    && let Err(err) = super::process::delete_instances_owned(
+      &old_init_keys,
+      owner,
+      keepalive,
+      state,
+    )
+    .await
   {
     // The replacement is already running. Do not turn successful replacement
     // into a failed update solely because cleanup of exited init containers
@@ -1343,6 +1537,140 @@ async fn update_unlocked(key: &str, state: &SystemState) -> IoResult<()> {
 mod tests {
   use super::*;
   use nanocl_stubs::vm_spec::VmHostConfig;
+
+  #[ntex::test]
+  async fn vm_start_without_dns_rejects_missing_or_foreign_runtime_generation()
+  {
+    use crate::{models::VmObjCreateIn, objects::generic::ObjCreate};
+    use futures::FutureExt;
+    use nanocl_stubs::vm_spec::VmSpecPartial;
+
+    const IMAGE: &str = "alpine:3.23";
+    let system = utils::tests::gen_default_test_system().await;
+    let state = &system.state;
+    let mut vm_keys = Vec::new();
+    let mut runtime_ids = Vec::new();
+    let result = std::panic::AssertUnwindSafe(async {
+      let mut vms = Vec::new();
+      for _ in 0..2 {
+        let vm = VmDb::fn_create_obj(
+          &VmObjCreateIn {
+            namespace: "global".into(),
+            version: vars::VERSION.into(),
+            spec: VmSpecPartial {
+              name: format!(
+                "start-generation-{}",
+                uuid::Uuid::new_v4().simple()
+              ),
+              image: "/tmp/start-generation-unused.img".into(),
+              cloud_init: Some(false),
+              host_config: Some(VmHostConfig {
+                runtime_network: Some("bridge".into()),
+                ..Default::default()
+              }),
+              ..Default::default()
+            },
+          },
+          state,
+        )
+        .await
+        .unwrap();
+        vm_keys.push(vm.spec.vm_key.clone());
+        vms.push(vm);
+      }
+      let vm = &vms[0];
+      assert!(vm.spec.host_config.dns.is_none());
+      super::super::image::download(
+        IMAGE,
+        None,
+        ImagePullPolicy::IfNotPresent,
+        vm,
+        state,
+      )
+      .await
+      .unwrap();
+      for generation in [None, Some(vms[1].spec.key)] {
+        let mut labels = HashMap::from([
+          ("io.nanocl.v".into(), vm.spec.vm_key.clone()),
+          ("io.nanocl.n".into(), vm.namespace_name.clone()),
+        ]);
+        if let Some(generation) = generation {
+          labels.insert("io.nanocl.vm-spec".into(), generation.to_string());
+        }
+        let process = super::super::process::create(
+          &ProcessKind::Vm,
+          &format!("{}.v", vm.spec.vm_key),
+          &vm.spec.vm_key,
+          &Config {
+            image: Some(IMAGE.into()),
+            cmd: Some(vec!["sleep".into(), "600".into()]),
+            labels: Some(labels),
+            host_config: Some(HostConfig {
+              network_mode: Some("bridge".into()),
+              ..Default::default()
+            }),
+            ..Default::default()
+          },
+          state,
+        )
+        .await
+        .unwrap();
+        runtime_ids.push(process.key.clone());
+        let before = state
+          .inner
+          .docker_api
+          .inspect_container(&process.key, None)
+          .await
+          .unwrap();
+        let guard = std::sync::Arc::new(
+          lifecycle_lock(&vm.spec.vm_key).lock_owned().await,
+        );
+        let error = start_unlocked_owned(&vm.spec.vm_key, None, guard, state)
+          .await
+          .unwrap_err();
+        assert!(error.to_string().contains(if generation.is_some() {
+          "another resource incarnation"
+        } else {
+          "generation is missing or invalid"
+        }));
+        let after = state
+          .inner
+          .docker_api
+          .inspect_container(&process.key, None)
+          .await
+          .unwrap();
+        assert_eq!(after.state.as_ref().unwrap().running, Some(false));
+        assert_eq!(
+          after.state.as_ref().unwrap().started_at,
+          before.state.as_ref().unwrap().started_at
+        );
+        assert_eq!(
+          VmDb::transform_read_by_pk(&vm.spec.vm_key, &state.inner.pool)
+            .await
+            .unwrap()
+            .status,
+          vm.status
+        );
+        super::super::process::delete_instances(&[process.key], state)
+          .await
+          .unwrap();
+        runtime_ids.clear();
+      }
+    })
+    .catch_unwind()
+    .await;
+    for id in runtime_ids {
+      super::super::process::delete_instances(&[id], state)
+        .await
+        .unwrap();
+    }
+    for key in vm_keys {
+      VmDb::clear_by_pk(&key, &state.inner.pool).await.unwrap();
+    }
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
+    }
+  }
 
   #[test]
   fn failed_vm_operation_preserves_observed_runtime_state() {
@@ -1386,9 +1714,12 @@ mod tests {
       "Internal": false, "IPAM": { "Config": [{ "Subnet": "192.0.2.0/24" }] }
     });
     assert!(parse_runtime_network(enabled.clone()).is_ok());
-    let mut legacy = enabled.clone();
-    legacy.as_object_mut().unwrap().remove("EnableIPv4");
-    assert!(parse_runtime_network(legacy).is_ok());
+    let mut optional_ipv4_field = enabled.clone();
+    optional_ipv4_field
+      .as_object_mut()
+      .unwrap()
+      .remove("EnableIPv4");
+    assert!(parse_runtime_network(optional_ipv4_field).is_ok());
     for flag in [
       serde_json::json!(false),
       serde_json::json!("true"),
@@ -1884,14 +2215,12 @@ mod tests {
   }
 
   #[test]
-  fn vm_network_mode_accepts_canonical_and_legacy_state_fields() {
-    for field in ["NetworkMode", "RuntimeNetwork"] {
-      let config = serde_yaml::from_str::<VmHostConfig>(&format!(
-        "Cpu: 1\nMemory: 512\n{field}: private-vm\n"
-      ))
-      .unwrap();
-      assert_eq!(config.runtime_network.as_deref(), Some("private-vm"));
-    }
+  fn vm_network_mode_uses_canonical_state_field() {
+    let config = serde_yaml::from_str::<VmHostConfig>(
+      "Cpu: 1\nMemory: 512\nNetworkMode: private-vm\n",
+    )
+    .unwrap();
+    assert_eq!(config.runtime_network.as_deref(), Some("private-vm"));
 
     let value = serde_json::to_value(VmHostConfig {
       runtime_network: Some("private-vm".to_owned()),
