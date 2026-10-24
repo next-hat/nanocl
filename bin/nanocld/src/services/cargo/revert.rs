@@ -68,6 +68,7 @@ mod tests {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: kind_name.to_owned(),
+      incarnation_key: None,
       kind_key: kind_key.to_owned(),
       version: "test".to_owned(),
       data: serde_json::Value::Null,

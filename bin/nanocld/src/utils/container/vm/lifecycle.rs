@@ -181,7 +181,7 @@ fn validate_process_owner(
   Ok(())
 }
 
-pub(super) async fn inspect_runtime(
+pub(crate) async fn inspect_runtime(
   vm: &Vm,
   state: &SystemState,
 ) -> IoResult<Option<ContainerInspectResponse>> {
@@ -207,6 +207,7 @@ pub(super) async fn inspect_runtime(
     &processes,
     &state.inner.config.hostname,
   )?;
+  super::validate_runtime_generation(vm, &runtime, state).await?;
   Ok(Some(runtime))
 }
 
@@ -227,7 +228,7 @@ pub(crate) fn socket_directory(
   };
   if label("io.nanocl.vm-qmp") != Some("1") {
     return Err(conflict(
-      "This runtime lacks managed QMP; explicitly force-stop it before upgrading to a QMP-capable image",
+      "VM runtime does not provide the required managed QMP interface",
     ));
   }
   let generation = label("io.nanocl.vm-spec")
@@ -412,10 +413,11 @@ async fn set_status(
   key: &str,
   wanted: ObjPsStatusKind,
   actual: ObjPsStatusKind,
+  guard: Arc<VmLifecycleGuard>,
   state: &SystemState,
 ) -> IoResult<()> {
   let old = ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await?;
-  ObjPsStatusDb::update_pk(
+  ObjPsStatusDb::update_owned(
     key,
     ObjPsStatusUpdate {
       wanted: Some(wanted.to_string()),
@@ -424,13 +426,19 @@ async fn set_status(
       prev_actual: Some(old.actual),
       ..Default::default()
     },
+    None,
+    guard,
     &state.inner.pool,
   )
   .await?;
   Ok(())
 }
 
-async fn restore_observed_status(vm: &Vm, state: &SystemState) -> IoResult<()> {
+async fn restore_observed_status(
+  vm: &Vm,
+  guard: Arc<VmLifecycleGuard>,
+  state: &SystemState,
+) -> IoResult<()> {
   let observed = timeout_at(
     Instant::now() + Duration::from_secs(5),
     inspect_runtime(vm, state),
@@ -451,7 +459,7 @@ async fn restore_observed_status(vm: &Vm, state: &SystemState) -> IoResult<()> {
   } else {
     ObjPsStatusKind::Start
   };
-  set_status(&vm.spec.vm_key, wanted, actual, state).await
+  set_status(&vm.spec.vm_key, wanted, actual, guard, state).await
 }
 
 async fn run_lifecycle(
@@ -459,9 +467,18 @@ async fn run_lifecycle(
   options: &VmLifecycleOptions,
   restart: bool,
   expected_id: Option<&str>,
+  guard: Arc<VmLifecycleGuard>,
   state: &SystemState,
 ) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if crate::models::OperationDb::current("Vm", key, &state.inner.pool)
+    .await?
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Err(conflict(
+      "A VM lifecycle operation is awaiting completion or recovery",
+    ));
+  }
   if let Some(expected) = expected_id {
     let runtime = inspect_runtime(&vm, state)
       .await?
@@ -478,12 +495,21 @@ async fn run_lifecycle(
   ) {
     return Err(conflict("A VM lifecycle transition is pending"));
   }
-  set_status(key, ObjPsStatusKind::Stop, ObjPsStatusKind::Stopping, state)
-    .await?;
-  if let Err(err) = complete_lifecycle(&vm, options, restart, state).await {
+  set_status(
+    key,
+    ObjPsStatusKind::Stop,
+    ObjPsStatusKind::Stopping,
+    guard.clone(),
+    state,
+  )
+  .await?;
+  if let Err(err) =
+    complete_lifecycle(&vm, options, restart, guard.clone(), state).await
+  {
     // Every failure after recording the stop request must restore observed
     // state, including database failures after the guest has already stopped.
-    if let Err(restore_error) = restore_observed_status(&vm, state).await {
+    if let Err(restore_error) = restore_observed_status(&vm, guard, state).await
+    {
       log::error!(
         "Unable to restore VM {key} status after {err}: {restore_error}"
       );
@@ -506,16 +532,25 @@ async fn complete_lifecycle(
   vm: &Vm,
   options: &VmLifecycleOptions,
   restart: bool,
+  guard: Arc<VmLifecycleGuard>,
   state: &SystemState,
 ) -> IoResult<()> {
   let key = &vm.spec.vm_key;
   let id = stop_runtime(vm, options, state).await?;
-  set_status(key, ObjPsStatusKind::Stop, ObjPsStatusKind::Stop, state).await?;
+  set_status(
+    key,
+    ObjPsStatusKind::Stop,
+    ObjPsStatusKind::Stop,
+    guard.clone(),
+    state,
+  )
+  .await?;
   if restart {
     set_status(
       key,
       ObjPsStatusKind::Start,
       ObjPsStatusKind::Starting,
+      guard.clone(),
       state,
     )
     .await?;
@@ -540,14 +575,16 @@ async fn complete_lifecycle(
             "Runtime did not remain running after start",
           ));
         }
-        ObjPsStatusDb::update_actual_status(
+        ObjPsStatusDb::update_actual_status_owned(
           key,
           &ObjPsStatusKind::Start,
+          None,
+          guard.clone(),
           &state.inner.pool,
         )
         .await?;
       } else {
-        super::start_unlocked(key, state).await?;
+        super::start_unlocked_owned(key, None, guard.clone(), state).await?;
       }
       Ok::<_, IoError>(())
     })
@@ -575,7 +612,7 @@ async fn begin_lifecycle(
   options
     .validate()
     .map_err(|err| IoError::invalid_input("VM shutdown", &err))?;
-  let guard = lifecycle_lock(key).try_lock_owned().await?;
+  let guard = Arc::new(lifecycle_lock(key).try_lock_owned().await?);
   // Validate existence before an asynchronous process endpoint accepts work.
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let key = key.to_owned();
@@ -587,9 +624,15 @@ async fn begin_lifecycle(
   let (tx, rx) = tokio::sync::oneshot::channel();
   ntex::rt::spawn(async move {
     let guard = guard;
-    let result =
-      run_lifecycle(&key, &options, restart, expected_id.as_deref(), &state)
-        .await;
+    let result = run_lifecycle(
+      &key,
+      &options,
+      restart,
+      expected_id.as_deref(),
+      guard.clone(),
+      &state,
+    )
+    .await;
     if let Err(error) = &result {
       state.emit_error_native_action(
         &vm,

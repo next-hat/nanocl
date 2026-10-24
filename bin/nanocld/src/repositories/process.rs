@@ -6,12 +6,12 @@ use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
-  process::Process,
+  process::{Process, ProcessPartial},
 };
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
-  models::{ColumnType, Pool, ProcessDb, ProcessUpdateDb},
+  models::{ColumnType, OperationOwner, Pool, ProcessDb, ProcessUpdateDb},
   schema::processes,
 };
 
@@ -110,6 +110,72 @@ impl RepositoryReadByTransform for ProcessDb {
 }
 
 impl ProcessDb {
+  fn belongs_to_operation(&self, owner: &OperationOwner) -> bool {
+    // ProcessKind's stored spelling differs from the resource kind used by
+    // operations. Keep this conversion exact instead of accepting arbitrary case.
+    let resource_kind = match self.kind.as_str() {
+      "vm" => "Vm",
+      "cargo" => "Cargo",
+      "job" => "Job",
+      _ => return false,
+    };
+    resource_kind == owner.resource_kind
+      && self.kind_key == owner.resource_key
+      && self.node_name == owner.node_name
+  }
+
+  pub(crate) async fn create_owned<G: Send + 'static>(
+    item: &ProcessPartial,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    let item = Self::from(item);
+    if owner
+      .as_ref()
+      .is_some_and(|owner| !item.belongs_to_operation(owner))
+    {
+      return Err(
+        super::operation::conflict(
+          "Process does not belong to its operation owner",
+        )
+        .into(),
+      );
+    }
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      Ok(
+        diesel::insert_into(processes::table)
+          .values(&item)
+          .get_result(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn delete_owned<G: Send + 'static>(
+    key: &str,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let key = key.to_owned();
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      if let Some(owner) = &expected_owner
+        && let Some(process) =
+          processes::table.find(&key).first::<Self>(conn).optional()?
+        && !process.belongs_to_operation(owner)
+      {
+        return Err(super::operation::conflict(
+          "Process does not belong to its operation owner",
+        ));
+      }
+      diesel::delete(processes::table.find(&key)).execute(conn)?;
+      Ok(())
+    })
+    .await
+  }
+
   /// Read network owners independently of the displayed page and its filters.
   pub async fn read_network_owners(
     targets: &[(String, String)],
@@ -173,5 +239,154 @@ impl ProcessDb {
       })),
     );
     ProcessDb::transform_read_by(&filter, pool).await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{
+    models::{
+      DistributedMutexDb, DistributedMutexPartial, NamespaceDb, NodeDb,
+      OperationDb, SystemState, VmDb, VmObjCreateIn,
+    },
+    objects::generic::ObjCreate,
+    utils::tests::gen_test_system,
+    vars,
+  };
+  use nanocl_stubs::{
+    process::ProcessKind, system::ObjPsStatusKind, vm_spec::VmSpecPartial,
+  };
+
+  fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
+
+  #[ntex::test]
+  async fn owned_vm_process_uses_process_kind_and_preserves_owner_fences() {
+    let system = gen_test_system(no_routes, vars::VERSION).await;
+    let state = &system.state;
+    let pool = &state.inner.pool;
+    NodeDb::register(state).await.unwrap();
+    let namespace = format!("process-owner-{}", uuid::Uuid::new_v4().simple());
+    NamespaceDb::create_from(NamespaceDb::new(&namespace), pool)
+      .await
+      .unwrap();
+    let vm = VmDb::fn_create_obj(
+      &VmObjCreateIn {
+        namespace: namespace.clone(),
+        version: vars::VERSION.into(),
+        spec: VmSpecPartial {
+          name: "guest".into(),
+          image: "/process-owner-test.qcow2".into(),
+          ..Default::default()
+        },
+      },
+      state,
+    )
+    .await
+    .unwrap();
+    let incarnation = VmDb::read_by_pk(&vm.spec.vm_key, pool)
+      .await
+      .unwrap()
+      .0
+      .incarnation_key;
+    let mutex = DistributedMutexDb::create_from(
+      DistributedMutexPartial {
+        action: "start".into(),
+        resource_kind: "Vm".into(),
+        resource_key: vm.spec.vm_key.clone(),
+        node_key: state.inner.config.hostname.clone(),
+        acquired_by: "process-owner-test".into(),
+      },
+      pool,
+    )
+    .await
+    .unwrap();
+    let owner = OperationOwner {
+      key: mutex.key,
+      incarnation_key: incarnation,
+      resource_kind: "Vm".into(),
+      resource_key: vm.spec.vm_key.clone(),
+      node_name: mutex.node_key,
+      owner_boot_id: "process-owner-test".into(),
+      lock_device: 1,
+      lock_inode: 2,
+    };
+    let operation =
+      OperationDb::new(&owner, "Vm", &vm.spec.vm_key, vm.spec.key, "start");
+    VmDb::accept_operation(&vm, None, operation.clone(), (), pool)
+      .await
+      .unwrap();
+    let process = ProcessPartial {
+      key: uuid::Uuid::new_v4().to_string(),
+      name: format!("{}.v", vm.spec.vm_key),
+      kind: ProcessKind::Vm,
+      data: serde_json::json!({}),
+      node_name: owner.node_name.clone(),
+      kind_key: vm.spec.vm_key.clone(),
+      created_at: None,
+    };
+    let stored =
+      ProcessDb::create_owned(&process, Some(owner.clone()), (), pool)
+        .await
+        .unwrap();
+    assert_eq!(stored.kind, "vm");
+    assert_eq!(owner.resource_kind, "Vm");
+    assert_eq!(stored.kind_key, operation.resource_key);
+    ProcessDb::delete_owned(&process.key, Some(owner.clone()), (), pool)
+      .await
+      .unwrap();
+    assert!(ProcessDb::read_by_pk(&process.key, pool).await.is_err());
+
+    let mut wrong_kind = process.clone();
+    wrong_kind.kind = ProcessKind::Cargo;
+    let mut wrong_resource = process.clone();
+    wrong_resource.kind_key.push_str("-other");
+    let mut wrong_node = process.clone();
+    wrong_node.node_name.push_str("-other");
+    for invalid in [&wrong_kind, &wrong_resource, &wrong_node] {
+      let error =
+        ProcessDb::create_owned(invalid, Some(owner.clone()), (), pool)
+          .await
+          .err()
+          .unwrap();
+      assert!(error.to_string().contains("does not belong"), "{error}");
+      assert!(ProcessDb::read_by_pk(&process.key, pool).await.is_err());
+    }
+    // An existing process belonging to another resource/kind must not be deleted.
+    for foreign in [&wrong_kind, &wrong_resource] {
+      ProcessDb::create_from(foreign, pool).await.unwrap();
+      let error =
+        ProcessDb::delete_owned(&foreign.key, Some(owner.clone()), (), pool)
+          .await
+          .unwrap_err();
+      assert!(error.to_string().contains("does not belong"), "{error}");
+      assert!(ProcessDb::read_by_pk(&foreign.key, pool).await.is_ok());
+      ProcessDb::del_by_pk(&foreign.key, pool).await.unwrap();
+    }
+    ProcessDb::create_owned(&process, Some(owner.clone()), (), pool)
+      .await
+      .unwrap();
+    assert!(
+      VmDb::finish_operation(
+        &operation,
+        ObjPsStatusKind::Stop,
+        "interrupted",
+        serde_json::Value::Null,
+        (),
+        pool
+      )
+      .await
+      .unwrap()
+    );
+    assert!(
+      ProcessDb::delete_owned(&process.key, Some(owner), (), pool)
+        .await
+        .is_err()
+    );
+    assert!(ProcessDb::read_by_pk(&process.key, pool).await.is_ok());
+    ProcessDb::del_by_pk(&process.key, pool).await.unwrap();
+    VmDb::clear_by_pk(&vm.spec.vm_key, pool).await.unwrap();
+    NamespaceDb::del_by_pk(&namespace, pool).await.unwrap();
+    state.wait_event_loop().await;
   }
 }

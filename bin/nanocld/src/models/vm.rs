@@ -27,7 +27,18 @@ pub struct VmDb {
   pub status_key: String,
   /// The spec key reference
   pub spec_key: uuid::Uuid,
+  /// Immutable identity retained after this live definition is deleted.
+  pub incarnation_key: uuid::Uuid,
 }
+
+#[derive(Debug)]
+pub(crate) struct AcceptedVmOperation {
+  pub vm: nanocl_stubs::vm::Vm,
+  pub operation: super::OperationDb,
+}
+
+pub(crate) type VmOperationLease =
+  (std::sync::Arc<VmLifecycleGuard>, super::OperationGuard);
 
 /// This structure is used to update a vm in the database.
 #[derive(Debug, Default, AsChangeset)]

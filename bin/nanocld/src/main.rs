@@ -42,6 +42,14 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(config) => config,
   };
+  // Keep the exclusive gate for the process lifetime, including runtime teardown
+  // after the HTTP server stops. The kernel closes it when the process exits.
+  let daemon_guard =
+    match utils::operation::acquire_daemon_guard(&config.state_dir) {
+      Ok(guard) => guard,
+      Err(error) => error.print_and_exit(),
+    };
+  std::mem::forget(daemon_guard);
   // Boot internal dependencies (database, event bus, etc...)
   let daemon_state = match system::init(&config).await {
     Err(err) => {

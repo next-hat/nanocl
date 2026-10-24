@@ -55,8 +55,7 @@ fn vm_spec_for_comparison(
   // Resolve omitted values only for comparison. PATCH must retain omissions
   // so a concurrent change after this inspect is not overwritten.
   let mut desired = desired.clone();
-  desired.mac_address =
-    current.mac_address.clone().or(desired.mac_address.clone());
+  desired.mac_address = current.mac_address.clone();
   desired.cloud_init = desired.cloud_init.or(current.cloud_init);
   desired.cloud_init_user_data = desired
     .cloud_init_user_data
@@ -110,11 +109,11 @@ mod tests {
     assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
     desired.mac_address = Some("02:00:00:00:00:02".to_owned());
     assert!(vm_spec_for_comparison(&desired, &current).is_err());
-    let mut legacy = current.clone();
-    legacy.mac_address = None;
-    vm_spec_for_comparison(&desired, &legacy).unwrap();
-    let update = VmSpecUpdate::from(desired);
-    assert_eq!(update.mac_address.as_deref(), Some("02:00:00:00:00:02"));
+    let mut invalid_current = current.clone();
+    invalid_current.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+    desired.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
   }
 
   #[test]
@@ -122,6 +121,7 @@ mod tests {
     let current = VmSpecPartial {
       name: "guest".into(),
       image: "/vm.qcow2".into(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
       cloud_init_user_data: Some("#cloud-config\n".to_owned().into()),
       ..Default::default()
     };

@@ -18,8 +18,8 @@ use nanocl_stubs::system::{
 
 use crate::{
   models::{
-    CargoDb, CargoReplicaDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb,
-    SystemState, VmDb, VmLifecycleObservationGuard,
+    CargoDb, CargoReplicaDb, ObjPsStatusDb, OperationDb, ProcessDb,
+    ProcessUpdateDb, SystemState, VmDb, VmLifecycleObservationGuard,
   },
   repositories::generic::*,
   utils, vars,
@@ -150,46 +150,23 @@ async fn handle_vm_runtime_exit(
   state: &SystemState,
   _guard: VmLifecycleObservationGuard,
 ) -> IoResult<()> {
-  // A contended event is checked only after the operation releases its lock.
-  // The VM may have restarted, changed desired state, or been deleted by then.
-  let actual_status =
-    match ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await {
-      Ok(status) => status,
-      Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-        return Ok(());
-      }
-      Err(error) => return Err(error),
-    };
-  if vm_runtime_failure_effect(
-    "die",
-    name,
-    &actual_status.wanted,
-    &actual_status.actual,
-  ) != VmRuntimeFailureEffect::FailAndEmitRuntimeError
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
   {
     return Ok(());
   }
-  // A delayed die event can describe a replaced runtime or an earlier run of
-  // a restarted container. Confirm that the current runtime is still exited.
-  let runtime = state
-    .inner
-    .docker_api
-    .inspect_container(&format!("{key}.v"), None::<InspectContainerOptions>)
-    .await;
-  let has_exited = match runtime {
-    Ok(runtime) => vm_runtime_has_exited(id, event_time, &runtime),
-    Err(bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 404,
-      ..
-    }) => false,
-    Err(error) => return Err(*error.map_err_context(|| "VM Docker event")),
+  // A contended event is checked only after the operation releases its lock.
+  // The VM may have restarted, changed desired state, or been deleted by then.
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
   };
-  if !has_exited {
-    log::debug!(
-      "VM {key} ignored stale or unconfirmed exit: container={id} event_time={event_time:?}"
-    );
-    return Ok(());
-  }
   let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
     Ok(vm) => vm,
     Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
@@ -197,17 +174,113 @@ async fn handle_vm_runtime_exit(
     }
     Err(error) => return Err(error),
   };
-  ObjPsStatusDb::update_actual_status(
-    key,
-    &ObjPsStatusKind::Fail,
+  if vm_runtime_failure_effect(
+    "die",
+    name,
+    &vm.status.wanted.to_string(),
+    &vm.status.actual.to_string(),
+  ) != VmRuntimeFailureEffect::FailAndEmitRuntimeError
+  {
+    return Ok(());
+  }
+  // A delayed die event can describe a replaced runtime or an earlier run of
+  // a restarted container. Confirm that the current runtime is still exited.
+  let has_exited =
+    match utils::container::vm::inspect_runtime(&vm, state).await? {
+      Some(runtime) => vm_runtime_has_exited(id, event_time, &runtime),
+      None => false,
+    };
+  if !has_exited {
+    log::debug!(
+      "VM {key} ignored stale or unconfirmed exit: container={id} event_time={event_time:?}"
+    );
+    return Ok(());
+  }
+  if !VmDb::observe_runtime_status(
+    &vm,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    ObjPsStatusKind::Fail,
+    guard,
     &state.inner.pool,
   )
-  .await?;
+  .await?
+  {
+    return Ok(());
+  }
   state.emit_error_native_action(
     &vm,
     NativeEventAction::Die,
     Some(format!("process {name} (container {id}, exit event {event_time:?}) died but should be alive")),
   );
+  Ok(())
+}
+
+async fn handle_vm_runtime_start(
+  key: &str,
+  id: &str,
+  event_time: Option<i64>,
+  state: &SystemState,
+  _guard: VmLifecycleObservationGuard,
+) -> IoResult<()> {
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Ok(());
+  }
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
+    Ok(vm) => vm,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  let Some(runtime) = utils::container::vm::inspect_runtime(&vm, state).await?
+  else {
+    return Ok(());
+  };
+  let started_at = runtime
+    .state
+    .as_ref()
+    .and_then(|state| state.started_at.as_deref())
+    .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+    .and_then(|value| value.timestamp_nanos_opt());
+  if runtime.id.as_deref() != Some(id)
+    || id.is_empty()
+    || runtime.state.as_ref().and_then(|state| state.running) != Some(true)
+    || !matches!((event_time, started_at), (Some(event), Some(start)) if event >= start)
+  {
+    return Ok(());
+  }
+  let generation = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref())
+    .and_then(|labels| labels.get("io.nanocl.vm-spec"))
+    .and_then(|value| uuid::Uuid::parse_str(value).ok());
+  let Some(generation) = generation else {
+    return Ok(());
+  };
+  utils::container::vm::validate_generation(&vm, generation, state).await?;
+  VmDb::observe_runtime_status(
+    &vm,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    ObjPsStatusKind::Start,
+    guard,
+    &state.inner.pool,
+  )
+  .await?;
   Ok(())
 }
 
@@ -536,12 +609,24 @@ async fn exec_docker(
             && !name.starts_with("tmp-")
             && !name.ends_with(".init.v") =>
         {
-          ObjPsStatusDb::update_actual_status(
-            &kind_key,
-            &ObjPsStatusKind::Start,
-            &state.inner.pool,
-          )
-          .await?;
+          if let Some(guard) = vm_runtime_failure_guard(&kind_key) {
+            handle_vm_runtime_start(&kind_key, &id, event_time, state, guard)
+              .await?;
+          } else {
+            let lock = utils::container::vm::lifecycle_lock(&kind_key);
+            let key = kind_key.clone();
+            let id = id.clone();
+            let state = state.clone();
+            rt::spawn(async move {
+              let guard = lock.observe_owned().await;
+              if let Err(error) =
+                handle_vm_runtime_start(&key, &id, event_time, &state, guard)
+                  .await
+              {
+                log::warn!("event::docker deferred VM start: {error}");
+              }
+            });
+          }
         }
         _ => {}
       }
@@ -1263,5 +1348,197 @@ mod tests {
       "demo-api.candidate.c",
       Some(&essential_app)
     ));
+  }
+
+  #[ntex::test]
+  async fn vm_docker_events_preserve_durable_pending_operations_without_tasks_or_mutexes()
+   {
+    use crate::{
+      models::{
+        DistributedMutexDb, DistributedMutexPartial, OperationOwner,
+        SystemStateInner, VmObjCreateIn,
+      },
+      objects::generic::ObjCreate,
+    };
+    use futures::FutureExt;
+    use nanocl_stubs::vm_spec::VmSpecPartial;
+
+    let system = utils::tests::gen_default_test_system().await;
+    // Pending observations must return before any Docker inspection. An
+    // unavailable socket makes a missing pending-owner check observable.
+    let state = SystemState {
+      inner: std::sync::Arc::new(SystemStateInner {
+        pool: system.state.inner.pool.clone(),
+        docker_api: bollard_next::Docker::connect_with_unix(
+          "/dev/null",
+          1,
+          bollard_next::API_DEFAULT_VERSION,
+        )
+        .unwrap(),
+        config: system.state.inner.config.clone(),
+        task_manager: Default::default(),
+        event_emitter: system.state.inner.event_emitter.clone(),
+        event_emitter_raw: Default::default(),
+        arbiter: ntex::rt::Arbiter::current(),
+      }),
+    };
+    for phase in [
+      ObjPsStatusKind::Starting,
+      ObjPsStatusKind::Updating,
+      ObjPsStatusKind::Destroying,
+    ] {
+      let vm = VmDb::fn_create_obj(
+        &VmObjCreateIn {
+          namespace: "global".to_owned(),
+          version: vars::VERSION.to_owned(),
+          spec: VmSpecPartial {
+            name: format!("pending-event-{}", uuid::Uuid::new_v4().simple()),
+            image: "/tmp/pending-event-test.img".to_owned(),
+            cloud_init: Some(false),
+            ..Default::default()
+          },
+        },
+        &state,
+      )
+      .await
+      .unwrap();
+      let key = &vm.spec.vm_key;
+      let mut mutex_key = None;
+      let result = std::panic::AssertUnwindSafe(async {
+        let mutex = DistributedMutexDb::create_from(
+          DistributedMutexPartial {
+            action: phase.to_string(),
+            resource_kind: "Vm".to_owned(),
+            resource_key: key.clone(),
+            node_key: state.inner.config.hostname.clone(),
+            acquired_by: "pending-event-test".to_owned(),
+          },
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
+        mutex_key = Some(mutex.key);
+        let (live, _, _) =
+          VmDb::read_by_pk(key, &state.inner.pool).await.unwrap();
+        let operation = OperationDb::new(
+          &OperationOwner {
+            key: mutex.key,
+            resource_kind: "Vm".into(),
+            resource_key: key.clone(),
+            incarnation_key: live.incarnation_key,
+            node_name: mutex.node_key,
+            owner_boot_id: "event-test-boot".to_owned(),
+            lock_device: 1,
+            lock_inode: 2,
+          },
+          "Vm",
+          key,
+          vm.spec.key,
+          match phase {
+            ObjPsStatusKind::Starting => "start",
+            ObjPsStatusKind::Updating => "update",
+            ObjPsStatusKind::Destroying => "delete",
+            _ => unreachable!(),
+          },
+        );
+        VmDb::accept_operation(
+          &vm,
+          None,
+          operation.clone(),
+          (),
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
+        DistributedMutexDb::del_by_pk(&operation.key, &state.inner.pool)
+          .await
+          .unwrap();
+        assert!(
+          state
+            .inner
+            .task_manager
+            .get_task(&format!("Vm@{key}"))
+            .await
+            .is_none()
+        );
+        assert!(
+          DistributedMutexDb::get_lock("Vm", key, &state.inner.pool)
+            .await
+            .is_err()
+        );
+        let before = ObjPsStatusDb::read_by_pk(key, &state.inner.pool)
+          .await
+          .unwrap();
+
+        let guard = utils::container::vm::lifecycle_lock(key)
+          .observe_owned()
+          .await;
+        handle_vm_runtime_start(
+          key,
+          "delayed-container-id",
+          Some(1),
+          &state,
+          guard,
+        )
+        .await
+        .unwrap();
+        let guard = utils::container::vm::lifecycle_lock(key)
+          .observe_owned()
+          .await;
+        handle_vm_runtime_exit(
+          key,
+          &format!("{key}.v"),
+          "delayed-container-id",
+          Some(1),
+          &state,
+          guard,
+        )
+        .await
+        .unwrap();
+
+        let after = ObjPsStatusDb::read_by_pk(key, &state.inner.pool)
+          .await
+          .unwrap();
+        assert_eq!(after.actual, before.actual);
+        assert_eq!(after.wanted, before.wanted);
+        assert_eq!(after.prev_actual, before.prev_actual);
+        assert_eq!(after.updated_at, before.updated_at);
+        assert_eq!(
+          OperationDb::current("Vm", key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(operation)
+        );
+      })
+      .catch_unwind()
+      .await;
+      if let Some(mutex_key) = mutex_key {
+        let _ =
+          DistributedMutexDb::del_by_pk(&mutex_key, &state.inner.pool).await;
+      }
+      if let Some(operation) =
+        OperationDb::current("Vm", key, &state.inner.pool)
+          .await
+          .unwrap()
+      {
+        if operation.outcome.is_none() {
+          VmDb::finish_operation(
+            &operation,
+            ObjPsStatusKind::Stop,
+            "interrupted",
+            serde_json::json!({"TestCleanup": true}),
+            (),
+            &state.inner.pool,
+          )
+          .await
+          .unwrap();
+        }
+      }
+      VmDb::clear_by_pk(key, &state.inner.pool).await.unwrap();
+      if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+      }
+    }
+    system.state.wait_event_loop().await;
   }
 }

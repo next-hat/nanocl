@@ -20,7 +20,7 @@ Alternative designs were considered:
 | TAP bridged directly to the Docker interface | Preserves the address but couples DHCP broadcast isolation and endpoint address ownership to bridge filtering. |
 | Routed TAP with proxy ARP | Preserves the guest's Docker endpoint address and separates DHCP at the link boundary. Requires explicit routes, proxy ARP, and removal of duplicate local IP ownership. |
 
-The implementation uses the third model. Only local Docker bridge networking is supported. `host`, `none`, and `container:` namespace sharing are incompatible with runtime network setup. Existing physical-interface takeover configurations must migrate to a Docker bridge.
+The implementation uses the third model. Only local Docker bridge networking is supported. `host`, `none`, and `container:` namespace sharing are incompatible with runtime network setup. Statefiles must select a Docker bridge.
 
 Leave `HostConfig.LinkNetIface` unset to discover the Docker uplink. An explicit value must match the selected network's container interface prefix followed by `0` (`eth0` by default). NanoCL checks this before starting or replacing the runtime; `eth1` does not select a second endpoint.
 
@@ -55,11 +55,66 @@ The API provides `POST /v0.19.0/vms/{key}/stop`, `POST /v0.19.0/vms/{key}/restar
 
 Status reports actual QEMU execution state as `{"Running":true,"Status":"running"}`. A paused guest reports `Running: false` and `Status: paused` even though its container is running. A stopped runtime reports `Running: false` and `Status: exited`. Status remains available while a shutdown request waits through its grace period. Pause/resume is not exposed.
 
-Generic process stop/restart returns HTTP 202 after accepting the bounded operation; completion or failure is reported through events and VM status. The dedicated VM stop/restart endpoints wait for completion. VM replacement and deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. Failed operations emit an error while VM status reflects the observed owned runtime: a guest left running remains `Start`. The requested specification is retained for inspection and retry. Known self-referential DNS on the currently assigned endpoint is rejected before accepting a replacement specification. A runtime image must include `io.nanocl.vm-qmp=1`. For older running containers, stop them from inside the guest or explicitly force-stop before replacing them with a matching runtime. Pulling an updated image alone does not change existing containers.
+Generic process stop/restart returns HTTP 202 after accepting the bounded operation; completion or failure is reported through events and VM status. The dedicated VM stop/restart endpoints wait for completion. VM replacement and deletion also request graceful shutdown before removing a running VM runtime. A shutdown failure prevents replacement or deletion; explicitly stop with `--force` before retrying if forced power-off is necessary. Failed operations emit an error while VM status reflects the observed owned runtime: a guest left running remains `Start`. The requested specification is retained for inspection and retry. Known self-referential DNS on the currently assigned endpoint is rejected before accepting a replacement specification. A runtime image must include `io.nanocl.vm-qmp=1`. Runtime containers must carry the current revision and runtime capability labels. Pulling an updated image alone does not change existing containers.
 
 Start, replacement, and deletion acquire lifecycle admission and their distributed mutex before changing desired state or recording a pending transition. The accepted task keeps that ownership through execution, failure reconciliation, and cleanup, even if the HTTP caller disconnects. A mutex acquisition failure leaves the pre-request specification and status untouched; an existing owner's mutex is never removed by that failed request. Error notifications after completion do not write VM status. Task completion and waiters retire only their own registered task handle.
 
-These guarantees cover setup failure in the running daemon. Recovery of pending transitions left by a daemon crash remains tracked in [issue #1526](https://github.com/next-hat/nanocl/issues/1526). An absent or expired mutex is not proof that an executor has stopped, so this change does not infer crash recovery from mutex garbage collection.
+### Shared operations and atomic VM acceptance
+
+Operation history uses the existing specification store and two small shared tables:
+
+| Table or relationship | Purpose |
+| --- | --- |
+| `resource_incarnations` | Retained UUID, resource kind/name, creation/deletion times, and authoritative `current_operation_key`. A deleted name can be reused with a new UUID. |
+| `operations` | One immutable request UUID, incarnation, kind/name snapshot, action, accepted specification UUID, owner node/boot/file identity, acceptance/completion times, outcome, and diagnostic. |
+| `vms.incarnation_key` | Associates the live definition with its retained identity. |
+| `specs.incarnation_key` | Associates VM revisions, including boot revisions, with that identity. VM deletion retains these revisions and operation history. |
+
+An operation is pending while its outcome is null; its terminal outcome is `completed`, `failed`, or `interrupted`. These are request outcomes, independent of VM runtime statuses. Accepted identity and inputs do not change. The current-operation pointer remains after completion and deletion. A historical UUID, matching revision, or absence of a pending operation cannot authorize a stale completion: every conditional write also checks the exact current association and incarnation. A new request inserts a new operation even when it uses the same specification. A partial unique index allows only one unresolved operation per incarnation; kind/node pending scans and kind/incarnation history queries have dedicated indexes.
+
+Replacement acceptance inserts its specification, changes the live specification pointer, records `Updating`, inserts the operation, and changes the authoritative current-operation pointer in one transaction on one connection. Start and deletion commit their pending status and operation association the same way. Any pre-commit failure rolls everything back. Only serialization failures are retried; Docker, QMP, events, and dispatch remain outside transactions. An uncertain commit is preserved for inspection and recovery rather than assumed to be rollback.
+
+The containerized daemon runs as the single controller for its node and persistent mounted state directory. It holds an exclusive kernel lock at `${state_dir}/run/operations.gate` for its entire process lifetime, including runtime teardown. A second controller using the same directory fails before startup. The state directory and node identity must remain stable across daemon replacement; copied state roots do not provide shared ownership protection.
+
+Before acceptance, the owner holds VM lifecycle admission and an exclusive kernel lock at `${state_dir}/run/operations/{operation_uuid}.lock`. The UUID is also the exact distributed mutex token. The file contains bounded immutable identity metadata. Detached acceptance and execution retain both guards if the HTTP caller or TaskManager waiter disconnects. Database workers receive their own guard references, so cancellation of an awaiting future cannot release ownership before the actual transaction and COMMIT finish. Expiry or deletion of the database mutex does not release the kernel lock.
+
+Shared code in `repositories/operation.rs` and `utils/operation.rs` handles retained identity, currentness, queries, owned database work, and file locks/cleanup. VM transactions remain in `repositories/vm_operation.rs`; tasks, QEMU, provisioning, runtime observation, and recovery policy remain VM-specific. Cargo and Job execution are unchanged.
+
+### Interrupted operations and automatic recovery
+
+After startup inventory, the daemon recovery loop scans up to 32 pending VM operations per page every ten seconds. Its cursor advances past unclassifiable owners. Recovery takes the ordinary VM mutation/observation guards, verifies the same node, opens the exact regular owner file without following symlinks, verifies its serialized accepted token, and acquires its exclusive lock nonblockingly. Same-boot recovery also requires the recorded device/inode. A live operation's lock prevents takeover even if its database mutex has expired. Missing tasks or elapsed time alone never establish abandonment.
+
+A replacement daemon holding the exclusive controller lock can recover an operation whose recorded owner boot differs from the current boot. The serialized accepted token must still match, and the operation's file lock must be free; a changed boot ID alone is insufficient. Device/inode values can change after a remount, so previous-boot recovery pins the opened file's current identity for safe cleanup while retaining the historical owner metadata. This recovery runs automatically through the same startup/periodic path as same-boot owner loss. Missing files, mismatched tokens, malformed metadata, foreign node identity, and other ambiguous evidence remain pending without altering accepted state. Recovery requires a recorded operation and never invents missing request history.
+
+The separate offline maintenance command and its quiescence-confirmation workflow have been removed. Routine recovery uses the daemon's configured database, Docker connection, node identity, and mounted state without operator-supplied operation UUIDs or credentials.
+
+Recovery verifies the live incarnation and current operation again before writing. It observes the owned Docker runtime and its saved boot revision, immutable container ID, local node, and current run timestamp. It also inventories VM-labeled init, temporary, and renamed containers, including containers with no process row. A running or unknown auxiliary container defers recovery because it may still be provisioning a disk. Wait for it to exit or inspect and explicitly stop it. Recovery does not replay, start, stop, replace, or delete a runtime.
+
+| Accepted action | Reconciliation result |
+| --- | --- |
+| `start` | Record `interrupted`; expose observed `Start` or `Stop`. A running container does not prove the request completed. |
+| `update` | Retain the accepted desired revision, record `interrupted`, and expose observed `Start` or `Stop`, including an older running boot revision from the same incarnation. |
+| `delete` | Retain live VM metadata, record `interrupted`, and expose observed `Start` or `Stop`. Deletion requires an explicit new request. |
+
+Database/Docker errors, ambiguous ownership, and invalid boot-generation evidence defer reconciliation without changing accepted state. Runtime inspection has a five-second bound; final database writes retain ownership through completion. Repeated reconciliation is harmless; a stale task, observation, or recovery candidate cannot settle a newer operation even after it completes. Recovery emits an interruption event. Runtime execution failures store a safe stage/operation reference rather than copying raw error strings or resolved secrets into history; existing VM events carry detailed runtime errors.
+
+For example, an update accepts desired revision B while revision A is running. If graceful shutdown fails, the operation is `failed` and observed status remains `Start`. If its owner crashes before recording the outcome, verified recovery records `interrupted` and `Start`, with A as the observed boot revision and B still desired. Neither case claims B is running. Inspect the revisions/runtime/events, resolve the cause, and submit a fresh update; the new UUID becomes current while the earlier record remains historical. Console access to A still requires both A and B to enable it.
+
+### Ownership-file cleanup and migration
+
+Completion and definitively rejected acceptance attempt exact file cleanup while holding its lock. Cleanup locks the retained incarnation row before deciding whether an operation is absent, fencing any in-flight acceptance transaction. A pending record, database error, unknown commit, live flock, malformed metadata, or identity mismatch preserves the evidence. Terminal records and definitively absent attempts are eligible; cleanup rechecks the exact path/device/inode before unlinking. Unknown or corrupt evidence is not silently removed.
+
+The recovery loop also visits at most 32 directory entries per pass with a persistent directory cursor, eventually revisiting eligible files missed by a crash. It never bulk-deletes the directory or removes operation/specification history. Retaining every historical lock file is unnecessary; no history-retention policy is introduced.
+
+The six `2026-10-24` migrations introduce the shared schema directly, with a required incarnation on every newly created VM. They replace the earlier, unmerged PR-only migrations; those migrations were absent from released tags and `nightly` when checked. Deployment requires a fresh cluster recreated from NanoCL Statefiles. There is no old-schema backfill or runtime adoption. A development database that applied an earlier revision of this PR must be recreated with its cluster, not upgraded in place.
+
+Stop all daemons and operation owners before cluster recreation or schema reversal. Overlapping old/new binaries are unsupported. The down migrations are checked in reverse dependency order: they discard retained operations/incarnations and their associations while preserving specification rows. Reapplying the new schema requires empty VM state. Production deployment uses cluster recreation and Statefile apply rather than an in-place upgrade or downgrade.
+
+### Automatic recovery validation
+
+The automatic-recovery correction passed formatting, Clippy, the development-binary build, and focused `cargo make tests` runs in a task-owned Docker engine with fresh state, both DNS/proxy profiles, a two-CPU cap, one Cargo job, and one test thread. The VM filter passed 123 tests, the operation filter passed 21, and the CLI-removal check passed one; these filters overlap. Three subprocess helpers are marked ignored for direct harness execution and are invoked by their parent tests.
+
+The recovery fixture terminates only its newly created child controller, then invokes the production recovery scan. Previous-boot coverage uses simulated boot-identity fixtures, including changed filesystem identity and exact cleanup. No host reboot was performed, no host boot identity was changed, and the installed cluster was untouched. Broader suite validation runs in PR CI rather than repeating the full suite locally.
 
 ## Live resource growth
 
@@ -201,7 +256,7 @@ Use the [noVNC example](../examples/vm-console/README.md) for a local browser co
 
 CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data FILE`, and `--console true|false`. PATCH also accepts `--clear-cloud-init-user-data`, mutually exclusive with the user-data file. PATCH preserves omitted options. Use a Statefile to select a local candidate runtime explicitly.
 
-## Migration
+## Fresh-cluster deployment
 
 1. Pull the published nightly runtime for current development and CI testing:
 
@@ -211,11 +266,10 @@ CLI create/run/patch accepts `--cloud-init true|false`, `--cloud-init-user-data 
 
    Nightly NanoCL builds default to this tag. Stable builds retain `ghcr.io/next-hat/nanocl-qemu:8.0.5.0`, which requires stable release publication. `HostConfig.Runtime` can select the nightly or an explicitly built local candidate. Pull updated nightly images explicitly because NanoCL uses `IfNotPresent`; an existing cached image is not refreshed automatically. NanoCL requires the image labels `io.nanocl.vm-runtime-api=0.19` and `io.nanocl.vm-qmp=1`; an older runtime without those contracts is rejected before replacement.
 
-2. Move `NetworkMode: host`, legacy `RuntimeNetwork: host`, and physical `LinkNetIface` configurations onto a named Docker bridge. `RuntimeNetwork` remains a spelling alias for `NetworkMode`.
-3. Existing VM images that retain cloud-init static network configuration need guest-side migration to DHCP. Disabling future seed generation does not remove guest state already written by an earlier seed. Back up the image and use its distribution's network tools to enable DHCP before replacing the runtime.
-4. Legacy VM specs without a MAC receive a persisted address before their next runtime creation. Their former runtime-generated MAC was not a durable identity. Check guest network rules that match the old MAC. A legacy VM may supply an explicit `MacAddress` before identity is assigned.
-5. Shut down a legacy guest from inside the guest OS, or explicitly use `nanocl vm stop <key> --force` if a power cut is acceptable. Replace its runtime to use the new DHCP, QMP, and console behavior. Stop/start alone can reuse an existing old container configuration. Retain `CloudInit: true` when existing guest provisioning is needed; set it to `false` for a prepared non-cloud-init image.
-6. Enable `Console` only for the VMs that need it, and connect through the configured daemon endpoint or the loopback example. Do not restore the old public websockify port mapping.
+2. Recreate the cluster and its database/state, then apply current NanoCL Statefiles. Use `HostConfig.NetworkMode` with a named Docker bridge and DHCP-capable guest images.
+3. VM creation assigns and persists a MAC when the Statefile omits it; an explicit `MacAddress` must be valid and unique. Existing definitions are not backfilled or adopted.
+4. Use `CloudInit: true` for cloud-init provisioning or `false` for a prepared image with its own DHCP configuration and login credentials.
+5. Enable `Console` only for the VMs that need it, and connect through the configured daemon endpoint or the loopback example.
 
 ## Reproducible release validation
 
