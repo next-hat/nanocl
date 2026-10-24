@@ -71,70 +71,32 @@ fn vm_spec_for_comparison(
   Ok(desired)
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn vm_state_apply_preserves_generated_identity_and_omitted_options() {
-    let current = VmSpecPartial {
-      name: "guest".to_owned(),
-      image: "/vm.qcow2".to_owned(),
-      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
-      cloud_init: Some(false),
-      cloud_init_user_data: Some(
-        serde_json::from_value(serde_json::json!({"packages": ["curl"]}))
-          .unwrap(),
-      ),
-      console: Some(true),
-      ..Default::default()
-    };
-    let mut desired = VmSpecPartial {
-      name: current.name.clone(),
-      image: current.image.clone(),
-      ..Default::default()
-    };
-    assert_eq!(vm_spec_for_comparison(&desired, &current).unwrap(), current);
-    let payload =
-      serde_json::to_value(VmSpecUpdate::from(desired.clone())).unwrap();
-    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
-      assert!(payload.get(field).is_none(), "{field} must remain omitted");
-    }
-    desired.console = Some(false);
-    desired.cloud_init_user_data = Some(String::new().into());
-    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
-    assert_eq!(comparison.console, Some(false));
-    assert_eq!(comparison.cloud_init_user_data, Some(String::new().into()));
-    assert_eq!(desired.console, Some(false));
-    assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
-    desired.mac_address = Some("02:00:00:00:00:02".to_owned());
-    assert!(vm_spec_for_comparison(&desired, &current).is_err());
-    let mut invalid_current = current.clone();
-    invalid_current.mac_address = None;
-    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
-    desired.mac_address = None;
-    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+async fn apply_matching_vm(
+  client: &nanocld_client::NanocldClient,
+  key: &str,
+  actual: &ObjPsStatusKind,
+  pg: &ProgressBar,
+  summary: &ProgressBar,
+  output: Option<&StateOutput>,
+) -> IoResult<&'static str> {
+  if *actual == ObjPsStatusKind::Start {
+    return Ok("Unchanged");
   }
-
-  #[test]
-  fn vm_state_apply_explicit_null_clears_user_data_without_mutating_payload() {
-    let current = VmSpecPartial {
-      name: "guest".into(),
-      image: "/vm.qcow2".into(),
-      mac_address: Some("02:ab:cd:ef:00:01".into()),
-      cloud_init_user_data: Some("#cloud-config\n".to_owned().into()),
-      ..Default::default()
-    };
-    let desired: VmSpecPartial = serde_json::from_value(serde_json::json!({
-      "Name": "guest", "Image": "/vm.qcow2", "CloudInitUserData": null,
-    }))
-    .unwrap();
-    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
-    assert!(comparison.cloud_init_user_data.is_none());
-    assert_ne!(comparison, current);
-    let payload = serde_json::to_value(VmSpecUpdate::from(desired)).unwrap();
-    assert_eq!(payload.get("CloudInitUserData"), Some(&Value::Null));
+  if *actual == ObjPsStatusKind::Stop {
+    let waiter = utils::process::wait_process_state(
+      key,
+      EventActorKind::Vm,
+      vec![NativeEventAction::Start],
+      client,
+    )
+    .await?;
+    utils::progress::set_state_message(pg, summary, "Starting", output)?;
+    client.start_process("vm", key).await?;
+    waiter.await.map_err(|err| {
+      IoError::interrupted("wait_process_state", &err.to_string())
+    })??;
   }
+  Ok("Running")
 }
 
 async fn state_apply(
@@ -370,8 +332,16 @@ async fn state_apply(
                   utils::progress::set_state_message(
                     &pg, summary, "Updated", output,
                   )?;
-                } else if inspect.status.actual == ObjPsStatusKind::Start {
-                  return Ok("Unchanged");
+                } else {
+                  return apply_matching_vm(
+                    client,
+                    key,
+                    &inspect.status.actual,
+                    &pg,
+                    summary,
+                    output,
+                  )
+                  .await;
                 }
               }
             }
@@ -596,4 +566,277 @@ pub(super) async fn exec_state_apply(
       .await;
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::{Arc, Mutex};
+
+  use futures::{channel::oneshot, future::Either};
+  use nanocld_client::{ConnectOpts, NANOCLD_DEFAULT_VERSION, NanocldClient};
+  use ntex::{util::Bytes, web};
+
+  use super::*;
+
+  struct VmApplyRequests {
+    paths: Vec<String>,
+    conditions: Option<Value>,
+    started: Option<oneshot::Sender<()>>,
+    completion: Option<oneshot::Receiver<bool>>,
+    reject_start: bool,
+  }
+
+  struct VmApplyFixture {
+    client: NanocldClient,
+    _server: web::test::TestServer,
+    requests: Arc<Mutex<VmApplyRequests>>,
+    started: oneshot::Receiver<()>,
+    complete: oneshot::Sender<bool>,
+  }
+
+  fn vm_event(failed: bool, action: &str) -> Bytes {
+    let event = serde_json::json!({
+      "Key": "3e8f6eef-f03a-446d-9e7a-635728c3f565",
+      "CreatedAt": "2026-01-01T00:00:00",
+      "ExpiresAt": "2026-01-01T01:00:00",
+      "ReportingNode": "test",
+      "ReportingController": "nanocl.io/core",
+      "Kind": if failed { "error" } else { "normal" },
+      "Action": action,
+      "Reason": "VM start",
+      "Note": if failed { "VM start failed" } else { "VM started" },
+      "Actor": {"Key": "global.guest", "Kind": "Vm"},
+    });
+    Bytes::from(format!("{event}\n"))
+  }
+
+  async fn watch_vm_start(
+    req: web::HttpRequest,
+    body: web::types::Json<Value>,
+  ) -> web::HttpResponse {
+    let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
+    let completion = {
+      let mut requests = requests.lock().unwrap();
+      requests.paths.push(req.path().to_owned());
+      requests.conditions = Some(body.into_inner());
+      requests.completion.take().unwrap()
+    };
+    let events = futures::stream::once(async {
+      Ok::<_, std::io::Error>(vm_event(false, "starting"))
+    })
+    .chain(futures::stream::once(async move {
+      let failed = completion.await.unwrap();
+      Ok::<_, std::io::Error>(vm_event(failed, "start"))
+    }));
+    web::HttpResponse::Ok().streaming(Box::pin(events))
+  }
+
+  async fn start_matching_vm(req: web::HttpRequest) -> web::HttpResponse {
+    let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
+    let mut requests = requests.lock().unwrap();
+    requests.paths.push(req.path().to_owned());
+    let _ = requests.started.take().unwrap().send(());
+    if requests.reject_start {
+      web::HttpResponse::Conflict()
+        .json(&serde_json::json!({"msg": "VM start rejected"}))
+    } else {
+      web::HttpResponse::Accepted().into()
+    }
+  }
+
+  fn vm_apply_fixture(reject_start: bool) -> VmApplyFixture {
+    let (start, started) = oneshot::channel();
+    let (complete, completion) = oneshot::channel();
+    let requests = Arc::new(Mutex::new(VmApplyRequests {
+      paths: Vec::new(),
+      conditions: None,
+      started: Some(start),
+      completion: Some(completion),
+      reject_start,
+    }));
+    let server_requests = requests.clone();
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(
+          web::WebAppConfig::new().set_state(server_requests.clone()),
+        )
+        .service(
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/events/watch"))
+            .route(web::post().to(watch_vm_start)),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/processes/vm/global.guest/start"
+          ))
+          .route(web::post().to(start_matching_vm)),
+        )
+    });
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: format!("http://localhost:{}", server.addr().port()),
+      ..Default::default()
+    })
+    .unwrap();
+    VmApplyFixture {
+      client,
+      _server: server,
+      requests,
+      started,
+      complete,
+    }
+  }
+
+  async fn stopped_vm_apply(failed: bool) -> IoResult<&'static str> {
+    let fixture = vm_apply_fixture(false);
+    let pg = ProgressBar::hidden();
+    let summary = ProgressBar::hidden();
+    let apply = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &pg,
+      &summary,
+      None,
+    );
+    futures::pin_mut!(apply);
+    match futures::future::select(apply.as_mut(), fixture.started).await {
+      Either::Left((result, _)) => {
+        panic!("apply finished before requesting start: {result:?}");
+      }
+      Either::Right((started, _)) => started.unwrap(),
+    }
+    // The accepted HTTP request alone cannot produce a successful apply.
+    assert!(futures::poll!(apply.as_mut()).is_pending());
+    fixture.complete.send(failed).unwrap();
+    let result = apply.await;
+    let requests = fixture.requests.lock().unwrap();
+    assert_eq!(
+      requests.paths,
+      [
+        format!("/v{NANOCLD_DEFAULT_VERSION}/events/watch"),
+        format!("/v{NANOCLD_DEFAULT_VERSION}/processes/vm/global.guest/start"),
+      ]
+    );
+    assert_eq!(
+      requests.conditions,
+      Some(serde_json::json!([{
+        "ActorKey": "global.guest",
+        "ActorKind": "Vm",
+        "Kind": ["normal", "error"],
+        "Action": ["start"],
+      }]))
+    );
+    result
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_running_is_unchanged() {
+    let fixture = vm_apply_fixture(false);
+    let result = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Start,
+      &ProgressBar::hidden(),
+      &ProgressBar::hidden(),
+      None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result, "Unchanged");
+    assert!(fixture.requests.lock().unwrap().paths.is_empty());
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_waits_for_start() {
+    assert_eq!(stopped_vm_apply(false).await.unwrap(), "Running");
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_start_failure() {
+    let error = stopped_vm_apply(true).await.unwrap_err();
+    assert!(error.to_string().contains("VM start failed"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_start_rejection() {
+    let fixture = vm_apply_fixture(true);
+    let result = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &ProgressBar::hidden(),
+      &ProgressBar::hidden(),
+      None,
+    )
+    .await;
+    // Close the fixture's event stream after the rejected request.
+    fixture.complete.send(false).unwrap();
+    assert!(
+      result
+        .unwrap_err()
+        .to_string()
+        .contains("VM start rejected")
+    );
+    assert_eq!(fixture.requests.lock().unwrap().paths.len(), 2);
+  }
+
+  #[test]
+  fn vm_state_apply_preserves_generated_identity_and_omitted_options() {
+    let current = VmSpecPartial {
+      name: "guest".to_owned(),
+      image: "/vm.qcow2".to_owned(),
+      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
+      cloud_init: Some(false),
+      cloud_init_user_data: Some(
+        serde_json::from_value(serde_json::json!({"packages": ["curl"]}))
+          .unwrap(),
+      ),
+      console: Some(true),
+      ..Default::default()
+    };
+    let mut desired = VmSpecPartial {
+      name: current.name.clone(),
+      image: current.image.clone(),
+      ..Default::default()
+    };
+    assert_eq!(vm_spec_for_comparison(&desired, &current).unwrap(), current);
+    let payload =
+      serde_json::to_value(VmSpecUpdate::from(desired.clone())).unwrap();
+    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
+      assert!(payload.get(field).is_none(), "{field} must remain omitted");
+    }
+    desired.console = Some(false);
+    desired.cloud_init_user_data = Some(String::new().into());
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert_eq!(comparison.console, Some(false));
+    assert_eq!(comparison.cloud_init_user_data, Some(String::new().into()));
+    assert_eq!(desired.console, Some(false));
+    assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
+    desired.mac_address = Some("02:00:00:00:00:02".to_owned());
+    assert!(vm_spec_for_comparison(&desired, &current).is_err());
+    let mut invalid_current = current.clone();
+    invalid_current.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+    desired.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+  }
+
+  #[test]
+  fn vm_state_apply_explicit_null_clears_user_data_without_mutating_payload() {
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: "/vm.qcow2".into(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
+      cloud_init_user_data: Some("#cloud-config\n".to_owned().into()),
+      ..Default::default()
+    };
+    let desired: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "guest", "Image": "/vm.qcow2", "CloudInitUserData": null,
+    }))
+    .unwrap();
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert!(comparison.cloud_init_user_data.is_none());
+    assert_ne!(comparison, current);
+    let payload = serde_json::to_value(VmSpecUpdate::from(desired)).unwrap();
+    assert_eq!(payload.get("CloudInitUserData"), Some(&Value::Null));
+  }
 }
