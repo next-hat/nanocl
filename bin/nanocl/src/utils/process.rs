@@ -50,32 +50,35 @@ pub async fn wait_process_state(
   action: Vec<NativeEventAction>,
   client: &NanocldClient,
 ) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let mut stream = client
-    .watch_events(Some(vec![EventCondition {
-      actor_key: Some(key.to_owned()),
-      actor_kind: Some(kind.clone()),
-      kind: vec![EventKind::Normal, EventKind::Error],
-      action,
-      ..Default::default()
-    }]))
-    .await?;
+  let condition = EventCondition {
+    actor_key: Some(key.to_owned()),
+    actor_kind: Some(kind),
+    kind: vec![EventKind::Normal, EventKind::Error],
+    action,
+    ..Default::default()
+  };
+  let mut stream = client.watch_events(Some(vec![condition.clone()])).await?;
   let key = key.to_owned();
   let fut = rt::spawn(async move {
     while let Some(event) = stream.next().await {
       let event = event?;
-      let Some(actor) = &event.actor else {
+      if condition != event {
         continue;
-      };
-      if event.kind == EventKind::Error
-        && actor.key.clone().unwrap_or_default() == key
-      {
+      }
+      if event.kind == EventKind::Error {
         return Err(IoError::interrupted(
           "Error",
           &event.note.unwrap_or_default(),
         ));
       }
+      if event.kind == EventKind::Normal {
+        return Ok(());
+      }
     }
-    Ok::<_, IoError>(())
+    Err(IoError::interrupted(
+      "wait_process_state",
+      &format!("Event stream ended before the requested completion for {key}"),
+    ))
   });
   Ok(fut)
 }

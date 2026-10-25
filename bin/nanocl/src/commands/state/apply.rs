@@ -79,24 +79,30 @@ async fn apply_matching_vm(
   summary: &ProgressBar,
   output: Option<&StateOutput>,
 ) -> IoResult<&'static str> {
-  if *actual == ObjPsStatusKind::Start {
-    return Ok("Unchanged");
+  match actual {
+    ObjPsStatusKind::Start => Ok("Unchanged"),
+    ObjPsStatusKind::Stop => {
+      let waiter = utils::process::wait_process_state(
+        key,
+        EventActorKind::Vm,
+        vec![NativeEventAction::Start],
+        client,
+      )
+      .await?;
+      utils::progress::set_state_message(pg, summary, "Starting", output)?;
+      client.start_process("vm", key).await?;
+      waiter.await.map_err(|err| {
+        IoError::interrupted("wait_process_state", &err.to_string())
+      })??;
+      Ok("Running")
+    }
+    _ => Err(IoError::other(
+      "StateApply",
+      &format!(
+        "VM {key} has observed status {actual:?}; expected Start or Stop"
+      ),
+    )),
   }
-  if *actual == ObjPsStatusKind::Stop {
-    let waiter = utils::process::wait_process_state(
-      key,
-      EventActorKind::Vm,
-      vec![NativeEventAction::Start],
-      client,
-    )
-    .await?;
-    utils::progress::set_state_message(pg, summary, "Starting", output)?;
-    client.start_process("vm", key).await?;
-    waiter.await.map_err(|err| {
-      IoError::interrupted("wait_process_state", &err.to_string())
-    })??;
-  }
-  Ok("Running")
 }
 
 async fn state_apply(
@@ -572,7 +578,10 @@ pub(super) async fn exec_state_apply(
 mod tests {
   use std::sync::{Arc, Mutex};
 
-  use futures::{channel::oneshot, future::Either};
+  use futures::{
+    channel::{mpsc, oneshot},
+    future::Either,
+  };
   use nanocld_client::{ConnectOpts, NANOCLD_DEFAULT_VERSION, NanocldClient};
   use ntex::{util::Bytes, web};
 
@@ -582,7 +591,7 @@ mod tests {
     paths: Vec<String>,
     conditions: Option<Value>,
     started: Option<oneshot::Sender<()>>,
-    completion: Option<oneshot::Receiver<bool>>,
+    events: Option<mpsc::UnboundedReceiver<Result<Bytes, std::io::Error>>>,
     reject_start: bool,
   }
 
@@ -591,10 +600,15 @@ mod tests {
     _server: web::test::TestServer,
     requests: Arc<Mutex<VmApplyRequests>>,
     started: oneshot::Receiver<()>,
-    complete: oneshot::Sender<bool>,
+    events: mpsc::UnboundedSender<Result<Bytes, std::io::Error>>,
   }
 
-  fn vm_event(failed: bool, action: &str) -> Bytes {
+  fn vm_event(
+    failed: bool,
+    action: &str,
+    actor_key: &str,
+    actor_kind: &str,
+  ) -> Bytes {
     let event = serde_json::json!({
       "Key": "3e8f6eef-f03a-446d-9e7a-635728c3f565",
       "CreatedAt": "2026-01-01T00:00:00",
@@ -605,7 +619,7 @@ mod tests {
       "Action": action,
       "Reason": "VM start",
       "Note": if failed { "VM start failed" } else { "VM started" },
-      "Actor": {"Key": "global.guest", "Kind": "Vm"},
+      "Actor": {"Key": actor_key, "Kind": actor_kind},
     });
     Bytes::from(format!("{event}\n"))
   }
@@ -615,19 +629,12 @@ mod tests {
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
     let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
-    let completion = {
+    let events = {
       let mut requests = requests.lock().unwrap();
       requests.paths.push(req.path().to_owned());
       requests.conditions = Some(body.into_inner());
-      requests.completion.take().unwrap()
+      requests.events.take().unwrap()
     };
-    let events = futures::stream::once(async {
-      Ok::<_, std::io::Error>(vm_event(false, "starting"))
-    })
-    .chain(futures::stream::once(async move {
-      let failed = completion.await.unwrap();
-      Ok::<_, std::io::Error>(vm_event(failed, "start"))
-    }));
     web::HttpResponse::Ok().streaming(Box::pin(events))
   }
 
@@ -646,12 +653,12 @@ mod tests {
 
   fn vm_apply_fixture(reject_start: bool) -> VmApplyFixture {
     let (start, started) = oneshot::channel();
-    let (complete, completion) = oneshot::channel();
+    let (events, stream) = mpsc::unbounded();
     let requests = Arc::new(Mutex::new(VmApplyRequests {
       paths: Vec::new(),
       conditions: None,
       started: Some(start),
-      completion: Some(completion),
+      events: Some(stream),
       reject_start,
     }));
     let server_requests = requests.clone();
@@ -681,12 +688,19 @@ mod tests {
       _server: server,
       requests,
       started,
-      complete,
+      events,
     }
   }
 
-  async fn stopped_vm_apply(failed: bool) -> IoResult<&'static str> {
+  async fn stopped_vm_apply(
+    events: Vec<Result<Bytes, std::io::Error>>,
+    close_stream: bool,
+  ) -> IoResult<&'static str> {
     let fixture = vm_apply_fixture(false);
+    fixture
+      .events
+      .unbounded_send(Ok(vm_event(false, "starting", "global.guest", "Vm")))
+      .unwrap();
     let pg = ProgressBar::hidden();
     let summary = ProgressBar::hidden();
     let apply = apply_matching_vm(
@@ -698,7 +712,13 @@ mod tests {
       None,
     );
     futures::pin_mut!(apply);
-    match futures::future::select(apply.as_mut(), fixture.started).await {
+    match tokio::time::timeout(
+      std::time::Duration::from_secs(5),
+      futures::future::select(apply.as_mut(), fixture.started),
+    )
+    .await
+    .expect("apply did not request start")
+    {
       Either::Left((result, _)) => {
         panic!("apply finished before requesting start: {result:?}");
       }
@@ -706,8 +726,16 @@ mod tests {
     }
     // The accepted HTTP request alone cannot produce a successful apply.
     assert!(futures::poll!(apply.as_mut()).is_pending());
-    fixture.complete.send(failed).unwrap();
-    let result = apply.await;
+    for event in events {
+      fixture.events.unbounded_send(event).unwrap();
+    }
+    if close_stream {
+      fixture.events.close_channel();
+    }
+    // When close_stream is false, success must not depend on receiving EOF.
+    let result = tokio::time::timeout(std::time::Duration::from_secs(5), apply)
+      .await
+      .expect("apply did not settle after the supplied events");
     let requests = fixture.requests.lock().unwrap();
     assert_eq!(
       requests.paths,
@@ -747,18 +775,35 @@ mod tests {
 
   #[ntex::test]
   async fn vm_state_apply_matching_stopped_waits_for_start() {
-    assert_eq!(stopped_vm_apply(false).await.unwrap(), "Running");
+    assert_eq!(
+      stopped_vm_apply(
+        vec![Ok(vm_event(false, "start", "global.guest", "Vm"))],
+        false,
+      )
+      .await
+      .unwrap(),
+      "Running"
+    );
   }
 
   #[ntex::test]
   async fn vm_state_apply_matching_stopped_propagates_start_failure() {
-    let error = stopped_vm_apply(true).await.unwrap_err();
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "start", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
     assert!(error.to_string().contains("VM start failed"));
   }
 
   #[ntex::test]
   async fn vm_state_apply_matching_stopped_propagates_start_rejection() {
     let fixture = vm_apply_fixture(true);
+    fixture
+      .events
+      .unbounded_send(Ok(vm_event(false, "starting", "global.guest", "Vm")))
+      .unwrap();
     let result = apply_matching_vm(
       &fixture.client,
       "global.guest",
@@ -769,7 +814,7 @@ mod tests {
     )
     .await;
     // Close the fixture's event stream after the rejected request.
-    fixture.complete.send(false).unwrap();
+    fixture.events.close_channel();
     assert!(
       result
         .unwrap_err()
@@ -777,6 +822,118 @@ mod tests {
         .contains("VM start rejected")
     );
     assert_eq!(fixture.requests.lock().unwrap().paths.len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_empty_eof() {
+    let fixture = vm_apply_fixture(false);
+    fixture.events.close_channel();
+    let pg = ProgressBar::hidden();
+    let summary = ProgressBar::hidden();
+    let apply = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &pg,
+      &summary,
+      None,
+    );
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), apply)
+      .await
+      .expect("apply did not settle after empty EOF")
+      .unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    assert!(error.to_string().contains("global.guest"));
+    assert!(
+      error
+        .to_string()
+        .contains("before the requested completion")
+    );
+    assert_eq!(fixture.requests.lock().unwrap().paths.len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_nonterminal_eof() {
+    let error = stopped_vm_apply(Vec::new(), true).await.unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    assert!(
+      error
+        .to_string()
+        .contains("before the requested completion")
+    );
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_unrelated_events_then_eof() {
+    for (failed, action, actor_key, actor_kind) in [
+      (false, "start", "global.other", "Vm"),
+      (false, "start", "global.guest", "Cargo"),
+      (false, "stop", "global.guest", "Vm"),
+      (false, "starting", "global.guest", "Vm"),
+      (true, "start", "global.other", "Vm"),
+    ] {
+      let error = stopped_vm_apply(
+        vec![Ok(vm_event(failed, action, actor_key, actor_kind))],
+        true,
+      )
+      .await
+      .unwrap_err();
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+      assert!(error.to_string().contains("global.guest"));
+      assert!(
+        error
+          .to_string()
+          .contains("before the requested completion")
+      );
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_stream_decode_failure() {
+    let error =
+      stopped_vm_apply(vec![Ok(Bytes::from_static(b"invalid event\n"))], true)
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("Unable to parse stream"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_stream_transport_failure()
+  {
+    let error = stopped_vm_apply(
+      vec![Err(std::io::Error::new(
+        std::io::ErrorKind::ConnectionReset,
+        "event stream disconnected",
+      ))],
+      true,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("Unable to read stream"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_other_statuses_fail_without_requests() {
+    for actual in [
+      ObjPsStatusKind::Create,
+      ObjPsStatusKind::Fail,
+      ObjPsStatusKind::Starting,
+    ] {
+      let fixture = vm_apply_fixture(false);
+      let error = apply_matching_vm(
+        &fixture.client,
+        "global.guest",
+        &actual,
+        &ProgressBar::hidden(),
+        &ProgressBar::hidden(),
+        None,
+      )
+      .await
+      .unwrap_err();
+      assert!(error.to_string().contains(&format!("{actual:?}")));
+      assert!(error.to_string().contains("global.guest"));
+      assert!(fixture.requests.lock().unwrap().paths.is_empty());
+    }
   }
 
   #[test]
