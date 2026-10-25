@@ -27,7 +27,7 @@ fn pending_phase(phase: &str) -> bool {
 }
 fn phase(action: &str) -> TransactionResult<&'static str> {
   match action {
-    "start" => Ok("starting"),
+    "start" | "restart" => Ok("starting"),
     "update" => Ok("updating"),
     "delete" => Ok("destroying"),
     _ => Err(conflict("Unsupported VM operation action")),
@@ -350,6 +350,18 @@ impl VmDb {
           .first::<ObjPsStatusDb>(conn)?;
         if pending_phase(&status.actual) {
           return Ok(false);
+        }
+        if operation.action == "restart" && outcome == "failed" {
+          // Restart previously restored both fields after a shutdown/start
+          // failure. Keep that behavior atomic with terminal settlement, using
+          // the observation already made under this operation's lease.
+          diesel::update(object_process_statuses::table.find(&vm.status_key))
+            .set(ObjPsStatusUpdate {
+              wanted: Some(status.actual.clone()),
+              prev_wanted: Some(status.wanted),
+              ..Default::default()
+            })
+            .execute(conn)?;
         }
         operation::complete_on_conn(
           conn,

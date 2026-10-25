@@ -40,6 +40,13 @@ pub(crate) struct AcceptedVmOperation {
 pub(crate) type VmOperationLease =
   (std::sync::Arc<VmLifecycleGuard>, super::OperationGuard);
 
+/// In-memory restart arguments; the accepted operation records recovery identity.
+pub(crate) struct VmRestartTask {
+  pub options: nanocl_stubs::vm::VmLifecycleOptions,
+  pub expected_id: Option<String>,
+  pub completion: tokio::sync::oneshot::Sender<nanocl_error::io::IoResult<()>>,
+}
+
 /// This structure is used to update a vm in the database.
 #[derive(Debug, Default, AsChangeset)]
 #[diesel(table_name = vms)]

@@ -16,7 +16,7 @@ use nanocl_stubs::{
 use crate::{
   models::{
     AcceptedVmOperation, DistributedMutexDb, EventDb, OperationDb,
-    OperationOwner, SystemState, VmDb, VmOperationLease,
+    OperationOwner, SystemState, VmDb, VmOperationLease, VmRestartTask,
   },
   repositories::generic::*,
   utils, vars,
@@ -45,9 +45,53 @@ where
   };
   let acquire_key = key.to_owned();
   let acquire_state = state.clone();
-  accept_task_with_acquisition(key, action, state, prepare, async move {
-    VmDb::create_mutex(&acquire_key, mutex_action, &acquire_state).await
-  })
+  accept_task_with_acquisition(
+    key,
+    action,
+    state,
+    prepare,
+    async move {
+      VmDb::create_mutex(&acquire_key, mutex_action, &acquire_state).await
+    },
+    None,
+  )
+  .await
+}
+
+pub(crate) async fn accept_restart(
+  key: &str,
+  restart: VmRestartTask,
+  state: &SystemState,
+) -> HttpResult<Vm> {
+  let prepare_key = key.to_owned();
+  let prepare_state = state.clone();
+  let acquire_key = key.to_owned();
+  let acquire_state = state.clone();
+  accept_task_with_acquisition(
+    key,
+    NativeEventAction::Restart,
+    state,
+    move |owner, lease| async move {
+      let vm =
+        VmDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
+          .await?;
+      let operation =
+        OperationDb::new(&owner, "Vm", &prepare_key, vm.spec.key, "restart");
+      VmDb::accept_operation(
+        &vm,
+        None,
+        operation,
+        lease,
+        &prepare_state.inner.pool,
+      )
+      .await
+      .map_err(crate::services::vm::lifecycle::lifecycle_error)
+    },
+    async move {
+      VmDb::create_mutex(&acquire_key, "restart", &acquire_state).await
+    },
+    Some(restart),
+  )
   .await
 }
 
@@ -57,6 +101,7 @@ async fn accept_task_with_acquisition<P, F, A>(
   state: &SystemState,
   prepare: P,
   acquire: A,
+  restart: Option<VmRestartTask>,
 ) -> HttpResult<Vm>
 where
   P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
@@ -182,14 +227,26 @@ where
           log::debug!(
             "Executing VM task: {key} {task_action} operation={operation} revision={revision}"
           );
-          utils::container::vm::run_task_unlocked(
-            &key,
-            task_action,
-            &accepted_operation,
-            &lease,
-            &task_state,
-          )
-          .await
+          if let Some(restart) = &restart {
+            utils::container::vm::run_restart_owned(
+              &key,
+              &restart.options,
+              restart.expected_id.as_deref(),
+              &accepted_operation,
+              &lease,
+              &task_state,
+            )
+            .await
+          } else {
+            utils::container::vm::run_task_unlocked(
+              &key,
+              task_action,
+              &accepted_operation,
+              &lease,
+              &task_state,
+            )
+            .await
+          }
         }
         Err(error) => (Err(error), false),
       };
@@ -223,7 +280,14 @@ where
         log::warn!("VM owner file cleanup deferred: {key}: {error}");
       }
       let cleanup = VmDb::delete_mutex(&operation, &task_state).await;
-      result.and(cleanup)
+      let result = result.and(cleanup);
+      // Preserve the synchronous restart endpoint without waking its caller
+      // while the mutation/owner lease is still held.
+      drop(lease);
+      if let Some(restart) = restart {
+        let _ = restart.completion.send(result.clone());
+      }
+      result
     });
     state
       .inner
@@ -233,19 +297,23 @@ where
         Ok(())
       })
       .await;
-    match tokio::time::timeout(
-      std::time::Duration::from_secs(5),
-      publish_acceptance(&task_vm, action, operation, &state),
-    )
-    .await
-    {
-      Ok(Ok(())) => {}
-      Ok(Err(error)) => log::warn!(
-        "VM acceptance notification failed: {task_key} operation={operation}: {error}"
-      ),
-      Err(_) => log::warn!(
-        "VM acceptance notification timed out: {task_key} operation={operation}; executing the registered task"
-      ),
+    // Restart has no separate acceptance event. Its existing Restart event
+    // remains a terminal notification, emitted only after runtime confirmation.
+    if action != NativeEventAction::Restart {
+      match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        publish_acceptance(&task_vm, action, operation, &state),
+      )
+      .await
+      {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => log::warn!(
+          "VM acceptance notification failed: {task_key} operation={operation}: {error}"
+        ),
+        Err(_) => log::warn!(
+          "VM acceptance notification timed out: {task_key} operation={operation}; executing the registered task"
+        ),
+      }
     }
     let _ = start.send(());
     let _ = reply.send(Ok(vm));
@@ -283,6 +351,7 @@ fn report_task_error(
     NativeEventAction::Starting => NativeEventAction::Start,
     NativeEventAction::Updating => NativeEventAction::Update,
     NativeEventAction::Destroying => NativeEventAction::Destroy,
+    NativeEventAction::Restart => NativeEventAction::Restart,
     _ => return,
   };
   // The owning task reconciled status before releasing its lifecycle guard.
@@ -606,6 +675,7 @@ mod tests {
             "injected acquisition failure",
           ))
         },
+        None,
       )
       .await
       .unwrap_err();

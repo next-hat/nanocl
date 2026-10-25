@@ -21,9 +21,10 @@ use tokio::time::{Instant, timeout_at};
 
 use crate::{
   models::{
-    ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, QmpClient, SystemState, VmDb,
-    VmLifecycleGuard, VmLifecycleLock, VmLifecycleLocks,
-    VmLifecycleObservationGuard,
+    ObjPsStatusDb, ObjPsStatusUpdate, OperationDb, OperationOwner, ProcessDb,
+    QmpClient, SystemState, VmDb, VmLifecycleGuard, VmLifecycleLock,
+    VmLifecycleLocks, VmLifecycleObservationGuard, VmOperationLease,
+    VmRestartTask,
   },
   repositories::generic::*,
 };
@@ -409,11 +410,12 @@ async fn runtime_status_before(
   qmp.query_status().await
 }
 
-async fn set_status(
+async fn set_status<G: Send + 'static>(
   key: &str,
   wanted: ObjPsStatusKind,
   actual: ObjPsStatusKind,
-  guard: Arc<VmLifecycleGuard>,
+  owner: Option<OperationOwner>,
+  guard: G,
   state: &SystemState,
 ) -> IoResult<()> {
   let old = ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await?;
@@ -426,7 +428,7 @@ async fn set_status(
       prev_actual: Some(old.actual),
       ..Default::default()
     },
-    None,
+    owner,
     guard,
     &state.inner.pool,
   )
@@ -434,9 +436,9 @@ async fn set_status(
   Ok(())
 }
 
-async fn restore_observed_status(
+async fn restore_observed_status<G: Send + 'static>(
   vm: &Vm,
-  guard: Arc<VmLifecycleGuard>,
+  guard: G,
   state: &SystemState,
 ) -> IoResult<()> {
   let observed = timeout_at(
@@ -459,21 +461,24 @@ async fn restore_observed_status(
   } else {
     ObjPsStatusKind::Start
   };
-  set_status(&vm.spec.vm_key, wanted, actual, guard, state).await
+  set_status(&vm.spec.vm_key, wanted, actual, None, guard, state).await
 }
 
-async fn run_lifecycle(
+async fn run_lifecycle<G: Clone + Send + 'static>(
   key: &str,
   options: &VmLifecycleOptions,
   restart: bool,
   expected_id: Option<&str>,
-  guard: Arc<VmLifecycleGuard>,
+  owner: Option<OperationOwner>,
+  guard: G,
   state: &SystemState,
 ) -> IoResult<()> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
   if crate::models::OperationDb::current("Vm", key, &state.inner.pool)
     .await?
-    .is_some_and(|operation| operation.outcome.is_none())
+    .is_some_and(|operation| {
+      operation.outcome.is_none() && Some(operation.owner()) != owner
+    })
   {
     return Err(conflict(
       "A VM lifecycle operation is awaiting completion or recovery",
@@ -487,28 +492,41 @@ async fn run_lifecycle(
       return Err(conflict("Requested VM process has been replaced"));
     }
   }
-  if matches!(
-    vm.status.actual,
-    ObjPsStatusKind::Starting
-      | ObjPsStatusKind::Updating
-      | ObjPsStatusKind::Destroying
-  ) {
+  if owner.is_none()
+    && matches!(
+      vm.status.actual,
+      ObjPsStatusKind::Starting
+        | ObjPsStatusKind::Updating
+        | ObjPsStatusKind::Destroying
+    )
+  {
     return Err(conflict("A VM lifecycle transition is pending"));
   }
   set_status(
     key,
     ObjPsStatusKind::Stop,
     ObjPsStatusKind::Stopping,
+    owner.clone(),
     guard.clone(),
     state,
   )
   .await?;
-  if let Err(err) =
-    complete_lifecycle(&vm, options, restart, guard.clone(), state).await
+  if let Err(err) = complete_lifecycle(
+    &vm,
+    options,
+    restart,
+    owner.clone(),
+    guard.clone(),
+    state,
+  )
+  .await
   {
     // Every failure after recording the stop request must restore observed
     // state, including database failures after the guest has already stopped.
-    if let Err(restore_error) = restore_observed_status(&vm, guard, state).await
+    // Durable restart failures are observed and settled by their owning task.
+    if owner.is_none()
+      && let Err(restore_error) =
+        restore_observed_status(&vm, guard, state).await
     {
       log::error!(
         "Unable to restore VM {key} status after {err}: {restore_error}"
@@ -528,11 +546,12 @@ async fn run_lifecycle(
   Ok(())
 }
 
-async fn complete_lifecycle(
+async fn complete_lifecycle<G: Clone + Send + 'static>(
   vm: &Vm,
   options: &VmLifecycleOptions,
   restart: bool,
-  guard: Arc<VmLifecycleGuard>,
+  owner: Option<OperationOwner>,
+  guard: G,
   state: &SystemState,
 ) -> IoResult<()> {
   let key = &vm.spec.vm_key;
@@ -541,6 +560,7 @@ async fn complete_lifecycle(
     key,
     ObjPsStatusKind::Stop,
     ObjPsStatusKind::Stop,
+    owner.clone(),
     guard.clone(),
     state,
   )
@@ -550,6 +570,7 @@ async fn complete_lifecycle(
       key,
       ObjPsStatusKind::Start,
       ObjPsStatusKind::Starting,
+      owner.clone(),
       guard.clone(),
       state,
     )
@@ -578,13 +599,14 @@ async fn complete_lifecycle(
         ObjPsStatusDb::update_actual_status_owned(
           key,
           &ObjPsStatusKind::Start,
-          None,
+          owner.clone(),
           guard.clone(),
           &state.inner.pool,
         )
         .await?;
       } else {
-        super::start_unlocked_owned(key, None, guard.clone(), state).await?;
+        super::start_unlocked_owned(key, owner.clone(), guard.clone(), state)
+          .await?;
       }
       Ok::<_, IoError>(())
     })
@@ -602,6 +624,29 @@ async fn complete_lifecycle(
   Ok(())
 }
 
+pub(crate) async fn run_restart_owned(
+  key: &str,
+  options: &VmLifecycleOptions,
+  expected_id: Option<&str>,
+  operation: &OperationDb,
+  lease: &VmOperationLease,
+  state: &SystemState,
+) -> (IoResult<()>, bool) {
+  let owner = Some(operation.owner());
+  let result = run_lifecycle(
+    key,
+    options,
+    true,
+    expected_id,
+    owner.clone(),
+    lease.clone(),
+    state,
+  )
+  .await;
+  super::record_task_outcome_owned(key, result, owner, lease.clone(), state)
+    .await
+}
+
 async fn begin_lifecycle(
   key: &str,
   options: &VmLifecycleOptions,
@@ -612,6 +657,35 @@ async fn begin_lifecycle(
   options
     .validate()
     .map_err(|err| IoError::invalid_input("VM shutdown", &err))?;
+  if restart {
+    let (completion, receiver) = tokio::sync::oneshot::channel();
+    crate::tasks::vm::accept_restart(
+      key,
+      VmRestartTask {
+        options: options.clone(),
+        expected_id: expected_id.map(str::to_owned),
+        completion,
+      },
+      state,
+    )
+    .await
+    .map_err(|error| {
+      // Acceptance uses the HTTP task facade; retain the lifecycle endpoint's
+      // existing conflict, missing-resource and timeout responses on return.
+      let kind = match error.status {
+        ntex::http::StatusCode::CONFLICT => std::io::ErrorKind::WouldBlock,
+        ntex::http::StatusCode::NOT_FOUND => std::io::ErrorKind::NotFound,
+        ntex::http::StatusCode::BAD_REQUEST => std::io::ErrorKind::InvalidInput,
+        ntex::http::StatusCode::GATEWAY_TIMEOUT => std::io::ErrorKind::TimedOut,
+        _ => std::io::ErrorKind::Other,
+      };
+      IoError::with_context(
+        "VM restart acceptance",
+        std::io::Error::new(kind, error),
+      )
+    })?;
+    return Ok(receiver);
+  }
   let guard = Arc::new(lifecycle_lock(key).try_lock_owned().await?);
   // Validate existence before an asynchronous process endpoint accepts work.
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
@@ -629,6 +703,7 @@ async fn begin_lifecycle(
       &options,
       restart,
       expected_id.as_deref(),
+      None,
       guard.clone(),
       &state,
     )
