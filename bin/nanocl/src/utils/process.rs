@@ -62,16 +62,19 @@ pub async fn wait_process_state(
   let fut = rt::spawn(async move {
     while let Some(event) = stream.next().await {
       let event = event?;
-      if condition != event {
-        continue;
-      }
-      if event.kind == EventKind::Error {
+      // A failed transition can use a different action from its completion.
+      if event.kind == EventKind::Error
+        && event.actor.as_ref().is_some_and(|actor| {
+          actor.key.as_deref() == Some(key.as_str())
+            && Some(&actor.kind) == condition.actor_kind.as_ref()
+        })
+      {
         return Err(IoError::interrupted(
           "Error",
           &event.note.unwrap_or_default(),
         ));
       }
-      if event.kind == EventKind::Normal {
+      if event.kind == EventKind::Normal && condition == event {
         return Ok(());
       }
     }

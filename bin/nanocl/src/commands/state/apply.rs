@@ -798,6 +798,28 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_update_failure() {
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "update", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.inner.to_string(), "VM start failed");
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_starting_failure() {
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "starting", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.inner.to_string(), "VM start failed");
+  }
+
+  #[ntex::test]
   async fn vm_state_apply_matching_stopped_propagates_start_rejection() {
     let fixture = vm_apply_fixture(true);
     fixture
@@ -871,6 +893,9 @@ mod tests {
       (false, "stop", "global.guest", "Vm"),
       (false, "starting", "global.guest", "Vm"),
       (true, "start", "global.other", "Vm"),
+      (true, "start", "global.guest", "Cargo"),
+      (true, "update", "global.other", "Vm"),
+      (true, "update", "global.guest", "Cargo"),
     ] {
       let error = stopped_vm_apply(
         vec![Ok(vm_event(failed, action, actor_key, actor_kind))],
