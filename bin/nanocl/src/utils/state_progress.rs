@@ -1,4 +1,8 @@
-use std::{collections::HashMap, future::Future, time::Duration};
+use std::{
+  collections::{HashMap, HashSet},
+  future::Future,
+  time::{Duration, Instant},
+};
 
 use bollard_next::models::CreateImageInfo;
 use futures::{StreamExt, future::Either};
@@ -30,6 +34,122 @@ fn related_image<'a>(
 
 fn image_state(event: &Event) -> Option<CreateImageInfo> {
   serde_json::from_value(event.metadata.as_ref()?.get("state")?.clone()).ok()
+}
+
+/// These are observations, not completion signals. In particular, the daemon
+/// can still roll back after a Cargo healthy event during route handoff.
+fn rollout_phase(
+  event: &Event,
+  key: &str,
+  kind: &EventActorKind,
+) -> Option<&'static str> {
+  if kind != &EventActorKind::Cargo
+    || event.reporting_controller != "nanocl.io/core"
+    || event.reason != "state_sync"
+  {
+    return None;
+  }
+  let actor = event.actor.as_ref()?;
+  if actor.kind == EventActorKind::Cargo && actor.key.as_deref() == Some(key) {
+    if event.kind == EventKind::Error {
+      return Some("observed cargo failure");
+    }
+    if event.kind != EventKind::Normal {
+      return None;
+    }
+    return match event.action.as_str() {
+      "starting" => Some("observed cargo starting"),
+      "updating" => Some("observed cargo updating"),
+      "start" => Some("observed cargo started"),
+      "healthy" => Some("observed cargo healthy"),
+      "unhealthy" => Some("observed cargo unhealthy"),
+      "fail" => Some("observed cargo failure"),
+      "update" => Some("observed cargo updated"),
+      _ => None,
+    };
+  }
+  let related = event.related.as_ref()?;
+  if actor.kind != EventActorKind::Process
+    || related.kind != EventActorKind::Cargo
+    || related.key.as_deref() != Some(key)
+    || event.kind != EventKind::Normal
+  {
+    return None;
+  }
+  let name = actor.key.as_deref()?;
+  let attributes = actor.attributes.as_ref()?;
+  let label = |key: &str| attributes.get(key).and_then(|value| value.as_str());
+  let ordinal = label("io.nanocl.cargo.replica-ordinal")?
+    .parse::<u32>()
+    .ok()?;
+  uuid::Uuid::parse_str(label("io.nanocl.cargo.replica")?).ok()?;
+  label("io.nanocl.cargo.essential")?.parse::<bool>().ok()?;
+  if label("io.nanocl") != Some("enabled")
+    || label("io.nanocl.kind") != Some("cargo")
+    || label("io.nanocl.c") != Some(key)
+    || label("name") != Some(name)
+    || label("io.nanocl.cargo.container")?.is_empty()
+    || !name.starts_with(&format!("{key}-r{ordinal}-"))
+    || !name.ends_with(".candidate.c")
+    || !name.bytes().all(|byte| {
+      byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
+    })
+  {
+    return None;
+  }
+  // Retained/active process events and legacy events without these identity
+  // labels cannot establish anything about the pending candidate.
+  let role = label("io.nanocl.cargo.role")?;
+  match (role, event.action.as_str()) {
+    ("init", "start") if name.ends_with(".init.candidate.c") => {
+      Some("observed candidate init running")
+    }
+    ("app", "start") => Some("observed candidate app started"),
+    ("sandbox", "start") => Some("observed candidate sandbox started"),
+    ("init", "die") if name.ends_with(".init.candidate.c") => {
+      match label("exitCode")?.parse::<i64>().ok()? {
+        0 => Some("observed candidate init exit zero"),
+        _ => Some("observed candidate init failed"),
+      }
+    }
+    ("app", "die") => Some("observed candidate app exited"),
+    ("sandbox", "die") => Some("observed candidate sandbox exited"),
+    ("init" | "app" | "sandbox", "oom") => {
+      Some("observed candidate out of memory")
+    }
+    ("app", "update") => {
+      // Docker health transitions are emitted as update events. Accept only
+      // the daemon's exact note format; never render arbitrary event notes.
+      match event
+        .note
+        .as_deref()?
+        .strip_prefix(&format!("process {name} health_status: "))?
+      {
+        "starting" => Some("observed candidate health starting"),
+        "healthy" => Some("observed candidate healthy"),
+        "unhealthy" => Some("observed candidate health unhealthy"),
+        _ => None,
+      }
+    }
+    _ => None,
+  }
+}
+
+fn rollout_output<'a>(
+  resource: &'a str,
+  phase: &'static str,
+  summary: &ProgressBar,
+  elapsed: Duration,
+) -> StateOutputEvent<'a> {
+  StateOutputEvent::Item {
+    resource,
+    status: phase,
+    completed: summary.position(),
+    total: summary.length().unwrap_or(0),
+    success: None,
+    elapsed_ms: elapsed.as_millis() as u64,
+    error: None,
+  }
 }
 
 fn byte_progress(state: &CreateImageInfo) -> Option<(u64, u64)> {
@@ -231,7 +351,8 @@ fn image_events(buffer: &mut Vec<u8>, bytes: &[u8]) -> Option<Vec<Event>> {
   Some(events)
 }
 
-/// Observe image events while the state operation remains authoritative.
+/// Observe image and Cargo phases while the state operation remains authoritative.
+/// Bound subscription setup so optional observation cannot hold up the operation.
 pub async fn with_image_progress<T>(
   client: &NanocldClient,
   key: &str,
@@ -241,14 +362,20 @@ pub async fn with_image_progress<T>(
   output: Option<&StateOutput>,
   operation: impl Future<Output = IoResult<T>>,
 ) -> IoResult<T> {
-  if output.is_none() && progress.is_hidden() {
+  if output.is_none() && progress.is_hidden() && kind != EventActorKind::Cargo {
     return operation.await;
   }
   // Event conditions stop the stream; they do not filter subscriptions.
   // Subscribe before polling the operation so its first pull events are seen.
-  let Ok(response) = client
-    .send_post("/events/watch", None::<Vec<EventCondition>>, None::<String>)
-    .await
+  let Ok(Ok(response)) = ntex::time::timeout(
+    ntex::time::Millis(2_000),
+    client.send_post(
+      "/events/watch",
+      None::<Vec<EventCondition>>,
+      None::<String>,
+    ),
+  )
+  .await
   else {
     return operation.await;
   };
@@ -257,6 +384,10 @@ pub async fn with_image_progress<T>(
   let mut events = response;
   let mut buffer = Vec::new();
   let mut layers = HashMap::new();
+  // A fixed set of phase strings keeps observation output and memory bounded,
+  // even if health events repeat or arrive out of order across replicas.
+  let mut observed_phases = HashSet::new();
+  let started = Instant::now();
   let resource = format!("{}/{key}", kind.to_string().to_lowercase());
   futures::pin_mut!(operation);
   let result = 'observe: loop {
@@ -267,6 +398,30 @@ pub async fn with_image_progress<T>(
           break None;
         };
         for event in events {
+          if let Some(phase) = rollout_phase(&event, key, &kind)
+            && observed_phases.insert(phase)
+          {
+            if let Some(output) = output {
+              if let Err(err) = output.emit(rollout_output(
+                &resource,
+                phase,
+                summary,
+                started.elapsed(),
+              )) {
+                break 'observe Some(Err(err));
+              }
+            } else {
+              let line = format!(
+                "  {resource}  {phase} [{}s; awaiting operation completion]",
+                started.elapsed().as_secs()
+              );
+              if progress.is_hidden() {
+                eprintln!("{line}");
+              } else {
+                let _ = progress.println(line);
+              }
+            }
+          }
           if let Some(output) = output {
             let state = image_state(&event);
             if let Some(event) =
@@ -275,7 +430,7 @@ pub async fn with_image_progress<T>(
             {
               break 'observe Some(Err(err));
             }
-          } else {
+          } else if !progress.is_hidden() {
             update_image_progress(
               &event,
               key,
@@ -344,6 +499,228 @@ mod tests {
     let resource = format!("{}/{key}", kind.to_string().to_lowercase());
     image_output(event, key, kind, &resource, state.as_ref())
       .map(|event| serde_json::to_value(event).unwrap())
+  }
+
+  fn cargo_event(action: &str) -> Event {
+    let mut event = event();
+    event.action = action.to_owned();
+    event.actor = Some(EventActor {
+      key: Some("global.app".to_owned()),
+      kind: EventActorKind::Cargo,
+      attributes: Some(json!({"private": "not emitted"})),
+    });
+    event.related = None;
+    event.metadata = None;
+    event.note = Some("private event detail must not be emitted".to_owned());
+    event
+  }
+
+  fn candidate_event(role: &str, action: &str) -> Event {
+    let mut event = event();
+    let suffix = if role == "init" { ".init" } else { "" };
+    let name = format!("global.app-r0-api-abcdef{suffix}.candidate.c");
+    event.action = action.to_owned();
+    event.actor = Some(EventActor {
+      key: Some(name.clone()),
+      kind: EventActorKind::Process,
+      attributes: Some(json!({
+        "name": name,
+        "io.nanocl": "enabled",
+        "io.nanocl.kind": "cargo",
+        "io.nanocl.c": "global.app",
+        "io.nanocl.cargo.role": role,
+        "io.nanocl.cargo.container": "api",
+        "io.nanocl.cargo.replica": "7a9778c5-6e52-49a0-99f8-b63bb15a4337",
+        "io.nanocl.cargo.replica-ordinal": "0",
+        "io.nanocl.cargo.essential": "true",
+        "private": "not emitted"
+      })),
+    });
+    event.metadata = None;
+    event
+  }
+
+  #[test]
+  fn rollout_observations_do_not_complete_or_advance_the_operation() {
+    let event = cargo_event("healthy");
+    let phase =
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).unwrap();
+    let summary = ProgressBar::hidden();
+    summary.set_length(3);
+    summary.set_position(1);
+    let output = serde_json::to_value(rollout_output(
+      "cargo/global.app",
+      phase,
+      &summary,
+      Duration::from_secs(2),
+    ))
+    .unwrap();
+    assert_eq!(
+      output,
+      json!({
+        "type": "item", "resource": "cargo/global.app",
+        "status": "observed cargo healthy", "completed": 1,
+        "total": 3, "elapsed_ms": 2000
+      })
+    );
+    assert_eq!(summary.position(), 1);
+    assert!(!summary.is_finished());
+    assert!(!output.to_string().contains("private"));
+    for action in ["starting", "updating", "start", "update", "unhealthy"] {
+      assert!(
+        rollout_phase(
+          &cargo_event(action),
+          "global.app",
+          &EventActorKind::Cargo
+        )
+        .unwrap()
+        .starts_with("observed cargo ")
+      );
+    }
+    let mut failed = cargo_event("updating");
+    failed.kind = EventKind::Error;
+    assert_eq!(
+      rollout_phase(&failed, "global.app", &EventActorKind::Cargo),
+      Some("observed cargo failure")
+    );
+  }
+
+  #[test]
+  fn rollout_observations_reject_unrelated_cargo_events() {
+    let mut event = cargo_event("healthy");
+    assert!(
+      rollout_phase(&event, "other.app", &EventActorKind::Cargo).is_none()
+    );
+    assert!(rollout_phase(&event, "global.app", &EventActorKind::Vm).is_none());
+    event.reason = "external".to_owned();
+    assert!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+    );
+    event.reason = "state_sync".to_owned();
+    event.reporting_controller = "another/controller".to_owned();
+    assert!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+    );
+    event.reporting_controller = "nanocl.io/core".to_owned();
+    event.kind = EventKind::Warning;
+    assert!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+    );
+  }
+
+  #[test]
+  fn rollout_observations_accept_only_exact_candidate_health_and_init_status() {
+    let mut event = candidate_event("app", "start");
+    assert_eq!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo),
+      Some("observed candidate app started")
+    );
+    event.action = "update".to_owned();
+    let name = event.actor.as_ref().unwrap().key.as_ref().unwrap().clone();
+    for (health, phase) in [
+      ("starting", "observed candidate health starting"),
+      ("healthy", "observed candidate healthy"),
+      ("unhealthy", "observed candidate health unhealthy"),
+    ] {
+      event.note = Some(format!("process {name} health_status: {health}"));
+      assert_eq!(
+        rollout_phase(&event, "global.app", &EventActorKind::Cargo),
+        Some(phase)
+      );
+    }
+    for note in [
+      "health_status: healthy".to_owned(),
+      "process old-process health_status: healthy".to_owned(),
+      format!("process {name} health_status: healthy\nprivate"),
+    ] {
+      event.note = Some(note);
+      assert!(
+        rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+      );
+    }
+    let mut init = candidate_event("init", "start");
+    assert_eq!(
+      rollout_phase(&init, "global.app", &EventActorKind::Cargo),
+      Some("observed candidate init running")
+    );
+    init.action = "die".to_owned();
+    for (code, phase) in [
+      ("0", Some("observed candidate init exit zero")),
+      ("1", Some("observed candidate init failed")),
+      ("unknown", None),
+    ] {
+      init.actor.as_mut().unwrap().attributes.as_mut().unwrap()["exitCode"] =
+        json!(code);
+      assert_eq!(
+        rollout_phase(&init, "global.app", &EventActorKind::Cargo),
+        phase
+      );
+    }
+  }
+
+  #[test]
+  fn rollout_observations_reject_retained_and_uncorrelated_processes() {
+    let event = candidate_event("app", "start");
+    for name in [
+      "global.app-r0-api-abcdef.tmp.c",
+      "global.app-r0-api-abcdef.c",
+      "other.app-r0-api-abcdef.candidate.c",
+      "global.app-r1-api-abcdef.candidate.c",
+    ] {
+      let mut changed = event.clone();
+      let actor = changed.actor.as_mut().unwrap();
+      actor.key = Some(name.to_owned());
+      actor.attributes.as_mut().unwrap()["name"] = json!(name);
+      assert!(
+        rollout_phase(&changed, "global.app", &EventActorKind::Cargo).is_none()
+      );
+    }
+    for label in [
+      "io.nanocl",
+      "io.nanocl.kind",
+      "io.nanocl.c",
+      "name",
+      "io.nanocl.cargo.replica",
+      "io.nanocl.cargo.replica-ordinal",
+      "io.nanocl.cargo.container",
+      "io.nanocl.cargo.role",
+      "io.nanocl.cargo.essential",
+    ] {
+      let mut changed = event.clone();
+      changed
+        .actor
+        .as_mut()
+        .unwrap()
+        .attributes
+        .as_mut()
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .remove(label);
+      assert!(
+        rollout_phase(&changed, "global.app", &EventActorKind::Cargo).is_none()
+      );
+    }
+    for (label, value) in [
+      ("io.nanocl.kind", "vm"),
+      ("io.nanocl.c", "other.app"),
+      ("io.nanocl.cargo.replica", "not-a-uuid"),
+      ("io.nanocl.cargo.essential", "unknown"),
+      ("io.nanocl.cargo.container", ""),
+      ("io.nanocl.cargo.role", "unknown"),
+    ] {
+      let mut changed = event.clone();
+      changed.actor.as_mut().unwrap().attributes.as_mut().unwrap()[label] =
+        json!(value);
+      assert!(
+        rollout_phase(&changed, "global.app", &EventActorKind::Cargo).is_none()
+      );
+    }
+    let mut changed = event.clone();
+    changed.related.as_mut().unwrap().key = Some("other.app".to_owned());
+    assert!(
+      rollout_phase(&changed, "global.app", &EventActorKind::Cargo).is_none()
+    );
   }
 
   #[test]

@@ -16,7 +16,7 @@ pub struct StateApplyOpts {
   /// Follow logs of the deployed cargo
   #[clap(long, short = 'f')]
   pub follow: bool,
-  /// Skip the confirmation prompt
+  /// Skip confirmation and show a concise Statefile summary
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
   /// Stream newline-delimited JSON to stdout (requires --yes)

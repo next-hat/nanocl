@@ -14,10 +14,14 @@ impl StateOutput {
     writer: &mut impl Write,
     event: StateOutputEvent<'_>,
   ) -> IoResult<()> {
+    let statefile = self
+      .statefile
+      .as_deref()
+      .map(super::state_summary::redact_url);
     let record = StateOutputRecord {
       schema_version: 1,
       operation: self.operation,
-      statefile: self.statefile.as_deref(),
+      statefile: statefile.as_deref(),
       event,
     };
     let mut line = serde_json::to_vec(&record)?;
@@ -32,6 +36,83 @@ impl StateOutput {
 mod tests {
   use super::*;
   use serde_json::{Value, json};
+
+  #[test]
+  fn apply_summary_records_omit_url_credentials_and_payloads() {
+    let state = crate::models::StateRef {
+      raw: "SECRET RAW CONTENT".to_owned(),
+      format: crate::models::DisplayFormat::Json,
+      root: crate::models::StateRoot::None,
+      location:
+        "https://user:password@example.org/state.yml?token=SECRET#fragment"
+          .to_owned(),
+      data: serde_json::from_value(json!({
+        "ApiVersion": "v0.18",
+        "Group": "production",
+        "Secrets": [{"Name": "key", "Kind": "Env", "Data": {"KEY": "SECRET"}}]
+      }))
+      .unwrap(),
+    };
+    let summary =
+      super::super::state_summary::summarize_state(&state, "production");
+    let output = StateOutput {
+      operation: "apply",
+      statefile: Some(state.location),
+    };
+    let mut writer = RecordWriter::default();
+    output
+      .write_to(
+        &mut writer,
+        StateOutputEvent::Summary {
+          summary: &summary,
+          reload: true,
+          remove_orphans: false,
+        },
+      )
+      .unwrap();
+    let text = String::from_utf8(writer.bytes).unwrap();
+    assert_eq!(text.lines().count(), 1);
+    assert_eq!(writer.flushes, 1);
+    for secret in ["password", "SECRET", "token=", "fragment", "user:"] {
+      assert!(
+        !text.contains(secret),
+        "unexpected sensitive field: {secret}"
+      );
+    }
+    let record: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(record["schema_version"], 1);
+    assert_eq!(record["type"], "summary");
+    assert_eq!(record["statefile"], "https://example.org/state.yml");
+    assert_eq!(record["summary"]["counts"]["secrets"], 1);
+    assert_eq!(record["reload"], true);
+    assert_eq!(record["remove_orphans"], false);
+    assert!(record.get("success").is_none());
+  }
+
+  #[test]
+  fn unavailable_cargo_receipt_does_not_claim_operation_failure() {
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let mut bytes = Vec::new();
+    output
+      .write_to(
+        &mut bytes,
+        StateOutputEvent::CargoReceipt {
+          resource: "cargo/global.web",
+          status: "unavailable",
+          receipt: None,
+        },
+      )
+      .unwrap();
+    let record: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(record["type"], "cargo_receipt");
+    assert_eq!(record["status"], "unavailable");
+    assert!(record.get("receipt").is_none());
+    assert!(record.get("success").is_none());
+    assert!(record.get("error").is_none());
+  }
 
   #[derive(Default)]
   struct RecordWriter {

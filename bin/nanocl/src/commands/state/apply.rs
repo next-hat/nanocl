@@ -15,7 +15,9 @@ use nanocld_client::stubs::{
 
 use crate::{
   config::CliConfig,
-  models::{StateApplyOpts, StateLogsOpts, StateOutput, StateRef},
+  models::{
+    StateApplyOpts, StateLogsOpts, StateOutput, StateOutputEvent, StateRef,
+  },
   utils::{self, cargo::cargo_spec_from_revision},
 };
 
@@ -103,6 +105,51 @@ async fn apply_matching_vm(
       ),
     )),
   }
+}
+
+/// A best-effort snapshot after the existing operation has completed. This is
+/// reporting, not an additional readiness gate: an unavailable snapshot must
+/// not turn a successful operation into a failed deployment.
+async fn report_cargo_receipt(
+  client: &nanocld_client::NanocldClient,
+  key: &str,
+  token: &str,
+  progress: &MultiProgress,
+  output: Option<&StateOutput>,
+) -> IoResult<()> {
+  let inspect = tokio::time::timeout(
+    std::time::Duration::from_secs(5),
+    client.inspect_cargo(key),
+  )
+  .await;
+  let receipt = match inspect {
+    Ok(Ok(inspect)) => {
+      Some(utils::state_receipt::cargo_receipt(token, &inspect))
+    }
+    _ => None,
+  };
+  if let Some(output) = output {
+    output.emit(StateOutputEvent::CargoReceipt {
+      resource: token,
+      status: if receipt.is_some() {
+        "observed"
+      } else {
+        "unavailable"
+      },
+      receipt: receipt.as_ref(),
+    })?;
+  } else {
+    let line = receipt.as_ref().map_or_else(
+      || format!("  {token}  Current snapshot unavailable; use nanocl state status to inspect"),
+      utils::state_receipt::format_cargo_receipt,
+    );
+    if progress.is_hidden() {
+      eprintln!("{line}");
+    } else {
+      progress.println(line)?;
+    }
+  }
+  Ok(())
 }
 
 async fn state_apply(
@@ -273,6 +320,7 @@ async fn state_apply(
         },
       )
       .await?;
+      report_cargo_receipt(client, &key, &token, progress, output).await?;
     }
   }
 
@@ -523,6 +571,32 @@ pub(super) async fn exec_state_apply(
     print_states(&states);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
+  } else {
+    // Show every rendered source before mutations, including orphan removal.
+    // Interactive users still review the complete Statefile above.
+    for state in &states {
+      let summary =
+        utils::state_summary::summarize_state(state, &get_nanocl_group(state));
+      if opts.json {
+        StateOutput {
+          operation: "apply",
+          statefile: Some(summary.source.clone()),
+        }
+        .emit(StateOutputEvent::Summary {
+          summary: &summary,
+          reload: opts.reload,
+          remove_orphans: opts.remove_orphans,
+        })?;
+      } else {
+        eprintln!("{}", utils::state_summary::format_state_summary(&summary));
+        if opts.reload || opts.remove_orphans {
+          eprintln!(
+            "  Options: reload={}, remove-orphans={}",
+            opts.reload, opts.remove_orphans
+          );
+        }
+      }
+    }
   }
   for state in &states {
     if opts.remove_orphans {

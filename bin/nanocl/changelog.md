@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Keep the full interactive Statefile preview and show a concise source,
+  group, object and image summary with `state apply -y`. Add plain-log phase
+  and waiting updates, passive Cargo rollout observations, and best-effort
+  post-apply revision, health and image-ID snapshots, including JSON records.
 - Migrate the networking stack to ntex 4.2 and require Rust 1.99.0 for builds.
 - Refresh Rust dependencies to their latest compatible stable releases.
 - Align `nanocl install` and `nanocl uninstall` with Statefile apply/remove
