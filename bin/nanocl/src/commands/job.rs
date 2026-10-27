@@ -12,8 +12,9 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, GenericStartOpts, GenericStopOpts, JobArg, JobCommand,
-    JobCompactRow, JobHistoryOpts, JobLogsOpts, JobRow, JobRunRow, JobWaitOpts,
+    GenericDefaultOpts, GenericHistoryOpts, GenericStartOpts, GenericStopOpts,
+    JobArg, JobCommand, JobCompactRow, JobLogsOpts, JobRow, JobRunRow,
+    JobWaitOpts,
   },
   utils,
 };
@@ -75,44 +76,31 @@ impl GenericCommandInspect for JobArg {
 /// Show durable run history independently of live Jobs and Docker log retention.
 async fn exec_job_history(
   cli_conf: &CliConfig,
-  opts: &JobHistoryOpts,
+  opts: &GenericHistoryOpts,
 ) -> IoResult<()> {
-  if let Some(run) = &opts.run {
-    let history = cli_conf.client.inspect_history_job(&opts.name, run).await?;
-    let display = opts
-      .display
-      .as_ref()
-      .unwrap_or(&cli_conf.user_config.display_format);
-    return utils::print::display_format(display, history);
-  }
-  if matches!(
-    opts.display.as_ref(),
-    Some(crate::models::DisplayFormat::Toml)
-  ) {
-    return Err(IoError::other(
-      "Job history",
-      "TOML output requires --run RUN-ID; use yaml or json for a history list",
-    ));
+  super::history::validate_options(opts)?;
+  if let Some(id) = &opts.id {
+    let history = cli_conf
+      .client
+      .inspect_history_job(&opts.key, &id.to_string())
+      .await?;
+    return super::history::print_detail(
+      opts,
+      &cli_conf.user_config.display_format,
+      history,
+    );
   }
   let runs = cli_conf
     .client
     .list_history_job(
-      &opts.name,
+      &opts.key,
       Some(&JobHistoryQuery {
         limit: opts.limit,
         offset: opts.offset,
       }),
     )
     .await?;
-  if let Some(display) = &opts.display {
-    return utils::print::display_format(display, runs);
-  }
-  let output =
-    utils::print::render_table(runs.into_iter().map(JobRunRow::from));
-  if !output.is_empty() {
-    println!("{output}");
-  }
-  Ok(())
+  super::history::print_list(opts, runs, JobRunRow::from)
 }
 
 /// Execute the `nanocl job logs` command to list the logs of a job
@@ -334,7 +322,7 @@ mod tests {
       fixture.history.run.clone(),
     )]);
     for expected in [
-      "RUN",
+      "ID",
       "INCARNATION",
       "STATE",
       "Succeeded",
@@ -352,7 +340,7 @@ mod tests {
       JobArg::try_parse_from(["job", "history", "backup", "--display", "toml"])
         .unwrap();
     let error = exec_job(&cli, &args).await.unwrap_err();
-    assert!(error.to_string().contains("TOML output requires --run"));
+    assert!(error.to_string().contains("TOML output requires --id"));
     assert!(fixture.requests.lock().unwrap().is_empty());
 
     let key = fixture.history.run.key.to_string();
@@ -360,7 +348,7 @@ mod tests {
       "job",
       "history",
       "backup",
-      "--run",
+      "--id",
       &key,
       "--display",
       "toml",
@@ -386,7 +374,7 @@ mod tests {
     let key = fixture.history.run.key.to_string();
     for display in [None, Some("json")] {
       let mut arguments =
-        vec!["job", "history", "backup", "--run", key.as_str()];
+        vec!["job", "history", "backup", "--id", key.as_str()];
       if let Some(display) = display {
         arguments.extend(["--display", display]);
       }
@@ -413,7 +401,7 @@ mod tests {
       "job",
       "history",
       "missing",
-      "--run",
+      "--id",
       "00000000-0000-0000-0000-000000000001",
     ])
     .unwrap();

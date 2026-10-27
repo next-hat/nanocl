@@ -30,8 +30,8 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, VmArg, VmCommand, VmCompactRow, VmCreateOpts,
-    VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
+    GenericDefaultOpts, GenericHistoryOpts, SpecHistoryRow, VmArg, VmCommand,
+    VmCompactRow, VmCreateOpts, VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
   },
   utils,
 };
@@ -39,6 +39,7 @@ use crate::{
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
+  history::{print_revision_history, validate_options},
 };
 
 impl GenericCommand for VmArg {
@@ -211,6 +212,25 @@ pub async fn exec_vm_patch(
   Ok(())
 }
 
+/// Execute VM history using the shared history selection and display.
+async fn exec_vm_history(
+  cli_conf: &CliConfig,
+  opts: &GenericHistoryOpts,
+) -> IoResult<()> {
+  validate_options(opts)?;
+  let mut histories = cli_conf.client.list_history_vm(&opts.key).await?;
+  histories.sort_by_key(|revision| {
+    std::cmp::Reverse((revision.created_at, revision.key))
+  });
+  print_revision_history(
+    opts,
+    &cli_conf.user_config.display_format,
+    histories,
+    |revision| revision.key,
+    SpecHistoryRow::from,
+  )
+}
+
 fn vm_process_name(key: &str) -> IoResult<String> {
   let key = key
     .parse::<ResourceKey>()
@@ -368,6 +388,7 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     }
     VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
     VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
+    VmCommand::History(opts) => exec_vm_history(cli_conf, opts).await,
     VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
     VmCommand::Stop(opts) => exec_vm_lifecycle(client, opts, false).await,
     VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,

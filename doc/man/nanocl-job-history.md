@@ -10,13 +10,14 @@ history - List retained Job executions or inspect one run
 
 ## SYNOPSIS
 
-**nanocl job history** *NAME* [**--limit** *LIMIT*] [**--offset** *OFFSET*] [**--display** *FORMAT*]
+**nanocl job history** *KEY* [**--limit** *LIMIT*] [**--offset** *OFFSET*] [**--display** *FORMAT*]
 
-**nanocl job history** *NAME* **--run** *RUN-ID* [**--display** *FORMAT*]
+**nanocl job history** *KEY* **--id** *UUID* [**--display** *FORMAT*]
 
 ## DESCRIPTION
 
-List executions from newest to oldest acceptance. Each result includes a stable
+The positional *KEY* is the global Job name. List executions from newest to
+oldest acceptance. Each result includes a stable
 run ID and incarnation ID, so executions of recreated Jobs with the same name
 remain distinguishable. History remains available after Job removal, TTL cleanup,
 or removal of its Docker containers.
@@ -35,22 +36,22 @@ logs. Use `nanocl job logs` while the relevant runtime logs remain available.
 
 **--limit** *LIMIT*
 
-Page size between 1 and 100. Defaults to 50. Cannot be used with **--run**.
+Page size between 1 and 100. Defaults to 50. Cannot be used with **--id**.
 
 **--offset** *OFFSET*
 
 Nonnegative number of executions to skip. Defaults to zero. Cannot be used with
-**--run**.
+**--id**.
 
-**--run** *RUN-ID*
+**--id** *UUID*
 
 Inspect one retained execution belonging to the named Job.
 
 **--display** *FORMAT*
 
-Lists support `yaml` or `json` and default to a table. Detail with **--run**
+Lists support `yaml` or `json` and default to a table. Detail with **--id**
 supports `yaml`, `json`, or `toml` and defaults to the configured inspection
-format.
+format, normally YAML. TOML requires **--id**.
 
 ## EXAMPLES
 
@@ -58,5 +59,6 @@ format.
 nanocl job history backup
 nanocl job history backup --limit 20 --offset 20
 nanocl job history backup --display json
-nanocl job history backup --run 12345678-1234-1234-1234-123456789abc
+nanocl job history backup --id 12345678-1234-1234-1234-123456789abc
+nanocl job history backup --id 12345678-1234-1234-1234-123456789abc --display toml
 ```

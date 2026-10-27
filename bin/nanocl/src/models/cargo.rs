@@ -8,8 +8,8 @@ use nanocld_client::stubs::{
 };
 
 use super::{
-  GenericInspectOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-  GenericStartOpts, GenericStopOpts, NamespacedListOpts,
+  GenericHistoryOpts, GenericInspectOpts, GenericRemoveForceOpts,
+  GenericRemoveOpts, GenericStartOpts, GenericStopOpts, NamespacedListOpts,
 };
 
 /// `nanocl cargo create` available options
@@ -126,13 +126,6 @@ pub struct CargoPatchOpts {
   pub(crate) volumes: Option<Vec<String>>,
 }
 
-/// `nanocl cargo history` available options
-#[derive(Clone, Parser)]
-pub struct CargoHistoryOpts {
-  /// Canonical key of the cargo whose history to browse
-  pub key: String,
-}
-
 /// `nanocl cargo revert` available options
 #[derive(Clone, Parser)]
 pub struct CargoRevertOpts {
@@ -197,8 +190,8 @@ pub enum CargoCommand {
   Inspect(GenericInspectOpts),
   /// Update a cargo by its canonical key
   Patch(CargoPatchOpts),
-  /// List cargo history
-  History(CargoHistoryOpts),
+  /// List cargo specification history or inspect a revision
+  History(GenericHistoryOpts),
   /// Revert cargo to a specific history
   Revert(CargoRevertOpts),
   /// Show logs

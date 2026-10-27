@@ -71,13 +71,27 @@ nanocl job start backup
 nanocl job wait backup
 nanocl job history backup
 nanocl job history backup --limit 20 --offset 20
-nanocl job history backup --run RUN_UUID
-nanocl job history backup --run RUN_UUID --display json
+nanocl job history backup --id RUN_UUID
+nanocl job history backup --id RUN_UUID --display json
 nanocl job stop backup
 ```
 
 History works after removal/TTL and distinguishes multiple incarnations by UUID.
 Detail includes the pinned definition, linked start operation, and ordered steps.
+Job, Cargo, and VM history commands share the same options: a positional key,
+`--id UUID` for detail, `--limit` and `--offset` for lists, and `--display` for
+structured output. Cargo and VM keys are canonical `namespace.name` keys; Job
+keys are global names. Cargo and VM histories contain specification revisions,
+while Job history contains executions. Inspecting history is read-only.
+
+Lists default to a table, with 50 results per page, a maximum limit of 100, and
+offset zero. JSON and YAML lists are also supported. Detail defaults to the
+configured inspection format, normally YAML. TOML requires `--id`, and `--id`
+cannot be combined with pagination options. Results are ordered newest first.
+Cargo and VM commands retrieve their existing revision-history response and
+apply pagination locally; the Job API paginates retained runs on the server.
+VM history uses the existing API's live-VM and current-incarnation scope.
+
 The API exposes `GET /jobs/{name}/histories` with `limit` (default 50, maximum 100)
 and nonnegative `offset`, and `GET /jobs/{name}/histories/{run}`. List order is
 acceptance descending, then run UUID descending. Current inspection/status uses

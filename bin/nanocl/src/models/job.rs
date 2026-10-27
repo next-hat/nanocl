@@ -8,34 +8,15 @@ use nanocld_client::stubs::{
 };
 
 use super::{
-  DisplayFormat, GenericInspectOpts, GenericListOpts, GenericRemoveOpts,
+  GenericHistoryOpts, GenericInspectOpts, GenericListOpts, GenericRemoveOpts,
   GenericStartOpts, GenericStopOpts,
 };
-
-/// `nanocl job history` lists retained executions or inspects a single run.
-#[derive(Clone, Parser)]
-pub struct JobHistoryOpts {
-  /// Job name, including a removed Job
-  pub name: String,
-  /// Inspect a single execution by its run ID
-  #[clap(long, conflicts_with_all = ["limit", "offset"])]
-  pub run: Option<String>,
-  /// Page size, 1 to 100; defaults to 50
-  #[clap(long, value_parser = clap::value_parser!(i64).range(1..=100))]
-  pub limit: Option<i64>,
-  /// Number of executions to skip, newest first
-  #[clap(long, value_parser = clap::value_parser!(i64).range(0..))]
-  pub offset: Option<i64>,
-  /// Display format; list defaults to a table, detail to configured format
-  #[clap(long)]
-  pub display: Option<DisplayFormat>,
-}
 
 /// One retained execution, including its incarnation to distinguish recreation.
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct JobRunRow {
-  pub run: String,
+  pub id: String,
   pub incarnation: String,
   pub state: String,
   #[tabled(rename = "ACCEPTED AT")]
@@ -57,7 +38,7 @@ impl From<JobRun> for JobRunRow {
         .to_string()
     };
     Self {
-      run: run.key.to_string(),
+      id: run.key.to_string(),
       incarnation: run.incarnation_key.to_string(),
       state: format!("{:?}", run.state),
       accepted_at: timestamp(run.accepted_at),
@@ -112,7 +93,7 @@ pub enum JobCommand {
   /// Inspect a job by its name
   Inspect(GenericInspectOpts),
   /// List retained executions or inspect a run; Docker logs are not archived
-  History(JobHistoryOpts),
+  History(GenericHistoryOpts),
   /// Show logs of a job
   Logs(JobLogsOpts),
   /// Wait for a job to finish
@@ -302,23 +283,26 @@ mod tests {
     let JobCommand::History(options) = args.command else {
       panic!("expected history command");
     };
-    assert_eq!(options.name, "backup");
+    assert_eq!(options.key, "backup");
     assert_eq!(options.limit, Some(100));
     assert_eq!(options.offset, Some(2));
-    assert!(matches!(options.display, Some(DisplayFormat::Json)));
+    assert!(matches!(
+      options.display,
+      Some(crate::models::DisplayFormat::Json)
+    ));
     let run = "00000000-0000-0000-0000-000000000001";
     let args =
-      JobArg::try_parse_from(["job", "history", "backup", "--run", run])
+      JobArg::try_parse_from(["job", "history", "backup", "--id", run])
         .unwrap();
     let JobCommand::History(options) = args.command else {
       panic!("expected history command");
     };
-    assert_eq!(options.run.as_deref(), Some(run));
+    assert_eq!(options.id, Some(run.parse().unwrap()));
     for invalid in [
       vec!["job", "history", "backup", "--limit", "0"],
       vec!["job", "history", "backup", "--limit", "101"],
       vec!["job", "history", "backup", "--offset", "-1"],
-      vec!["job", "history", "backup", "--run", run, "--limit", "1"],
+      vec!["job", "history", "backup", "--id", run, "--limit", "1"],
     ] {
       assert!(JobArg::try_parse_from(invalid).is_err());
     }
@@ -345,7 +329,7 @@ mod tests {
       reason: Some("Runtime observation unavailable".into()),
     };
     let row = JobRunRow::from(run.clone());
-    assert_eq!(row.run, run.key.to_string());
+    assert_eq!(row.id, run.key.to_string());
     assert_eq!(row.incarnation, run.incarnation_key.to_string());
     assert_eq!(row.state, "Unknown");
     assert_eq!(row.started_at, "-");
