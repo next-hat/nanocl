@@ -6,8 +6,8 @@ use std::os::{
 use std::path::{Path, PathBuf};
 
 use bollard_next::{
-  container::{Config, StartContainerOptions, WaitContainerOptions},
-  secret::{DeviceMapping, HostConfig},
+  models::{ContainerCreateBody as Config, DeviceMapping, HostConfig},
+  query_parameters::{StartContainerOptions, WaitContainerOptions},
 };
 use futures::StreamExt;
 
@@ -62,12 +62,12 @@ async fn ensure_networks(vm: &Vm, state: &SystemState) -> IoResult<()> {
   )
 }
 
-// The pinned Docker model predates EnableIPv4. Read the same configured Unix
-// transport once so an explicitly configured subnet cannot hide disabled IPv4.
+// Validate the raw inspection before projecting the network, so an explicitly
+// configured subnet cannot hide disabled or malformed IPv4 settings.
 async fn inspect_runtime_network(
   mode: &str,
   docker_host: &str,
-) -> IoResult<bollard_next::models::Network> {
+) -> IoResult<bollard_next::models::NetworkInspect> {
   let socket = docker_host.replacen("unix://", "", 1);
   let cfg = ntex::SharedCfg::new("vm-network-inspect").add(
     ntex::client::ClientConfig::new()
@@ -121,7 +121,7 @@ async fn inspect_runtime_network(
 
 fn parse_runtime_network(
   document: serde_json::Value,
-) -> IoResult<bollard_next::models::Network> {
+) -> IoResult<bollard_next::models::NetworkInspect> {
   match document.get("EnableIPv4") {
     None | Some(serde_json::Value::Bool(true)) => {}
     Some(serde_json::Value::Bool(false)) => {
@@ -143,7 +143,7 @@ fn parse_runtime_network(
 }
 
 fn validate_runtime_network(
-  network: &bollard_next::models::Network,
+  network: &bollard_next::models::NetworkInspect,
 ) -> IoResult<()> {
   if network.driver.as_deref() != Some("bridge")
     || network.internal == Some(true)
@@ -379,9 +379,7 @@ fn runtime_sysctls() -> HashMap<String, String> {
   sysctls
 }
 
-fn runtime_networking(
-  mode: String,
-) -> bollard_next::container::NetworkingConfig<String> {
+fn runtime_networking(mode: String) -> bollard_next::models::NetworkingConfig {
   // Unlike conf.default, endpoint options apply to the already-created veth.
   // Docker replaces IFNAME with the endpoint's actual interface name.
   let settings = [
@@ -393,8 +391,8 @@ fn runtime_networking(
   ]
   .map(|setting| format!("net.ipv4.conf.IFNAME.{setting}"))
   .join(",");
-  bollard_next::container::NetworkingConfig {
-    endpoints_config: HashMap::from([(
+  bollard_next::models::NetworkingConfig {
+    endpoints_config: Some(HashMap::from([(
       mode,
       bollard_next::models::EndpointSettings {
         driver_opts: Some(HashMap::from([(
@@ -403,7 +401,7 @@ fn runtime_networking(
         )])),
         ..Default::default()
       },
-    )]),
+    )])),
   }
 }
 
@@ -1024,11 +1022,11 @@ async fn start_init_container(
   state
     .inner
     .docker_api
-    .start_container(&process.name, None::<StartContainerOptions<String>>)
+    .start_container(&process.name, None::<StartContainerOptions>)
     .await
     .map_err(|err| err.map_err_context(|| "InitContainer"))?;
   let options = Some(WaitContainerOptions {
-    condition: "not-running",
+    condition: "not-running".to_owned(),
   });
   let mut stream = state
     .inner
@@ -1162,7 +1160,7 @@ async fn create_instance_owned<G: Clone + Send + 'static>(
   let network_mode = super::network::resolve_network_mode(
     vm.spec.host_config.runtime_network.clone(),
   );
-  let spec = bollard_next::container::Config {
+  let spec = bollard_next::models::ContainerCreateBody {
     image: Some(image),
     tty: Some(true),
     hostname: vm.spec.hostname.clone(),
@@ -2030,7 +2028,7 @@ mod tests {
   #[test]
   fn vm_endpoint_sysctls_apply_to_the_actual_uplink() {
     let config = runtime_networking("vm-network".into());
-    let endpoint = &config.endpoints_config["vm-network"];
+    let endpoint = &config.endpoints_config.as_ref().unwrap()["vm-network"];
     let options = endpoint.driver_opts.as_ref().unwrap();
     let settings = &options["com.docker.network.endpoint.sysctls"];
     for setting in [
@@ -2198,8 +2196,8 @@ mod tests {
     }
   }
 
-  fn bridge_network(subnets: &[&str]) -> bollard_next::models::Network {
-    bollard_next::models::Network {
+  fn bridge_network(subnets: &[&str]) -> bollard_next::models::NetworkInspect {
+    bollard_next::models::NetworkInspect {
       driver: Some("bridge".into()),
       internal: Some(false),
       enable_ipv6: Some(false),

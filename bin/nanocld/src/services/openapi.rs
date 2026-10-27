@@ -54,6 +54,7 @@ impl Modify for VersionModifier {
     node::list_node,
     node::count_node,
     node::start_node_cargo,
+    node::delete_node_cargo,
     // Network
     network::list_network,
     network::inspect_network,
@@ -141,7 +142,6 @@ impl Modify for VersionModifier {
     process::create_process_exec,
     process::start_process_exec_detached,
     process::start_process_exec_attached,
-    process::start_process_by_pk,
     process::process_stats_by_name,
     // Event
     event::list_event,
@@ -388,6 +388,8 @@ mod tests {
     for wrapper in ["Container", "container_config"] {
       assert!(!properties.contains_key(wrapper));
     }
+    // Use the current native Docker create model, without legacy top-level MACs.
+    assert!(!properties.contains_key("MacAddress"));
 
     let host_reference = find_schema_reference(&properties["HostConfig"])
       .expect("HostConfig must reference its strict component");
@@ -414,12 +416,38 @@ mod tests {
   }
 
   #[test]
+  fn generated_openapi_exposes_node_delete_query() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    assert_node_delete_query(&generated);
+  }
+
+  fn assert_node_delete_query(document: &serde_json::Value) {
+    let operation = &document["paths"]["/nodes/cargoes"]["delete"];
+    assert!(operation.is_object());
+    assert!(operation.get("requestBody").is_none());
+    let [parameter] = operation["parameters"].as_array().unwrap().as_slice()
+    else {
+      panic!("node deletion must require exactly one query parameter");
+    };
+    assert_eq!(parameter["name"], "CargoKey");
+    assert_eq!(parameter["in"], "query");
+    assert_eq!(parameter["required"], true);
+    assert_eq!(parameter["schema"]["type"], "string");
+  }
+
+  #[test]
   fn checked_in_swagger_matches_generated_openapi() {
     // Schema extension maps do not guarantee YAML key order. Compare every
     // value in the parsed document while preserving array order and types.
     let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
     let checked_in: serde_json::Value =
       serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for document in [&generated, &checked_in] {
+      let paths = document["paths"].as_object().unwrap();
+      assert!(!paths.contains_key("/processes/{pk}/start"));
+      assert!(paths["/processes/{kind}/{key}/start"]["post"].is_object());
+      assert_node_delete_query(document);
+    }
     assert_eq!(
       generated, checked_in,
       "run the ignored regenerate_checked_in_swagger test"

@@ -139,16 +139,16 @@ pub(super) async fn ensure_auxiliary_stopped(
   let containers = state
     .inner
     .docker_api
-    .list_containers(Some(bollard_next::container::ListContainersOptions::<
-      String,
-    > {
-      all: true,
-      filters: std::collections::HashMap::from([(
-        "label".to_owned(),
-        vec![format!("io.nanocl.v={}", vm.spec.vm_key)],
-      )]),
-      ..Default::default()
-    }))
+    .list_containers(Some(
+      bollard_next::query_parameters::ListContainersOptions {
+        all: true,
+        filters: Some(std::collections::HashMap::from([(
+          "label".to_owned(),
+          vec![format!("io.nanocl.v={}", vm.spec.vm_key)],
+        )])),
+        ..Default::default()
+      },
+    ))
     .await
     .map_err(|error| {
       conflict(&format!("VM container inventory unavailable: {error}"))
@@ -1005,9 +1005,12 @@ mod tests {
   #[ntex::test]
   async fn vm_recovery_observes_old_generation_and_partially_stopped_runtime() {
     use crate::models::{NodeDb, ObjPsStatusDb, ObjPsStatusUpdate};
-    use bollard_next::container::{
-      Config, CreateContainerOptions, RemoveContainerOptions,
-      StartContainerOptions, StopContainerOptions,
+    use bollard_next::{
+      models::ContainerCreateBody as Config,
+      query_parameters::{
+        CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
+        StopContainerOptions,
+      },
     };
     use nanocl_stubs::generic::ImagePullPolicy;
     use std::collections::HashMap;
@@ -1120,7 +1123,7 @@ mod tests {
       let auxiliary = docker
         .create_container(
           Some(CreateContainerOptions {
-            name: format!("{key}.test.init.v"),
+            name: Some(format!("{key}.test.init.v")),
             ..Default::default()
           }),
           Config {
@@ -1138,7 +1141,7 @@ mod tests {
         .unwrap();
       auxiliary_id = Some(auxiliary.id.clone());
       docker
-        .start_container(&auxiliary.id, None::<StartContainerOptions<String>>)
+        .start_container(&auxiliary.id, None::<StartContainerOptions>)
         .await
         .unwrap();
       let (_, provisioning, guard) =
@@ -1173,7 +1176,7 @@ mod tests {
         provisioning
       );
       docker
-        .stop_container(&auxiliary.id, Some(StopContainerOptions { t: 0 }))
+        .stop_container(&auxiliary.id, Some(StopContainerOptions { t: Some(0), ..Default::default() }))
         .await
         .unwrap();
       assert!(recover_with_retries(&provisioning, &state).await.unwrap());
@@ -1188,7 +1191,7 @@ mod tests {
       let created = docker
         .create_container(
           Some(CreateContainerOptions {
-            name: format!("{key}.v"),
+            name: Some(format!("{key}.v")),
             ..Default::default()
           }),
           Config {
@@ -1206,7 +1209,7 @@ mod tests {
         .unwrap();
       runtime_id = Some(created.id.clone());
       docker
-        .start_container(&created.id, None::<StartContainerOptions<String>>)
+        .start_container(&created.id, None::<StartContainerOptions>)
         .await
         .unwrap();
       let inspect = docker.inspect_container(&created.id, None).await.unwrap();
@@ -1269,7 +1272,7 @@ mod tests {
       // Interruption after runtime work has begun: it is now stopped even
       // though the persisted operation still names its pending destroy phase.
       docker
-        .stop_container(&created.id, Some(StopContainerOptions { t: 0 }))
+        .stop_container(&created.id, Some(StopContainerOptions { t: Some(0), ..Default::default() }))
         .await
         .unwrap();
       ObjPsStatusDb::update_pk(

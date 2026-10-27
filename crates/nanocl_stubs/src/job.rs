@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use bollard_next::container::Config;
+use bollard_next::models::ContainerCreateBody as Config;
 
 use crate::{
   generic::ImagePullPolicy,

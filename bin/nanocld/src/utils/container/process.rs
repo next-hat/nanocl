@@ -1,8 +1,11 @@
-use bollard_next::container::{
-  Config, CreateContainerOptions, InspectContainerOptions,
-  RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
+use bollard_next::models::HostConfig;
+use bollard_next::{
+  models::ContainerCreateBody as Config,
+  query_parameters::{
+    CreateContainerOptions, InspectContainerOptions, RemoveContainerOptions,
+    StartContainerOptions, StopContainerOptions,
+  },
 };
-use bollard_next::service::HostConfig;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -55,7 +58,7 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
     .docker_api
     .create_container(
       Some(CreateContainerOptions {
-        name,
+        name: Some(name.to_owned()),
         ..Default::default()
       }),
       config,
@@ -307,7 +310,7 @@ pub(crate) async fn start_instances_owned<G: Send + 'static>(
       .docker_api
       .start_container(
         &process.data.id.unwrap_or_default(),
-        None::<StartContainerOptions<String>>,
+        None::<StartContainerOptions>,
       )
       .await
       .map_err(|err| err.map_err_context(|| "StartProcess"))?;

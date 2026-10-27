@@ -3,9 +3,7 @@ use clap::{Args, Parser};
 use std::path::PathBuf;
 use tabled::Tabled;
 
-use bollard_next::{
-  container::MemoryStatsStats, service::ContainerStateStatusEnum,
-};
+use bollard_next::models::ContainerStateStatusEnum;
 
 use nanocld_client::stubs::{
   generic::{GenericClause, GenericFilter},
@@ -246,36 +244,45 @@ pub struct ProcessStatsRow {
 impl From<ProcessStats> for ProcessStatsRow {
   fn from(process_stats: ProcessStats) -> Self {
     let stats = process_stats.stats;
-    let key = stats.name.replace('/', "");
-    let cpu_delta = stats.cpu_stats.cpu_usage.total_usage as f64
-      - stats.precpu_stats.cpu_usage.total_usage as f64;
-    let system_cpu_delta = stats.cpu_stats.system_cpu_usage.unwrap_or_default()
+    let key = stats.name.unwrap_or(process_stats.name).replace('/', "");
+    let cpu_stats = stats.cpu_stats.unwrap_or_default();
+    let precpu_stats = stats.precpu_stats.unwrap_or_default();
+    let cpu_delta = cpu_stats
+      .cpu_usage
+      .and_then(|usage| usage.total_usage)
+      .unwrap_or_default() as f64
+      - precpu_stats
+        .cpu_usage
+        .and_then(|usage| usage.total_usage)
+        .unwrap_or_default() as f64;
+    let system_cpu_delta = cpu_stats.system_cpu_usage.unwrap_or_default()
       as f64
-      - stats.precpu_stats.system_cpu_usage.unwrap_or_default() as f64;
-    let number_cpus = stats.cpu_stats.online_cpus.unwrap_or_default() as f64;
-    let cpu_usage = format!(
-      "{:.2}%",
+      - precpu_stats.system_cpu_usage.unwrap_or_default() as f64;
+    let number_cpus = cpu_stats.online_cpus.unwrap_or_default() as f64;
+    let cpu_percent = if system_cpu_delta > 0.0 {
       ((cpu_delta / system_cpu_delta) * number_cpus) * 100.0
-    );
-    let available_memory = stats.memory_stats.limit.unwrap_or_default() as f64;
-    let used_memory = stats.memory_stats.usage.unwrap_or_default() as f64;
-    let memory_usage = if let Some(memory_stats) = stats.memory_stats.stats {
-      match memory_stats {
-        MemoryStatsStats::V1(mem_stat) => used_memory - mem_stat.cache as f64,
-        MemoryStatsStats::V2(mem_stat) => {
-          used_memory - mem_stat.inactive_file as f64
-        }
-      }
     } else {
-      0.00
+      0.0
     };
+    let cpu_usage = format!("{cpu_percent:.2}%");
+    let memory_stats = stats.memory_stats.unwrap_or_default();
+    let available_memory = memory_stats.limit.unwrap_or_default() as f64;
+    let used_memory = memory_stats.usage.unwrap_or_default() as f64;
+    let memory_usage = memory_stats
+      .stats
+      .as_ref()
+      .and_then(|stats| {
+        stats.get("cache").or_else(|| stats.get("inactive_file"))
+      })
+      .map(|cache| used_memory - *cache as f64)
+      .unwrap_or_default();
     let net_io = if let Some(networks) = stats.networks {
       // calculate total network io
       let mut total_rx = 0;
       let mut total_tx = 0;
       for (_, network) in networks {
-        total_rx += network.rx_bytes;
-        total_tx += network.tx_bytes;
+        total_rx += network.rx_bytes.unwrap_or_default();
+        total_tx += network.tx_bytes.unwrap_or_default();
       }
       format!(
         "{:.1}MB / {:.1}MB",
@@ -288,14 +295,16 @@ impl From<ProcessStats> for ProcessStatsRow {
       String::default()
     };
     let (total_read, total_write) = if let Some(io_service_bytes_recursive) =
-      stats.blkio_stats.io_service_bytes_recursive
+      stats
+        .blkio_stats
+        .and_then(|stats| stats.io_service_bytes_recursive)
     {
       let total_read = match io_service_bytes_recursive.first() {
-        Some(val) => val.value,
+        Some(val) => val.value.unwrap_or_default(),
         None => 0,
       };
       let total_write = match io_service_bytes_recursive.get(1) {
-        Some(val) => val.value,
+        Some(val) => val.value.unwrap_or_default(),
         None => 0,
       };
       (total_read as f64, total_write as f64)
@@ -307,7 +316,18 @@ impl From<ProcessStats> for ProcessStatsRow {
       total_read / 1000.00 / 1000.00,
       total_write / 1000.00 / 1000.00 / 1000.00
     );
-    let pids = format!("{}", stats.pids_stats.current.unwrap_or_default());
+    let pids = format!(
+      "{}",
+      stats
+        .pids_stats
+        .and_then(|stats| stats.current)
+        .unwrap_or_default()
+    );
+    let memory_percent = if available_memory > 0.0 {
+      (memory_usage / available_memory) * 100.0
+    } else {
+      0.0
+    };
     Self {
       key,
       cpu_usage,
@@ -318,7 +338,7 @@ impl From<ProcessStats> for ProcessStatsRow {
         // convert to GiB
         available_memory / 1024.00 / 1024.00 / 1024.00
       ),
-      mem: format!("{:.2}%", (memory_usage / available_memory) * 100.0),
+      mem: format!("{memory_percent:.2}%"),
       net_io,
       block_io,
       pids,
@@ -334,8 +354,57 @@ mod tests {
   use clap::Parser;
   use tabled::Tabled;
 
-  use super::{Process, ProcessCompactRow, ProcessRow, format_age};
+  use super::{
+    Process, ProcessCompactRow, ProcessRow, ProcessStats, ProcessStatsRow,
+    format_age,
+  };
   use crate::models::{Cli, Command};
+
+  #[test]
+  fn process_stats_rows_preserve_cgroup_v1_and_v2_memory_usage() {
+    for cache_field in ["cache", "inactive_file"] {
+      let stats = serde_json::from_value(serde_json::json!({
+        "name": "/app",
+        "cpu_stats": {"cpu_usage": {"total_usage": 200}, "system_cpu_usage": 1200, "online_cpus": 2},
+        "precpu_stats": {"cpu_usage": {"total_usage": 100}, "system_cpu_usage": 1000},
+        "memory_stats": {"usage": 805306368_u64, "limit": 1073741824_u64, "stats": {cache_field: 268435456_u64}},
+        "networks": {"eth0": {"rx_bytes": 1000000, "tx_bytes": 2000000}, "eth1": {"rx_bytes": 2000000, "tx_bytes": 1000000}},
+        "blkio_stats": {"io_service_bytes_recursive": [{"value": 3000000}, {"value": 4000000000_u64}]},
+        "pids_stats": {"current": 4}
+      })).unwrap();
+      let row = ProcessStatsRow::from(ProcessStats {
+        name: "fallback".to_owned(),
+        stats,
+      });
+      assert_eq!(row.key, "app");
+      assert_eq!(row.cpu_usage, "100.00%");
+      assert_eq!(row.mem_usage_limit, "512.0MiB / 1.00GiB");
+      assert_eq!(row.mem, "50.00%");
+      assert_eq!(row.net_io, "3.0MB / 3.0MB");
+      assert_eq!(row.block_io, "3.0MB / 4.0GB");
+      assert_eq!(row.pids, "4");
+    }
+  }
+
+  #[test]
+  fn process_stats_rows_accept_missing_optional_measurements() {
+    for stats in [
+      serde_json::json!({}),
+      serde_json::json!({"cpu_stats": {}, "precpu_stats": {"cpu_usage": {}}, "memory_stats": {"stats": {}}, "pids_stats": {}, "blkio_stats": {"io_service_bytes_recursive": [{}]}}),
+    ] {
+      let row = ProcessStatsRow::from(ProcessStats {
+        name: "fallback".to_owned(),
+        stats: serde_json::from_value(stats).unwrap(),
+      });
+      assert_eq!(row.key, "fallback");
+      assert_eq!(row.cpu_usage, "0.00%");
+      assert_eq!(row.mem_usage_limit, "0.0MiB / 0.00GiB");
+      assert_eq!(row.mem, "0.00%");
+      assert_eq!(row.net_io, "");
+      assert_eq!(row.block_io, "0.0MB / 0.0GB");
+      assert_eq!(row.pids, "0");
+    }
+  }
 
   fn process_with_network(mode: &str) -> Process {
     serde_json::from_value(serde_json::json!({

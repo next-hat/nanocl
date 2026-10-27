@@ -1,6 +1,6 @@
 use ntex::web;
 
-use bollard_next::network::InspectNetworkOptions;
+use bollard_next::query_parameters::InspectNetworkOptions;
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::HostInfo;
 
@@ -24,7 +24,7 @@ pub async fn get_info(
   let network = state
     .inner
     .docker_api
-    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions>)
     .await?;
   let info = HostInfo {
     docker,

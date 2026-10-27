@@ -1,6 +1,6 @@
 use ntex::web;
 
-use bollard_next::container::StopContainerOptions;
+use bollard_next::query_parameters::StopContainerOptions;
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::ProcessKind;
 

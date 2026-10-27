@@ -19,6 +19,12 @@ pub fn ntex_config(
         .to_with_state(start_node_cargo),
     )
     .service(
+      web::resource("/nodes/cargoes")
+        .name("delete_node_cargo")
+        .guard(web::guard::Delete())
+        .to_with_state(delete_node_cargo),
+    )
+    .service(
       web::resource("/nodes")
         .name("list_node")
         .guard(web::guard::Get())

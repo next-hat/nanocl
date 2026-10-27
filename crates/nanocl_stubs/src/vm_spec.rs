@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-pub use bollard_next::container::Config;
+pub use bollard_next::models::ContainerCreateBody as Config;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -167,20 +167,23 @@ impl utoipa::PartialSchema for VmCloudInitUserData {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for VmCloudInitUserData {
-  fn schema_name() -> String {
-    "VmCloudInitUserData".to_owned()
+  fn schema_name() -> std::borrow::Cow<'static, str> {
+    "VmCloudInitUserData".into()
   }
 
   fn json_schema(
-    generator: &mut schemars::r#gen::SchemaGenerator,
-  ) -> schemars::schema::Schema {
-    let prefix = generator.settings().definitions_path.clone();
+    generator: &mut schemars::SchemaGenerator,
+  ) -> schemars::Schema {
+    let prefix = format!(
+      "#{}/",
+      generator
+        .settings()
+        .definitions_path
+        .trim_start_matches('#')
+        .trim_end_matches('/')
+    );
     for (name, schema) in cloud_init_schema_components(&prefix) {
-      generator.definitions_mut().insert(
-        name,
-        serde_json::from_value(schema)
-          .expect("the bundled cloud-init JSON Schema must be valid"),
-      );
+      generator.definitions_mut().insert(name, schema);
     }
     serde_json::from_value(cloud_init_user_data_schema(&prefix))
       .expect("the static cloud-init user-data JSON schema must be valid")
@@ -1233,24 +1236,38 @@ mod tests {
   #[cfg(feature = "schemars")]
   #[test]
   fn vm_cloud_init_user_data_statefile_schema_resolves_bundled_definitions() {
-    let schema =
-      serde_json::to_value(schemars::schema_for!(crate::statefile::Statefile))
-        .unwrap();
-    let data = &schema["definitions"]["VmCloudInitUserData"];
-    assert_eq!(data["oneOf"][0]["type"], "string");
-    assert_eq!(data["oneOf"][0]["maxLength"], 65536);
-    assert_eq!(data["oneOf"][1]["$ref"], "#/definitions/CloudInit26_2");
-    assert_eq!(data["oneOf"].as_array().unwrap().len(), 3);
-    assert_eq!(data["oneOf"][2]["type"], "null");
-    assert_local_cloud_init_references(&schema, &schema, "#/definitions/");
-    let root = &schema["definitions"]["CloudInit26_2"];
-    assert_eq!(root["type"], "object");
-    assert_eq!(root["additionalProperties"], false);
-    assert!(root["allOf"].is_array());
-    assert!(root["properties"]["users"].is_object());
-    let user = &schema["definitions"]["CloudInit26_2.users_groups.user"];
-    assert!(user["oneOf"].is_array());
-    assert_eq!(user["properties"]["name"]["type"], "string");
+    use schemars::generate::SchemaSettings;
+
+    let mut custom = SchemaSettings::draft07();
+    custom.definitions_path = "#/components/schemas/".into();
+    for (settings, definitions, prefix) in [
+      (SchemaSettings::draft07(), "/definitions", "#/definitions/"),
+      (SchemaSettings::draft2020_12(), "/$defs", "#/$defs/"),
+      (custom, "/components/schemas", "#/components/schemas/"),
+    ] {
+      let dialect = settings.meta_schema.clone().unwrap();
+      let schema = settings
+        .into_generator()
+        .into_root_schema_for::<crate::statefile::Statefile>()
+        .to_value();
+      assert_eq!(schema["$schema"], dialect.as_ref());
+      let definitions = schema.pointer(definitions).unwrap();
+      let data = &definitions["VmCloudInitUserData"];
+      assert_eq!(data["oneOf"][0]["type"], "string");
+      assert_eq!(data["oneOf"][0]["maxLength"], 65536);
+      assert_eq!(data["oneOf"][1]["$ref"], format!("{prefix}CloudInit26_2"));
+      assert_eq!(data["oneOf"].as_array().unwrap().len(), 3);
+      assert_eq!(data["oneOf"][2]["type"], "null");
+      assert_local_cloud_init_references(&schema, &schema, prefix);
+      let root = &definitions["CloudInit26_2"];
+      assert_eq!(root["type"], "object");
+      assert_eq!(root["additionalProperties"], false);
+      assert!(root["allOf"].is_array());
+      assert!(root["properties"]["users"].is_object());
+      let user = &definitions["CloudInit26_2.users_groups.user"];
+      assert!(user["oneOf"].is_array());
+      assert_eq!(user["properties"]["name"]["type"], "string");
+    }
   }
 
   #[cfg(feature = "utoipa")]
@@ -1271,11 +1288,15 @@ mod tests {
   #[cfg(feature = "schemars")]
   #[test]
   fn vm_host_config_statefile_schema_bounds_boot_limits() {
-    let schema =
-      serde_json::to_value(schemars::schema_for!(VmHostConfig)).unwrap();
+    let schema = schemars::generate::SchemaSettings::draft07()
+      .into_generator()
+      .into_root_schema_for::<VmHostConfig>()
+      .to_value();
     assert_boot_limit_schema(&schema);
-    let update =
-      serde_json::to_value(schemars::schema_for!(VmHostConfigUpdate)).unwrap();
+    let update = schemars::generate::SchemaSettings::draft07()
+      .into_generator()
+      .into_root_schema_for::<VmHostConfigUpdate>()
+      .to_value();
     assert_boot_limit_schema(&update);
     assert_required_resource_patch_schema(&update);
   }

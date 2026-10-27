@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::stubs::{
-  cargo_spec::CargoSpec,
+  cargo_spec::{CargoSpec, Config},
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
   resource::{ResourcePartial, ResourceUpdate},
   secret::{SecretPartial, SecretUpdate},
@@ -49,6 +49,29 @@ fn insert_nanocl_group(
   }
 }
 
+fn normalize_container_map_keys(config: &mut Config) {
+  // These native vectors represent Docker map keys. Canonicalize only the
+  // comparison copies; the authored payload and ordered fields stay intact.
+  for keys in [&mut config.exposed_ports, &mut config.volumes]
+    .into_iter()
+    .flatten()
+  {
+    keys.sort_unstable();
+  }
+}
+
+fn cargo_specs_match(current: &CargoSpec, desired: &CargoSpec) -> bool {
+  let mut current = current.clone();
+  let mut desired = desired.clone();
+  for spec in [&mut current, &mut desired] {
+    for container in spec.init_containers.iter_mut().chain(&mut spec.containers)
+    {
+      normalize_container_map_keys(&mut container.container_config);
+    }
+  }
+  current == desired
+}
+
 fn vm_spec_for_comparison(
   desired: &VmSpecPartial,
   current: &VmSpecPartial,
@@ -74,6 +97,21 @@ fn vm_spec_for_comparison(
     desired.cloud_init_user_data = None;
   }
   Ok(desired)
+}
+
+fn vm_specs_match(
+  current: &VmSpecPartial,
+  desired: &VmSpecPartial,
+) -> IoResult<bool> {
+  let mut desired = vm_spec_for_comparison(desired, current)?;
+  let mut current = current.clone();
+  for config in [&mut current.init_container, &mut desired.init_container]
+    .into_iter()
+    .flatten()
+  {
+    normalize_container_map_keys(config);
+  }
+  Ok(current == desired)
 }
 
 async fn apply_matching_vm(
@@ -325,7 +363,7 @@ async fn state_apply(
               }
               Ok(inspect) => {
                 let cmp = cargo_spec_from_revision(&inspect.spec);
-                if (cmp != cargo) || opts.reload {
+                if !cargo_specs_match(&cmp, &cargo) || opts.reload {
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
                   )?;
@@ -399,8 +437,7 @@ async fn state_apply(
               }
               Ok(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
-                let comparison = vm_spec_for_comparison(&vm, &cmp)?;
-                if (cmp != comparison) || opts.reload {
+                if !vm_specs_match(&cmp, &vm)? || opts.reload {
                   let update: VmSpecUpdate = vm.clone().into();
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
@@ -693,6 +730,93 @@ mod tests {
   use ntex::{util::Bytes, web};
 
   use super::*;
+
+  fn cargo_comparison_fixture() -> CargoSpec {
+    use nanocld_client::stubs::cargo_spec::ContainerSpec;
+
+    let container = |name: &str| ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some("alpine:latest".to_owned()),
+        exposed_ports: Some(vec!["9000/tcp".to_owned(), "8080/tcp".to_owned()]),
+        volumes: Some(vec!["/logs".to_owned(), "/data".to_owned()]),
+        env: Some(vec!["A=1".to_owned(), "B=2".to_owned()]),
+        cmd: Some(vec!["first".to_owned(), "second".to_owned()]),
+        ..Default::default()
+      },
+    };
+    CargoSpec {
+      name: "app".to_owned(),
+      init_containers: vec![container("prepare"), container("migrate")],
+      containers: vec![container("api"), container("worker")],
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn cargo_state_apply_skips_reordered_map_keys_without_mutating_payloads() {
+    let current = cargo_comparison_fixture();
+    let mut desired = current.clone();
+    for container in desired
+      .init_containers
+      .iter_mut()
+      .chain(&mut desired.containers)
+    {
+      container
+        .container_config
+        .exposed_ports
+        .as_mut()
+        .unwrap()
+        .reverse();
+      container
+        .container_config
+        .volumes
+        .as_mut()
+        .unwrap()
+        .reverse();
+    }
+    let original_desired = desired.clone();
+    let original_current = current.clone();
+    assert_ne!(current, desired);
+    assert!(cargo_specs_match(&current, &desired));
+    assert_eq!(current, original_current);
+    assert_eq!(desired, original_desired);
+  }
+
+  #[test]
+  fn cargo_state_apply_preserves_real_map_and_ordered_field_changes() {
+    let current = cargo_comparison_fixture();
+    for init in [false, true] {
+      for field in ["ExposedPorts", "Volumes", "Env", "Cmd", "Containers"] {
+        let mut desired = current.clone();
+        let containers = if init {
+          &mut desired.init_containers
+        } else {
+          &mut desired.containers
+        };
+        let config = &mut containers.first_mut().unwrap().container_config;
+        match field {
+          "ExposedPorts" => {
+            config.exposed_ports.as_mut().unwrap().pop();
+          }
+          "Volumes" => {
+            config.volumes.as_mut().unwrap().pop();
+          }
+          "Env" => config.env.as_mut().unwrap().reverse(),
+          "Cmd" => config.cmd.as_mut().unwrap().reverse(),
+          _ => containers.reverse(),
+        }
+        assert!(
+          !cargo_specs_match(&current, &desired),
+          "init={init} {field}"
+        );
+      }
+    }
+  }
 
   struct FailingReceiptWriter {
     fail_on_flush: bool,
@@ -1177,6 +1301,58 @@ mod tests {
       assert!(error.to_string().contains("global.guest"));
       assert!(fixture.requests.lock().unwrap().paths.is_empty());
     }
+  }
+
+  #[test]
+  fn vm_state_apply_compares_init_map_keys_without_masking_real_changes() {
+    let current = VmSpecPartial {
+      name: "guest".to_owned(),
+      image: "/vm.qcow2".to_owned(),
+      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
+      init_container: Some(
+        cargo_comparison_fixture()
+          .containers
+          .into_iter()
+          .next()
+          .unwrap()
+          .container_config,
+      ),
+      ..Default::default()
+    };
+    let mut desired = current.clone();
+    desired.mac_address = None;
+    let config = desired.init_container.as_mut().unwrap();
+    config.exposed_ports.as_mut().unwrap().reverse();
+    config.volumes.as_mut().unwrap().reverse();
+    let original_current = current.clone();
+    let original_desired = desired.clone();
+    assert!(vm_specs_match(&current, &desired).unwrap());
+    assert_eq!(current, original_current);
+    assert_eq!(desired, original_desired);
+
+    for field in ["ExposedPorts", "Volumes", "Env", "Cmd"] {
+      let mut changed = desired.clone();
+      let config = changed.init_container.as_mut().unwrap();
+      match field {
+        "ExposedPorts" => {
+          config.exposed_ports.as_mut().unwrap().pop();
+        }
+        "Volumes" => {
+          config.volumes.as_mut().unwrap().pop();
+        }
+        "Env" => config.env.as_mut().unwrap().reverse(),
+        _ => config.cmd.as_mut().unwrap().reverse(),
+      }
+      assert!(!vm_specs_match(&current, &changed).unwrap(), "{field}");
+    }
+    let mut changed = desired.clone();
+    changed.init_container = None;
+    assert!(!vm_specs_match(&current, &changed).unwrap());
+    changed.mac_address = Some("02:00:00:00:00:02".to_owned());
+    assert!(vm_specs_match(&current, &changed).is_err());
+    let mut invalid_current = current;
+    invalid_current.mac_address = None;
+    assert!(vm_specs_match(&invalid_current, &desired).is_err());
   }
 
   #[test]

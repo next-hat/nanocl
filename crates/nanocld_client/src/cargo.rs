@@ -38,7 +38,7 @@ impl NanocldClient {
   ///    secrets: Vec::new(),
   ///    image_pull_secret: None,
   ///    image_pull_policy: ImagePullPolicy::IfNotPresent,
-  ///    container_config: bollard_next::container::Config {
+  ///    container_config: bollard_next::models::ContainerCreateBody {
   ///      image: Some(String::from("alpine")),
   ///      ..Default::default()
   ///    },
@@ -191,7 +191,7 @@ impl NanocldClient {
   ///     secrets: Vec::new(),
   ///     image_pull_secret: None,
   ///     image_pull_policy: ImagePullPolicy::IfNotPresent,
-  ///     container_config: bollard_next::container::Config {
+  ///     container_config: bollard_next::models::ContainerCreateBody {
   ///       image: Some("alpine".into()),
   ///       ..Default::default()
   ///     },

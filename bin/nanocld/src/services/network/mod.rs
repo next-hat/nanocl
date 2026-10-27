@@ -25,7 +25,7 @@ pub fn ntex_config(
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::service::Network as DockerNetwork;
+  use bollard_next::models::NetworkInspect as DockerNetwork;
   use nanocl_stubs::{
     generic::{GenericClause, GenericFilter, GenericListQuery},
     network::{Network, NetworkPartial},

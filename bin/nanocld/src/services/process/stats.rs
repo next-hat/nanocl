@@ -1,7 +1,7 @@
 use futures::{StreamExt, TryStreamExt, stream::select_all};
 use ntex::web;
 
-use bollard_next::container::StatsOptions;
+use bollard_next::query_parameters::StatsOptions;
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter},
@@ -43,21 +43,22 @@ pub async fn stats_processes(
     GenericFilter::new().r#where("kind", GenericClause::Eq(kind.to_string()));
   let processes =
     ProcessDb::read_by_kind_key(&key, Some(filter), &state.inner.pool).await?;
-  let streams =
-    processes
-      .into_iter()
-      .map(|process| {
-        state.inner.docker_api.stats(&process.key, Some(opts)).map(
-          move |elem| match elem {
-            Err(err) => Err(err),
-            Ok(stats) => Ok(ProcessStats {
-              name: process.name.clone(),
-              stats,
-            }),
-          },
-        )
-      })
-      .collect::<Vec<_>>();
+  let streams = processes
+    .into_iter()
+    .map(|process| {
+      state
+        .inner
+        .docker_api
+        .stats(&process.key, Some(opts.clone()))
+        .map(move |elem| match elem {
+          Err(err) => Err(err),
+          Ok(stats) => Ok(ProcessStats {
+            name: process.name.clone(),
+            stats,
+          }),
+        })
+    })
+    .collect::<Vec<_>>();
   let stream = select_all(streams).into_stream();
   Ok(
     web::HttpResponse::Ok()

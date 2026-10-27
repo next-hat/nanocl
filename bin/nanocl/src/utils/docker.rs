@@ -2,13 +2,11 @@ use std::collections::HashMap;
 
 use futures::StreamExt;
 
-use bollard_next::container::CreateContainerOptions;
-use bollard_next::image::CreateImageOptions;
-#[cfg(test)]
-use bollard_next::models::EmptyObject;
-use bollard_next::service::{
+use bollard_next::models::{
   ContainerCreateResponse, HostConfig, RestartPolicy, RestartPolicyNameEnum,
 };
+use bollard_next::query_parameters::CreateContainerOptions;
+use bollard_next::query_parameters::CreateImageOptions;
 use bollard_next::{API_DEFAULT_VERSION, Docker};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -48,8 +46,8 @@ pub async fn install_image(
     output,
   } = *image_progress;
   let options = Some(CreateImageOptions {
-    from_image,
-    tag,
+    from_image: Some(from_image.to_owned()),
+    tag: Some(tag.to_owned()),
     ..Default::default()
   });
   let mut stream = docker_api.create_image(options, None, None);
@@ -94,7 +92,11 @@ pub async fn install_image(
           &mut layers,
         );
       }
-      if let Some(error) = data.error.as_deref() {
+      if let Some(error) = data
+        .error_detail
+        .as_ref()
+        .and_then(|detail| detail.message.as_deref())
+      {
         return Err(IoError::other("Install image", error));
       }
     }
@@ -299,7 +301,9 @@ fn installer_container_config(
     host_config.port_bindings = Some(port_bindings.clone());
     let exposed_ports = config.exposed_ports.get_or_insert_default();
     for port in port_bindings.keys() {
-      exposed_ports.entry(port.clone()).or_default();
+      if !exposed_ports.contains(port) {
+        exposed_ports.push(port.clone());
+      }
     }
   }
   config.host_config = Some(host_config);
@@ -346,7 +350,7 @@ pub async fn create_cargo_container(
   let container = docker
     .create_container(
       Some(CreateContainerOptions {
-        name: format!("{key}.c"),
+        name: Some(format!("{key}.c")),
         ..Default::default()
       }),
       hooked_container,
@@ -437,10 +441,7 @@ mod tests {
     };
     let declared = container(Config {
       env: Some(vec!["KEEP=yes".to_owned()]),
-      exposed_ports: Some(HashMap::from([(
-        "9000/tcp".to_owned(),
-        EmptyObject::default(),
-      )])),
+      exposed_ports: Some(vec!["9000/tcp".to_owned()]),
       host_config: Some(HostConfig {
         binds: Some(vec!["data:/data".to_owned()]),
         privileged: Some(true),
@@ -463,8 +464,8 @@ mod tests {
     );
     assert_eq!(host.privileged, Some(true));
     let exposed = config.exposed_ports.unwrap();
-    assert!(exposed.contains_key("8080/tcp"));
-    assert!(exposed.contains_key("9000/tcp"));
+    assert!(exposed.contains(&"8080/tcp".to_owned()));
+    assert!(exposed.contains(&"9000/tcp".to_owned()));
   }
 
   #[test]

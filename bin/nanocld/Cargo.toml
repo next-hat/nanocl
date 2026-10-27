@@ -48,12 +48,12 @@ nanocl_error = { version = "0.7", features = [
   "serde_yaml",
   "tokio",
 ] }
-bollard-next = { version = "0.18.1" }
+bollard-next = { version = "0.22.1" }
 log = "0.4.34"
 futures = "0.3.34"
 serde_yaml = "0.9.34"
 env_logger = { version = "0.11.11" }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 diesel_migrations = "2.3.2"
 clap = { version = "4.6.7", features = ["derive"] }
 url = { version = "2.5.8", features = ["serde"] }
@@ -69,21 +69,21 @@ diesel = { version = "2.3.14", features = [
   "ipnet-address",
   "i-implement-a-third-party-backend-and-opt-into-breaking-changes",
 ] }
-tokio = { version = "1.53.2", features = ["fs", "process", "io-std"] }
+tokio = { version = "1.53.3", features = ["fs", "process", "io-std"] }
 tokio-util = "0.7.20"
 futures-util = "0.3.34"
-libc = "0.2.190"
+libc = "0.2.191"
 chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
   "serde",
 ] }
-jsonschema = { version = "0.58.6", default-features = false }
+jsonschema = { version = "0.59.0", default-features = false }
 nanocld_client = { version = "0.19", features = ["tokio"] }
 metrsd_client = "0.6.0"
 nanocl_stubs = { version = "0.19", features = ["serde", "clap"] }
 nanocl_utils = { version = "0.9", features = ["unix", "ntex", "logger"] }
-utoipa = { version = "5.5.0", features = ["yaml"], optional = true }
+utoipa = { version = "6.0.0", features = ["yaml"], optional = true }
 notify = "8.2.0"
 ntex-cors = "4.1.1"
 rand = "0.10.3"

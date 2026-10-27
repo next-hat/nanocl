@@ -1127,7 +1127,7 @@ mod tests {
         .docker_api
         .inspect_container(
           &sandbox_id,
-          None::<bollard_next::container::InspectContainerOptions>,
+          None::<bollard_next::query_parameters::InspectContainerOptions>,
         )
         .await
         .is_ok(),

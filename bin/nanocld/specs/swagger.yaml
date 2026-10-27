@@ -842,6 +842,22 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Node'
+  /nodes/cargoes:
+    delete:
+      tags:
+      - Nodes
+      summary: Delete cargo instances on the node used for node to node communication
+      operationId: delete_node_cargo
+      parameters:
+      - name: CargoKey
+        in: query
+        description: Canonical cargo key in {namespace}.{name} format
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Cargoes sucessfully deleted
   /nodes/cargoes/start:
     post:
       tags:
@@ -1318,23 +1334,6 @@ paths:
           description: Process instances logs
           content:
             application/vdn.nanocl.raw-stream: {}
-  /processes/{pk}/start:
-    post:
-      tags:
-      - Processes
-      summary: Start a single process by it's name or id
-      operationId: start_process_by_pk
-      parameters:
-      - name: pk
-        in: path
-        description: Pk of the process
-        required: true
-        schema:
-          type: string
-        example: '1234567890'
-      responses:
-        '202':
-          description: Process instances started
   /resource/kinds:
     get:
       tags:
@@ -2326,21 +2325,6 @@ paths:
                 $ref: '#/components/schemas/ApiError'
 components:
   schemas:
-    Address:
-      type: object
-      description: Address represents an IPv4 or IPv6 IP address.
-      properties:
-        Addr:
-          type:
-          - string
-          - 'null'
-          description: IP address.
-        PrefixLen:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: Mask length of the IP address.
     Any:
       oneOf:
       - type: string
@@ -2389,131 +2373,6 @@ components:
         CommitId:
           type: string
           description: CommitID is the commit id of the current binary
-    BlkioStats:
-      type: object
-      description: I/O statistics for the container.
-      properties:
-        io_service_bytes_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_serviced_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_queue_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_service_time_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_wait_time_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_merged_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        io_time_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-        sectors_recursive:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/BlkioStatsEntry'
-    BlkioStatsEntry:
-      type: object
-      required:
-      - major
-      - minor
-      - op
-      - value
-      properties:
-        major:
-          type: integer
-          format: int64
-          minimum: 0
-        minor:
-          type: integer
-          format: int64
-          minimum: 0
-        op:
-          type: string
-        value:
-          type: integer
-          format: int64
-          minimum: 0
-    CPUStats:
-      type: object
-      description: General CPU statistics for the container.
-      required:
-      - cpu_usage
-      - throttling_data
-      properties:
-        cpu_usage:
-          $ref: '#/components/schemas/CPUUsage'
-        system_cpu_usage:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        online_cpus:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        throttling_data:
-          $ref: '#/components/schemas/ThrottlingData'
-    CPUUsage:
-      type: object
-      description: CPU usage statistics for the container.
-      required:
-      - usage_in_usermode
-      - total_usage
-      - usage_in_kernelmode
-      properties:
-        percpu_usage:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-            format: int64
-            minimum: 0
-        usage_in_usermode:
-          type: integer
-          format: int64
-          minimum: 0
-        total_usage:
-          type: integer
-          format: int64
-          minimum: 0
-        usage_in_kernelmode:
-          type: integer
-          format: int64
-          minimum: 0
     Cargo:
       type: object
       description: |-
@@ -2648,9 +2507,9 @@ components:
       properties:
         Strategy:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementStrategy'
             description: Strategy to use to place the cargo on the nodes
+          - type: 'null'
         Regions:
           type:
           - array
@@ -2660,14 +2519,14 @@ components:
           description: Regions to deploy the cargo
         Require:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: requirements to select nodes to deploy the cargo
+          - type: 'null'
         Prefer:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSelectorSpec'
             description: preferences to select nodes to deploy the cargo
+          - type: 'null'
       additionalProperties: false
     CargoPlacementStrategy:
       oneOf:
@@ -2774,14 +2633,14 @@ components:
           minimum: 1
         NetworkMode:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoNetworkMode'
             description: Cargo-owned network shared by the replica's containers.
+          - type: 'null'
         PortBindings:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Cargo-owned host port bindings.
+          - type: 'null'
         Hostname:
           type:
           - string
@@ -2801,14 +2660,14 @@ components:
           description: Secrets inherited by every regular and init container.
         Placement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSpec'
             description: Fine tune how the cargo is placed on the nodes
+          - type: 'null'
         ResourceRequirement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
             description: Define minimal resource requirements for the cargo
+          - type: 'null'
         InitContainers:
           type: array
           items:
@@ -2850,14 +2709,14 @@ components:
           minimum: 1
         NetworkMode:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoNetworkMode'
             description: New Cargo-owned network mode.
+          - type: 'null'
         PortBindings:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Replacement Cargo-owned port bindings.
+          - type: 'null'
         Hostname:
           type:
           - string
@@ -2879,14 +2738,14 @@ components:
           description: Replacement Cargo-level shared secrets.
         Placement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSpec'
             description: Fine tune how the cargo is placed on the nodes
+          - type: 'null'
         ResourceRequirement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
             description: Define minimal resource requirements for the cargo
+          - type: 'null'
         InitContainers:
           type:
           - array
@@ -2946,14 +2805,14 @@ components:
           minimum: 1
         NetworkMode:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoNetworkMode'
             description: Cargo-owned network shared by the revision's containers.
+          - type: 'null'
         PortBindings:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HashMap'
             description: Cargo-owned host port bindings.
+          - type: 'null'
         Hostname:
           type:
           - string
@@ -2973,13 +2832,13 @@ components:
           description: Secrets inherited by every regular and init container.
         Placement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoPlacementSpec'
             description: Fine tune how the cargo is placed on the nodes
+          - type: 'null'
         ResourceRequirement:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/CargoResourceRequirementSpec'
+          - type: 'null'
         InitContainers:
           type: array
           items:
@@ -3025,6 +2884,65 @@ components:
           $ref: '#/components/schemas/CargoSpecRevision'
           description: Specification of the cargo
     CloudInit26_2:
+      additionalProperties: false
+      allOf:
+      - $ref: '#/components/schemas/CloudInit26_2.base_config'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ansible'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apk_configure'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_configure'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_pipelining'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_autoinstall'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_bootcmd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_byobu'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ca_certs'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_chef'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_disable_ec2_metadata'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_disk_setup'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_fan'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_final_message'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_growpart'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_grub_dpkg'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_install_hotplug'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_keyboard'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_keys_to_console'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_landscape'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_locale'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_lxd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_mcollective'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_mounts'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ntp'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_package_update_upgrade_install'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_phone_home'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_power_state_change'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_puppet'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_raspberry_pi'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_resizefs'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_resolv_conf'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_rh_subscription'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_rsyslog'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_runcmd'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_salt_minion'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_scripts_vendor'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_seed_random'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_set_hostname'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_set_passwords'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_snap'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_spacewalk'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_authkey_fingerprints'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_import_id'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_timezone'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_drivers'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_pro'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_update_etc_hosts'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_update_hostname'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_users_groups'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_wireguard'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_write_files'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_yum_add_repo'
+      - $ref: '#/components/schemas/CloudInit26_2.cc_zypper_add_repo'
+      - $ref: '#/components/schemas/CloudInit26_2.reporting_config'
+      - $ref: '#/components/schemas/CloudInit26_2.output_config'
       type: object
       properties:
         allow_public_ssh_keys: {}
@@ -3126,65 +3044,6 @@ components:
         yum_repo_dir: {}
         yum_repos: {}
         zypper: {}
-      additionalProperties: false
-      allOf:
-      - $ref: '#/components/schemas/CloudInit26_2.base_config'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ansible'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apk_configure'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_configure'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_apt_pipelining'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_autoinstall'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_bootcmd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_byobu'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ca_certs'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_chef'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_disable_ec2_metadata'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_disk_setup'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_fan'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_final_message'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_growpart'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_grub_dpkg'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_install_hotplug'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_keyboard'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_keys_to_console'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_landscape'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_locale'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_lxd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_mcollective'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_mounts'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ntp'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_package_update_upgrade_install'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_phone_home'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_power_state_change'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_puppet'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_raspberry_pi'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_resizefs'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_resolv_conf'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_rh_subscription'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_rsyslog'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_runcmd'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_salt_minion'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_scripts_vendor'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_seed_random'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_set_hostname'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_set_passwords'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_snap'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_spacewalk'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_authkey_fingerprints'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh_import_id'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ssh'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_timezone'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_drivers'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_ubuntu_pro'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_update_etc_hosts'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_update_hostname'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_users_groups'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_wireguard'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_write_files'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_yum_add_repo'
-      - $ref: '#/components/schemas/CloudInit26_2.cc_zypper_add_repo'
-      - $ref: '#/components/schemas/CloudInit26_2.reporting_config'
-      - $ref: '#/components/schemas/CloudInit26_2.output_config'
     CloudInit26_2.all_modules:
       enum:
       - ansible
@@ -3286,6 +3145,14 @@ components:
       - zypper-add-repo
       - zypper_add_repo
     CloudInit26_2.ansible.pull:
+      oneOf:
+      - required:
+        - url
+        - playbook_name
+      - required:
+        - url
+        - playbook_names
+      additionalProperties: false
       type: object
       properties:
         accept_host_key:
@@ -3346,14 +3213,6 @@ components:
         verify_commit:
           default: false
           type: boolean
-      oneOf:
-      - required:
-        - url
-        - playbook_name
-      - required:
-        - url
-        - playbook_names
-      additionalProperties: false
     CloudInit26_2.apt_configure.mirror:
       type: array
       items:
@@ -3386,6 +3245,7 @@ components:
         type: object
       minItems: 1
     CloudInit26_2.base_config:
+      type: object
       properties:
         cloud_config_modules:
           $ref: '#/components/schemas/CloudInit26_2.modules_definition'
@@ -3405,10 +3265,7 @@ components:
           deprecated_description: System and/or distro specific settings. This is not intended to be overridden by user-data or vendor-data.
           deprecated_version: '24.2'
           type: object
-      type: object
     CloudInit26_2.ca_certs.properties:
-      additionalProperties: false
-      minProperties: 1
       type: object
       properties:
         remove-defaults:
@@ -3426,8 +3283,9 @@ components:
             type: string
           minItems: 1
           type: array
+      minProperties: 1
+      additionalProperties: false
     CloudInit26_2.cc_ansible:
-      type: object
       properties:
         ansible:
           additionalProperties: false
@@ -3557,6 +3415,7 @@ components:
                   type: array
               type: object
           type: object
+      type: object
     CloudInit26_2.cc_apk_configure:
       type: object
       properties:
@@ -3735,7 +3594,6 @@ components:
               type: string
           type: object
     CloudInit26_2.cc_apt_pipelining:
-      type: object
       properties:
         apt_pipelining:
           oneOf:
@@ -3751,7 +3609,9 @@ components:
               - none
               - unchanged
             type: string
+      type: object
     CloudInit26_2.cc_bootcmd:
+      type: object
       properties:
         bootcmd:
           additionalItems: false
@@ -3763,8 +3623,8 @@ components:
             - type: string
           minItems: 1
           type: array
-      type: object
     CloudInit26_2.cc_byobu:
+      type: object
       properties:
         byobu_by_default:
           enum:
@@ -3777,7 +3637,6 @@ components:
           - user
           - system
           type: string
-      type: object
     CloudInit26_2.cc_ca_certs:
       properties:
         ca-certs:
@@ -3933,13 +3792,14 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_disable_ec2_metadata:
-      type: object
       properties:
         disable_ec2_metadata:
           default: false
           description: 'Set true to disable IPv4 routes to EC2 metadata. Default: ``false``.'
           type: boolean
+      type: object
     CloudInit26_2.cc_disk_setup:
+      type: object
       properties:
         device_aliases:
           additionalProperties: false
@@ -4034,8 +3894,8 @@ components:
                 type: string
             type: object
           type: array
-      type: object
     CloudInit26_2.cc_fan:
+      type: object
       properties:
         fan:
           additionalProperties: false
@@ -4050,7 +3910,6 @@ components:
           required:
           - config
           type: object
-      type: object
     CloudInit26_2.cc_final_message:
       properties:
         final_message:
@@ -4058,6 +3917,7 @@ components:
           type: string
       type: object
     CloudInit26_2.cc_growpart:
+      type: object
       properties:
         growpart:
           additionalProperties: false
@@ -4099,7 +3959,6 @@ components:
                 enum:
                 - false
           type: object
-      type: object
     CloudInit26_2.cc_grub_dpkg:
       properties:
         grub-dpkg:
@@ -4153,6 +4012,7 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_keyboard:
+      type: object
       properties:
         keyboard:
           additionalProperties: false
@@ -4173,7 +4033,6 @@ components:
           required:
           - layout
           type: object
-      type: object
     CloudInit26_2.cc_keys_to_console:
       properties:
         ssh:
@@ -4440,6 +4299,7 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_ntp:
+      type: object
       properties:
         ntp:
           additionalProperties: false
@@ -4506,7 +4366,6 @@ components:
           type:
           - 'null'
           - object
-      type: object
     CloudInit26_2.cc_package_update_upgrade_install:
       properties:
         apt_reboot_if_required:
@@ -4556,7 +4415,6 @@ components:
           type: array
       type: object
     CloudInit26_2.cc_phone_home:
-      type: object
       properties:
         phone_home:
           additionalProperties: false
@@ -4587,8 +4445,8 @@ components:
           required:
           - url
           type: object
-    CloudInit26_2.cc_power_state_change:
       type: object
+    CloudInit26_2.cc_power_state_change:
       properties:
         power_state:
           additionalProperties: false
@@ -4630,7 +4488,9 @@ components:
           required:
           - mode
           type: object
+      type: object
     CloudInit26_2.cc_puppet:
+      type: object
       properties:
         puppet:
           additionalProperties: false
@@ -4712,8 +4572,8 @@ components:
               description: Optional version to pass to the installer script or package manager. If unset, the latest version from the repos will be installed.
               type: string
           type: object
-      type: object
     CloudInit26_2.cc_raspberry_pi:
+      type: object
       properties:
         rpi:
           properties:
@@ -4752,7 +4612,6 @@ components:
                   type: boolean
               type: object
           type: object
-      type: object
     CloudInit26_2.cc_resizefs:
       type: object
       properties:
@@ -4763,6 +4622,7 @@ components:
           - false
           - noblock
     CloudInit26_2.cc_resolv_conf:
+      type: object
       properties:
         manage_resolv_conf:
           default: false
@@ -4787,7 +4647,6 @@ components:
               description: A list of IP addresses to be added to ``sortlist`` line.
               type: array
           type: object
-      type: object
     CloudInit26_2.cc_rh_subscription:
       properties:
         rh_subscription:
@@ -4902,6 +4761,7 @@ components:
           type: object
       type: object
     CloudInit26_2.cc_rsyslog:
+      type: object
       properties:
         rsyslog:
           additionalProperties: false
@@ -4965,9 +4825,7 @@ components:
                   type: string
                 type: array
           type: object
-      type: object
     CloudInit26_2.cc_runcmd:
-      type: object
       properties:
         runcmd:
           items:
@@ -4979,8 +4837,8 @@ components:
             - type: 'null'
           minItems: 1
           type: array
-    CloudInit26_2.cc_salt_minion:
       type: object
+    CloudInit26_2.cc_salt_minion:
       properties:
         salt_minion:
           additionalProperties: false
@@ -5010,7 +4868,9 @@ components:
               description: 'Service name to enable. Default: ``salt-minion``.'
               type: string
           type: object
+      type: object
     CloudInit26_2.cc_scripts_vendor:
+      type: object
       properties:
         vendor_data:
           additionalProperties: false
@@ -5034,7 +4894,6 @@ components:
               - array
               - string
           type: object
-      type: object
     CloudInit26_2.cc_seed_random:
       type: object
       properties:
@@ -5089,6 +4948,7 @@ components:
           description: 'If true, the hostname will not be changed. Default: ``false``.'
           type: boolean
     CloudInit26_2.cc_set_passwords:
+      type: object
       properties:
         chpasswd:
           additionalProperties: false
@@ -5153,9 +5013,7 @@ components:
             changed_description: Use of non-boolean values for this field is deprecated.
             changed_version: '22.3'
             type: string
-      type: object
     CloudInit26_2.cc_snap:
-      type: object
       properties:
         snap:
           additionalProperties: false
@@ -5195,8 +5053,8 @@ components:
               - object
               - array
           type: object
-    CloudInit26_2.cc_spacewalk:
       type: object
+    CloudInit26_2.cc_spacewalk:
       properties:
         spacewalk:
           additionalProperties: false
@@ -5211,8 +5069,8 @@ components:
               description: The Spacewalk server to use.
               type: string
           type: object
-    CloudInit26_2.cc_ssh:
       type: object
+    CloudInit26_2.cc_ssh:
       properties:
         allow_public_ssh_keys:
           default: true
@@ -5275,8 +5133,8 @@ components:
           default: false
           description: 'If ``true``, will suppress the output of key generation to the console. Default: ``false``.'
           type: boolean
-    CloudInit26_2.cc_ssh_authkey_fingerprints:
       type: object
+    CloudInit26_2.cc_ssh_authkey_fingerprints:
       properties:
         authkey_hash:
           default: sha256
@@ -5286,6 +5144,7 @@ components:
           default: false
           description: 'If true, SSH fingerprints will not be written. Default: ``false``.'
           type: boolean
+      type: object
     CloudInit26_2.cc_ssh_import_id:
       type: object
       properties:
@@ -5301,8 +5160,6 @@ components:
           description: The timezone to use as represented in /usr/share/zoneinfo.
           type: string
     CloudInit26_2.cc_ubuntu_autoinstall:
-      type: object
-      additionalProperties: true
       properties:
         autoinstall:
           description: 'Cloud-init ignores this key and its values. It is used by Subiquity, the Ubuntu Autoinstaller. See: https://ubuntu.com/server/docs/install/autoinstall-reference.'
@@ -5312,8 +5169,9 @@ components:
           required:
           - version
           type: object
-    CloudInit26_2.cc_ubuntu_drivers:
       type: object
+      additionalProperties: true
+    CloudInit26_2.cc_ubuntu_drivers:
       properties:
         drivers:
           additionalProperties: false
@@ -5331,6 +5189,7 @@ components:
               - license-accepted
               type: object
           type: object
+      type: object
     CloudInit26_2.cc_ubuntu_pro:
       properties:
         ubuntu_advantage:
@@ -5342,6 +5201,7 @@ components:
           $ref: '#/components/schemas/CloudInit26_2.ubuntu_pro.properties'
       type: object
     CloudInit26_2.cc_update_etc_hosts:
+      type: object
       properties:
         fqdn:
           description: Optional fully qualified domain name to use when updating ``/etc/hosts``. Preferred over **hostname** if both are provided. In absence of **hostname** and **fqdn** in cloud-config, the ``local-hostname`` value will be used from datasource metadata.
@@ -5362,9 +5222,7 @@ components:
             changed_version: '22.3'
             enum:
             - template
-      type: object
     CloudInit26_2.cc_update_hostname:
-      type: object
       properties:
         create_hostname_file:
           default: true
@@ -5378,6 +5236,7 @@ components:
           default: false
           description: 'Do not update system hostname when ``true``. Default: ``false``.'
           type: boolean
+      type: object
     CloudInit26_2.cc_users_groups:
       properties:
         groups:
@@ -5638,6 +5497,7 @@ components:
           type: array
       type: array
     CloudInit26_2.output_config:
+      type: object
       properties:
         output:
           additionalProperties: false
@@ -5651,7 +5511,6 @@ components:
             init:
               $ref: '#/components/schemas/CloudInit26_2.output_log_operator'
           type: object
-      type: object
     CloudInit26_2.output_log_operator:
       oneOf:
       - description: 'A filepath operation configuration. This is a string containing a filepath and an optional leading operator: ''>'', ''>>'' or ''|''. Operators ''>'' and ''>>'' indicate whether to overwrite or append to the file. The operator ''|'' redirects content to the command arguments specified.'
@@ -5766,38 +5625,37 @@ components:
               type: object
           type: object
     CloudInit26_2.rh_subscription_activation_key:
-      description: The activation key to use. Must be used with **org**. Should not be used with **username** or **password**.
       type: string
+      description: The activation key to use. Must be used with **org**. Should not be used with **username** or **password**.
     CloudInit26_2.rh_subscription_add_pool:
       description: A list of pool IDs add to the subscription.
       items:
         type: string
       type: array
     CloudInit26_2.rh_subscription_auto_attach:
-      type: boolean
       description: Whether to attach subscriptions automatically.
+      type: boolean
     CloudInit26_2.rh_subscription_disable_repo:
+      type: array
       description: A list of repositories to disable.
       items:
         type: string
-      type: array
     CloudInit26_2.rh_subscription_enable_repo:
+      description: A list of repositories to enable.
       items:
         type: string
       type: array
-      description: A list of repositories to enable.
     CloudInit26_2.rh_subscription_rhsm_baseurl:
-      description: Sets the baseurl in ``/etc/rhsm/rhsm.conf``.
       type: string
+      description: Sets the baseurl in ``/etc/rhsm/rhsm.conf``.
     CloudInit26_2.rh_subscription_server_hostname:
       description: Sets the serverurl in ``/etc/rhsm/rhsm.conf``.
       type: string
     CloudInit26_2.rh_subscription_service_level:
-      description: The service level to use when subscribing to RH repositories. ``auto_attach`` must be true for this to be used.
       type: string
+      description: The service level to use when subscribing to RH repositories. ``auto_attach`` must be true for this to be used.
     CloudInit26_2.ubuntu_pro.properties:
       type: object
-      additionalProperties: false
       properties:
         config:
           additionalProperties: true
@@ -5862,8 +5720,8 @@ components:
         token:
           description: Contract token obtained from https://ubuntu.com/pro to attach. Required for non-Pro instances.
           type: string
-    CloudInit26_2.users_groups.groups_by_groupname:
       additionalProperties: false
+    CloudInit26_2.users_groups.groups_by_groupname:
       patternProperties:
         ^.+$:
           description: Optional string of single username or a list of usernames to add to the group.
@@ -5874,6 +5732,7 @@ components:
           type:
           - string
           - array
+      additionalProperties: false
     CloudInit26_2.users_groups.user:
       properties:
         create-groups:
@@ -6089,26 +5948,28 @@ components:
           description: The ID of the swarm.
         Version:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ObjectVersion'
+          - type: 'null'
         CreatedAt:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/String'
-            description: Date and time at which the swarm was initialised in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which the swarm was initialised in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         UpdatedAt:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/String'
-            description: Date and time at which the swarm was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which the swarm was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         Spec:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpec'
+          - type: 'null'
         TLSInfo:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/TlsInfo'
+          - type: 'null'
         RootRotationInProgress:
           type:
           - boolean
@@ -6144,183 +6005,15 @@ components:
           - string
           - 'null'
           description: Actual commit ID of external tool.
-        Expected:
-          type:
-          - string
-          - 'null'
-          description: Commit ID of external tool expected by dockerd as set at build time.
-    Config:
+    ConfigReference:
       type: object
-      description: Container to create.
+      description: The config-only network source to provide the configuration for this network.
       properties:
-        Hostname:
+        Network:
           type:
           - string
           - 'null'
-          description: The hostname to use for the container, as a valid RFC 1123 hostname.
-        Domainname:
-          type:
-          - string
-          - 'null'
-          description: The domain name to use for the container.
-        User:
-          type:
-          - string
-          - 'null'
-          description: The user that commands are run as inside the container.
-        AttachStdin:
-          type:
-          - boolean
-          - 'null'
-          description: Whether to attach to `stdin`.
-        AttachStdout:
-          type:
-          - boolean
-          - 'null'
-          description: Whether to attach to `stdout`.
-        AttachStderr:
-          type:
-          - boolean
-          - 'null'
-          description: Whether to attach to `stderr`.
-        ExposedPorts:
-          type:
-          - object
-          - 'null'
-          description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
-          additionalProperties:
-            type: object
-            additionalProperties:
-              default: null
-            propertyNames:
-              default: null
-          propertyNames:
-            type: string
-        Tty:
-          type:
-          - boolean
-          - 'null'
-          description: Attach standard streams to a TTY, including `stdin` if it is not closed.
-        OpenStdin:
-          type:
-          - boolean
-          - 'null'
-          description: Open `stdin`
-        StdinOnce:
-          type:
-          - boolean
-          - 'null'
-          description: Close `stdin` after one attached client disconnects
-        Env:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
-        Cmd:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: Command to run specified as a string or an array of strings.
-        Healthcheck:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/HealthConfig'
-            description: A TEST to perform TO Check that the container is healthy.
-        ArgsEscaped:
-          type:
-          - boolean
-          - 'null'
-          description: Command is already escaped (Windows only)
-        Image:
-          type:
-          - string
-          - 'null'
-          description: The name of the image to use when creating the container
-        Volumes:
-          type:
-          - object
-          - 'null'
-          description: An object mapping mount point paths inside the container to empty objects.
-          additionalProperties:
-            type: object
-            additionalProperties:
-              default: null
-            propertyNames:
-              default: null
-          propertyNames:
-            type: string
-        WorkingDir:
-          type:
-          - string
-          - 'null'
-          description: The working directory for commands to run in.
-        Entrypoint:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
-        NetworkDisabled:
-          type:
-          - boolean
-          - 'null'
-          description: Disable networking for the container.
-        MacAddress:
-          type:
-          - string
-          - 'null'
-          description: MAC address of the container.
-        OnBuild:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
-        Labels:
-          type:
-          - object
-          - 'null'
-          description: User-defined key/value metadata.
-          additionalProperties:
-            type: string
-          propertyNames:
-            type: string
-        StopSignal:
-          type:
-          - string
-          - 'null'
-          description: Signal to stop a container as a string or unsigned integer.
-        StopTimeout:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: Timeout to stop a container in seconds.
-        Shell:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
-        HostConfig:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/HostConfig'
-            description: |-
-              Container configuration that depends on the host we are running on.
-              Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
-        NetworkingConfig:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/NetworkingConfig_String'
-            description: This container's networking configuration.
+          description: The name of the config-only network that provides the network's configuration. The specified network must be an existing config-only network. Only network names are allowed, not network IDs.
     ConstraintOp:
       type: string
       description: |-
@@ -6329,9 +6022,94 @@ components:
       enum:
       - Eq
       - Ne
+    ContainerBlkioStatEntry:
+      type: object
+      description: Blkio stats entry.  This type is Linux-specific and omitted for Windows containers.
+      properties:
+        major:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        minor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        op:
+          type:
+          - string
+          - 'null'
+        value:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+    ContainerBlkioStats:
+      type: object
+      description: BlkioStats stores all IO service stats for data read and write.  This type is Linux-specific and holds many fields that are specific to cgroups v1. On a cgroup v2 host, all fields other than `io_service_bytes_recursive` are omitted or `null`.  This type is only populated on Linux and omitted for Windows containers.
+      properties:
+        io_service_bytes_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+        io_serviced_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        io_queue_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        io_service_time_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        io_wait_time_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        io_merged_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        io_time_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
+        sectors_recursive:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ContainerBlkioStatEntry'
+          description: This field is only available when using Linux containers with cgroups v1. It is omitted or `null` when using cgroups v2.
     ContainerConfig:
       type: object
-      description: Configuration for a container that is portable between hosts.  When used as `ContainerConfig` field in an image, `ContainerConfig` is an optional field containing the configuration of the container that was last committed when creating the image.  Previous versions of Docker builder used this field to store build cache, and it is not in active use anymore.
+      description: Configuration for a container that is portable between hosts.
       properties:
         Hostname:
           type:
@@ -6347,7 +6125,7 @@ components:
           type:
           - string
           - 'null'
-          description: The user that commands are run as inside the container.
+          description: Commands run as this user inside the container. If omitted, commands run as the user specified in the image the container was started from.  Can be either user-name or UID, and optional group-name or GID, separated by a colon (`<user-name|UID>[<:group-name|GID>]`).
         AttachStdin:
           type:
           - boolean
@@ -6407,8 +6185,8 @@ components:
           description: Command to run specified as a string or an array of strings.
         Healthcheck:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HealthConfig'
+          - type: 'null'
         ArgsEscaped:
           type:
           - boolean
@@ -6449,11 +6227,6 @@ components:
           - boolean
           - 'null'
           description: Disable networking for the container.
-        MacAddress:
-          type:
-          - string
-          - 'null'
-          description: 'MAC address of the container.  Deprecated: this field is deprecated in API v1.44 and up. Use EndpointSettings.MacAddress instead.'
         OnBuild:
           type:
           - array
@@ -6488,131 +6261,68 @@ components:
           items:
             type: string
           description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
-    ContainerInspectResponse:
+    ContainerCpuStats:
       type: object
+      description: CPU related info of the container
       properties:
-        Id:
-          type:
-          - string
-          - 'null'
-          description: The ID of the container
-        Created:
-          type:
-          - string
-          - 'null'
-          description: The time the container was created
-        Path:
-          type:
-          - string
-          - 'null'
-          description: The path to the command being run
-        Args:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: The arguments to the command being run
-        State:
+        cpu_usage:
           oneOf:
+          - $ref: '#/components/schemas/ContainerCpuUsage'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerState'
-        Image:
-          type:
-          - string
-          - 'null'
-          description: The container's image ID
-        ResolvConfPath:
-          type:
-          - string
-          - 'null'
-        HostnamePath:
-          type:
-          - string
-          - 'null'
-        HostsPath:
-          type:
-          - string
-          - 'null'
-        LogPath:
-          type:
-          - string
-          - 'null'
-        Name:
-          type:
-          - string
-          - 'null'
-        RestartCount:
+        system_cpu_usage:
           type:
           - integer
           - 'null'
           format: int64
-        Driver:
-          type:
-          - string
-          - 'null'
-        Platform:
-          type:
-          - string
-          - 'null'
-        MountLabel:
-          type:
-          - string
-          - 'null'
-        ProcessLabel:
-          type:
-          - string
-          - 'null'
-        AppArmorProfile:
-          type:
-          - string
-          - 'null'
-        ExecIDs:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: IDs of exec instances that are running in the container.
-        HostConfig:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/HostConfig'
-        GraphDriver:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/GraphDriverData'
-        SizeRw:
+          description: System Usage.  This field is Linux-specific and omitted for Windows containers.
+          minimum: 0
+        online_cpus:
           type:
           - integer
           - 'null'
-          format: int64
-          description: The size of files that have been created or changed by this container.
-        SizeRootFs:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: The total size of all the files in this container.
-        Mounts:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/MountPoint'
-        Config:
+          format: int32
+          description: Number of online CPUs.  This field is Linux-specific and omitted for Windows containers.
+          minimum: 0
+        throttling_data:
           oneOf:
+          - $ref: '#/components/schemas/ContainerThrottlingData'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerConfig'
-        NetworkSettings:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/NetworkSettings'
-    ContainerSpec:
+    ContainerCpuUsage:
       type: object
-      description: Declaration of one named container in a multi-container Cargo.
-      required:
-      - Name
+      description: All CPU stats aggregated since container inception.
+      properties:
+        total_usage:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Total CPU time consumed in nanoseconds (Linux) or 100's of nanoseconds (Windows).
+          minimum: 0
+        percpu_usage:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+          description: Total CPU time (in nanoseconds) consumed per core (Linux).  This field is Linux-specific when using cgroups v1. It is omitted when using cgroups v2 and Windows containers.
+        usage_in_kernelmode:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Time (in nanoseconds) spent by tasks of the cgroup in kernel mode (Linux), or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).  Not populated for Windows containers using Hyper-V isolation.
+          minimum: 0
+        usage_in_usermode:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Time (in nanoseconds) spent by tasks of the cgroup in user mode (Linux), or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).  Not populated for Windows containers using Hyper-V isolation.
+          minimum: 0
+    ContainerCreateBody:
+      type: object
       properties:
         Hostname:
           type:
@@ -6628,7 +6338,7 @@ components:
           type:
           - string
           - 'null'
-          description: The user that commands are run as inside the container.
+          description: Commands run as this user inside the container. If omitted, commands run as the user specified in the image the container was started from.  Can be either user-name or UID, and optional group-name or GID, separated by a colon (`<user-name|UID>[<:group-name|GID>]`).
         AttachStdin:
           type:
           - boolean
@@ -6688,9 +6398,8 @@ components:
           description: Command to run specified as a string or an array of strings.
         Healthcheck:
           oneOf:
+          - $ref: '#/components/schemas/HealthConfig'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerSpecHealthConfig'
-            description: A TEST to perform TO Check that the container is healthy.
         ArgsEscaped:
           type:
           - boolean
@@ -6700,7 +6409,7 @@ components:
           type:
           - string
           - 'null'
-          description: The name of the image to use when creating the container
+          description: The name (or reference) of the image to use when creating the container, or which was used when the container was created.
         Volumes:
           type:
           - object
@@ -6731,11 +6440,6 @@ components:
           - boolean
           - 'null'
           description: Disable networking for the container.
-        MacAddress:
-          type:
-          - string
-          - 'null'
-          description: MAC address of the container.
         OnBuild:
           type:
           - array
@@ -6772,16 +6476,470 @@ components:
           description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
         HostConfig:
           oneOf:
+          - $ref: '#/components/schemas/HostConfig'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerSpecHostConfig'
-            description: |-
-              Container configuration that depends on the host we are running on.
-              Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
         NetworkingConfig:
           oneOf:
+          - $ref: '#/components/schemas/NetworkingConfig'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerSpecNetworkingConfig_String'
-            description: This container's networking configuration.
+    ContainerInspectResponse:
+      type: object
+      properties:
+        Id:
+          type:
+          - string
+          - 'null'
+          description: The ID of this container as a 128-bit (64-character) hexadecimal string (32 bytes).
+        Created:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which the container was created, formatted in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+        Path:
+          type:
+          - string
+          - 'null'
+          description: The path to the command being run
+        Args:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: The arguments to the command being run
+        State:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerState'
+          - type: 'null'
+        Image:
+          type:
+          - string
+          - 'null'
+          description: The ID (digest) of the image that this container was created from.
+        ResolvConfPath:
+          type:
+          - string
+          - 'null'
+          description: Location of the `/etc/resolv.conf` generated for the container on the host.  This file is managed through the docker daemon, and should not be accessed or modified by other tools.
+        HostnamePath:
+          type:
+          - string
+          - 'null'
+          description: Location of the `/etc/hostname` generated for the container on the host.  This file is managed through the docker daemon, and should not be accessed or modified by other tools.
+        HostsPath:
+          type:
+          - string
+          - 'null'
+          description: Location of the `/etc/hosts` generated for the container on the host.  This file is managed through the docker daemon, and should not be accessed or modified by other tools.
+        LogPath:
+          type:
+          - string
+          - 'null'
+          description: Location of the file used to buffer the container's logs. Depending on the logging-driver used for the container, this field may be omitted.  This file is managed through the docker daemon, and should not be accessed or modified by other tools.
+        Name:
+          type:
+          - string
+          - 'null'
+          description: The name associated with this container.  For historic reasons, the name may be prefixed with a forward-slash (`/`).
+        RestartCount:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of times the container was restarted since it was created, or since daemon was started.
+        Driver:
+          type:
+          - string
+          - 'null'
+          description: The storage-driver used for the container's filesystem (graph-driver or snapshotter).
+        Platform:
+          type:
+          - string
+          - 'null'
+          description: The platform (operating system) for which the container was created.  This field was introduced for the experimental \"LCOW\" (Linux Containers On Windows) features, which has been removed. In most cases, this field is equal to the host's operating system (`linux` or `windows`).
+        ImageManifestDescriptor:
+          oneOf:
+          - $ref: '#/components/schemas/OciDescriptor'
+            description: 'OCI descriptor of the platform-specific manifest of the image the container was created from.  Note: Only available if the daemon provides a multi-platform image store.'
+          - type: 'null'
+        MountLabel:
+          type:
+          - string
+          - 'null'
+          description: SELinux mount label set for the container.
+        ProcessLabel:
+          type:
+          - string
+          - 'null'
+          description: SELinux process label set for the container.
+        AppArmorProfile:
+          type:
+          - string
+          - 'null'
+          description: The AppArmor profile set for the container.
+        ExecIDs:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: IDs of exec instances that are running in the container.
+        HostConfig:
+          oneOf:
+          - $ref: '#/components/schemas/HostConfig'
+          - type: 'null'
+        GraphDriver:
+          oneOf:
+          - $ref: '#/components/schemas/DriverData'
+          - type: 'null'
+        Storage:
+          oneOf:
+          - $ref: '#/components/schemas/Storage'
+          - type: 'null'
+        SizeRw:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The size of files that have been created or changed by this container.  This field is omitted by default, and only set when size is requested in the API request.
+        SizeRootFs:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The total size of all files in the read-only layers from the image that the container uses. These layers can be shared between containers.  This field is omitted by default, and only set when size is requested in the API request.
+        Mounts:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/MountPoint'
+          description: List of mounts used by the container.
+        Config:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerConfig'
+          - type: 'null'
+        NetworkSettings:
+          oneOf:
+          - $ref: '#/components/schemas/NetworkSettings'
+          - type: 'null'
+    ContainerMemoryStats:
+      type: object
+      description: Aggregates all memory stats since container inception on Linux. Windows returns stats for commit and private working set only.
+      properties:
+        usage:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Current `res_counter` usage for memory.  This field is Linux-specific and omitted for Windows containers.
+          minimum: 0
+        max_usage:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Maximum usage ever recorded.  This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers.
+          minimum: 0
+        stats:
+          type:
+          - object
+          - 'null'
+          description: All the stats exported via memory.stat.  The fields in this object differ between cgroups v1 and v2. On cgroups v1, fields such as `cache`, `rss`, `mapped_file` are available. On cgroups v2, fields such as `file`, `anon`, `inactive_file` are available.  This field is Linux-specific and omitted for Windows containers.
+          additionalProperties:
+            type: integer
+            format: int64
+            minimum: 0
+          propertyNames:
+            type: string
+        failcnt:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of times memory usage hits limits.  This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers.
+          minimum: 0
+        limit:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: This field is Linux-specific and omitted for Windows containers.
+          minimum: 0
+        commitbytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Committed bytes.  This field is Windows-specific and omitted for Linux containers.
+          minimum: 0
+        commitpeakbytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Peak committed bytes.  This field is Windows-specific and omitted for Linux containers.
+          minimum: 0
+        privateworkingset:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Private working set.  This field is Windows-specific and omitted for Linux containers.
+          minimum: 0
+    ContainerNetworkStats:
+      type: object
+      description: Aggregates the network stats of one container
+      properties:
+        rx_bytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Bytes received. Windows and Linux.
+          minimum: 0
+        rx_packets:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Packets received. Windows and Linux.
+          minimum: 0
+        rx_errors:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Received errors. Not used on Windows.  This field is Linux-specific and always zero for Windows containers.
+          minimum: 0
+        rx_dropped:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Incoming packets dropped. Windows and Linux.
+          minimum: 0
+        tx_bytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Bytes sent. Windows and Linux.
+          minimum: 0
+        tx_packets:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Packets sent. Windows and Linux.
+          minimum: 0
+        tx_errors:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Sent errors. Not used on Windows.  This field is Linux-specific and always zero for Windows containers.
+          minimum: 0
+        tx_dropped:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Outgoing packets dropped. Windows and Linux.
+          minimum: 0
+        endpoint_id:
+          type:
+          - string
+          - 'null'
+          description: Endpoint ID. Not used on Linux.  This field is Windows-specific and omitted for Linux containers.
+        instance_id:
+          type:
+          - string
+          - 'null'
+          description: Instance ID. Not used on Linux.  This field is Windows-specific and omitted for Linux containers.
+    ContainerPidsStats:
+      type: object
+      description: PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).  This type is Linux-specific and omitted for Windows containers.
+      properties:
+        current:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Current is the number of PIDs in the cgroup.
+          minimum: 0
+        limit:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Limit is the hard limit on the number of pids in the cgroup. A \"Limit\" of 0 means that there is no limit.
+          minimum: 0
+    ContainerSpec:
+      type: object
+      description: Declaration of one named container in a multi-container Cargo.
+      required:
+      - Name
+      properties:
+        Hostname:
+          type:
+          - string
+          - 'null'
+          description: The hostname to use for the container, as a valid RFC 1123 hostname.
+        Domainname:
+          type:
+          - string
+          - 'null'
+          description: The domain name to use for the container.
+        User:
+          type:
+          - string
+          - 'null'
+          description: Commands run as this user inside the container. If omitted, commands run as the user specified in the image the container was started from.  Can be either user-name or UID, and optional group-name or GID, separated by a colon (`<user-name|UID>[<:group-name|GID>]`).
+        AttachStdin:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stdin`.
+        AttachStdout:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stdout`.
+        AttachStderr:
+          type:
+          - boolean
+          - 'null'
+          description: Whether to attach to `stderr`.
+        ExposedPorts:
+          type:
+          - object
+          - 'null'
+          description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              default: null
+            propertyNames:
+              default: null
+          propertyNames:
+            type: string
+        Tty:
+          type:
+          - boolean
+          - 'null'
+          description: Attach standard streams to a TTY, including `stdin` if it is not closed.
+        OpenStdin:
+          type:
+          - boolean
+          - 'null'
+          description: Open `stdin`
+        StdinOnce:
+          type:
+          - boolean
+          - 'null'
+          description: Close `stdin` after one attached client disconnects
+        Env:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
+        Cmd:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Command to run specified as a string or an array of strings.
+        Healthcheck:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerSpecHealthConfig'
+          - type: 'null'
+        ArgsEscaped:
+          type:
+          - boolean
+          - 'null'
+          description: Command is already escaped (Windows only)
+        Image:
+          type:
+          - string
+          - 'null'
+          description: The name (or reference) of the image to use when creating the container, or which was used when the container was created.
+        Volumes:
+          type:
+          - object
+          - 'null'
+          description: An object mapping mount point paths inside the container to empty objects.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              default: null
+            propertyNames:
+              default: null
+          propertyNames:
+            type: string
+        WorkingDir:
+          type:
+          - string
+          - 'null'
+          description: The working directory for commands to run in.
+        Entrypoint:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
+        NetworkDisabled:
+          type:
+          - boolean
+          - 'null'
+          description: Disable networking for the container.
+        OnBuild:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+        Labels:
+          type:
+          - object
+          - 'null'
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        StopSignal:
+          type:
+          - string
+          - 'null'
+          description: Signal to stop a container as a string or unsigned integer.
+        StopTimeout:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Timeout to stop a container in seconds.
+        Shell:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+        HostConfig:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerSpecHostConfig'
+          - type: 'null'
+        NetworkingConfig:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerSpecNetworkingConfig'
+          - type: 'null'
         Name:
           type: string
           description: Name unique within the Cargo declaration.
@@ -6834,6 +6992,7 @@ components:
           type:
           - string
           - 'null'
+          description: The name of the device driver to use for this request.  Note that if this is specified the capabilities are ignored when selecting a device driver.
         Count:
           type:
           - integer
@@ -6853,7 +7012,7 @@ components:
             type: array
             items:
               type: string
-          description: A list of capabilities; an OR list of AND lists of capabilities.
+          description: A list of capabilities; an OR list of AND lists of capabilities.  Note that if a driver is specified the capabilities have no effect on selecting a driver as the driver name is used directly.  Note that if no driver is specified the capabilities are used to select a driver with the required capabilities.
         Options:
           type:
           - object
@@ -6889,8 +7048,8 @@ components:
       properties:
         IPAMConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecEndpointIpamConfig'
+          - type: 'null'
         Links:
           type:
           - array
@@ -6908,6 +7067,21 @@ components:
           - 'null'
           items:
             type: string
+        DriverOpts:
+          type:
+          - object
+          - 'null'
+          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        GwPriority:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: This property determines which endpoint will provide the default gateway for a container. The endpoint with the highest priority will be used. If multiple endpoints have the same priority, endpoints are lexicographically sorted based on their network name, and the one that sorts first is picked.
         NetworkID:
           type:
           - string
@@ -6950,15 +7124,6 @@ components:
           - 'null'
           format: int64
           description: Mask length of the global IPv6 address.
-        DriverOpts:
-          type:
-          - object
-          - 'null'
-          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
-          additionalProperties:
-            type: string
-          propertyNames:
-            type: string
         DNSNames:
           type:
           - array
@@ -6967,32 +7132,9 @@ components:
             type: string
           description: List of all DNS names an endpoint has on a specific network. This list is based on the container name, network aliases, container short ID, and hostname.  These DNS names are non-fully qualified but can contain several dots. You can get fully qualified DNS names by appending `.<network-name>`. For instance, if container name is `my.ctr` and the network is named `testnet`, `DNSNames` will contain `my.ctr` and the FQDN will be `my.ctr.testnet`.
       additionalProperties: false
-    ContainerSpecHashMap:
-      type: object
-      additionalProperties:
-        oneOf:
-        - type: 'null'
-        - type: array
-          items:
-            type: object
-            description: PortBinding represents a binding between a host IP address and a host port.
-            properties:
-              HostIp:
-                type:
-                - string
-                - 'null'
-                description: Host IP address that the container's port is mapped to.
-              HostPort:
-                type:
-                - string
-                - 'null'
-                description: Host port number that the container's port is mapped to.
-            additionalProperties: false
-      propertyNames:
-        type: string
     ContainerSpecHealthConfig:
       type: object
-      description: A test to perform to check that the container is healthy.
+      description: A test to perform to check that the container is healthy. Healthcheck commands should be side-effect free.
       properties:
         Test:
           type:
@@ -7000,7 +7142,7 @@ components:
           - 'null'
           items:
             type: string
-          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell'
+          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell  A non-zero exit code indicates a failed healthcheck: - `0` healthy - `1` unhealthy - `2` reserved (treated as unhealthy) - other values: error running probe'
         Interval:
           type:
           - integer
@@ -7012,7 +7154,7 @@ components:
           - integer
           - 'null'
           format: int64
-          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.  If the health check command does not complete within this timeout, the check is considered failed and the health check process is forcibly terminated without a graceful shutdown.
         Retries:
           type:
           - integer
@@ -7150,12 +7292,6 @@ components:
           items:
             $ref: '#/components/schemas/ContainerSpecDeviceRequest'
           description: A list of requests for devices to be sent to device drivers.
-        KernelMemoryTCP:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: Hard limit for kernel TCP buffer memory (in bytes). Depending on the OCI runtime in use, this option may be ignored. It is no longer supported by the default (runc) runtime.  This field is omitted when empty.
         MemoryReservation:
           type:
           - integer
@@ -7241,21 +7377,29 @@ components:
           description: Path to a file where the container ID is written
         LogConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecHostConfigLogConfig'
+          - type: 'null'
         NetworkMode:
           type:
           - string
           - 'null'
           description: 'Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network''s name to which this container should connect to.'
         PortBindings:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/ContainerSpecHashMap'
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            type:
+            - array
+            - 'null'
+            items:
+              $ref: '#/components/schemas/ContainerSpecPortBinding'
+          propertyNames:
+            type: string
         RestartPolicy:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecRestartPolicy'
+          - type: 'null'
         AutoRemove:
           type:
           - boolean
@@ -7286,7 +7430,7 @@ components:
           - 'null'
           items:
             type: integer
-            format: int32
+            minimum: 0
           description: Initial console size, as an `[height, width]` array.
         Annotations:
           type:
@@ -7313,9 +7457,9 @@ components:
           description: A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'.
         CgroupnsMode:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecHostConfigCgroupnsModeEnum'
             description: 'cgroup namespace mode for the container. Possible values are:  - `\"private\"`: the container runs in its own private cgroup namespace - `\"host\"`: use the host system''s cgroup namespace  If not specified, the daemon default is used, which can either be `\"private\"` or `\"host\"`, depending on daemon version, kernel support and configuration.'
+          - type: 'null'
         Dns:
           type:
           - array
@@ -7439,7 +7583,7 @@ components:
           type:
           - object
           - 'null'
-          description: 'A list of kernel parameters (sysctls) to set in the container. For example:  ``` {\"net.ipv4.ip_forward\": \"1\"} ```'
+          description: A list of kernel parameters (sysctls) to set in the container.  This field is omitted if not set.
           additionalProperties:
             type: string
           propertyNames:
@@ -7451,9 +7595,9 @@ components:
           description: Runtime to use with this container.
         Isolation:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecHostConfigIsolationEnum'
             description: Isolation technology of the container. (Windows only)
+          - type: 'null'
         MaskedPaths:
           type:
           - array
@@ -7478,10 +7622,10 @@ components:
     ContainerSpecHostConfigIsolationEnum:
       type: string
       enum:
-      - EMPTY
       - default
       - process
       - hyperv
+      - EMPTY
     ContainerSpecHostConfigLogConfig:
       type: object
       description: The logging configuration for this container
@@ -7490,10 +7634,12 @@ components:
           type:
           - string
           - 'null'
+          description: Name of the logging driver used for the container or \"none\" if logging is disabled.
         Config:
           type:
           - object
           - 'null'
+          description: Driver-specific configuration options for the logging driver.
           additionalProperties:
             type: string
           propertyNames:
@@ -7511,12 +7657,11 @@ components:
           type:
           - string
           - 'null'
-          description: Mount source (e.g. a volume name, a host path).
+          description: Mount source (e.g. a volume name, a host path). The source cannot be specified when using `Type=tmpfs`. For `Type=bind`, the source path must either exist, or the `CreateMountpoint` must be set to `true` to create the source path on the host if missing.  For `Type=npipe`, the pipe must exist prior to creating the container.
         Type:
           oneOf:
+          - $ref: '#/components/schemas/ContainerSpecMountType'
           - type: 'null'
-          - $ref: '#/components/schemas/ContainerSpecMountTypeEnum'
-            description: 'The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed. - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs. - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container. - `cluster` a Swarm cluster volume'
         ReadOnly:
           type:
           - boolean
@@ -7529,16 +7674,20 @@ components:
           description: 'The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`.'
         BindOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecMountBindOptions'
+          - type: 'null'
         VolumeOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecMountVolumeOptions'
+          - type: 'null'
+        ImageOptions:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerSpecMountImageOptions'
+          - type: 'null'
         TmpfsOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecMountTmpfsOptions'
+          - type: 'null'
       additionalProperties: false
     ContainerSpecMountBindOptions:
       type: object
@@ -7546,9 +7695,9 @@ components:
       properties:
         Propagation:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecMountBindOptionsPropagationEnum'
             description: A propagation mode with the value `[r]private`, `[r]shared`, or `[r]slave`.
+          - type: 'null'
         NonRecursive:
           type:
           - boolean
@@ -7563,7 +7712,7 @@ components:
           type:
           - boolean
           - 'null'
-          description: Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction).  Addded in v1.44, before that version all read-only mounts were non-recursive by default. To match the previous behaviour this will default to `true` for clients on versions prior to v1.44.
+          description: Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction).  Added in v1.44, before that version all read-only mounts were non-recursive by default. To match the previous behaviour this will default to `true` for clients on versions prior to v1.44.
         ReadOnlyForceRecursive:
           type:
           - boolean
@@ -7580,6 +7729,16 @@ components:
       - rshared
       - slave
       - rslave
+    ContainerSpecMountImageOptions:
+      type: object
+      description: Optional configuration for the `image` type.
+      properties:
+        Subpath:
+          type:
+          - string
+          - 'null'
+          description: Source path inside the image. Must be relative without any back traversals.
+      additionalProperties: false
     ContainerSpecMountTmpfsOptions:
       type: object
       description: Optional configuration for the `tmpfs` type.
@@ -7595,17 +7754,31 @@ components:
           - integer
           - 'null'
           format: int64
-          description: The permission mode for the tmpfs mount in an integer.
+          description: The permission mode for the tmpfs mount in an integer. The value must not be in octal format (e.g. 755) but rather the decimal representation of the octal value (e.g. 493).
+        Options:
+          type:
+          - array
+          - 'null'
+          items:
+            type: array
+            items:
+              type: string
+          description: The options to be passed to the tmpfs mount. An array of arrays. Flag options should be provided as 1-length arrays. Other types should be provided as as 2-length arrays, where the first item is the key and the second the value.
       additionalProperties: false
-    ContainerSpecMountTypeEnum:
+    ContainerSpecMountType:
       type: string
+      description: |-
+        The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. The `Source` must exist prior to creating the container. - `cluster` a Swarm cluster volume - `image` Mounts an image. - `npipe` Mounts a named pipe from the host into the container. The `Source` must exist prior to creating the container. - `tmpfs` Create a tmpfs with the given options. The mount `Source` cannot be specified for tmpfs. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed.
+        Enumeration of values.
+        Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+        which helps with FFI.
       enum:
-      - EMPTY
       - bind
-      - volume
-      - tmpfs
-      - npipe
       - cluster
+      - image
+      - npipe
+      - tmpfs
+      - volume
     ContainerSpecMountVolumeOptions:
       type: object
       description: Optional configuration for the `volume` type.
@@ -7626,8 +7799,8 @@ components:
             type: string
         DriverConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecMountVolumeOptionsDriverConfig'
+          - type: 'null'
         Subpath:
           type:
           - string
@@ -7653,18 +7826,34 @@ components:
           propertyNames:
             type: string
       additionalProperties: false
-    ContainerSpecNetworkingConfig_String:
+    ContainerSpecNetworkingConfig:
       type: object
-      description: This container's networking configuration.
-      required:
-      - EndpointsConfig
+      description: NetworkingConfig represents the container's networking configuration for each of its interfaces. It is used for the networking configs specified in the `docker create` and `docker network connect` commands.
       properties:
         EndpointsConfig:
-          type: object
+          type:
+          - object
+          - 'null'
+          description: A mapping of network name to endpoint configuration for that network. The endpoint configuration can be left empty to connect to that network with no particular endpoint configuration.
           additionalProperties:
             $ref: '#/components/schemas/ContainerSpecEndpointSettings'
           propertyNames:
             type: string
+      additionalProperties: false
+    ContainerSpecPortBinding:
+      type: object
+      description: PortBinding represents a binding between a host IP address and a host port.
+      properties:
+        HostIp:
+          type:
+          - string
+          - 'null'
+          description: Host IP address that the container's port is mapped to.
+        HostPort:
+          type:
+          - string
+          - 'null'
+          description: Host port number that the container's port is mapped to.
       additionalProperties: false
     ContainerSpecResourcesBlkioWeightDevice:
       type: object
@@ -7706,9 +7895,9 @@ components:
       properties:
         Name:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerSpecRestartPolicyNameEnum'
             description: '- Empty string means not to restart - `no` Do not automatically restart - `always` Always restart - `unless-stopped` Restart always except when the user has manually stopped the container - `on-failure` Restart only when the container exit code is non-zero'
+          - type: 'null'
         MaximumRetryCount:
           type:
           - integer
@@ -7745,9 +7934,9 @@ components:
       properties:
         Status:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ContainerStateStatusEnum'
             description: String representation of the container state. Can be one of \"created\", \"running\", \"paused\", \"restarting\", \"removing\", \"exited\", or \"dead\".
+          - type: 'null'
         Running:
           type:
           - boolean
@@ -7800,8 +7989,8 @@ components:
           description: The time when this container last exited.
         Health:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Health'
+          - type: 'null'
     ContainerStateStatusEnum:
       type: string
       enum:
@@ -7813,6 +8002,158 @@ components:
       - removing
       - exited
       - dead
+      - stopping
+    ContainerStatsResponse:
+      type: object
+      description: Statistics sample for a container.
+      properties:
+        id:
+          type:
+          - string
+          - 'null'
+          description: ID of the container for which the stats were collected.
+        name:
+          type:
+          - string
+          - 'null'
+          description: Name of the container for which the stats were collected.
+        os_type:
+          type:
+          - string
+          - 'null'
+          description: OSType is the OS of the container (\"linux\" or \"windows\") to allow platform-specific handling of stats.
+        read:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which this sample was collected. The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+        cpu_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerCpuStats'
+          - type: 'null'
+        memory_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerMemoryStats'
+          - type: 'null'
+        networks:
+          type:
+          - object
+          - 'null'
+          description: Network statistics for the container per interface.  This field is omitted if the container has no networking enabled.
+          additionalProperties:
+            $ref: '#/components/schemas/ContainerNetworkStats'
+          propertyNames:
+            type: string
+        pids_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerPidsStats'
+          - type: 'null'
+        blkio_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerBlkioStats'
+          - type: 'null'
+        num_procs:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: The number of processors on the system.  This field is Windows-specific and always zero for Linux containers.
+          minimum: 0
+        storage_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerStorageStats'
+          - type: 'null'
+        preread:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which this first sample was collected. This field is not propagated if the \"one-shot\" option is set. If the \"one-shot\" option is set, this field may be omitted, empty, or set to a default date (`0001-01-01T00:00:00Z`).  The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+        precpu_stats:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerCpuStats'
+          - type: 'null'
+    ContainerStorageStats:
+      type: object
+      description: StorageStats is the disk I/O stats for read/write on Windows.  This type is Windows-specific and omitted for Linux containers.
+      properties:
+        read_count_normalized:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        read_size_bytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        write_count_normalized:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        write_size_bytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+    ContainerThrottlingData:
+      type: object
+      description: CPU throttling stats of the container.  This type is Linux-specific and omitted for Windows containers.
+      properties:
+        periods:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of periods with throttling active.
+          minimum: 0
+        throttled_periods:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of periods when the container hit its throttling limit.
+          minimum: 0
+        throttled_time:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Aggregated time (in nanoseconds) the container was throttled for.
+          minimum: 0
+    ContainerdInfo:
+      type: object
+      description: Information for connecting to the containerd instance that is used by the daemon. This is included for debugging purposes only.
+      properties:
+        Address:
+          type:
+          - string
+          - 'null'
+          description: The address of the containerd socket.
+        Namespaces:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerdInfoNamespaces'
+          - type: 'null'
+    ContainerdInfoNamespaces:
+      type: object
+      description: The namespaces that the daemon uses for running containers and plugins in containerd. These namespaces can be configured in the daemon configuration, and are considered to be used exclusively by the daemon, Tampering with the containerd instance may cause unexpected behavior.  As these namespaces are considered to be exclusively accessed by the daemon, it is not recommended to change these values, or to change them to a value that is used by other systems, such as cri-containerd.
+      properties:
+        Containers:
+          type:
+          - string
+          - 'null'
+          description: The default containerd namespace used for containers managed by the daemon.  The default namespace for containers is \"moby\", but will be suffixed with the `<uid>.<gid>` of the remapped `root` if user-namespaces are enabled and the containerd image-store is used.
+        Plugins:
+          type:
+          - string
+          - 'null'
+          description: The default containerd namespace used for plugins managed by the daemon.  The default namespace for plugins is \"plugins.moby\", but will be suffixed with the `<uid>.<gid>` of the remapped `root` if user-namespaces are enabled and the containerd image-store is used.
     DaemonConfig:
       type: object
       description: |-
@@ -7868,9 +8209,23 @@ components:
           minimum: 0
         ssl:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SslConfig'
             description: Optional ssl configuration
+          - type: 'null'
+    DeviceInfo:
+      type: object
+      description: DeviceInfo represents a device that can be used by a container.
+      properties:
+        Source:
+          type:
+          - string
+          - 'null'
+          description: The origin device driver.
+        ID:
+          type:
+          - string
+          - 'null'
+          description: The unique identifier for the device within its source driver. For CDI devices, this would be an FQDN like \"vendor.com/gpu=0\".
     DeviceMapping:
       type: object
       description: A device mapping between the host and container
@@ -7895,6 +8250,7 @@ components:
           type:
           - string
           - 'null'
+          description: The name of the device driver to use for this request.  Note that if this is specified the capabilities are ignored when selecting a device driver.
         Count:
           type:
           - integer
@@ -7914,7 +8270,7 @@ components:
             type: array
             items:
               type: string
-          description: A list of capabilities; an OR list of AND lists of capabilities.
+          description: A list of capabilities; an OR list of AND lists of capabilities.  Note that if a driver is specified the capabilities have no effect on selecting a driver as the driver name is used directly.  Note that if no driver is specified the capabilities are used to select a driver with the required capabilities.
         Options:
           type:
           - object
@@ -7935,6 +8291,23 @@ components:
         IpAddress:
           $ref: '#/components/schemas/NetworkKind'
       additionalProperties: false
+    DriverData:
+      type: object
+      description: Information about the storage driver used to store the container's and image's filesystem.
+      required:
+      - Name
+      - Data
+      properties:
+        Name:
+          type: string
+          description: Name of the storage driver.
+        Data:
+          type: object
+          description: Low-level storage metadata, provided as key/value pairs.  This information is driver-specific, and depends on the storage-driver in use, and should be used for informational purposes only.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
     EndpointIpamConfig:
       type: object
       description: EndpointIPAMConfig represents an endpoint's IPAM configuration.
@@ -7953,14 +8326,38 @@ components:
           - 'null'
           items:
             type: string
+    EndpointResource:
+      type: object
+      description: contains network resources allocated and used for a container in a network.
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+        EndpointID:
+          type:
+          - string
+          - 'null'
+        MacAddress:
+          type:
+          - string
+          - 'null'
+        IPv4Address:
+          type:
+          - string
+          - 'null'
+        IPv6Address:
+          type:
+          - string
+          - 'null'
     EndpointSettings:
       type: object
       description: Configuration for a network endpoint.
       properties:
         IPAMConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/EndpointIpamConfig'
+          - type: 'null'
         Links:
           type:
           - array
@@ -7978,6 +8375,21 @@ components:
           - 'null'
           items:
             type: string
+        DriverOpts:
+          type:
+          - object
+          - 'null'
+          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        GwPriority:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: This property determines which endpoint will provide the default gateway for a container. The endpoint with the highest priority will be used. If multiple endpoints have the same priority, endpoints are lexicographically sorted based on their network name, and the one that sorts first is picked.
         NetworkID:
           type:
           - string
@@ -8020,15 +8432,6 @@ components:
           - 'null'
           format: int64
           description: Mask length of the global IPv6 address.
-        DriverOpts:
-          type:
-          - object
-          - 'null'
-          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
-          additionalProperties:
-            type: string
-          propertyNames:
-            type: string
         DNSNames:
           type:
           - array
@@ -8092,16 +8495,16 @@ components:
           description: Human-readable description of the status of this operation
         Actor:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/EventActor'
             description: Actor contains the object this Event is about.
+          - type: 'null'
         Related:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/EventActor'
             description: |-
               Optional secondary actor for more complex actions.
               E.g. when regarding actor triggers a creation or deletion of related actor.
+          - type: 'null'
         Metadata:
           type: object
           description: Standard metadata.
@@ -8152,16 +8555,16 @@ components:
           - 'null'
         ActorKind:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/EventActorKind'
+          - type: 'null'
         RelatedKey:
           type:
           - string
           - 'null'
         RelatedKind:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/EventActorKind'
+          - type: 'null'
         Kind:
           type: array
           items:
@@ -8177,6 +8580,24 @@ components:
       - error
       - normal
       - warning
+    FirewallInfo:
+      type: object
+      description: Information about the daemon's firewalling configuration.  This field is currently only used on Linux, and omitted on other platforms.
+      properties:
+        Driver:
+          type:
+          - string
+          - 'null'
+          description: The name of the firewall backend driver.
+        Info:
+          type:
+          - array
+          - 'null'
+          items:
+            type: array
+            items:
+              type: string
+          description: 'Information about the firewall backend, provided as \"label\" / \"value\" pairs.  <p><br /></p>  > **Note**: The information returned in this field, including the > formatting of values and labels, should not be considered stable, > and may change without notice.'
     GenericCount:
       type: object
       description: Generic count response
@@ -8192,12 +8613,12 @@ components:
       properties:
         NamedResourceSpec:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/GenericResourcesInnerNamedResourceSpec'
+          - type: 'null'
         DiscreteResourceSpec:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/GenericResourcesInnerDiscreteResourceSpec'
+          - type: 'null'
     GenericResourcesInnerDiscreteResourceSpec:
       type: object
       properties:
@@ -8221,23 +8642,6 @@ components:
           type:
           - string
           - 'null'
-    GraphDriverData:
-      type: object
-      description: Information about the storage driver used to store the container's and image's filesystem.
-      required:
-      - Name
-      - Data
-      properties:
-        Name:
-          type: string
-          description: Name of the storage driver.
-        Data:
-          type: object
-          description: Low-level storage metadata, provided as key/value pairs.  This information is driver-specific, and depends on the storage-driver in use, and should be used for informational purposes only.
-          additionalProperties:
-            type: string
-          propertyNames:
-            type: string
     HashMap:
       type: object
       additionalProperties:
@@ -8266,9 +8670,9 @@ components:
       properties:
         Status:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HealthStatusEnum'
             description: Status is one of `none`, `starting`, `healthy` or `unhealthy`  - \"none\"      Indicates there is no healthcheck - \"starting\"  Starting indicates that the container is not yet ready - \"healthy\"   Healthy indicates that the container is running correctly - \"unhealthy\" Unhealthy indicates that the container has a problem
+          - type: 'null'
         FailingStreak:
           type:
           - integer
@@ -8284,7 +8688,7 @@ components:
           description: Log contains the last few results (oldest first)
     HealthConfig:
       type: object
-      description: A test to perform to check that the container is healthy.
+      description: A test to perform to check that the container is healthy. Healthcheck commands should be side-effect free.
       properties:
         Test:
           type:
@@ -8292,7 +8696,7 @@ components:
           - 'null'
           items:
             type: string
-          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell'
+          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell  A non-zero exit code indicates a failed healthcheck: - `0` healthy - `1` unhealthy - `2` reserved (treated as unhealthy) - other values: error running probe'
         Interval:
           type:
           - integer
@@ -8304,7 +8708,7 @@ components:
           - integer
           - 'null'
           format: int64
-          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.  If the health check command does not complete within this timeout, the check is considered failed and the health check process is forcibly terminated without a graceful shutdown.
         Retries:
           type:
           - integer
@@ -8336,15 +8740,17 @@ components:
       description: HealthcheckResult stores information about a single run of a healthcheck probe
       properties:
         Start:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/String'
-            description: Date and time at which this check started in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which this check started in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         End:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/String'
-            description: Date and time at which this check ended in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which this check ended in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         ExitCode:
           type:
           - integer
@@ -8474,12 +8880,6 @@ components:
           items:
             $ref: '#/components/schemas/DeviceRequest'
           description: A list of requests for devices to be sent to device drivers.
-        KernelMemoryTCP:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: Hard limit for kernel TCP buffer memory (in bytes). Depending on the OCI runtime in use, this option may be ignored. It is no longer supported by the default (runc) runtime.  This field is omitted when empty.
         MemoryReservation:
           type:
           - integer
@@ -8565,21 +8965,29 @@ components:
           description: Path to a file where the container ID is written
         LogConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HostConfigLogConfig'
+          - type: 'null'
         NetworkMode:
           type:
           - string
           - 'null'
           description: 'Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network''s name to which this container should connect to.'
         PortBindings:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/HashMap'
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            type:
+            - array
+            - 'null'
+            items:
+              $ref: '#/components/schemas/PortBinding'
+          propertyNames:
+            type: string
         RestartPolicy:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/RestartPolicy'
+          - type: 'null'
         AutoRemove:
           type:
           - boolean
@@ -8610,7 +9018,7 @@ components:
           - 'null'
           items:
             type: integer
-            format: int32
+            minimum: 0
           description: Initial console size, as an `[height, width]` array.
         Annotations:
           type:
@@ -8637,9 +9045,9 @@ components:
           description: A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'.
         CgroupnsMode:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HostConfigCgroupnsModeEnum'
             description: 'cgroup namespace mode for the container. Possible values are:  - `\"private\"`: the container runs in its own private cgroup namespace - `\"host\"`: use the host system''s cgroup namespace  If not specified, the daemon default is used, which can either be `\"private\"` or `\"host\"`, depending on daemon version, kernel support and configuration.'
+          - type: 'null'
         Dns:
           type:
           - array
@@ -8763,7 +9171,7 @@ components:
           type:
           - object
           - 'null'
-          description: 'A list of kernel parameters (sysctls) to set in the container. For example:  ``` {\"net.ipv4.ip_forward\": \"1\"} ```'
+          description: A list of kernel parameters (sysctls) to set in the container.  This field is omitted if not set.
           additionalProperties:
             type: string
           propertyNames:
@@ -8775,9 +9183,9 @@ components:
           description: Runtime to use with this container.
         Isolation:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/HostConfigIsolationEnum'
             description: Isolation technology of the container. (Windows only)
+          - type: 'null'
         MaskedPaths:
           type:
           - array
@@ -8801,10 +9209,10 @@ components:
     HostConfigIsolationEnum:
       type: string
       enum:
-      - EMPTY
       - default
       - process
       - hyperv
+      - EMPTY
     HostConfigLogConfig:
       type: object
       description: The logging configuration for this container
@@ -8813,10 +9221,12 @@ components:
           type:
           - string
           - 'null'
+          description: Name of the logging driver used for the container or \"none\" if logging is disabled.
         Config:
           type:
           - object
           - 'null'
+          description: Driver-specific configuration options for the logging driver.
           additionalProperties:
             type: string
           propertyNames:
@@ -8835,7 +9245,7 @@ components:
             type: string
             description: HostGateway is the gateway address of the host
           Network:
-            $ref: '#/components/schemas/Network'
+            $ref: '#/components/schemas/NetworkInspect'
             description: Network configuration
           Config:
             $ref: '#/components/schemas/DaemonConfig'
@@ -8884,9 +9294,9 @@ components:
           description: Url to target
         Redirect:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/UrlRedirect'
             description: Redirect type if it's a redirect
+          - type: 'null'
       additionalProperties: false
     ImagePullPolicy:
       type: string
@@ -8966,6 +9376,17 @@ components:
           - 'null'
           additionalProperties:
             type: string
+          propertyNames:
+            type: string
+    IpamStatus:
+      type: object
+      properties:
+        Subnets:
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            $ref: '#/components/schemas/SubnetStatus'
           propertyNames:
             type: string
     Job:
@@ -9084,12 +9505,12 @@ components:
           description: Secret to use when pulling the image
         ImagePullPolicy:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
+          - type: 'null'
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/Config'
+            $ref: '#/components/schemas/ContainerCreateBody'
           description: List of container to run
       additionalProperties: false
     JobSpec:
@@ -9136,13 +9557,13 @@ components:
           description: Secret to use when pulling the image
         ImagePullPolicy:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ImagePullPolicy'
             description: Image pull policy
+          - type: 'null'
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/Config'
+            $ref: '#/components/schemas/ContainerCreateBody'
           description: Containers to run
     JobSummary:
       type: object
@@ -9240,419 +9661,6 @@ components:
         description: Target a specific http url
       - $ref: '#/components/schemas/UnixTarget'
         description: Target a specific unix socket
-    MemoryStats:
-      type: object
-      description: General memory statistics for the container.
-      properties:
-        stats:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/MemoryStatsStats'
-        max_usage:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        usage:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        failcnt:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        limit:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        commit:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        commit_peak:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        commitbytes:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        commitpeakbytes:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        privateworkingset:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-    MemoryStatsStats:
-      oneOf:
-      - $ref: '#/components/schemas/MemoryStatsStatsV1'
-      - $ref: '#/components/schemas/MemoryStatsStatsV2'
-      description: Granular memory statistics for the container.
-    MemoryStatsStatsV1:
-      type: object
-      description: |-
-        Granular memory statistics for the container, v1 cgroups.
-
-        Exposed in the docker library [here](https://github.com/moby/moby/blob/40d9e2aff130b42ba0f83d5238b9b53184c8ab3b/daemon/daemon_unix.go#L1436).
-      required:
-      - cache
-      - dirty
-      - mapped_file
-      - total_inactive_file
-      - pgpgout
-      - rss
-      - total_mapped_file
-      - writeback
-      - unevictable
-      - pgpgin
-      - total_unevictable
-      - pgmajfault
-      - total_rss
-      - total_rss_huge
-      - total_writeback
-      - total_inactive_anon
-      - rss_huge
-      - hierarchical_memory_limit
-      - total_pgfault
-      - total_active_file
-      - active_anon
-      - total_active_anon
-      - total_pgpgout
-      - total_cache
-      - total_dirty
-      - inactive_anon
-      - active_file
-      - pgfault
-      - inactive_file
-      - total_pgmajfault
-      - total_pgpgin
-      properties:
-        cache:
-          type: integer
-          format: int64
-          minimum: 0
-        dirty:
-          type: integer
-          format: int64
-          minimum: 0
-        mapped_file:
-          type: integer
-          format: int64
-          minimum: 0
-        total_inactive_file:
-          type: integer
-          format: int64
-          minimum: 0
-        pgpgout:
-          type: integer
-          format: int64
-          minimum: 0
-        rss:
-          type: integer
-          format: int64
-          minimum: 0
-        total_mapped_file:
-          type: integer
-          format: int64
-          minimum: 0
-        writeback:
-          type: integer
-          format: int64
-          minimum: 0
-        unevictable:
-          type: integer
-          format: int64
-          minimum: 0
-        pgpgin:
-          type: integer
-          format: int64
-          minimum: 0
-        total_unevictable:
-          type: integer
-          format: int64
-          minimum: 0
-        pgmajfault:
-          type: integer
-          format: int64
-          minimum: 0
-        total_rss:
-          type: integer
-          format: int64
-          minimum: 0
-        total_rss_huge:
-          type: integer
-          format: int64
-          minimum: 0
-        total_writeback:
-          type: integer
-          format: int64
-          minimum: 0
-        total_inactive_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        rss_huge:
-          type: integer
-          format: int64
-          minimum: 0
-        hierarchical_memory_limit:
-          type: integer
-          format: int64
-          minimum: 0
-        total_pgfault:
-          type: integer
-          format: int64
-          minimum: 0
-        total_active_file:
-          type: integer
-          format: int64
-          minimum: 0
-        active_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        total_active_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        total_pgpgout:
-          type: integer
-          format: int64
-          minimum: 0
-        total_cache:
-          type: integer
-          format: int64
-          minimum: 0
-        total_dirty:
-          type: integer
-          format: int64
-          minimum: 0
-        inactive_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        active_file:
-          type: integer
-          format: int64
-          minimum: 0
-        pgfault:
-          type: integer
-          format: int64
-          minimum: 0
-        inactive_file:
-          type: integer
-          format: int64
-          minimum: 0
-        total_pgmajfault:
-          type: integer
-          format: int64
-          minimum: 0
-        total_pgpgin:
-          type: integer
-          format: int64
-          minimum: 0
-        hierarchical_memsw_limit:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        shmem:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        total_shmem:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-      additionalProperties: false
-    MemoryStatsStatsV2:
-      type: object
-      description: |-
-        Granular memory statistics for the container, v2 cgroups.
-
-        Exposed in the docker library [here](https://github.com/moby/moby/blob/40d9e2aff130b42ba0f83d5238b9b53184c8ab3b/daemon/daemon_unix.go#L1542).
-      required:
-      - anon
-      - file
-      - kernel_stack
-      - slab
-      - sock
-      - shmem
-      - file_mapped
-      - file_dirty
-      - file_writeback
-      - anon_thp
-      - inactive_anon
-      - active_anon
-      - inactive_file
-      - active_file
-      - unevictable
-      - slab_reclaimable
-      - slab_unreclaimable
-      - pgfault
-      - pgmajfault
-      - workingset_refault
-      - workingset_activate
-      - workingset_nodereclaim
-      - pgrefill
-      - pgscan
-      - pgsteal
-      - pgactivate
-      - pgdeactivate
-      - pglazyfree
-      - pglazyfreed
-      - thp_fault_alloc
-      - thp_collapse_alloc
-      properties:
-        anon:
-          type: integer
-          format: int64
-          minimum: 0
-        file:
-          type: integer
-          format: int64
-          minimum: 0
-        kernel_stack:
-          type: integer
-          format: int64
-          minimum: 0
-        slab:
-          type: integer
-          format: int64
-          minimum: 0
-        sock:
-          type: integer
-          format: int64
-          minimum: 0
-        shmem:
-          type: integer
-          format: int64
-          minimum: 0
-        file_mapped:
-          type: integer
-          format: int64
-          minimum: 0
-        file_dirty:
-          type: integer
-          format: int64
-          minimum: 0
-        file_writeback:
-          type: integer
-          format: int64
-          minimum: 0
-        anon_thp:
-          type: integer
-          format: int64
-          minimum: 0
-        inactive_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        active_anon:
-          type: integer
-          format: int64
-          minimum: 0
-        inactive_file:
-          type: integer
-          format: int64
-          minimum: 0
-        active_file:
-          type: integer
-          format: int64
-          minimum: 0
-        unevictable:
-          type: integer
-          format: int64
-          minimum: 0
-        slab_reclaimable:
-          type: integer
-          format: int64
-          minimum: 0
-        slab_unreclaimable:
-          type: integer
-          format: int64
-          minimum: 0
-        pgfault:
-          type: integer
-          format: int64
-          minimum: 0
-        pgmajfault:
-          type: integer
-          format: int64
-          minimum: 0
-        workingset_refault:
-          type: integer
-          format: int64
-          minimum: 0
-        workingset_activate:
-          type: integer
-          format: int64
-          minimum: 0
-        workingset_nodereclaim:
-          type: integer
-          format: int64
-          minimum: 0
-        pgrefill:
-          type: integer
-          format: int64
-          minimum: 0
-        pgscan:
-          type: integer
-          format: int64
-          minimum: 0
-        pgsteal:
-          type: integer
-          format: int64
-          minimum: 0
-        pgactivate:
-          type: integer
-          format: int64
-          minimum: 0
-        pgdeactivate:
-          type: integer
-          format: int64
-          minimum: 0
-        pglazyfree:
-          type: integer
-          format: int64
-          minimum: 0
-        pglazyfreed:
-          type: integer
-          format: int64
-          minimum: 0
-        thp_fault_alloc:
-          type: integer
-          format: int64
-          minimum: 0
-        thp_collapse_alloc:
-          type: integer
-          format: int64
-          minimum: 0
-      additionalProperties: false
     Metric:
       type: object
       description: Metric entry
@@ -9718,12 +9726,11 @@ components:
           type:
           - string
           - 'null'
-          description: Mount source (e.g. a volume name, a host path).
+          description: Mount source (e.g. a volume name, a host path). The source cannot be specified when using `Type=tmpfs`. For `Type=bind`, the source path must either exist, or the `CreateMountpoint` must be set to `true` to create the source path on the host if missing.  For `Type=npipe`, the pipe must exist prior to creating the container.
         Type:
           oneOf:
+          - $ref: '#/components/schemas/MountType'
           - type: 'null'
-          - $ref: '#/components/schemas/MountTypeEnum'
-            description: 'The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed. - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs. - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container. - `cluster` a Swarm cluster volume'
         ReadOnly:
           type:
           - boolean
@@ -9736,25 +9743,29 @@ components:
           description: 'The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`.'
         BindOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/MountBindOptions'
+          - type: 'null'
         VolumeOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/MountVolumeOptions'
+          - type: 'null'
+        ImageOptions:
+          oneOf:
+          - $ref: '#/components/schemas/MountImageOptions'
+          - type: 'null'
         TmpfsOptions:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/MountTmpfsOptions'
+          - type: 'null'
     MountBindOptions:
       type: object
       description: Optional configuration for the `bind` type.
       properties:
         Propagation:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/MountBindOptionsPropagationEnum'
             description: A propagation mode with the value `[r]private`, `[r]shared`, or `[r]slave`.
+          - type: 'null'
         NonRecursive:
           type:
           - boolean
@@ -9769,7 +9780,7 @@ components:
           type:
           - boolean
           - 'null'
-          description: Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction).  Addded in v1.44, before that version all read-only mounts were non-recursive by default. To match the previous behaviour this will default to `true` for clients on versions prior to v1.44.
+          description: Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction).  Added in v1.44, before that version all read-only mounts were non-recursive by default. To match the previous behaviour this will default to `true` for clients on versions prior to v1.44.
         ReadOnlyForceRecursive:
           type:
           - boolean
@@ -9785,15 +9796,23 @@ components:
       - rshared
       - slave
       - rslave
+    MountImageOptions:
+      type: object
+      description: Optional configuration for the `image` type.
+      properties:
+        Subpath:
+          type:
+          - string
+          - 'null'
+          description: Source path inside the image. Must be relative without any back traversals.
     MountPoint:
       type: object
       description: MountPoint represents a mount point configuration inside the container. This is used for reporting the mountpoints in use by a container.
       properties:
         Type:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/MountPointTypeEnum'
-            description: 'The mount type:  - `bind` a mount of a file or directory from the host into the container. - `volume` a docker volume with the given `Name`. - `tmpfs` a `tmpfs`. - `npipe` a named pipe from the host into the container. - `cluster` a Swarm cluster volume'
+          type:
+          - string
+          - 'null'
         Name:
           type:
           - string
@@ -9829,15 +9848,6 @@ components:
           - string
           - 'null'
           description: Propagation describes how mounts are propagated from the host into the mount point, and vice-versa. Refer to the [Linux kernel documentation](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt) for details. This field is not used on Windows.
-    MountPointTypeEnum:
-      type: string
-      enum:
-      - EMPTY
-      - bind
-      - volume
-      - tmpfs
-      - npipe
-      - cluster
     MountTmpfsOptions:
       type: object
       description: Optional configuration for the `tmpfs` type.
@@ -9853,16 +9863,30 @@ components:
           - integer
           - 'null'
           format: int64
-          description: The permission mode for the tmpfs mount in an integer.
-    MountTypeEnum:
+          description: The permission mode for the tmpfs mount in an integer. The value must not be in octal format (e.g. 755) but rather the decimal representation of the octal value (e.g. 493).
+        Options:
+          type:
+          - array
+          - 'null'
+          items:
+            type: array
+            items:
+              type: string
+          description: The options to be passed to the tmpfs mount. An array of arrays. Flag options should be provided as 1-length arrays. Other types should be provided as as 2-length arrays, where the first item is the key and the second the value.
+    MountType:
       type: string
+      description: |-
+        The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. The `Source` must exist prior to creating the container. - `cluster` a Swarm cluster volume - `image` Mounts an image. - `npipe` Mounts a named pipe from the host into the container. The `Source` must exist prior to creating the container. - `tmpfs` Create a tmpfs with the given options. The mount `Source` cannot be specified for tmpfs. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed.
+        Enumeration of values.
+        Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+        which helps with FFI.
       enum:
-      - EMPTY
       - bind
-      - volume
-      - tmpfs
-      - npipe
       - cluster
+      - image
+      - npipe
+      - tmpfs
+      - volume
     MountVolumeOptions:
       type: object
       description: Optional configuration for the `volume` type.
@@ -9883,8 +9907,8 @@ components:
             type: string
         DriverConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/MountVolumeOptionsDriverConfig'
+          - type: 'null'
         Subpath:
           type:
           - string
@@ -10044,61 +10068,80 @@ components:
           other:
             type: string
       description: Action is the action that triggered the event
-    Network:
+    NetworkInspect:
       type: object
+      description: The body of the \"get network\" http response message.
       properties:
         Name:
           type:
           - string
           - 'null'
+          description: Name of the network.
         Id:
           type:
           - string
           - 'null'
+          description: ID that uniquely identifies a network on a single machine.
         Created:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/String'
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date and time at which the network was created in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         Scope:
           type:
           - string
           - 'null'
+          description: The level at which the network exists (e.g. `swarm` for cluster-wide or `local` for machine level)
         Driver:
           type:
           - string
           - 'null'
+          description: The name of the driver used to create the network (e.g. `bridge`, `overlay`).
+        EnableIPv4:
+          type:
+          - boolean
+          - 'null'
+          description: Whether the network was created with IPv4 enabled.
         EnableIPv6:
           type:
           - boolean
           - 'null'
+          description: Whether the network was created with IPv6 enabled.
         IPAM:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Ipam'
+            description: The network's IP Address Management.
+          - type: 'null'
         Internal:
           type:
           - boolean
           - 'null'
+          description: Whether the network is created to only allow internal networking connectivity.
         Attachable:
           type:
           - boolean
           - 'null'
+          description: Whether a global / swarm scope network is manually attachable by regular containers from workers in swarm mode.
         Ingress:
           type:
           - boolean
           - 'null'
-        Containers:
+          description: Whether the network is providing the routing-mesh for the swarm cluster.
+        ConfigFrom:
+          oneOf:
+          - $ref: '#/components/schemas/ConfigReference'
+          - type: 'null'
+        ConfigOnly:
           type:
-          - object
+          - boolean
           - 'null'
-          additionalProperties:
-            $ref: '#/components/schemas/NetworkContainer'
-          propertyNames:
-            type: string
+          description: Whether the network is a config-only network. Config-only networks are placeholder networks for network configurations to be used by other networks. Config-only networks cannot be used directly to run containers or services.
         Options:
           type:
           - object
           - 'null'
+          description: Network-specific options uses when creating the network.
           additionalProperties:
             type: string
           propertyNames:
@@ -10107,33 +10150,40 @@ components:
           type:
           - object
           - 'null'
+          description: Metadata specific to the network being created.
           additionalProperties:
             type: string
           propertyNames:
             type: string
-    NetworkContainer:
-      type: object
-      properties:
-        Name:
+        Peers:
           type:
-          - string
+          - array
           - 'null'
-        EndpointID:
+          items:
+            $ref: '#/components/schemas/PeerInfo'
+          description: List of peer nodes for an overlay network. This field is only present for overlay networks, and omitted for other network types.
+        Containers:
           type:
-          - string
+          - object
           - 'null'
-        MacAddress:
+          description: Contains endpoints attached to the network.
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointResource'
+          propertyNames:
+            type: string
+        Services:
           type:
-          - string
+          - object
           - 'null'
-        IPv4Address:
-          type:
-          - string
-          - 'null'
-        IPv6Address:
-          type:
-          - string
-          - 'null'
+          description: List of services using the network. This field is only present for swarm scope networks, and omitted for local scope networks.
+          additionalProperties: {}
+          propertyNames:
+            type: string
+        Status:
+          oneOf:
+          - $ref: '#/components/schemas/NetworkStatus'
+            description: provides runtime information about the network such as the number of allocated IPs.
+          - type: 'null'
     NetworkKind:
       oneOf:
       - type: string
@@ -10157,97 +10207,28 @@ components:
       type: object
       description: NetworkSettings exposes the network settings in the API
       properties:
-        Bridge:
-          type:
-          - string
-          - 'null'
-          description: Name of the default bridge interface when dockerd's --bridge flag is set.
         SandboxID:
           type:
           - string
           - 'null'
           description: SandboxID uniquely represents a container's network stack.
-        HairpinMode:
-          type:
-          - boolean
-          - 'null'
-          description: 'Indicates if hairpin NAT should be enabled on the virtual interface.  Deprecated: This field is never set and will be removed in a future release.'
-        LinkLocalIPv6Address:
-          type:
-          - string
-          - 'null'
-          description: 'IPv6 unicast address using the link-local prefix.  Deprecated: This field is never set and will be removed in a future release.'
-        LinkLocalIPv6PrefixLen:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: 'Prefix length of the IPv6 unicast address.  Deprecated: This field is never set and will be removed in a future release.'
-        Ports:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/HashMap'
         SandboxKey:
           type:
           - string
           - 'null'
           description: SandboxKey is the full path of the netns handle
-        SecondaryIPAddresses:
+        Ports:
           type:
-          - array
+          - object
           - 'null'
-          items:
-            $ref: '#/components/schemas/Address'
-          description: 'Deprecated: This field is never set and will be removed in a future release.'
-        SecondaryIPv6Addresses:
-          type:
-          - array
-          - 'null'
-          items:
-            $ref: '#/components/schemas/Address'
-          description: 'Deprecated: This field is never set and will be removed in a future release.'
-        EndpointID:
-          type:
-          - string
-          - 'null'
-          description: 'EndpointID uniquely represents a service endpoint in a Sandbox.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        Gateway:
-          type:
-          - string
-          - 'null'
-          description: 'Gateway address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        GlobalIPv6Address:
-          type:
-          - string
-          - 'null'
-          description: 'Global IPv6 address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        GlobalIPv6PrefixLen:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: 'Mask length of the global IPv6 address.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        IPAddress:
-          type:
-          - string
-          - 'null'
-          description: 'IPv4 address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        IPPrefixLen:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          description: 'Mask length of the IPv4 address.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        IPv6Gateway:
-          type:
-          - string
-          - 'null'
-          description: 'IPv6 gateway address for this network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
-        MacAddress:
-          type:
-          - string
-          - 'null'
-          description: 'MAC address for the container on the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          additionalProperties:
+            type:
+            - array
+            - 'null'
+            items:
+              $ref: '#/components/schemas/PortBinding'
+          propertyNames:
+            type: string
         Networks:
           type:
           - object
@@ -10257,59 +10238,23 @@ components:
             $ref: '#/components/schemas/EndpointSettings'
           propertyNames:
             type: string
-    NetworkStats:
+    NetworkStatus:
       type: object
-      description: Network statistics for the container.
-      required:
-      - rx_dropped
-      - rx_bytes
-      - rx_errors
-      - tx_packets
-      - tx_dropped
-      - rx_packets
-      - tx_errors
-      - tx_bytes
+      description: provides runtime information about the network such as the number of allocated IPs.
       properties:
-        rx_dropped:
-          type: integer
-          format: int64
-          minimum: 0
-        rx_bytes:
-          type: integer
-          format: int64
-          minimum: 0
-        rx_errors:
-          type: integer
-          format: int64
-          minimum: 0
-        tx_packets:
-          type: integer
-          format: int64
-          minimum: 0
-        tx_dropped:
-          type: integer
-          format: int64
-          minimum: 0
-        rx_packets:
-          type: integer
-          format: int64
-          minimum: 0
-        tx_errors:
-          type: integer
-          format: int64
-          minimum: 0
-        tx_bytes:
-          type: integer
-          format: int64
-          minimum: 0
-    NetworkingConfig_String:
+        IPAM:
+          oneOf:
+          - $ref: '#/components/schemas/IpamStatus'
+          - type: 'null'
+    NetworkingConfig:
       type: object
-      description: This container's networking configuration.
-      required:
-      - EndpointsConfig
+      description: NetworkingConfig represents the container's networking configuration for each of its interfaces. It is used for the networking configs specified in the `docker create` and `docker network connect` commands.
       properties:
         EndpointsConfig:
-          type: object
+          type:
+          - object
+          - 'null'
+          description: A mapping of network name to endpoint configuration for that network. The endpoint configuration can be left empty to connect to that network with no particular endpoint configuration.
           additionalProperties:
             $ref: '#/components/schemas/EndpointSettings'
           propertyNames:
@@ -10361,6 +10306,19 @@ components:
           type: string
           description: Constraint value
       additionalProperties: false
+    NriInfo:
+      type: object
+      description: Information about the Node Resource Interface (NRI).  This field is only present if NRI is enabled.
+      properties:
+        Info:
+          type:
+          - array
+          - 'null'
+          items:
+            type: array
+            items:
+              type: string
+          description: 'Information about NRI, provided as \"label\" / \"value\" pairs.  <p><br /></p>  > **Note**: The information returned in this field, including the > formatting of values and labels, should not be considered stable, > and may change without notice.'
     ObjPsHealthStatusKind:
       type: string
       enum:
@@ -10415,6 +10373,101 @@ components:
           - 'null'
           format: int64
           minimum: 0
+    OciDescriptor:
+      type: object
+      description: A descriptor struct containing digest, media type, and size, as defined in the [OCI Content Descriptors Specification](https://github.com/opencontainers/image-spec/blob/v1.0.1/descriptor.md).
+      properties:
+        mediaType:
+          type:
+          - string
+          - 'null'
+          description: The media type of the object this schema refers to.
+        digest:
+          type:
+          - string
+          - 'null'
+          description: The digest of the targeted content.
+        size:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: The size in bytes of the blob.
+        urls:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: List of URLs from which this object MAY be downloaded.
+        annotations:
+          type:
+          - object
+          - 'null'
+          description: Arbitrary metadata relating to the targeted content.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        data:
+          type:
+          - string
+          - 'null'
+          description: Data is an embedding of the targeted content. This is encoded as a base64 string when marshalled to JSON (automatically, by encoding/json). If present, Data can be used directly to avoid fetching the targeted content.
+        platform:
+          oneOf:
+          - $ref: '#/components/schemas/OciPlatform'
+          - type: 'null'
+        artifactType:
+          type:
+          - string
+          - 'null'
+          description: ArtifactType is the IANA media type of this artifact.
+    OciPlatform:
+      type: object
+      description: Describes the platform which the image in the manifest runs on, as defined in the [OCI Image Index Specification](https://github.com/opencontainers/image-spec/blob/v1.0.1/image-index.md).
+      properties:
+        architecture:
+          type:
+          - string
+          - 'null'
+          description: The CPU architecture, for example `amd64` or `ppc64`.
+        os:
+          type:
+          - string
+          - 'null'
+          description: The operating system, for example `linux` or `windows`.
+        os.version:
+          type:
+          - string
+          - 'null'
+          description: Optional field specifying the operating system version, for example on Windows `10.0.19041.1165`.
+        os.features:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Optional field specifying an array of strings, each listing a required OS feature (for example on Windows `win32k`).
+        variant:
+          type:
+          - string
+          - 'null'
+          description: Optional field specifying a variant of the CPU, for example `v7` to specify ARMv7 when architecture is `arm`.
+    PeerInfo:
+      type: object
+      description: represents one peer of an overlay network.
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: ID of the peer-node in the Swarm cluster.
+        IP:
+          type:
+          - string
+          - 'null'
+          description: IP-address of the peer-node in the Swarm cluster.
     PeerNode:
       type: object
       description: Represents a peer-node in the swarm
@@ -10429,22 +10482,6 @@ components:
           - string
           - 'null'
           description: IP address and ports at which this node can be reached.
-    PidsStats:
-      type: object
-      description: Process ID statistics for the container.
-      properties:
-        current:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        limit:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
     PluginsInfo:
       type: object
       description: 'Available plugins per type.  <p><br /></p>  > **Note**: Only unmanaged (V1) plugins are included in this list. > V1 plugins are \"lazily\" loaded, and are not returned in this list > if there is no resource using the plugin.'
@@ -10477,6 +10514,20 @@ components:
           items:
             type: string
           description: Names of available logging-drivers, and logging-driver plugins.
+    PortBinding:
+      type: object
+      description: PortBinding represents a binding between a host IP address and a host port.
+      properties:
+        HostIp:
+          type:
+          - string
+          - 'null'
+          description: Host IP address that the container's port is mapped to.
+        HostPort:
+          type:
+          - string
+          - 'null'
+          description: Host port number that the container's port is mapped to.
     Primitive:
       oneOf:
       - type: string
@@ -10620,7 +10671,7 @@ components:
         Name:
           type: string
         Stats:
-          $ref: '#/components/schemas/Stats'
+          $ref: '#/components/schemas/ContainerStatsResponse'
     ProxyCache:
       type: string
       description: 'A validated nginx proxy cache value: `off` or a configured cache zone.'
@@ -10691,9 +10742,9 @@ components:
           description: The target cargo
         LimitReq:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/LimitReq'
             description: Setup limit request for this location
+          - type: 'null'
         AllowedIps:
           type:
           - array
@@ -10716,14 +10767,14 @@ components:
           description: Http version to use
         ClientMaxBodySize:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/NginxSize'
             description: Maximum request body size for this location
+          - type: 'null'
         ClientBodyTimeout:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/NginxDuration'
             description: Request body read timeout
+          - type: 'null'
         RequestBuffering:
           type:
           - boolean
@@ -10736,29 +10787,29 @@ components:
           description: Buffer upstream responses
         Cache:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxyCache'
             description: Enable the proxy cache
+          - type: 'null'
         ReadTimeout:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/NginxDuration'
             description: Upstream response read timeout
+          - type: 'null'
         SendTimeout:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/NginxDuration'
             description: Upstream response send timeout
+          - type: 'null'
         ConnectTimeout:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/NginxDuration'
             description: Upstream connection timeout
+          - type: 'null'
         NextUpstream:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxyNextUpstream'
             description: Upstream retry behavior
+          - type: 'null'
         InterceptErrors:
           type:
           - boolean
@@ -10798,17 +10849,17 @@ components:
           minimum: 0
         Hsts:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Hsts'
             description: Hsts configuration
+          - type: 'null'
         Network:
           $ref: '#/components/schemas/NetworkKind'
           description: Type of network binding
         LimitReqZone:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/LimitReqZone'
             description: Optional limit request zone
+          - type: 'null'
         Locations:
           type: array
           items:
@@ -10816,14 +10867,14 @@ components:
           description: The locations to handle multiple paths
         Ssl:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
             description: The ssl configuration
+          - type: 'null'
         Http3:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxyHttp3'
             description: HTTP/3 configuration
+          - type: 'null'
         Includes:
           type:
           - array
@@ -10854,9 +10905,9 @@ components:
           minimum: 0
         Ssl:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
             description: The ssl configuration
+          - type: 'null'
         Target:
           $ref: '#/components/schemas/StreamTarget'
           description: The target
@@ -10903,27 +10954,13 @@ components:
       type: object
       description: RegistryServiceConfig stores daemon registry services configuration.
       properties:
-        AllowNondistributableArtifactsCIDRs:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: 'List of IP ranges to which nondistributable artifacts can be pushed, using the CIDR syntax [RFC 4632](https://tools.ietf.org/html/4632).  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior, and enables the daemon to push nondistributable artifacts to all registries whose resolved IP address is within the subnet described by the CIDR syntax.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
-        AllowNondistributableArtifactsHostnames:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          description: 'List of registry hostnames to which nondistributable artifacts can be pushed, using the format `<hostname>[:<port>]` or `<IP address>[:<port>]`.  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior for the specified registries.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
         InsecureRegistryCIDRs:
           type:
           - array
           - 'null'
           items:
             type: string
-          description: 'List of IP ranges of insecure registries, using the CIDR syntax ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  By default, local registries (`127.0.0.0/8`) are configured as insecure. All other registries are secure. Communicating with an insecure registry is not possible if the daemon assumes that registry is secure.  This configuration override this behavior, insecure communication with registries whose resolved IP address is within the subnet described by the CIDR syntax.  Registries can also be marked insecure by hostname. Those registries are listed under `IndexConfigs` and have their `Secure` field set to `false`.  > **Warning**: Using this option can be useful when running a local > registry, but introduces security vulnerabilities. This option > should therefore ONLY be used for testing purposes. For increased > security, users should add their CA to their system''s list of trusted > CAs instead of enabling this option.'
+          description: 'List of IP ranges of insecure registries, using the CIDR syntax ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  By default, local registries (`::1/128` and `127.0.0.0/8`) are configured as insecure. All other registries are secure. Communicating with an insecure registry is not possible if the daemon assumes that registry is secure.  This configuration override this behavior, insecure communication with registries whose resolved IP address is within the subnet described by the CIDR syntax.  Registries can also be marked insecure by hostname. Those registries are listed under `IndexConfigs` and have their `Secure` field set to `false`.  > **Warning**: Using this option can be useful when running a local > registry, but introduces security vulnerabilities. This option > should therefore ONLY be used for testing purposes. For increased > security, users should add their CA to their system''s list of trusted > CAs instead of enabling this option.'
         IndexConfigs:
           type:
           - object
@@ -11235,9 +11272,9 @@ components:
       properties:
         Name:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/RestartPolicyNameEnum'
             description: '- Empty string means not to restart - `no` Do not automatically restart - `always` Always restart - `unless-stopped` Restart always except when the user has manually stopped the container - `on-failure` Restart only when the container exit code is non-zero'
+          - type: 'null'
         MaximumRetryCount:
           type:
           - integer
@@ -11252,6 +11289,24 @@ components:
       - always
       - unless-stopped
       - on-failure
+    RootFsStorage:
+      type: object
+      description: Information about the storage used for the container's root filesystem.
+      properties:
+        Snapshot:
+          oneOf:
+          - $ref: '#/components/schemas/RootFsStorageSnapshot'
+            description: Information about the snapshot used for the container's root filesystem.
+          - type: 'null'
+    RootFsStorageSnapshot:
+      type: object
+      description: Information about a snapshot backend of the container's root filesystem.
+      properties:
+        Name:
+          type:
+          - string
+          - 'null'
+          description: Name of the snapshotter.
     Runtime:
       type: object
       description: Runtime describes an [OCI compliant](https://github.com/opencontainers/runtime-spec) runtime.  The runtime is invoked by the daemon via the `containerd` daemon. OCI runtimes act as an interface to the Linux kernel namespaces, cgroups, and SELinux.
@@ -11435,9 +11490,9 @@ components:
           description: Api version to use or remote url
         Metadata:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/StatefileMetadata'
             description: Optional metadata about the statefile
+          - type: 'null'
         Args:
           type:
           - array
@@ -11513,9 +11568,9 @@ components:
           description: Kind of the build arg
         Default:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/StatefileArgsValue'
             description: Default value of the build arg
+          - type: 'null'
         Required:
           type: boolean
           description: Required argument
@@ -11586,84 +11641,15 @@ components:
           - 'null'
           description: Override the content of the manual page for this statefile
       additionalProperties: false
-    Stats:
+    Storage:
       type: object
-      description: Statistics for the container.
-      required:
-      - read
-      - preread
-      - num_procs
-      - pids_stats
-      - memory_stats
-      - blkio_stats
-      - cpu_stats
-      - precpu_stats
-      - storage_stats
+      description: Information about the storage used by the container.
       properties:
-        read:
-          type: string
-        preread:
-          type: string
-        num_procs:
-          type: integer
-          format: int32
-          minimum: 0
-        pids_stats:
-          $ref: '#/components/schemas/PidsStats'
-        network:
+        RootFS:
           oneOf:
+          - $ref: '#/components/schemas/RootFsStorage'
+            description: Information about the storage used for the container's root filesystem.
           - type: 'null'
-          - $ref: '#/components/schemas/NetworkStats'
-        networks:
-          type:
-          - object
-          - 'null'
-          additionalProperties:
-            $ref: '#/components/schemas/NetworkStats'
-          propertyNames:
-            type: string
-        memory_stats:
-          $ref: '#/components/schemas/MemoryStats'
-        blkio_stats:
-          $ref: '#/components/schemas/BlkioStats'
-        cpu_stats:
-          $ref: '#/components/schemas/CPUStats'
-        precpu_stats:
-          $ref: '#/components/schemas/CPUStats'
-        storage_stats:
-          $ref: '#/components/schemas/StorageStats'
-        name:
-          type: string
-        id:
-          type: string
-    StorageStats:
-      type: object
-      description: File I/O statistics for the container.
-      properties:
-        read_count_normalized:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        read_size_bytes:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        write_count_normalized:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
-        write_size_bytes:
-          type:
-          - integer
-          - 'null'
-          format: int64
-          minimum: 0
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
@@ -11672,8 +11658,6 @@ components:
         description: Target a specific uri
       - $ref: '#/components/schemas/UnixTarget'
         description: Target a specific unix socket
-    String:
-      type: string
     SubState:
       oneOf:
       - type: string
@@ -11706,6 +11690,23 @@ components:
           items:
             $ref: '#/components/schemas/SubStateArg'
       additionalProperties: false
+    SubnetStatus:
+      type: object
+      properties:
+        IPsInUse:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of IP addresses in the subnet that are in use or reserved and are therefore unavailable for allocation, saturating at 2<sup>64</sup> - 1.
+          minimum: 0
+        DynamicIPsAvailable:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Number of IP addresses within the network's IPRange for the subnet that are available for allocation, saturating at 2<sup>64</sup> - 1.
+          minimum: 0
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.
@@ -11722,8 +11723,8 @@ components:
           description: IP address at which this node can be reached by other nodes in the swarm.
         LocalNodeState:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/LocalNodeState'
+          - type: 'null'
         ControlAvailable:
           type:
           - boolean
@@ -11753,8 +11754,8 @@ components:
           description: Total number of managers in the swarm.
         Cluster:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ClusterInfo'
+          - type: 'null'
     SwarmSpec:
       type: object
       description: User modifiable swarm configuration.
@@ -11775,28 +11776,28 @@ components:
             type: string
         Orchestration:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecOrchestration'
+          - type: 'null'
         Raft:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecRaft'
+          - type: 'null'
         Dispatcher:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecDispatcher'
+          - type: 'null'
         CAConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecCaConfig'
+          - type: 'null'
         EncryptionConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecEncryptionConfig'
+          - type: 'null'
         TaskDefaults:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecTaskDefaults'
+          - type: 'null'
     SwarmSpecCaConfig:
       type: object
       description: CA configuration.
@@ -11836,9 +11837,9 @@ components:
       properties:
         Protocol:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecCaConfigExternalCasProtocolEnum'
             description: Protocol for communication with the external CA (currently only `cfssl` is supported).
+          - type: 'null'
         URL:
           type:
           - string
@@ -11935,8 +11936,8 @@ components:
       properties:
         LogDriver:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmSpecTaskDefaultsLogDriver'
+          - type: 'null'
     SwarmSpecTaskDefaultsLogDriver:
       type: object
       description: The log driver to use for tasks created in the orchestrator if unspecified by a service.  Updating this value only affects new tasks. Existing tasks continue to use their previously configured log driver until recreated.
@@ -11950,7 +11951,7 @@ components:
           type:
           - object
           - 'null'
-          description: Driver-specific options for the selectd log driver, specified as key/value pairs.
+          description: Driver-specific options for the selected log driver, specified as key/value pairs.
           additionalProperties:
             type: string
           propertyNames:
@@ -12014,8 +12015,8 @@ components:
           description: Root directory of persistent Docker state.  Defaults to `/var/lib/docker` on Linux, and `C:\\ProgramData\\docker` on Windows.
         Plugins:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PluginsInfo'
+          - type: 'null'
         MemoryLimit:
           type:
           - boolean
@@ -12026,11 +12027,6 @@ components:
           - boolean
           - 'null'
           description: Indicates if the host has memory swap limit support enabled.
-        KernelMemoryTCP:
-          type:
-          - boolean
-          - 'null'
-          description: Indicates if the host has kernel memory TCP limit support enabled. This field is omitted if not supported.  Kernel memory TCP limits are not supported when using cgroups v2, which does not support the corresponding `memory.kmem.tcp.limit_in_bytes` cgroup.
         CpuCfsPeriod:
           type:
           - boolean
@@ -12066,16 +12062,6 @@ components:
           - boolean
           - 'null'
           description: Indicates IPv4 forwarding is enabled.
-        BridgeNfIptables:
-          type:
-          - boolean
-          - 'null'
-          description: Indicates if `bridge-nf-call-iptables` is available on the host.
-        BridgeNfIp6tables:
-          type:
-          - boolean
-          - 'null'
-          description: Indicates if `bridge-nf-call-ip6tables` is available on the host.
         Debug:
           type:
           - boolean
@@ -12105,14 +12091,14 @@ components:
           description: The logging driver to use as a default for new containers.
         CgroupDriver:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SystemInfoCgroupDriverEnum'
             description: The driver to use for managing cgroups.
+          - type: 'null'
         CgroupVersion:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SystemInfoCgroupVersionEnum'
             description: The version of the cgroup.
+          - type: 'null'
         NEventsListener:
           type:
           - integer
@@ -12128,7 +12114,7 @@ components:
           type:
           - string
           - 'null'
-          description: 'Name of the host''s operating system, for example: \"Ubuntu 16.04.2 LTS\" or \"Windows Server 2016 Datacenter\"'
+          description: 'Name of the host''s operating system, for example: \"Ubuntu 24.04 LTS\" or \"Windows Server 2016 Datacenter\"'
         OSVersion:
           type:
           - string
@@ -12143,7 +12129,7 @@ components:
           type:
           - string
           - 'null'
-          description: Hardware architecture of the host, as returned by the Go runtime (`GOARCH`).  A full list of possible values can be found in the [Go documentation](https://go.dev/doc/install/source#environment).
+          description: Hardware architecture of the host, as returned by the operating system. This is equivalent to the output of `uname -m` on Linux.  Unlike `Arch` (from `/version`), this reports the machine's native architecture, which can differ from the Go runtime architecture when running a binary compiled for a different architecture (for example, a 32-bit binary running on 64-bit hardware).
         NCPU:
           type:
           - integer
@@ -12163,12 +12149,14 @@ components:
           description: Address / URL of the index server that is used for image search, and as a default for user authentication for Docker Hub and Docker Cloud.
         RegistryConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/RegistryServiceConfig'
-        GenericResources:
-          oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/GenericResourcesInner'
+        GenericResources:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/GenericResourcesInner'
         HttpProxy:
           type:
           - string
@@ -12222,8 +12210,8 @@ components:
           description: Name of the default OCI runtime that is used when starting containers.  The default can be overridden per-container at create time.
         Swarm:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SwarmInfo'
+          - type: 'null'
         LiveRestoreEnabled:
           type:
           - boolean
@@ -12231,9 +12219,9 @@ components:
           description: Indicates if live restore is enabled.  If enabled, containers are kept running when the daemon is shutdown or upon daemon start if running containers are detected.
         Isolation:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/SystemInfoIsolationEnum'
             description: Represents the isolation technology to use as a default for containers. The supported values are platform-specific.  If no isolation value is specified on daemon start, on Windows client, the default is `hyperv`, and on Windows server, the default is `process`.  This option is currently not used on other platforms.
+          - type: 'null'
         InitBinary:
           type:
           - string
@@ -12241,16 +12229,16 @@ components:
           description: Name and, optional, path of the `docker-init` binary.  If the path is omitted, the daemon searches the host's `$PATH` for the binary and uses the first result.
         ContainerdCommit:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Commit'
+          - type: 'null'
         RuncCommit:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Commit'
+          - type: 'null'
         InitCommit:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/Commit'
+          - type: 'null'
         SecurityOptions:
           type:
           - array
@@ -12270,6 +12258,21 @@ components:
           items:
             $ref: '#/components/schemas/SystemInfoDefaultAddressPools'
           description: 'List of custom default address pools for local networks, which can be specified in the daemon.json file or dockerd option.  Example: a Base \"10.10.0.0/16\" with Size 24 will define the set of 256 10.10.[0-255].0/24 address pools.'
+        FirewallBackend:
+          oneOf:
+          - $ref: '#/components/schemas/FirewallInfo'
+          - type: 'null'
+        DiscoveredDevices:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/DeviceInfo'
+          description: List of devices discovered by device drivers.  Each device includes information about its source driver, kind, name, and additional driver-specific attributes.
+        NRI:
+          oneOf:
+          - $ref: '#/components/schemas/NriInfo'
+          - type: 'null'
         Warnings:
           type:
           - array
@@ -12284,6 +12287,10 @@ components:
           items:
             type: string
           description: List of directories where (Container Device Interface) CDI specifications are located.  These specifications define vendor-specific modifications to an OCI runtime specification for a container being created.  An empty list indicates that CDI device injection is disabled.  Note that since using CDI device injection requires the daemon to have experimental enabled. For non-experimental daemons an empty list will always be returned.
+        Containerd:
+          oneOf:
+          - $ref: '#/components/schemas/ContainerdInfo'
+          - type: 'null'
     SystemInfoCgroupDriverEnum:
       type: string
       enum:
@@ -12314,10 +12321,10 @@ components:
     SystemInfoIsolationEnum:
       type: string
       enum:
-      - EMPTY
       - default
       - hyperv
       - process
+      - EMPTY
     ThrottleDevice:
       type: object
       properties:
@@ -12332,26 +12339,6 @@ components:
           - 'null'
           format: int64
           description: Rate
-    ThrottlingData:
-      type: object
-      description: CPU throttling statistics.
-      required:
-      - periods
-      - throttled_periods
-      - throttled_time
-      properties:
-        periods:
-          type: integer
-          format: int64
-          minimum: 0
-        throttled_periods:
-          type: integer
-          format: int64
-          minimum: 0
-        throttled_time:
-          type: integer
-          format: int64
-          minimum: 0
     TlsInfo:
       type: object
       description: Information about the issuer of leaf TLS certificates and the trusted root CA certificate.
@@ -12406,9 +12393,9 @@ components:
           description: Enable Nginx file access logging for this target (disabled by default).
         Ssl:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/ProxySsl'
             description: SSL configuration for this target
+          - type: 'null'
       additionalProperties: false
     UriTarget:
       type: object
@@ -12779,9 +12766,9 @@ components:
           description: Default ssh key for the user
         InitContainer:
           oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerCreateBody'
             description: Action to run before the VM runtime container
+          - type: 'null'
         CloudInit:
           type:
           - boolean
@@ -12866,9 +12853,9 @@ components:
           description: Default ssh pub key for the user (recommended)
         InitContainer:
           oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerCreateBody'
             description: Action to run before the VM runtime container
+          - type: 'null'
         CloudInit:
           type:
           - boolean
@@ -12908,9 +12895,9 @@ components:
             type: string
         HostConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/VmHostConfig'
             description: A vm's resources (cpu, memory, network)
+          - type: 'null'
       additionalProperties: false
     VmSpecUpdate:
       type: object
@@ -12955,9 +12942,9 @@ components:
           description: Default ssh key for the user
         InitContainer:
           oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerCreateBody'
             description: Action to run before the VM runtime container
+          - type: 'null'
         CloudInit:
           type:
           - boolean
@@ -12992,9 +12979,9 @@ components:
             type: string
         HostConfig:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/VmHostConfigUpdate'
             description: A vm's resources (cpu, memory, network)
+          - type: 'null'
       additionalProperties: false
     VmSummary:
       type: object
@@ -13059,7 +13046,7 @@ components:
           type: string
           description: Node whose Docker daemon owns this network.
         Data:
-          $ref: '#/components/schemas/Network'
+          $ref: '#/components/schemas/NetworkInspect'
           description: Complete Docker network inspection response.
         Metadata:
           description: User-defined metadata retained across snapshot refreshes.

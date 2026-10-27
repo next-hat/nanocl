@@ -4,7 +4,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use bollard_next::container::{
+use bollard_next::query_parameters::{
   InspectContainerOptions, RemoveContainerOptions, RenameContainerOptions,
   StartContainerOptions, StopContainerOptions,
 };
@@ -615,7 +615,7 @@ async fn attach_process(
 async fn inspect_process(
   process_key: &str,
   state: &SystemState,
-) -> IoResult<bollard_next::service::ContainerInspectResponse> {
+) -> IoResult<bollard_next::models::ContainerInspectResponse> {
   Ok(
     state
       .inner
@@ -640,8 +640,9 @@ async fn start_process(process: &Process, state: &SystemState) -> IoResult<()> {
     state
       .inner
       .docker_api
-      .start_container(&process.key, None::<StartContainerOptions<String>>)
+      .start_container(&process.key, None::<StartContainerOptions>)
       .await
+      .map(|_| ())
       .map_err(|error| error.map_err_context(|| "StartCargoProcess"))?,
   )
 }
@@ -662,6 +663,7 @@ async fn stop_process(process: &Process, state: &SystemState) -> IoResult<()> {
       .docker_api
       .stop_container(&process.key, None::<StopContainerOptions>)
       .await
+      .map(|_| ())
       .map_err(|error| error.map_err_context(|| "StopCargoProcess"))?,
   )
 }
@@ -1153,7 +1155,7 @@ async fn rename_old_slots(
       .docker_api
       .rename_container(
         &slot.process.key,
-        RenameContainerOptions { name: &name },
+        RenameContainerOptions { name: name.clone() },
       )
       .await
       .map_err(|error| error.map_err_context(|| "RenameCargoProcess"))?;
@@ -1196,7 +1198,7 @@ async fn set_candidate_marker(
         .docker_api
         .rename_container(
           &slot.process.key,
-          RenameContainerOptions { name: &name },
+          RenameContainerOptions { name: name.clone() },
         )
         .await
         .map_err(|error| error.map_err_context(|| "MarkCargoCandidate"))?;
@@ -2567,7 +2569,7 @@ mod tests {
       direct_config
         .exposed_ports
         .as_ref()
-        .is_some_and(|ports| ports.contains_key("8080/tcp"))
+        .is_some_and(|ports| ports.contains(&"8080/tcp".to_owned()))
     );
 
     let mut shared = compilable_topology_cargo(2, 0, Some("private"));

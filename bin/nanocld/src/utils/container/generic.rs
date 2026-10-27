@@ -1,4 +1,4 @@
-use bollard_next::network::InspectNetworkOptions;
+use bollard_next::query_parameters::InspectNetworkOptions;
 use nanocl_error::{
   http::HttpResult,
   io::{IoError, IoResult},
@@ -188,7 +188,7 @@ pub async fn resolve_internal_gateway(
   let network_gateway = state
     .inner
     .docker_api
-    .inspect_network(&network_name, None::<InspectNetworkOptions<String>>)
+    .inspect_network(&network_name, None::<InspectNetworkOptions>)
     .await
     .map_err(|err| {
       IoError::interrupted(

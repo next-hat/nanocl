@@ -1,7 +1,7 @@
 use futures::{StreamExt, TryStreamExt, stream::select_all};
 use ntex::web;
 
-use bollard_next::container::LogsOptions;
+use bollard_next::query_parameters::LogsOptions;
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::{ProcessKind, ProcessLogQuery, ProcessOutputLog};
 
@@ -35,13 +35,13 @@ pub async fn logs_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
   log::debug!("process::logs_process: {name}");
-  let options: LogsOptions<String> = qs.into_inner().into();
+  let options = LogsOptions::from(qs.into_inner());
   let stream = state
     .inner
     .docker_api
     .logs(
       &name,
-      Some(LogsOptions::<String> {
+      Some(LogsOptions {
         stdout: true,
         stderr: true,
         ..options.clone()
@@ -94,7 +94,7 @@ pub async fn logs_processes(
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let processes =
     ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
-  let options: LogsOptions<String> = qs.into_inner().into();
+  let options = LogsOptions::from(qs.into_inner());
   let futures = processes
     .into_iter()
     .filter(|process| {
@@ -112,7 +112,7 @@ pub async fn logs_processes(
         .docker_api
         .logs(
           &process.data.id.unwrap_or_default(),
-          Some(LogsOptions::<String> {
+          Some(LogsOptions {
             stdout: true,
             stderr: true,
             ..options.clone()

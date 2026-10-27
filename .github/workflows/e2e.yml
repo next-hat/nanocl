@@ -31,6 +31,32 @@ jobs:
     steps:
       # Clone project
       - uses: actions/checkout@v7.0.1
+      # NanoCL mounts the runner socket, so upgrade that daemon before Buildx.
+      - name: Set up Docker Engine
+        env:
+          DOCKER_ENGINE_VERSION: "29.9.2"
+        run: |
+          # Configure the signed apt source explicitly on hosted runners.
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          . /etc/os-release
+          sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}
+          Components: stable
+          Architectures: $(dpkg --print-architecture)
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          package_version="$(apt-cache madison docker-ce | awk -v version="$DOCKER_ENGINE_VERSION" 'index($3, "5:" version "-") == 1 && !found {print $3; found = 1}')"
+          test -n "$package_version" || { echo "Docker Engine $DOCKER_ENGINE_VERSION is unavailable in the runner's apt repository" >&2; exit 1; }
+          sudo apt-get install --yes --no-install-recommends \
+            "docker-ce=$package_version" "docker-ce-cli=$package_version" containerd.io
+          sudo systemctl restart docker
+          test "$(docker --host unix:///var/run/docker.sock version --format '{{.Server.Version}}')" = "$DOCKER_ENGINE_VERSION"
+          curl --fail --silent --show-error --output /dev/null --unix-socket /var/run/docker.sock http://localhost/v1.53/info
       # Install buildx
       - name: Set up Docker Buildx
         id: buildx

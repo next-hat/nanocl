@@ -10,7 +10,9 @@ use ntex::{
 };
 use tokio::io::AsyncWriteExt;
 
-use bollard_next::container::{AttachContainerOptions, AttachContainerResults};
+use bollard_next::{
+  container::AttachContainerResults, query_parameters::AttachContainerOptions,
+};
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::OutputLog;
 
@@ -137,12 +139,12 @@ pub async fn attach_process(
     .docker_api
     .attach_container(
       &name,
-      Some(AttachContainerOptions::<String> {
-        stdin: Some(true),
-        stdout: Some(true),
-        stderr: Some(true),
-        stream: Some(true),
-        logs: Some(false),
+      Some(AttachContainerOptions {
+        stdin: true,
+        stdout: true,
+        stderr: true,
+        stream: true,
+        logs: false,
         detach_keys: Some("ctrl-c".to_owned()),
       }),
     )
