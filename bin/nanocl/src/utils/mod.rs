@@ -16,6 +16,8 @@ pub(crate) mod state_diff_pager;
 mod state_diff_text;
 pub mod state_output;
 pub mod state_progress;
+pub mod state_receipt;
+pub mod state_summary;
 
 #[cfg(test)]
 pub mod tests {
