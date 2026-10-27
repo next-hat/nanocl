@@ -415,22 +415,18 @@ pub struct ProcessLogQuery {
   pub stdout: Option<bool>,
 }
 
-/// Convert a log query without truncating Docker's signed 32-bit timestamps.
-impl TryFrom<ProcessLogQuery> for LogsOptions {
-  type Error = &'static str;
-
-  fn try_from(query: ProcessLogQuery) -> Result<Self, Self::Error> {
-    Ok(Self {
+/// Preserve Docker's signed 64-bit log timestamps.
+impl From<ProcessLogQuery> for LogsOptions {
+  fn from(query: ProcessLogQuery) -> Self {
+    Self {
       follow: query.follow.unwrap_or_default(),
       timestamps: query.timestamps.unwrap_or_default(),
-      since: i32::try_from(query.since.unwrap_or_default())
-        .map_err(|_| "since must fit in a signed 32-bit Unix timestamp")?,
-      until: i32::try_from(query.until.unwrap_or_default())
-        .map_err(|_| "until must fit in a signed 32-bit Unix timestamp")?,
+      since: query.since.unwrap_or_default(),
+      until: query.until.unwrap_or_default(),
       tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: query.stdout.unwrap_or(true),
       stderr: query.stdout.unwrap_or(true),
-    })
+    }
   }
 }
 
@@ -580,51 +576,39 @@ mod tests {
   };
 
   #[test]
-  fn process_log_timestamps_are_checked_at_docker_bounds() {
+  fn process_log_timestamps_preserve_signed_64_bit_values() {
     use bollard_next::query_parameters::LogsOptions;
 
-    let defaults = LogsOptions::try_from(ProcessLogQuery::default()).unwrap();
+    let defaults = LogsOptions::from(ProcessLogQuery::default());
     assert_eq!(defaults.since, 0);
     assert_eq!(defaults.until, 0);
     assert_eq!(defaults.tail, "all");
     assert!(defaults.stdout && defaults.stderr);
-    for timestamp in [i64::from(i32::MIN), -1, 0, i64::from(i32::MAX)] {
-      let options = LogsOptions::try_from(ProcessLogQuery {
+    for timestamp in [
+      i64::MIN,
+      i64::from(i32::MIN) - 1,
+      i64::from(i32::MIN),
+      -1,
+      0,
+      i64::from(i32::MAX),
+      i64::from(i32::MAX) + 1,
+      i64::MAX,
+    ] {
+      let options = LogsOptions::from(ProcessLogQuery {
         since: Some(timestamp),
         until: Some(timestamp),
         follow: Some(true),
         timestamps: Some(true),
         tail: Some("25".to_owned()),
         ..Default::default()
-      })
-      .unwrap();
-      assert_eq!(i64::from(options.since), timestamp);
-      assert_eq!(i64::from(options.until), timestamp);
+      });
+      assert_eq!(options.since, timestamp);
+      assert_eq!(options.until, timestamp);
+      let wire = serde_json::to_value(&options).unwrap();
+      assert_eq!(wire["since"].as_i64(), Some(timestamp));
+      assert_eq!(wire["until"].as_i64(), Some(timestamp));
       assert!(options.follow && options.timestamps);
       assert_eq!(options.tail, "25");
-    }
-    for timestamp in [
-      i64::from(i32::MIN) - 1,
-      i64::from(i32::MAX) + 1,
-      i64::MIN,
-      i64::MAX,
-    ] {
-      assert_eq!(
-        LogsOptions::try_from(ProcessLogQuery {
-          since: Some(timestamp),
-          ..Default::default()
-        })
-        .unwrap_err(),
-        "since must fit in a signed 32-bit Unix timestamp"
-      );
-      assert_eq!(
-        LogsOptions::try_from(ProcessLogQuery {
-          until: Some(timestamp),
-          ..Default::default()
-        })
-        .unwrap_err(),
-        "until must fit in a signed 32-bit Unix timestamp"
-      );
     }
   }
 

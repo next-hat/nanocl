@@ -35,8 +35,7 @@ pub async fn logs_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
   log::debug!("process::logs_process: {name}");
-  let options =
-    LogsOptions::try_from(qs.into_inner()).map_err(HttpError::bad_request)?;
+  let options = LogsOptions::from(qs.into_inner());
   let stream = state
     .inner
     .docker_api
@@ -95,8 +94,7 @@ pub async fn logs_processes(
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let processes =
     ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
-  let options =
-    LogsOptions::try_from(qs.into_inner()).map_err(HttpError::bad_request)?;
+  let options = LogsOptions::from(qs.into_inner());
   let futures = processes
     .into_iter()
     .filter(|process| {

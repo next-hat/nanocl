@@ -848,12 +848,13 @@ paths:
       - Nodes
       summary: Delete cargo instances on the node used for node to node communication
       operationId: delete_node_cargo
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteNodeCargoParams'
+      parameters:
+      - name: CargoKey
+        in: query
+        description: Canonical cargo key in {namespace}.{name} format
         required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Cargoes sucessfully deleted
@@ -8211,14 +8212,6 @@ components:
           - $ref: '#/components/schemas/SslConfig'
             description: Optional ssl configuration
           - type: 'null'
-    DeleteNodeCargoParams:
-      type: object
-      required:
-      - CargoKey
-      properties:
-        CargoKey:
-          type: string
-          description: Canonical cargo key in `{namespace}.{name}` format
     DeviceInfo:
       type: object
       description: DeviceInfo represents a device that can be used by a container.
