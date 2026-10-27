@@ -210,11 +210,15 @@ mod tests {
         secrets: 2,
       }
     );
-    assert_eq!(summary.cargoes[0].replicas, 2);
-    assert_eq!(
-      summary.cargoes[0].containers[0].image.as_deref(),
-      Some("web:v1")
-    );
+    let [web, store] = summary.cargoes.as_slice() else {
+      panic!("summary must retain both declared cargoes");
+    };
+    assert_eq!((web.name.as_str(), store.name.as_str()), ("web", "store"));
+    assert_eq!(web.replicas, 2);
+    let [app] = web.containers.as_slice() else {
+      panic!("web must retain its one declared application container");
+    };
+    assert_eq!(app.image.as_deref(), Some("web:v1"));
     assert!(!format_state_summary(&summary).contains("nested.yml"));
   }
 
@@ -300,14 +304,23 @@ mod tests {
       "/deploy/Statefile.yml",
     );
     let summary = summarize_state(&state, &state.location);
-    let containers = &summary.cargoes[0].containers;
-    assert!(containers[0].init);
-    assert_eq!(containers[0].name, "migrate");
-    assert_eq!(containers[1].healthcheck, "image_default");
-    assert_eq!(containers[2].healthcheck, "disabled");
-    assert!(!containers[2].essential);
-    assert_eq!(containers[3].healthcheck, "configured");
-    assert_eq!(containers[4].healthcheck, "image_default");
+    let [web] = summary.cargoes.as_slice() else {
+      panic!("summary must retain the declared cargo");
+    };
+    let [init, default, disabled, configured, inherited] =
+      web.containers.as_slice()
+    else {
+      panic!(
+        "summary must retain init and all four application containers in order"
+      );
+    };
+    assert!(init.init);
+    assert_eq!(init.name, "migrate");
+    assert_eq!(default.healthcheck, "image_default");
+    assert_eq!(disabled.healthcheck, "disabled");
+    assert!(!disabled.essential);
+    assert_eq!(configured.healthcheck, "configured");
+    assert_eq!(inherited.healthcheck, "image_default");
     let output = format_state_summary(&summary);
     assert!(output.contains(
       "init \"migrate\": image=\"web:v1\"; health=image default; must complete"
