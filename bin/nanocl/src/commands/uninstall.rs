@@ -1,7 +1,7 @@
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::stubs::statefile::Statefile;
 
-use bollard_next::container::{
+use bollard_next::query_parameters::{
   InspectContainerOptions, RemoveContainerOptions,
 };
 

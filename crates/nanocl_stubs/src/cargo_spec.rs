@@ -7,9 +7,8 @@ use std::collections::HashMap;
 #[cfg(feature = "serde")]
 use std::collections::{BTreeMap, HashSet};
 
-pub use bollard_next::{
-  container::Config,
-  models::{HealthConfig, HostConfig, PortBinding, PortMap},
+pub use bollard_next::models::{
+  ContainerCreateBody as Config, HealthConfig, HostConfig, PortBinding, PortMap,
 };
 
 #[cfg(feature = "utoipa")]
@@ -355,14 +354,20 @@ pub struct ContainerSpec {
 
 #[cfg(feature = "schemars")]
 fn strict_schemars_config_schema(
-  generator: &mut schemars::r#gen::SchemaGenerator,
-) -> schemars::schema::Schema {
+  generator: &mut schemars::SchemaGenerator,
+) -> schemars::Schema {
   use schemars::JsonSchema;
 
   let config_schema = Config::json_schema(generator);
-  let reference_prefix = generator.settings().definitions_path.clone();
-  let config_value = serde_json::to_value(&config_schema)
-    .expect("Bollard Config must serialize as a Schemars schema");
+  let reference_prefix = format!(
+    "#{}/",
+    generator
+      .settings()
+      .definitions_path
+      .trim_start_matches('#')
+      .trim_end_matches('/')
+  );
+  let config_value = config_schema.to_value();
 
   let mut reachable = BTreeSet::new();
   collect_schema_references(&config_value, &reference_prefix, &mut reachable);
@@ -371,10 +376,8 @@ fn strict_schemars_config_schema(
     let Some(schema) = generator.definitions().get(&name) else {
       continue;
     };
-    let schema = serde_json::to_value(schema)
-      .expect("Bollard definition must serialize as a Schemars schema");
     let mut nested = BTreeSet::new();
-    collect_schema_references(&schema, &reference_prefix, &mut nested);
+    collect_schema_references(schema, &reference_prefix, &mut nested);
     for name in nested {
       if reachable.insert(name.clone()) {
         pending.push(name);
@@ -391,20 +394,16 @@ fn strict_schemars_config_schema(
   let strict_definitions = strict_components
     .iter()
     .map(|name| {
-      let mut schema = serde_json::to_value(
-        generator
-          .definitions()
-          .get(name)
-          .expect("reachable Bollard definition must exist"),
-      )
-      .expect("Bollard definition must serialize as a Schemars schema");
+      let mut schema = generator
+        .definitions()
+        .get(name)
+        .expect("reachable Bollard definition must exist")
+        .clone();
       close_and_retarget_container_schema(
         &mut schema,
         &reference_prefix,
         &strict_components,
       );
-      let schema = serde_json::from_value(schema)
-        .expect("strict Bollard definition must remain a Schemars schema");
       (strict_container_component_name(name), schema)
     })
     .collect::<Vec<_>>();
@@ -426,26 +425,31 @@ fn strict_schemars_config_schema(
     &reference_prefix,
     &strict_components,
   );
-  serde_json::from_value(config_value)
+  schemars::Schema::try_from(config_value)
     .expect("strict Bollard Config must remain a Schemars schema")
 }
 
 #[cfg(feature = "schemars")]
 fn schemars_container_property<T: schemars::JsonSchema>(
-  generator: &mut schemars::r#gen::SchemaGenerator,
+  generator: &mut schemars::SchemaGenerator,
   description: &str,
   default: Option<serde_json::Value>,
-) -> schemars::schema::Schema {
-  let mut schema = generator.subschema_for::<T>().into_object();
-  schema.metadata().description = Some(description.to_owned());
-  schema.metadata().default = default;
-  schema.into()
+) -> schemars::Schema {
+  let mut schema = generator.subschema_for::<T>();
+  let object = schema.ensure_object();
+  object.insert("description".to_owned(), description.into());
+  if let Some(default) = default {
+    object.insert("default".to_owned(), default);
+  } else {
+    object.remove("default");
+  }
+  schema
 }
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for ContainerSpec {
-  fn schema_name() -> String {
-    "ContainerSpec".to_owned()
+  fn schema_name() -> std::borrow::Cow<'static, str> {
+    "ContainerSpec".into()
   }
 
   fn schema_id() -> std::borrow::Cow<'static, str> {
@@ -453,15 +457,15 @@ impl schemars::JsonSchema for ContainerSpec {
   }
 
   fn json_schema(
-    generator: &mut schemars::r#gen::SchemaGenerator,
-  ) -> schemars::schema::Schema {
-    let mut schema = strict_schemars_config_schema(generator).into_object();
-    schema.metadata().description = Some(
-      "Declaration of one named container in a multi-container Cargo."
-        .to_owned(),
+    generator: &mut schemars::SchemaGenerator,
+  ) -> schemars::Schema {
+    let mut schema = strict_schemars_config_schema(generator);
+    let object = schema.ensure_object();
+    object.insert(
+      "description".to_owned(),
+      "Declaration of one named container in a multi-container Cargo.".into(),
     );
-    let object = schema.object();
-    object.additional_properties = Some(Box::new(false.into()));
+    object.insert("additionalProperties".to_owned(), false.into());
 
     let fields = [
       (
@@ -505,19 +509,25 @@ impl schemars::JsonSchema for ContainerSpec {
         ),
       ),
     ];
+    let properties = object
+      .get_mut("properties")
+      .and_then(serde_json::Value::as_object_mut)
+      .expect("Bollard Config must expose its properties");
     for (name, field_schema) in fields {
       assert!(
-        object
-          .properties
-          .insert(name.to_owned(), field_schema)
+        properties
+          .insert(name.to_owned(), field_schema.to_value())
           .is_none(),
         "Bollard Config field {name:?} collides with ContainerSpec's Nanocl namespace"
       );
     }
     object
-      .required
-      .insert(NANOCL_CONTAINER_FIELDS[0].to_owned());
-    schema.into()
+      .entry("required")
+      .or_insert_with(|| serde_json::json!([]))
+      .as_array_mut()
+      .expect("Bollard Config required fields must be an array")
+      .push(NANOCL_CONTAINER_FIELDS[0].into());
+    schema
   }
 }
 
@@ -1652,13 +1662,17 @@ impl CargoSpecRevision {
   }
 }
 
-#[cfg(all(test, feature = "schemars"))]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
 
+  #[cfg(feature = "schemars")]
   #[test]
   fn nanocl_container_fields_do_not_collide_with_pinned_bollard_config() {
-    let schema = serde_json::to_value(schemars::schema_for!(Config)).unwrap();
+    let schema = schemars::generate::SchemaSettings::draft07()
+      .into_generator()
+      .into_root_schema_for::<Config>()
+      .to_value();
     let properties = schema["properties"]
       .as_object()
       .expect("Bollard Config schema must expose its properties");
@@ -1670,6 +1684,148 @@ mod tests {
         !properties.contains_key(field),
         "Bollard Config field {field:?} collides with ContainerSpec's Nanocl namespace"
       );
+    }
+  }
+
+  #[test]
+  fn container_docker_maps_keep_their_wire_shape_and_strict_fields() {
+    let value = serde_json::json!({
+      "Name": "app",
+      "Image": "example/app:latest",
+      "ExposedPorts": {"8080/tcp": {}},
+      "Volumes": {"/data": {}},
+      "HostConfig": {"Binds": ["/srv/data:/data"]}
+    });
+    let spec: ContainerSpec = serde_json::from_value(value.clone()).unwrap();
+    let _: &bollard_next::models::ContainerCreateBody = &spec.container_config;
+    assert_eq!(
+      spec.container_config.exposed_ports.as_deref(),
+      Some(["8080/tcp".to_owned()].as_slice())
+    );
+    assert_eq!(
+      spec.container_config.volumes.as_deref(),
+      Some(["/data".to_owned()].as_slice())
+    );
+    let encoded = serde_json::to_value(&spec).unwrap();
+    for field in ["ExposedPorts", "Volumes", "HostConfig"] {
+      assert_eq!(encoded[field], value[field], "{field}");
+    }
+    assert_eq!(encoded["Essential"], true);
+    assert_eq!(encoded["ImagePullPolicy"], "IfNotPresent");
+    let yaml = serde_yaml::to_string(&spec).unwrap();
+    assert_eq!(serde_yaml::from_str::<ContainerSpec>(&yaml).unwrap(), spec);
+
+    for invalid in [
+      serde_json::json!({"Name": "app", "Image": "image", "Imag": "typo"}),
+      serde_json::json!({"Name": "app", "Image": "image", "HostConfig": {"NetworkMdoe": "host"}}),
+      serde_json::json!({"Name": "app", "Image": "image", "ExposedPorts": ["8080/tcp"]}),
+      serde_json::json!({"Name": "app", "Image": "image", "Volumes": ["/data"]}),
+    ] {
+      assert!(serde_json::from_value::<ContainerSpec>(invalid).is_err());
+    }
+  }
+
+  #[cfg(any(feature = "schemars", feature = "utoipa"))]
+  fn assert_local_references(
+    document: &serde_json::Value,
+    value: &serde_json::Value,
+    prefix: &str,
+  ) {
+    match value {
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get("$ref").and_then(|v| v.as_str()) {
+          assert!(reference.starts_with(prefix), "{reference}");
+          assert!(document.pointer(&reference[1..]).is_some(), "{reference}");
+        }
+        for value in object.values() {
+          assert_local_references(document, value, prefix);
+        }
+      }
+      serde_json::Value::Array(values) => {
+        for value in values {
+          assert_local_references(document, value, prefix);
+        }
+      }
+      _ => {}
+    }
+  }
+
+  #[cfg(feature = "schemars")]
+  #[test]
+  fn container_schema_preserves_flattening_and_scoped_strict_references() {
+    use schemars::generate::SchemaSettings;
+
+    let mut custom = SchemaSettings::draft07();
+    custom.definitions_path = "#/components/schemas/".into();
+    for (settings, definitions, prefix) in [
+      (SchemaSettings::draft07(), "/definitions", "#/definitions/"),
+      (SchemaSettings::draft2020_12(), "/$defs", "#/$defs/"),
+      (custom, "/components/schemas", "#/components/schemas/"),
+    ] {
+      let schema = settings
+        .into_generator()
+        .into_root_schema_for::<ContainerSpec>()
+        .to_value();
+      assert_eq!(schema["type"], "object");
+      assert_eq!(schema["additionalProperties"], false);
+      assert_eq!(schema["required"], serde_json::json!(["Name"]));
+      assert!(schema.get("allOf").is_none());
+      let properties = schema["properties"].as_object().unwrap();
+      for field in ["Name", "Image", "Cmd", "HostConfig", "Healthcheck"] {
+        assert!(properties.contains_key(field), "{field}");
+      }
+      assert!(!properties.contains_key("Config"));
+      assert_eq!(properties["Essential"]["default"], true);
+      assert_eq!(properties["Secrets"]["default"], serde_json::json!([]));
+      assert_eq!(properties["ImagePullPolicy"]["default"], "IfNotPresent");
+      for field in ["ExposedPorts", "Volumes"] {
+        assert!(
+          properties[field]["additionalProperties"].is_object(),
+          "{field}"
+        );
+        assert!(properties[field].get("items").is_none(), "{field}");
+      }
+      assert_local_references(&schema, &schema, prefix);
+      let definitions = schema.pointer(definitions).unwrap();
+      for name in ["HostConfig", "HealthConfig"] {
+        let strict_name = strict_container_component_name(name);
+        assert_eq!(definitions[&strict_name]["additionalProperties"], false);
+        assert!(definitions[name].get("additionalProperties").is_none());
+      }
+    }
+  }
+
+  #[cfg(feature = "utoipa")]
+  #[test]
+  fn container_openapi_preserves_docker_maps_and_private_components() {
+    let schema =
+      serde_json::to_value(<ContainerSpec as utoipa::PartialSchema>::schema())
+        .unwrap();
+    assert_eq!(schema["type"], "object");
+    assert_eq!(schema["required"], serde_json::json!(["Name"]));
+    assert_eq!(schema["additionalProperties"], false);
+    assert!(schema.get("allOf").is_none());
+    for field in ["ExposedPorts", "Volumes"] {
+      let property = &schema["properties"][field];
+      assert!(property["additionalProperties"].is_object(), "{field}");
+      assert!(property.get("items").is_none(), "{field}");
+    }
+    let mut schemas = Vec::new();
+    <ContainerSpec as utoipa::ToSchema>::schemas(&mut schemas);
+    let schemas = schemas
+      .into_iter()
+      .map(|(name, schema)| (name, serde_json::to_value(schema).unwrap()))
+      .collect::<serde_json::Map<_, _>>();
+    let document = serde_json::json!({"components": {"schemas": schemas}});
+    assert_local_references(&document, &schema, "#/components/schemas/");
+    assert_local_references(&document, &document, "#/components/schemas/");
+    for name in ["HostConfig", "HealthConfig"] {
+      let schemas = &document["components"]["schemas"];
+      assert_eq!(
+        schemas[strict_container_component_name(name)]["additionalProperties"],
+        false
+      );
+      assert!(schemas[name].get("additionalProperties").is_none());
     }
   }
 }

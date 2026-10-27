@@ -2,7 +2,9 @@ use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
 use bollard_next::{
   container::LogOutput,
-  exec::{ResizeExecOptions, StartExecOptions, StartExecResults},
+  exec::{
+    CreateExecOptions, ResizeExecOptions, StartExecOptions, StartExecResults,
+  },
 };
 use futures::{StreamExt, future::ready};
 use ntex::{
@@ -360,7 +362,7 @@ pub async fn create_process_exec(
   let result = state
     .inner
     .docker_api
-    .create_exec(&name, payload.into_inner().into())
+    .create_exec(&name, CreateExecOptions::from(payload.into_inner()))
     .await?;
   Ok(web::HttpResponse::Created().json(&ProcessExecCreated::from(result)))
 }

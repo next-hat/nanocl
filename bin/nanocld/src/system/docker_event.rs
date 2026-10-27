@@ -6,10 +6,8 @@ use ntex::rt;
 use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
-  container::InspectContainerOptions,
-  models::ContainerInspectResponse,
-  service::{EventMessage, EventMessageTypeEnum},
-  system::EventsOptions,
+  models::{ContainerInspectResponse, EventMessage, EventMessageTypeEnum},
+  query_parameters::{EventsOptions, InspectContainerOptions},
 };
 use nanocl_stubs::system::{
   EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
@@ -776,8 +774,7 @@ pub fn analyze(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
     loop {
-      let mut streams =
-        state.inner.docker_api.events(None::<EventsOptions<String>>);
+      let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
       log::info!("event::analyze_docker: stream connected");
       let reconnect_state = state.clone();
       rt::spawn(async move {
@@ -809,7 +806,7 @@ pub fn analyze(state: &SystemState) {
 mod tests {
   use std::collections::HashMap;
 
-  use bollard_next::service::EventActor as DockerEventActor;
+  use bollard_next::models::EventActor as DockerEventActor;
 
   use super::*;
 

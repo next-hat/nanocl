@@ -1,6 +1,6 @@
 use std::{cell::RefCell, io, rc::Rc, time::Instant};
 
-use bollard_next::service::ContainerInspectResponse;
+use bollard_next::models::ContainerInspectResponse;
 use futures::future::{Either, select};
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{

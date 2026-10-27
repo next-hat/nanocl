@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, HashMap};
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use bollard_next::{
-  container::{InspectContainerOptions, ListContainersOptions},
-  service::ContainerInspectResponse,
+  models::ContainerInspectResponse,
+  query_parameters::{InspectContainerOptions, ListContainersOptions},
 };
 use nanocl_stubs::{
   cargo_spec::CARGO_CONTAINER_POSITION_LABEL,
@@ -444,7 +444,7 @@ pub async fn register_namespace(
 /// desired rows do not exist yet.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_processes: starting");
-  let options = Some(ListContainersOptions::<&str> {
+  let options = Some(ListContainersOptions {
     all: true,
     ..Default::default()
   });

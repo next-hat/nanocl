@@ -500,8 +500,8 @@ impl CargoReplicaProcessDb {
 mod tests {
   use std::fmt::Debug;
 
-  use bollard_next::{
-    container::Config as DockerConfig, service::ContainerInspectResponse,
+  use bollard_next::models::{
+    ContainerCreateBody as DockerConfig, ContainerInspectResponse,
   };
   use nanocl_stubs::{
     cargo_spec::{CargoSpec, ContainerSpec},

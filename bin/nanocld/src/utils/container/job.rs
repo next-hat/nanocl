@@ -1,8 +1,8 @@
 use futures::StreamExt;
 
 use bollard_next::{
-  container::{Config, StartContainerOptions, WaitContainerOptions},
-  secret::HostConfig,
+  models::{ContainerCreateBody as Config, HostConfig},
+  query_parameters::{StartContainerOptions, WaitContainerOptions},
 };
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
@@ -129,13 +129,13 @@ pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
     let _ = state
       .inner
       .docker_api
-      .start_container(&process.key, None::<StartContainerOptions<String>>)
+      .start_container(&process.key, None::<StartContainerOptions>)
       .await;
     // We currently run a sequential order so we wait for the container to finish to start the next one.
     let mut stream = state.inner.docker_api.wait_container(
       &process.key,
       Some(WaitContainerOptions {
-        condition: "not-running",
+        condition: "not-running".to_owned(),
       }),
     );
     while let Some(stream) = stream.next().await {

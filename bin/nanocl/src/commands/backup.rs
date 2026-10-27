@@ -1,4 +1,4 @@
-use bollard_next::{container::Config, secret::HostConfig};
+use bollard_next::models::{ContainerCreateBody as Config, HostConfig};
 use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::stubs::{
   cargo_spec::{CargoSpec, ContainerSpec},

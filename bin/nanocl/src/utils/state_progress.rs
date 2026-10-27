@@ -207,7 +207,9 @@ fn image_output<'a>(
   if !matches!(event.action.as_str(), "downloading" | "download") {
     return None;
   }
-  let error = state.and_then(|state| state.error.as_deref());
+  let error = state
+    .and_then(|state| state.error_detail.as_ref())
+    .and_then(|detail| detail.message.as_deref());
   let (status, error) = if event.kind == EventKind::Error || error.is_some() {
     (Some("failed"), error.or(event.note.as_deref()))
   } else if event.action == "download" {
@@ -235,7 +237,11 @@ pub(crate) fn image_output_record<'a>(
   status: Option<&'a str>,
   error: Option<&'a str>,
 ) -> StateOutputEvent<'a> {
-  let error = error.or_else(|| state.and_then(|state| state.error.as_deref()));
+  let error = error.or_else(|| {
+    state
+      .and_then(|state| state.error_detail.as_ref())
+      .and_then(|detail| detail.message.as_deref())
+  });
   let status = if error.is_some() {
     "failed"
   } else {
@@ -333,8 +339,9 @@ pub(crate) fn render_image_progress(
       bar
     });
   let status = state
-    .error
-    .as_deref()
+    .error_detail
+    .as_ref()
+    .and_then(|detail| detail.message.as_deref())
     .or(state.status.as_deref())
     .unwrap_or("Pulling image");
   bar.set_message(format!("{status} ({node})"));
@@ -913,8 +920,9 @@ mod tests {
       }))
     );
     event.kind = EventKind::Normal;
-    event.metadata =
-      Some(json!({"state": {"id": "layer-a", "error": "pull failed"}}));
+    event.metadata = Some(json!({"state": {
+      "id": "layer-a", "errorDetail": {"message": "pull failed"}
+    }}));
     let output =
       image_json(&event, "global.app", &EventActorKind::Cargo).unwrap();
     assert_eq!(output["status"], "failed");
@@ -945,6 +953,56 @@ mod tests {
   }
 
   #[test]
+  fn image_progress_error_detail_overrides_success_and_preserves_explicit_error()
+   {
+    let mut event = event();
+    event.action = "download".to_owned();
+    event.metadata.as_mut().unwrap()["state"]["status"] =
+      json!("Pull complete");
+    event.metadata.as_mut().unwrap()["state"]["errorDetail"] =
+      json!({"message": "registry denied"});
+    let state = image_state(&event).unwrap();
+    let failed =
+      image_json(&event, "global.app", &EventActorKind::Cargo).unwrap();
+    assert_eq!(failed["status"], "failed");
+    assert_eq!(failed["error"], "registry denied");
+    assert!(failed.get("current").is_none());
+    assert!(failed.get("total").is_none());
+
+    for explicit_error in [None, Some("operation failed")] {
+      let record = image_output_record(
+        "cargo/global.app",
+        "alpine:latest",
+        "node-a",
+        Some(&state),
+        Some("downloaded"),
+        explicit_error,
+      );
+      let record = serde_json::to_value(record).unwrap();
+      assert_eq!(record["status"], "failed");
+      assert_eq!(record["error"], explicit_error.unwrap_or("registry denied"));
+      assert!(record.get("current").is_none());
+      assert!(record.get("total").is_none());
+    }
+
+    let progress =
+      MultiProgress::with_draw_target(ProgressDrawTarget::hidden());
+    let summary = progress.add(ProgressBar::new(1));
+    let mut layers = HashMap::new();
+    render_image_progress(
+      "node-a",
+      "alpine:latest",
+      &state,
+      &progress,
+      &summary,
+      &mut layers,
+    );
+    let bar = layers.values().next().unwrap();
+    assert_eq!(bar.message(), "registry denied (node-a)");
+    clear_layers(&progress, &mut layers, None);
+  }
+
+  #[test]
   fn image_progress_direct_pull_records_match_state_events() {
     let mut event = event();
     for (metadata, expected) in [
@@ -968,7 +1026,9 @@ mod tests {
         }),
       ),
       (
-        json!({"state": {"id": "layer-a", "error": "pull failed"}}),
+        json!({"state": {
+          "id": "layer-a", "errorDetail": {"message": "pull failed"}
+        }}),
         json!({
           "type": "image", "resource": "cargo/global.app",
           "image": "alpine:latest", "node": "node-a", "layer": "layer-a",

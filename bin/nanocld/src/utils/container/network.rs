@@ -4,9 +4,9 @@ use std::{
 };
 
 use bollard_next::{
-  container::Config,
   errors::Error as DockerError,
-  network::{CreateNetworkOptions, InspectNetworkOptions, ListNetworksOptions},
+  models::{ContainerCreateBody as Config, NetworkCreateRequest},
+  query_parameters::{InspectNetworkOptions, ListNetworksOptions},
 };
 use futures::lock::Mutex;
 
@@ -77,17 +77,17 @@ fn has_status(err: &DockerError, expected: u16) -> bool {
 async fn inspect_network(
   name: &str,
   state: &SystemState,
-) -> Result<bollard_next::service::Network, DockerError> {
+) -> Result<bollard_next::models::NetworkInspect, DockerError> {
   state
     .inner
     .docker_api
-    .inspect_network(name, None::<InspectNetworkOptions<String>>)
+    .inspect_network(name, None::<InspectNetworkOptions>)
     .await
 }
 
 async fn persist_network(
   requested_name: &str,
-  network: bollard_next::service::Network,
+  network: bollard_next::models::NetworkInspect,
   state: &SystemState,
 ) -> IoResult<String> {
   let node_name = state.inner.config.hostname.clone();
@@ -143,7 +143,7 @@ fn missing_network_action<'a>(
 
 async fn persist_inspected_network(
   requested_name: &str,
-  network: bollard_next::service::Network,
+  network: bollard_next::models::NetworkInspect,
   state: &SystemState,
 ) -> IoResult<Option<String>> {
   let name = network
@@ -247,7 +247,9 @@ pub async fn reconcile_networks(state: &SystemState) -> IoResult<()> {
   let networks = state
     .inner
     .docker_api
-    .list_networks(Some(ListNetworksOptions { filters }))
+    .list_networks(Some(ListNetworksOptions {
+      filters: Some(filters),
+    }))
     .await
     .map_err(|err| {
       docker_error(err, "Unable to list Docker custom networks".to_owned())
@@ -311,15 +313,14 @@ async fn ensure_network_exists_unlocked(
         ("io.nanocl".to_owned(), "enabled".to_owned()),
         ("io.nanocl.kind".to_owned(), "network".to_owned()),
       ]);
-      let options = CreateNetworkOptions {
+      let options = NetworkCreateRequest {
         name: network_mode.to_owned(),
-        check_duplicate: true,
-        driver: "bridge".to_owned(),
-        internal: false,
-        attachable: true,
-        ingress: false,
-        enable_ipv6: false,
-        labels,
+        driver: Some("bridge".to_owned()),
+        internal: Some(false),
+        attachable: Some(true),
+        ingress: Some(false),
+        enable_ipv6: Some(false),
+        labels: Some(labels),
         ..Default::default()
       };
       match state.inner.docker_api.create_network(options).await {
@@ -413,7 +414,7 @@ mod tests {
     assert_eq!(container_network_mode(&default_container), DEFAULT_NETWORK);
 
     let host_container = Config {
-      host_config: Some(bollard_next::service::HostConfig {
+      host_config: Some(bollard_next::models::HostConfig {
         network_mode: Some("host".into()),
         ..Default::default()
       }),

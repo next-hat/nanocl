@@ -1,4 +1,4 @@
-use bollard_next::container::WaitContainerOptions;
+use bollard_next::query_parameters::WaitContainerOptions;
 use futures::StreamExt;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{cargo::Cargo, node::CargoReplicaTask, process::Process};
@@ -134,7 +134,7 @@ async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
   let mut stream = state.inner.docker_api.wait_container(
     &process.key,
     Some(WaitContainerOptions {
-      condition: "not-running",
+      condition: "not-running".to_owned(),
     }),
   );
   while let Some(status) = stream.next().await {

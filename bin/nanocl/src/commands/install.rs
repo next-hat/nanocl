@@ -2,8 +2,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bollard_next::{
-  container::{LogOutput, LogsOptions, StartContainerOptions},
-  network::{CreateNetworkOptions, InspectNetworkOptions},
+  container::LogOutput,
+  models::NetworkCreateRequest,
+  query_parameters::{
+    InspectNetworkOptions, LogsOptions, StartContainerOptions,
+  },
 };
 use futures::{StreamExt, stream::FuturesUnordered};
 use nix::unistd::Group;
@@ -152,19 +155,18 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
   if docker
-    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions>)
     .await
     .is_err()
   {
     docker
-      .create_network(CreateNetworkOptions {
-        name: "nanoclbr0",
-        check_duplicate: true,
-        driver: "bridge",
-        internal: false,
-        attachable: true,
-        ingress: false,
-        enable_ipv6: false,
+      .create_network(NetworkCreateRequest {
+        name: "nanoclbr0".to_owned(),
+        driver: Some("bridge".to_owned()),
+        internal: Some(false),
+        attachable: Some(true),
+        ingress: Some(false),
+        enable_ipv6: Some(false),
         ..Default::default()
       })
       .await
@@ -236,10 +238,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
               .await?;
           utils::progress::set_state_message(&pg, summary, "Starting", output)?;
           docker
-            .start_container(
-              &container.id,
-              None::<StartContainerOptions<String>>,
-            )
+            .start_container(&container.id, None::<StartContainerOptions>)
             .await
             .map_err(|err| {
               err.map_err_context(|| {
@@ -299,7 +298,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .map(move |cargo| {
         let docker_ptr = docker.clone();
         async move {
-          let opts = LogsOptions::<String> {
+          let opts = LogsOptions {
             follow: true,
             stdout: true,
             stderr: true,

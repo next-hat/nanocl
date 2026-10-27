@@ -7,7 +7,7 @@ pub mod server;
 pub(crate) mod tests {
   use std::sync::Arc;
 
-  use bollard_next::container::Config;
+  use bollard_next::models::ContainerCreateBody as Config;
   use nanocl_error::io::{FromIo, IoResult};
   pub use nanocl_utils::ntex::test_client::*;
 

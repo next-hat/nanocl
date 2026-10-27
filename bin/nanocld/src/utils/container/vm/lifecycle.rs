@@ -5,10 +5,10 @@ use std::{
 };
 
 use bollard_next::{
-  container::{
+  models::ContainerInspectResponse,
+  query_parameters::{
     StartContainerOptions, StopContainerOptions, WaitContainerOptions,
   },
-  models::ContainerInspectResponse,
 };
 use futures::StreamExt;
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -256,7 +256,7 @@ pub(crate) fn socket_directory(
   if matches.next().is_some()
     || mount.source.as_deref() != directory.to_str()
     || mount.rw != Some(true)
-    || mount.typ != Some(bollard_next::models::MountPointTypeEnum::BIND)
+    || mount.typ.as_deref() != Some("bind")
   {
     return Err(conflict(
       "VM runtime socket mount does not match its owner and generation",
@@ -334,7 +334,13 @@ async fn stop_runtime_before(
     state
       .inner
       .docker_api
-      .stop_container(&id, Some(StopContainerOptions { t: 0 }))
+      .stop_container(
+        &id,
+        Some(StopContainerOptions {
+          t: Some(0),
+          ..Default::default()
+        }),
+      )
       .await
       .map_err(|err| err.map_err_context(|| "VM force-stop"))?;
   } else {
@@ -351,7 +357,7 @@ async fn stop_runtime_before(
   let mut wait = state.inner.docker_api.wait_container(
     &id,
     Some(WaitContainerOptions {
-      condition: "not-running",
+      condition: "not-running".to_owned(),
     }),
   );
   // The enclosing stop_runtime deadline covers both the wait and inspection.
@@ -581,7 +587,7 @@ async fn complete_lifecycle<G: Clone + Send + 'static>(
         state
           .inner
           .docker_api
-          .start_container(&id, None::<StartContainerOptions<String>>)
+          .start_container(&id, None::<StartContainerOptions>)
           .await
           .map_err(|err| err.map_err_context(|| "VM restart"))?;
         let runtime = state
@@ -821,6 +827,11 @@ mod tests {
     changed = runtime.clone();
     changed.mounts.as_mut().unwrap()[0].rw = Some(false);
     assert!(socket_directory(&vm, &changed, "/").is_err());
+    for typ in [None, Some("volume"), Some("future-type")] {
+      let mut changed = runtime.clone();
+      changed.mounts.as_mut().unwrap()[0].typ = typ.map(str::to_owned);
+      assert!(socket_directory(&vm, &changed, "/").is_err());
+    }
     assert!(socket_directory(&vm, &runtime, "relative").is_err());
   }
 

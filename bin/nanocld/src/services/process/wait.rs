@@ -2,7 +2,7 @@ use futures::{StreamExt, TryStreamExt, stream::select_all};
 use ntex::web;
 
 use bollard_next::{
-  container::WaitContainerOptions, secret::ContainerWaitExitError,
+  models::ContainerWaitExitError, query_parameters::WaitContainerOptions,
 };
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::process::{ProcessWaitQuery, ProcessWaitResponse};
@@ -36,7 +36,7 @@ pub async fn wait_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let opts = WaitContainerOptions {
-    condition: qs.condition.clone().unwrap_or_default(),
+    condition: qs.condition.clone().unwrap_or_default().into(),
   };
   let processes =
     ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
@@ -106,7 +106,7 @@ pub async fn wait_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, name) = path.into_inner();
   let opts = WaitContainerOptions {
-    condition: qs.condition.clone().unwrap_or_default(),
+    condition: qs.condition.clone().unwrap_or_default().into(),
   };
   let stream = state
     .inner

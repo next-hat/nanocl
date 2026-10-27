@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use bollard_next::service::{
+use bollard_next::models::{
   ContainerInspectResponse, ContainerStateStatusEnum,
 };
 use nanocl_error::io::{IoError, IoResult};
@@ -75,8 +75,34 @@ impl CargoBootstrapProcess {
       .to_owned();
     let inspected = instance.config.clone().unwrap_or_default();
     let labels = inspected.labels.clone().unwrap_or_default();
-    let mut config: DockerConfig = inspected.into();
-    config.host_config.clone_from(&instance.host_config);
+    let config = DockerConfig {
+      hostname: inspected.hostname,
+      domainname: inspected.domainname,
+      user: inspected.user,
+      attach_stdin: inspected.attach_stdin,
+      attach_stdout: inspected.attach_stdout,
+      attach_stderr: inspected.attach_stderr,
+      exposed_ports: inspected.exposed_ports,
+      tty: inspected.tty,
+      open_stdin: inspected.open_stdin,
+      stdin_once: inspected.stdin_once,
+      env: inspected.env,
+      cmd: inspected.cmd,
+      healthcheck: inspected.healthcheck,
+      args_escaped: inspected.args_escaped,
+      image: inspected.image,
+      volumes: inspected.volumes,
+      working_dir: inspected.working_dir,
+      entrypoint: inspected.entrypoint,
+      network_disabled: inspected.network_disabled,
+      on_build: inspected.on_build,
+      labels: inspected.labels,
+      stop_signal: inspected.stop_signal,
+      stop_timeout: inspected.stop_timeout,
+      shell: inspected.shell,
+      host_config: instance.host_config.clone(),
+      networking_config: None,
+    };
     let status = instance.state.as_ref().and_then(|state| state.status);
     Ok(Self {
       process_key,
@@ -507,6 +533,14 @@ fn normalize_declared_config(
   let mut config = process.config.clone();
   config.networking_config = None;
   config.network_disabled = None;
+  // Docker encodes these as maps; the native models expose their keys as
+  // vectors whose inspection order must not change declaration equality.
+  for keys in [&mut config.exposed_ports, &mut config.volumes]
+    .into_iter()
+    .flatten()
+  {
+    keys.sort_unstable();
+  }
 
   if config.hostname.as_deref()
     == Some(
@@ -643,7 +677,7 @@ fn normalize_declared_config(
       ownership.port_bindings.as_ref(),
     )
   {
-    exposed.retain(|port, _| !port_bindings.contains_key(port));
+    exposed.retain(|port| !port_bindings.contains_key(port));
     if exposed.is_empty() {
       config.exposed_ports = None;
     }
@@ -949,7 +983,7 @@ pub(super) fn reconstruct_cargo(
 #[cfg(test)]
 mod tests {
   use bollard_next::models::{
-    ContainerConfig, ContainerState, EmptyObject, HostConfig, PortBinding,
+    ContainerConfig, ContainerState, HostConfig, PortBinding,
   };
 
   use super::*;
@@ -1060,15 +1094,25 @@ mod tests {
   #[test]
   fn docker_inspect_is_projected_into_the_reconstruction_observation() {
     let labels = HashMap::from([("io.nanocl.c".to_owned(), KEY.to_owned())]);
+    let inspected = ContainerConfig {
+      image: Some("alpine:latest".to_owned()),
+      labels: Some(labels.clone()),
+      env: Some(vec!["APP_MODE=production".to_owned()]),
+      user: Some("1000:1000".to_owned()),
+      entrypoint: Some(vec!["/entrypoint".to_owned()]),
+      cmd: Some(vec!["serve".to_owned()]),
+      exposed_ports: Some(vec!["8080/tcp".to_owned()]),
+      volumes: Some(vec!["/data".to_owned()]),
+      stop_signal: Some("SIGTERM".to_owned()),
+      stop_timeout: Some(12),
+      ..Default::default()
+    };
+    let expected_config = serde_json::to_value(&inspected).unwrap();
     let observed =
       CargoBootstrapProcess::from_inspect(&ContainerInspectResponse {
         id: Some("0123456789abcdef".to_owned()),
         name: Some("/system.bootstrap.c".to_owned()),
-        config: Some(ContainerConfig {
-          image: Some("alpine:latest".to_owned()),
-          labels: Some(labels.clone()),
-          ..Default::default()
-        }),
+        config: Some(inspected),
         host_config: Some(HostConfig {
           network_mode: Some(DEFAULT_NETWORK.to_owned()),
           ..Default::default()
@@ -1085,6 +1129,12 @@ mod tests {
     assert_eq!(observed.process_name, "system.bootstrap.c");
     assert_eq!(observed.labels, labels);
     assert_eq!(observed.config.image.as_deref(), Some("alpine:latest"));
+    let mut projected_config = serde_json::to_value(&observed.config).unwrap();
+    projected_config
+      .as_object_mut()
+      .unwrap()
+      .remove("HostConfig");
+    assert_eq!(projected_config, expected_config);
     assert_eq!(
       observed
         .config
@@ -1173,6 +1223,46 @@ mod tests {
         .iter()
         .all(|process| { process.role != CargoReplicaProcessRole::Sandbox })
     );
+  }
+
+  #[test]
+  fn replica_map_key_order_does_not_change_reconstructed_declarations() {
+    let mut first = direct_app(replica(1), 0, "api", "0", DEFAULT_NETWORK);
+    first.config.exposed_ports =
+      Some(vec!["9000/tcp".to_owned(), "8080/tcp".to_owned()]);
+    first.config.volumes = Some(vec!["/logs".to_owned(), "/data".to_owned()]);
+    let mut second = direct_app(replica(2), 1, "api", "0", DEFAULT_NETWORK);
+    second.config.exposed_ports =
+      Some(vec!["8080/tcp".to_owned(), "9000/tcp".to_owned()]);
+    second.config.volumes = Some(vec!["/data".to_owned(), "/logs".to_owned()]);
+
+    let reconstructed =
+      reconstruct_cargo(KEY, &[first.clone(), second.clone()])
+        .unwrap()
+        .unwrap();
+    assert_eq!(reconstructed.spec.replicas, 2);
+    let [container] = reconstructed.spec.containers.as_slice() else {
+      panic!("expected one shared application declaration");
+    };
+    assert_eq!(
+      container.container_config.exposed_ports.as_deref(),
+      Some(["8080/tcp".to_owned(), "9000/tcp".to_owned()].as_slice())
+    );
+    assert_eq!(
+      container.container_config.volumes.as_deref(),
+      Some(["/data".to_owned(), "/logs".to_owned()].as_slice())
+    );
+
+    for changed_field in ["ExposedPorts", "Volumes"] {
+      let mut changed = second.clone();
+      match changed_field {
+        "ExposedPorts" => changed.config.exposed_ports.as_mut().unwrap().pop(),
+        _ => changed.config.volumes.as_mut().unwrap().pop(),
+      };
+      let error =
+        reconstruct_cargo(KEY, &[first.clone(), changed]).unwrap_err();
+      assert!(error.to_string().contains("contradictory observed"));
+    }
   }
 
   #[test]
@@ -1676,10 +1766,7 @@ mod tests {
     let mut app = app(replica, 0, "bootstrap", "0");
     app.process_name = format!("{KEY}.c");
     app.config.env = Some(vec!["NANOCL_NODE=node-a".to_owned()]);
-    app.config.exposed_ports = Some(HashMap::from([(
-      "9443/tcp".to_owned(),
-      EmptyObject::default(),
-    )]));
+    app.config.exposed_ports = Some(vec!["9443/tcp".to_owned()]);
     let host = app.config.host_config.as_mut().unwrap();
     host.network_mode = Some(DEFAULT_NETWORK.to_owned());
     host.port_bindings = Some(bindings.clone());
@@ -1845,10 +1932,7 @@ mod tests {
       }]),
     )]);
     let mut custom = direct_app(replica, 0, "api", "0", "private-api");
-    custom.config.exposed_ports = Some(HashMap::from([(
-      "8080/tcp".to_owned(),
-      EmptyObject::default(),
-    )]));
+    custom.config.exposed_ports = Some(vec!["8080/tcp".to_owned()]);
     custom.config.host_config.as_mut().unwrap().port_bindings =
       Some(bindings.clone());
     let mut prepare = init(replica, 0, "prepare", "0");

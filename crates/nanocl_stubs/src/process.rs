@@ -4,13 +4,13 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use bollard_next::{
-  container::{
-    KillContainerOptions, LogOutput, LogsOptions, Stats, StatsOptions,
-  },
+  container::LogOutput,
   exec::{CreateExecOptions, CreateExecResults},
-  service::{
-    ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
+  models::{
+    ContainerInspectResponse, ContainerStatsResponse, ContainerWaitExitError,
+    ContainerWaitResponse,
   },
+  query_parameters::{KillContainerOptions, LogsOptions, StatsOptions},
 };
 
 /// Kind of process (Vm, Job, Cargo)
@@ -149,7 +149,7 @@ impl Default for ProcessKillOptions {
   }
 }
 
-impl From<ProcessKillOptions> for KillContainerOptions<String> {
+impl From<ProcessKillOptions> for KillContainerOptions {
   fn from(options: ProcessKillOptions) -> Self {
     Self {
       signal: options.signal,
@@ -415,18 +415,22 @@ pub struct ProcessLogQuery {
   pub stdout: Option<bool>,
 }
 
-/// Convert a ProcessLogQuery into a LogsOptions
-impl From<ProcessLogQuery> for LogsOptions<String> {
-  fn from(query: ProcessLogQuery) -> LogsOptions<String> {
-    LogsOptions::<String> {
+/// Convert a log query without truncating Docker's signed 32-bit timestamps.
+impl TryFrom<ProcessLogQuery> for LogsOptions {
+  type Error = &'static str;
+
+  fn try_from(query: ProcessLogQuery) -> Result<Self, Self::Error> {
+    Ok(Self {
       follow: query.follow.unwrap_or_default(),
       timestamps: query.timestamps.unwrap_or_default(),
-      since: query.since.unwrap_or_default(),
-      until: query.until.unwrap_or_default(),
+      since: i32::try_from(query.since.unwrap_or_default())
+        .map_err(|_| "since must fit in a signed 32-bit Unix timestamp")?,
+      until: i32::try_from(query.until.unwrap_or_default())
+        .map_err(|_| "until must fit in a signed 32-bit Unix timestamp")?,
       tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: query.stdout.unwrap_or(true),
       stderr: query.stdout.unwrap_or(true),
-    }
+    })
   }
 }
 
@@ -553,7 +557,7 @@ pub struct ProcessStatsQuery {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProcessStats {
   pub name: String,
-  pub stats: Stats,
+  pub stats: ContainerStatsResponse,
 }
 
 impl From<ProcessStatsQuery> for StatsOptions {
@@ -572,7 +576,77 @@ mod tests {
   use super::{
     Process, ProcessExecCreateOptions, ProcessExecCreated,
     ProcessExecInputControl, ProcessExecOutputControl, ProcessKillOptions,
+    ProcessLogQuery, ProcessStats,
   };
+
+  #[test]
+  fn process_log_timestamps_are_checked_at_docker_bounds() {
+    use bollard_next::query_parameters::LogsOptions;
+
+    let defaults = LogsOptions::try_from(ProcessLogQuery::default()).unwrap();
+    assert_eq!(defaults.since, 0);
+    assert_eq!(defaults.until, 0);
+    assert_eq!(defaults.tail, "all");
+    assert!(defaults.stdout && defaults.stderr);
+    for timestamp in [i64::from(i32::MIN), -1, 0, i64::from(i32::MAX)] {
+      let options = LogsOptions::try_from(ProcessLogQuery {
+        since: Some(timestamp),
+        until: Some(timestamp),
+        follow: Some(true),
+        timestamps: Some(true),
+        tail: Some("25".to_owned()),
+        ..Default::default()
+      })
+      .unwrap();
+      assert_eq!(i64::from(options.since), timestamp);
+      assert_eq!(i64::from(options.until), timestamp);
+      assert!(options.follow && options.timestamps);
+      assert_eq!(options.tail, "25");
+    }
+    for timestamp in [
+      i64::from(i32::MIN) - 1,
+      i64::from(i32::MAX) + 1,
+      i64::MIN,
+      i64::MAX,
+    ] {
+      assert_eq!(
+        LogsOptions::try_from(ProcessLogQuery {
+          since: Some(timestamp),
+          ..Default::default()
+        })
+        .unwrap_err(),
+        "since must fit in a signed 32-bit Unix timestamp"
+      );
+      assert_eq!(
+        LogsOptions::try_from(ProcessLogQuery {
+          until: Some(timestamp),
+          ..Default::default()
+        })
+        .unwrap_err(),
+        "until must fit in a signed 32-bit Unix timestamp"
+      );
+    }
+  }
+
+  #[test]
+  fn process_stats_preserve_docker_field_names_and_memory_counters() {
+    for stats in [
+      serde_json::json!({}),
+      serde_json::json!({
+        "name": "/app",
+        "cpu_stats": {"cpu_usage": {"total_usage": 123}, "online_cpus": 2},
+        "memory_stats": {"usage": 1024, "stats": {"cache": 128, "inactive_file": 64, "rss": 832}},
+        "networks": {"eth0": {"rx_bytes": 42}},
+        "blkio_stats": {"io_service_bytes_recursive": [{"op": "read", "value": 16}]},
+        "pids_stats": {"current": 3}
+      }),
+    ] {
+      let value = serde_json::json!({"Name": "app", "Stats": stats});
+      let process: ProcessStats =
+        serde_json::from_value(value.clone()).unwrap();
+      assert_eq!(serde_json::to_value(process).unwrap(), value);
+    }
+  }
 
   #[test]
   fn process_ip_address_preserves_wire_compatibility() {
@@ -661,6 +735,8 @@ mod tests {
     assert_eq!(docker_options.privileged, Some(false));
     assert_eq!(docker_options.user.as_deref(), Some("1000:1000"));
     assert_eq!(docker_options.working_dir.as_deref(), Some("/work"));
+    let native: bollard_next::models::ExecConfig = docker_options.into();
+    assert_eq!(serde_json::to_value(native).unwrap(), value);
   }
 
   #[test]

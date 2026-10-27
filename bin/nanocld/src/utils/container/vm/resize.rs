@@ -3,7 +3,7 @@ use std::{
   time::Duration,
 };
 
-use bollard_next::models::{ContainerInspectResponse, MountPointTypeEnum};
+use bollard_next::models::ContainerInspectResponse;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
@@ -151,6 +151,15 @@ fn same_boot_spec(current: &VmSpec, boot: &VmSpec) -> bool {
       .expect("VmSpec always has HostConfig");
     config.cpu = 0;
     config.memory = 0;
+    if let Some(init) = spec.init_container.as_mut() {
+      // Docker encodes these as maps, so key order is not a boot change.
+      for keys in [&mut init.exposed_ports, &mut init.volumes]
+        .into_iter()
+        .flatten()
+      {
+        keys.sort_unstable();
+      }
+    }
   }
   current == boot
 }
@@ -203,7 +212,7 @@ fn validate_disk_mount(
   if mounts.next().is_some()
     || mount.source.as_deref() != Some(vm.spec.image.as_str())
     || mount.rw != Some(true)
-    || mount.typ != Some(MountPointTypeEnum::BIND)
+    || mount.typ.as_deref() != Some("bind")
   {
     return Err(conflict(
       "VM disk bind mount does not match its specification",
@@ -700,6 +709,34 @@ mod tests {
   }
 
   #[test]
+  fn boot_identity_compares_init_container_maps_without_key_order() {
+    let mut boot = VmSpec::default();
+    boot.vm_key = "global.test".into();
+    boot.init_container = Some(bollard_next::models::ContainerCreateBody {
+      exposed_ports: Some(vec!["80/tcp".into(), "443/tcp".into()]),
+      volumes: Some(vec!["/data".into(), "/cache".into()]),
+      ..Default::default()
+    });
+    let mut current = boot.clone();
+    current.key = uuid::Uuid::new_v4();
+    current.host_config.cpu = 4;
+    current.host_config.memory = 2048;
+    let init = current.init_container.as_mut().unwrap();
+    init.exposed_ports.as_mut().unwrap().reverse();
+    init.volumes.as_mut().unwrap().reverse();
+    assert!(same_boot_spec(&current, &boot));
+
+    let equivalent = current.clone();
+    current.init_container.as_mut().unwrap().exposed_ports =
+      Some(vec!["80/tcp".into(), "8443/tcp".into()]);
+    assert!(!same_boot_spec(&current, &boot));
+    current = equivalent;
+    current.init_container.as_mut().unwrap().volumes =
+      Some(vec!["/data".into(), "/other".into()]);
+    assert!(!same_boot_spec(&current, &boot));
+  }
+
+  #[test]
   fn live_disk_requires_the_exact_writable_bind() {
     let mut vm = Vm::default();
     vm.spec.image = "/state/vm.qcow2".into();
@@ -714,6 +751,11 @@ mod tests {
     let mut readonly = runtime.clone();
     readonly.mounts.as_mut().unwrap()[0].rw = Some(false);
     assert!(validate_disk_mount(&vm, &readonly).is_err());
+    for typ in [None, Some("volume"), Some("future-type")] {
+      let mut changed = runtime.clone();
+      changed.mounts.as_mut().unwrap()[0].typ = typ.map(str::to_owned);
+      assert!(validate_disk_mount(&vm, &changed).is_err());
+    }
     let mut duplicate = runtime.clone();
     duplicate
       .mounts

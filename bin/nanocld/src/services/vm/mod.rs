@@ -377,9 +377,11 @@ mod tests {
       models::{ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, VmDb},
       repositories::generic::*,
     };
-    use bollard_next::container::{
-      Config, CreateContainerOptions, RemoveContainerOptions,
-      StartContainerOptions,
+    use bollard_next::{
+      models::ContainerCreateBody as Config,
+      query_parameters::{
+        CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
+      },
     };
     use futures::FutureExt;
     use nanocl_stubs::{
@@ -437,7 +439,7 @@ mod tests {
       let runtime = docker
         .create_container(
           Some(CreateContainerOptions {
-            name: format!("{key}.v"),
+            name: Some(format!("{key}.v")),
             ..Default::default()
           }),
           Config {
@@ -455,7 +457,7 @@ mod tests {
         .unwrap();
       runtime_id = Some(runtime.id.clone());
       docker
-        .start_container(&runtime.id, None::<StartContainerOptions<String>>)
+        .start_container(&runtime.id, None::<StartContainerOptions>)
         .await
         .unwrap();
       let inspect = docker.inspect_container(&runtime.id, None).await.unwrap();

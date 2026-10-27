@@ -30,7 +30,7 @@ pub use wait::*;
 /// Identify a managed VM before choosing a raw Docker lifecycle operation.
 /// Ambiguous VM metadata must never fall back to a Docker power cut.
 fn managed_vm_runtime_key(
-  runtime: &bollard_next::service::ContainerInspectResponse,
+  runtime: &bollard_next::models::ContainerInspectResponse,
   known_vm: bool,
 ) -> nanocl_error::http::HttpResult<Option<String>> {
   use nanocl_error::http::HttpError;
@@ -188,7 +188,7 @@ mod tests {
   #[test]
   fn managed_vm_lifecycle_classification_rejects_ambiguous_runtime() {
     let runtime = |name: &str, labels: serde_json::Value| {
-      serde_json::from_value::<bollard_next::service::ContainerInspectResponse>(
+      serde_json::from_value::<bollard_next::models::ContainerInspectResponse>(
         serde_json::json!({"Name": name, "Config": {"Labels": labels}}),
       )
       .unwrap()

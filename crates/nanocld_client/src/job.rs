@@ -56,7 +56,7 @@ impl NanocldClient {
   ///
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
-  /// use nanocld_client::bollard_next::container::Config;
+  /// use nanocld_client::bollard_next::models::ContainerCreateBody as Config;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.create_job(&JobPartial {
@@ -96,7 +96,7 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::Config;
+  use bollard_next::models::ContainerCreateBody as Config;
   use futures::StreamExt;
 
   use crate::ConnectOpts;
