@@ -11,6 +11,10 @@ The live `jobs` row references an immutable `specs` revision, a retained
 `resource_incarnations` row, and its current run. Specifications contain authored
 declarations and secret references before runtime secret injection. Resolved
 environment secrets and injected credentials are not stored in run history.
+Like Cargo and VM inspection, the returned `Spec` includes immutable revision
+metadata: `Key`, `JobKey`, `Version`, and `CreatedAt`. Jobs use their global name
+as `JobKey`. Authored `JobPartial` input contains only the declaration; revision
+metadata is assigned by the daemon and is also returned with retained run detail.
 
 Shared `operations` records describe start, stop, and delete requests. Start
 atomically commits its operation, run, ordered pending steps, pinned definition,

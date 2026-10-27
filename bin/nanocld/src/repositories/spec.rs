@@ -7,6 +7,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::{
   cargo_spec::{CargoSpec, CargoSpecRevision},
   generic::{GenericClause, GenericFilter},
+  job::{JobPartial, JobSpec},
   vm_spec::{VmSpec, VmSpecPartial},
 };
 
@@ -201,6 +202,24 @@ impl SpecDb {
     };
     Ok(spec)
   }
+
+  pub fn try_to_job_spec(&self) -> IoResult<JobSpec> {
+    let partial = serde_json::from_value::<JobPartial>(self.data.clone())?;
+    Ok(JobSpec {
+      key: self.key,
+      job_key: self.kind_key.clone(),
+      version: self.version.clone(),
+      created_at: self.created_at,
+      name: partial.name,
+      metadata: self.metadata.clone(),
+      secrets: partial.secrets,
+      schedule: partial.schedule,
+      ttl: partial.ttl,
+      containers: partial.containers,
+      image_pull_secret: partial.image_pull_secret,
+      image_pull_policy: partial.image_pull_policy,
+    })
+  }
 }
 
 #[cfg(test)]
@@ -215,6 +234,40 @@ mod tests {
   };
 
   use super::*;
+
+  #[test]
+  fn job_revision_reconstruction_preserves_declaration_and_metadata() {
+    let desired = JobPartial {
+      name: "scheduled-job".into(),
+      metadata: Some(serde_json::json!({"owner": "platform"})),
+      secrets: Some(vec!["database-credentials".into()]),
+      schedule: Some("@daily".into()),
+      ttl: Some(60),
+      image_pull_secret: Some("registry-credentials".into()),
+      image_pull_policy: Some(ImagePullPolicy::Always),
+      containers: vec![Config {
+        image: Some("busybox".into()),
+        cmd: Some(vec!["true".into()]),
+        ..Default::default()
+      }],
+    };
+    let stored = SpecDb {
+      key: uuid::Uuid::from_u128(1),
+      created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+      kind_name: "Job".into(),
+      kind_key: desired.name.clone(),
+      version: "v0.19".into(),
+      data: serde_json::to_value(&desired).unwrap(),
+      metadata: desired.metadata.clone(),
+      incarnation_key: Some(uuid::Uuid::from_u128(2)),
+    };
+    let revision = stored.try_to_job_spec().unwrap();
+    assert_eq!(revision.key, stored.key);
+    assert_eq!(revision.job_key, stored.kind_key);
+    assert_eq!(revision.version, stored.version);
+    assert_eq!(revision.created_at, stored.created_at);
+    assert_eq!(JobPartial::from(revision), desired);
+  }
 
   #[test]
   fn vm_cloud_init_user_data_survives_spec_persistence() {

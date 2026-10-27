@@ -253,6 +253,10 @@ mod tests {
           reason: None,
         },
         spec: JobSpec {
+          key: spec_key,
+          job_key: "backup".into(),
+          version: "v0.19".into(),
+          created_at: time,
           name: "backup".into(),
           ..Default::default()
         },
@@ -466,6 +470,10 @@ mod tests {
         instance_running: 0,
         instance_failed: 0,
         spec: JobSpec {
+          key: uuid::Uuid::from_u128(3),
+          job_key: "backup".into(),
+          version: "v0.19".into(),
+          created_at: time,
           name: "backup".into(),
           ..Default::default()
         },

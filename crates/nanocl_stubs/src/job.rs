@@ -75,14 +75,22 @@ impl JobPartial {
   }
 }
 
-/// A job specification is a collection of containers to run in sequence as a
-/// single unit to act like a command.
+/// Stored revision of a Job declaration, including immutable revision metadata.
+/// Its containers run in sequence as a single unit to act like a command.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobSpec {
+  /// Unique identifier of the immutable Job specification
+  pub key: uuid::Uuid,
+  /// Job resource key (Jobs are identified by their global name)
+  pub job_key: String,
+  /// Version of the specification
+  pub version: String,
+  /// Creation date of the specification revision
+  pub created_at: chrono::NaiveDateTime,
   /// Name of the job
   pub name: String,
   /// Secrets to load as environment variables
@@ -128,21 +136,6 @@ pub struct JobSpec {
 
 impl From<JobSpec> for JobPartial {
   fn from(spec: JobSpec) -> Self {
-    Self {
-      name: spec.name,
-      secrets: spec.secrets,
-      metadata: spec.metadata,
-      schedule: spec.schedule,
-      ttl: spec.ttl,
-      containers: spec.containers,
-      image_pull_secret: spec.image_pull_secret,
-      image_pull_policy: spec.image_pull_policy,
-    }
-  }
-}
-
-impl From<JobPartial> for JobSpec {
-  fn from(spec: JobPartial) -> Self {
     Self {
       name: spec.name,
       secrets: spec.secrets,
@@ -459,6 +452,59 @@ mod tests {
   }
 
   #[test]
+  fn job_spec_revision_metadata_stays_out_of_authored_input() {
+    let key = uuid::Uuid::from_u128(1);
+    let created_at = chrono::DateTime::UNIX_EPOCH.naive_utc();
+    let spec = JobSpec {
+      key,
+      job_key: "backup".into(),
+      version: "v0.19".into(),
+      created_at,
+      name: "backup".into(),
+      secrets: Some(vec!["database-credentials".into()]),
+      metadata: Some(serde_json::json!({"team": "storage"})),
+      schedule: Some("@daily".into()),
+      ttl: Some(60),
+      image_pull_secret: Some("registry-credentials".into()),
+      image_pull_policy: Some(crate::generic::ImagePullPolicy::IfNotPresent),
+      containers: vec![super::Config {
+        image: Some("busybox".into()),
+        cmd: Some(vec!["true".into()]),
+        ..Default::default()
+      }],
+    };
+    let revision = serde_json::to_value(&spec).unwrap();
+    assert_eq!(revision["Key"], key.to_string());
+    assert_eq!(revision["JobKey"], "backup");
+    assert_eq!(revision["Version"], "v0.19");
+    assert_eq!(
+      revision["CreatedAt"],
+      serde_json::to_value(created_at).unwrap()
+    );
+    assert_eq!(
+      serde_json::from_value::<JobSpec>(revision.clone()).unwrap(),
+      spec
+    );
+
+    let partial = JobPartial::from(spec);
+    let authored = serde_json::to_value(&partial).unwrap();
+    let mut declaration = revision.clone();
+    for field in ["Key", "JobKey", "Version", "CreatedAt"] {
+      assert!(authored.get(field).is_none());
+      declaration.as_object_mut().unwrap().remove(field);
+      let mut supplied = authored.clone();
+      supplied[field] = revision[field].clone();
+      assert!(serde_json::from_value::<JobPartial>(supplied).is_err());
+    }
+    assert_eq!(authored, declaration);
+    assert_eq!(
+      serde_json::from_value::<JobPartial>(authored.clone()).unwrap(),
+      partial
+    );
+    assert!(serde_json::from_value::<JobSpec>(authored).is_err());
+  }
+
+  #[test]
   fn job_deletion_query_preserves_no_run_and_rejects_unscoped_run() {
     let incarnation = uuid::Uuid::from_u128(1);
     let run = uuid::Uuid::from_u128(2);
@@ -585,6 +631,10 @@ mod tests {
         reason: None,
       },
       spec: JobSpec {
+        key,
+        job_key: "backup".into(),
+        version: "v0.19".into(),
+        created_at: accepted_at,
         name: "backup".into(),
         secrets: Some(vec!["database-credentials".into()]),
         ..Default::default()
@@ -631,6 +681,10 @@ mod tests {
       spec_key,
       current_run_key: Some(run_key),
       spec: JobSpec {
+        key: spec_key,
+        job_key: "backup".into(),
+        version: "v0.19".into(),
+        created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
         name: "backup".into(),
         ..Default::default()
       },

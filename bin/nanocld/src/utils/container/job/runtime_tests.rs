@@ -296,6 +296,7 @@ impl Fixture {
         containers: vec![container.clone(), container],
         ..Default::default()
       },
+      "v0.19",
       &state.inner.pool,
     )
     .await
@@ -682,9 +683,10 @@ async fn job_runtime_old_ttl_cannot_delete_successor_run_or_recreated_job() {
     ntex::time::sleep(Duration::from_millis(20)).await;
   }
   let partial: JobPartial = fixture.job.clone().into();
-  fixture.job = JobDb::create_with_spec(&partial, &fixture.state.inner.pool)
-    .await
-    .unwrap();
+  fixture.job =
+    JobDb::create_with_spec(&partial, "v0.19", &fixture.state.inner.pool)
+      .await
+      .unwrap();
   assert!(
     crate::tasks::job::delete_if_current(
       &fixture.job.spec.name,

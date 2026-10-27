@@ -9848,12 +9848,30 @@ components:
     JobSpec:
       type: object
       description: |-
-        A job specification is a collection of containers to run in sequence as a
-        single unit to act like a command.
+        Stored revision of a Job declaration, including immutable revision metadata.
+        Its containers run in sequence as a single unit to act like a command.
       required:
+      - Key
+      - JobKey
+      - Version
+      - CreatedAt
       - Name
       - Containers
       properties:
+        Key:
+          type: string
+          format: uuid
+          description: Unique identifier of the immutable Job specification
+        JobKey:
+          type: string
+          description: Job resource key (Jobs are identified by their global name)
+        Version:
+          type: string
+          description: Version of the specification
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the specification revision
         Name:
           type: string
           description: Name of the job

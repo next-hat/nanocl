@@ -1,22 +1,28 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
-  job::{Job, JobInspect, JobPartial},
+  job::{Job, JobInspect},
   system::NativeEventAction,
 };
 
-use crate::{models::JobDb, repositories::generic::*, utils};
+use crate::{
+  models::{JobDb, JobObjCreateIn},
+  repositories::generic::*,
+  utils,
+};
 
 use super::generic::*;
 
 impl ObjCreate for JobDb {
-  type ObjCreateIn = JobPartial;
+  type ObjCreateIn = JobObjCreateIn;
   type ObjCreateOut = Job;
 
   async fn fn_create_obj(
     obj: &Self::ObjCreateIn,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    let job = JobDb::create_with_spec(obj, &state.inner.pool).await?;
+    let job =
+      JobDb::create_with_spec(&obj.spec, &obj.version, &state.inner.pool)
+        .await?;
     if let Some(schedule) = &job.spec.schedule {
       utils::cron::add_cron_rule(&job, schedule, state).await?;
     }

@@ -132,7 +132,9 @@ mod tests {
       containers: vec![ContainerCreateBody::default(); 2],
       ..Default::default()
     };
-    let mut job = JobDb::create_with_spec(&original, pool).await.unwrap();
+    let mut job = JobDb::create_with_spec(&original, "v0.19", pool)
+      .await
+      .unwrap();
     let mut runs = Vec::new();
     for _ in 0..2 {
       let accepted =
@@ -237,6 +239,7 @@ mod tests {
         metadata: Some(serde_json::json!({"definition": "replacement"})),
         ..Default::default()
       },
+      "v0.19",
       pool,
     )
     .await
@@ -250,7 +253,12 @@ mod tests {
       assert_eq!(detail.run.state, JobRunState::Succeeded);
       assert_eq!(detail.run.incarnation_key, job.incarnation_key);
       assert_eq!(detail.run.spec_key, job.spec_key);
-      assert_eq!(detail.spec, original.clone().into());
+      assert_eq!(detail.spec.key, job.spec_key);
+      assert_eq!(detail.spec.job_key, name);
+      assert_eq!(detail.spec.version, "v0.19");
+      assert_eq!(detail.spec.created_at, job.spec.created_at);
+      assert_eq!(detail.spec, job.spec);
+      assert_eq!(JobPartial::from(detail.spec.clone()), original);
       assert_eq!(
         detail
           .steps

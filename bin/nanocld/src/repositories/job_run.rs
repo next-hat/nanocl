@@ -1,8 +1,7 @@
 use diesel::prelude::*;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::job::{
-  JobHistoryQuery, JobPartial, JobRun, JobRunInspect, JobRunOperation,
-  JobRunStep,
+  JobHistoryQuery, JobRun, JobRunInspect, JobRunOperation, JobRunStep,
 };
 
 use super::{
@@ -509,9 +508,7 @@ impl JobDb {
           .load::<JobRunStepDb>(conn)?;
         Ok(JobRunInspect {
           run: run.to_public()?,
-          spec: serde_json::from_value::<JobPartial>(spec.data)
-            .map_err(IoError::from)?
-            .into(),
+          spec: spec.try_to_job_spec()?,
           operation: JobRunOperation {
             key: op.key,
             incarnation_key: op.incarnation_key,
@@ -546,6 +543,7 @@ mod tests {
     utils::tests::{TestSystem, gen_test_system},
     vars,
   };
+  use nanocl_stubs::job::JobPartial;
 
   fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
 
@@ -564,9 +562,10 @@ mod tests {
         containers: vec![Default::default(), Default::default()],
         ..Default::default()
       };
-      let job = JobDb::create_with_spec(&partial, &system.state.inner.pool)
-        .await
-        .unwrap();
+      let job =
+        JobDb::create_with_spec(&partial, "v0.19", &system.state.inner.pool)
+          .await
+          .unwrap();
       Self {
         system,
         job,
@@ -805,9 +804,10 @@ mod tests {
     let mut replacement: JobPartial = fixture.job.clone().into();
     replacement.containers.clear();
     replacement.metadata = Some(serde_json::json!({"replacement":true}));
-    fixture.job = JobDb::create_with_spec(&replacement, fixture.pool())
-      .await
-      .unwrap();
+    fixture.job =
+      JobDb::create_with_spec(&replacement, "v0.19", fixture.pool())
+        .await
+        .unwrap();
     assert_ne!(fixture.job.incarnation_key, first.run.incarnation_key);
     assert_ne!(fixture.job.spec_key, first.run.spec_key);
     let retained =

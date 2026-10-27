@@ -239,6 +239,10 @@ mod tests {
       instance_running: 1,
       instance_failed: 1,
       spec: JobSpec {
+        key: uuid::Uuid::nil(),
+        job_key: "backup".to_owned(),
+        version: "v0.19".to_owned(),
+        created_at,
         name: "backup".to_owned(),
         ..Default::default()
       },

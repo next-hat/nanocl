@@ -11,7 +11,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobPartial, JobSpec, JobSummary},
+  job::{Job, JobPartial, JobSummary},
   process::ProcessKind,
   system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
 };
@@ -152,7 +152,6 @@ impl JobDb {
     spec: &SpecDb,
     status: &ObjPsStatusDb,
   ) -> IoResult<Job> {
-    let p = serde_json::from_value::<JobPartial>(spec.data.clone())?;
     Ok(Job {
       created_at: self.created_at,
       updated_at: self.updated_at,
@@ -160,21 +159,13 @@ impl JobDb {
       incarnation_key: self.incarnation_key,
       spec_key: self.spec_key,
       current_run_key: self.current_run_key,
-      spec: JobSpec {
-        name: self.key.clone(),
-        metadata: spec.metadata.clone(),
-        secrets: p.secrets.clone(),
-        schedule: p.schedule.clone(),
-        ttl: p.ttl,
-        containers: p.containers.clone(),
-        image_pull_secret: p.image_pull_secret.clone(),
-        image_pull_policy: p.image_pull_policy.clone(),
-      },
+      spec: spec.try_to_job_spec()?,
     })
   }
 
   pub(crate) async fn create_with_spec(
     p: &JobPartial,
+    version: &str,
     pool: &Pool,
   ) -> IoResult<Job> {
     use super::operation::{run_query_owned, transaction};
@@ -193,7 +184,7 @@ impl JobDb {
       created_at: now,
       kind_name: "Job".into(),
       kind_key: p.name.clone(),
-      version: crate::vars::VERSION.into(),
+      version: version.to_owned(),
       data: serde_json::to_value(p)?,
       metadata: p.metadata.clone(),
       incarnation_key: Some(identity.key),

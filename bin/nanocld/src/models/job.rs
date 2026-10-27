@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use nanocl_stubs::job::JobPartial;
 
 use crate::schema::jobs;
 
@@ -22,6 +23,12 @@ pub struct JobDb {
   pub incarnation_key: uuid::Uuid,
   /// Most recently accepted execution, including its retained terminal state.
   pub current_run_key: Option<uuid::Uuid>,
+}
+
+/// Arguments to create a Job with the request API version.
+pub struct JobObjCreateIn {
+  pub spec: JobPartial,
+  pub version: String,
 }
 
 /// This structure represent the update of a job.

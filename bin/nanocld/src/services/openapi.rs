@@ -206,6 +206,17 @@ mod tests {
       "#/components/schemas/JobRunInspect"
     );
     let schemas = &document["components"]["schemas"];
+    for field in ["Key", "JobKey", "Version", "CreatedAt"] {
+      assert!(schemas["JobSpec"]["properties"][field].is_object());
+      assert!(
+        schemas["JobSpec"]["required"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|required| required == field)
+      );
+      assert!(schemas["JobPartial"]["properties"].get(field).is_none());
+    }
     for model in ["Job", "JobInspect", "JobSummary"] {
       for field in ["IncarnationKey", "SpecKey", "CurrentRunKey"] {
         assert!(schemas[model]["properties"][field].is_object());
