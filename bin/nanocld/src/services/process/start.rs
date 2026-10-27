@@ -1,40 +1,8 @@
 use ntex::web;
 
-use bollard_next::query_parameters::StartContainerOptions;
 use nanocl_error::http::{HttpError, HttpResult};
 
-use crate::{
-  models::{ProcessDb, SystemState},
-  repositories::generic::*,
-  utils,
-};
-
-/// Start a single process by it's name or id
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Processes",
-  path = "/processes/{pk}/start",
-  params(
-    ("pk" = String, Path, description = "Pk of the process", example = "1234567890"),
-  ),
-  responses(
-    (status = 202, description = "Process instances started"),
-  ),
-))]
-pub async fn start_process_by_pk(
-  state: &SystemState,
-  _request_state: (),
-  path: web::types::Path<(String, String)>,
-) -> HttpResult<web::HttpResponse> {
-  let (_, pk) = path.into_inner();
-  let process = ProcessDb::read_by_pk(&pk, &state.inner.pool).await?;
-  state
-    .inner
-    .docker_api
-    .start_container(&process.key, None::<StartContainerOptions>)
-    .await?;
-  Ok(web::HttpResponse::Accepted().build())
-}
+use crate::{models::SystemState, utils};
 
 /// Start all processes for a kind and canonical resource key
 #[cfg_attr(feature = "dev", utoipa::path(

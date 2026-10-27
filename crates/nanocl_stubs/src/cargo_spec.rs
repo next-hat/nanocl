@@ -1717,6 +1717,7 @@ mod tests {
 
     for invalid in [
       serde_json::json!({"Name": "app", "Image": "image", "Imag": "typo"}),
+      serde_json::json!({"Name": "app", "Image": "image", "MacAddress": "02:42:ac:11:00:02"}),
       serde_json::json!({"Name": "app", "Image": "image", "HostConfig": {"NetworkMdoe": "host"}}),
       serde_json::json!({"Name": "app", "Image": "image", "ExposedPorts": ["8080/tcp"]}),
       serde_json::json!({"Name": "app", "Image": "image", "Volumes": ["/data"]}),
