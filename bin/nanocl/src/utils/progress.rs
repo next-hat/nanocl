@@ -6,7 +6,7 @@ use std::time::Duration;
 
 const PLAIN_WAIT_INTERVAL: Duration = Duration::from_secs(30);
 
-fn plain_elapsed(elapsed: Duration) -> String {
+pub(super) fn plain_elapsed(elapsed: Duration) -> String {
   let seconds = elapsed.as_secs();
   if seconds >= 3600 {
     format!(
@@ -281,7 +281,13 @@ where
     match image_actor {
       Some((client, key, kind)) => {
         super::state_progress::with_image_progress(
-          client, key, kind, progress, summary, output, operation,
+          client,
+          key,
+          kind,
+          (progress, summary),
+          &pg,
+          output,
+          operation,
         )
         .await
       }

@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use futures::{StreamExt, stream::FuturesUnordered};
 use indicatif::{MultiProgress, ProgressBar};
 use serde_json::Value;
@@ -16,7 +18,8 @@ use nanocld_client::stubs::{
 use crate::{
   config::CliConfig,
   models::{
-    StateApplyOpts, StateLogsOpts, StateOutput, StateOutputEvent, StateRef,
+    StateApplyOpts, StateCargoReceipt, StateLogsOpts, StateOutput,
+    StateOutputEvent, StateRef,
   },
   utils::{self, cargo::cargo_spec_from_revision},
 };
@@ -116,7 +119,7 @@ async fn report_cargo_receipt(
   token: &str,
   progress: &MultiProgress,
   output: Option<&StateOutput>,
-) -> IoResult<()> {
+) {
   let inspect = tokio::time::timeout(
     std::time::Duration::from_secs(5),
     client.inspect_cargo(key),
@@ -128,28 +131,58 @@ async fn report_cargo_receipt(
     }
     _ => None,
   };
-  if let Some(output) = output {
-    output.emit(StateOutputEvent::CargoReceipt {
-      resource: token,
-      status: if receipt.is_some() {
-        "observed"
-      } else {
-        "unavailable"
-      },
-      receipt: receipt.as_ref(),
-    })?;
+  if output.is_some() {
+    write_cargo_receipt(
+      token,
+      receipt.as_ref(),
+      progress,
+      output,
+      &mut io::stdout().lock(),
+    );
   } else {
-    let line = receipt.as_ref().map_or_else(
+    write_cargo_receipt(
+      token,
+      receipt.as_ref(),
+      progress,
+      None,
+      &mut io::stderr(),
+    );
+  }
+}
+
+fn write_cargo_receipt(
+  token: &str,
+  receipt: Option<&StateCargoReceipt>,
+  progress: &MultiProgress,
+  output: Option<&StateOutput>,
+  writer: &mut impl Write,
+) {
+  // Receipts are optional observations. Their output must not interrupt later
+  // Statefile items or replace an already completed operation's result.
+  if let Some(output) = output {
+    let _ = output.write_to(
+      writer,
+      StateOutputEvent::CargoReceipt {
+        resource: token,
+        status: if receipt.is_some() {
+          "observed"
+        } else {
+          "unavailable"
+        },
+        receipt,
+      },
+    );
+  } else {
+    let line = receipt.map_or_else(
       || format!("  {token}  Current snapshot unavailable; use nanocl state status to inspect"),
       utils::state_receipt::format_cargo_receipt,
     );
     if progress.is_hidden() {
-      eprintln!("{line}");
+      let _ = writeln!(writer, "{line}");
     } else {
-      progress.println(line)?;
+      let _ = progress.println(line);
     }
   }
-  Ok(())
 }
 
 async fn state_apply(
@@ -320,7 +353,7 @@ async fn state_apply(
         },
       )
       .await?;
-      report_cargo_receipt(client, &key, &token, progress, output).await?;
+      report_cargo_receipt(client, &key, &token, progress, output).await;
     }
   }
 
@@ -660,6 +693,117 @@ mod tests {
   use ntex::{util::Bytes, web};
 
   use super::*;
+
+  struct FailingReceiptWriter {
+    fail_on_flush: bool,
+    writes: usize,
+    flushes: usize,
+  }
+
+  impl Write for FailingReceiptWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+      self.writes += 1;
+      if self.fail_on_flush {
+        Ok(bytes.len())
+      } else {
+        Err(io::Error::new(
+          io::ErrorKind::BrokenPipe,
+          "closed receipt sink",
+        ))
+      }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+      self.flushes += 1;
+      Err(io::Error::new(
+        io::ErrorKind::BrokenPipe,
+        "closed receipt sink",
+      ))
+    }
+  }
+
+  #[test]
+  fn optional_cargo_receipt_ignores_write_and_flush_failures() {
+    let progress =
+      MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let receipt = StateCargoReceipt {
+      resource: "cargo/global.web".to_owned(),
+      revision: "revision".to_owned(),
+      running: 0,
+      total: 0,
+      processes: Vec::new(),
+    };
+    for receipt in [Some(&receipt), None] {
+      for output in [Some(&output), None] {
+        for fail_on_flush in [false, true] {
+          let mut writer = FailingReceiptWriter {
+            fail_on_flush,
+            writes: 0,
+            flushes: 0,
+          };
+          write_cargo_receipt(
+            "cargo/global.web",
+            receipt,
+            &progress,
+            output,
+            &mut writer,
+          );
+          assert!(writer.writes > 0);
+          assert_eq!(
+            writer.flushes,
+            usize::from(output.is_some() && fail_on_flush),
+          );
+          // Required output retains its existing error contract.
+          if let Some(output) = output {
+            assert!(
+              output
+                .write_to(
+                  &mut writer,
+                  StateOutputEvent::Result {
+                    success: true,
+                    error: None,
+                  }
+                )
+                .is_err()
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn optional_cargo_receipt_writes_json_and_plain_snapshots() {
+    let progress =
+      MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let mut bytes = Vec::new();
+    write_cargo_receipt(
+      "cargo/global.web",
+      None,
+      &progress,
+      Some(&output),
+      &mut bytes,
+    );
+    let record: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(record["type"], "cargo_receipt");
+    assert_eq!(record["resource"], "cargo/global.web");
+    assert_eq!(record["status"], "unavailable");
+    assert!(record.get("success").is_none());
+    bytes.clear();
+    write_cargo_receipt("cargo/global.web", None, &progress, None, &mut bytes);
+    assert_eq!(
+      String::from_utf8(bytes).unwrap(),
+      "  cargo/global.web  Current snapshot unavailable; use nanocl state status to inspect\n"
+    );
+  }
 
   struct VmApplyRequests {
     paths: Vec<String>,

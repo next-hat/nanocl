@@ -40,7 +40,7 @@ revision, running application processes, effective health status and image IDs.
 Image IDs are not registry manifest digests. Disabled checks are distinguished
 from unavailable health information. The snapshot is an observation, not an
 extra readiness gate or a guarantee that no concurrent update occurred. A
-failed or timed-out snapshot does not fail an otherwise successful apply;
+failed or timed-out snapshot, or a failure to write it, does not fail apply;
 use **nanocl state status** to inspect current state. Existing apply completion
 and exit-code semantics are unchanged.
 

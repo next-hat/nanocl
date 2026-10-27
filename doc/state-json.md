@@ -25,6 +25,9 @@ In particular, `observed ...` statuses describe daemon events while the
 operation remains pending. An observed healthy candidate does not establish
 rollout completion. Wait for the existing item and command result records and
 check the process exit code. Stream loss is not evidence of successful apply.
+All phases of an item use the same elapsed-time clock. Consecutive identical
+observations from the same actor and node are suppressed; health recovery and
+observations from other candidates remain visible.
 
 The `summary` object contains `source`, `namespace`, `group`, `explicit_group`,
 `counts` and `cargoes`. Counts cover `cargoes`, `virtual_machines`, `jobs`,
@@ -43,8 +46,9 @@ are Docker image IDs, not registry manifest digests. A receipt never carries
 `success`: it is a snapshot, may reflect concurrent changes, and does not
 override the operation result. The single inspection is limited to five
 seconds; failure or timeout produces `unavailable`, without changing successful
-apply into failure. No container environment, health command or health log is
-included.
+apply into failure. Receipt output errors are also ignored so they cannot stop
+later Statefile items; required progress and result records retain their output
+error handling. No container environment, health command or health log is included.
 
 ```sh
 nanocl state apply -s https://example.org/Statefile.yml -y --json

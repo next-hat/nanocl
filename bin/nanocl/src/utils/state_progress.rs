@@ -1,8 +1,4 @@
-use std::{
-  collections::{HashMap, HashSet},
-  future::Future,
-  time::{Duration, Instant},
-};
+use std::{collections::HashMap, future::Future, time::Duration};
 
 use bollard_next::models::CreateImageInfo;
 use futures::{StreamExt, future::Either};
@@ -139,7 +135,7 @@ fn rollout_output<'a>(
   resource: &'a str,
   phase: &'static str,
   summary: &ProgressBar,
-  elapsed: Duration,
+  item: &ProgressBar,
 ) -> StateOutputEvent<'a> {
   StateOutputEvent::Item {
     resource,
@@ -147,9 +143,46 @@ fn rollout_output<'a>(
     completed: summary.position(),
     total: summary.length().unwrap_or(0),
     success: None,
-    elapsed_ms: elapsed.as_millis() as u64,
+    elapsed_ms: item.elapsed().as_millis() as u64,
     error: None,
   }
+}
+
+fn next_rollout_phase(
+  event: &Event,
+  key: &str,
+  kind: &EventActorKind,
+  previous: &mut Option<(String, EventActorKind, String, &'static str)>,
+) -> Option<&'static str> {
+  let phase = rollout_phase(event, key, kind)?;
+  let actor = event.actor.as_ref()?;
+  let actor_key = actor.key.as_deref()?;
+  if previous.as_ref().is_some_and(|(node, kind, key, last)| {
+    node == &event.reporting_node
+      && kind == &actor.kind
+      && key == actor_key
+      && *last == phase
+  }) {
+    return None;
+  }
+  *previous = Some((
+    event.reporting_node.clone(),
+    actor.kind.clone(),
+    actor_key.to_owned(),
+    phase,
+  ));
+  Some(phase)
+}
+
+fn plain_rollout_line(
+  resource: &str,
+  phase: &str,
+  elapsed: Duration,
+) -> String {
+  format!(
+    "  {resource}  {phase} [{}; awaiting operation completion]",
+    super::progress::plain_elapsed(elapsed)
+  )
 }
 
 fn byte_progress(state: &CreateImageInfo) -> Option<(u64, u64)> {
@@ -357,11 +390,12 @@ pub async fn with_image_progress<T>(
   client: &NanocldClient,
   key: &str,
   kind: EventActorKind,
-  progress: &MultiProgress,
-  summary: &ProgressBar,
+  progress: (&MultiProgress, &ProgressBar),
+  item: &ProgressBar,
   output: Option<&StateOutput>,
   operation: impl Future<Output = IoResult<T>>,
 ) -> IoResult<T> {
+  let (progress, summary) = progress;
   if output.is_none() && progress.is_hidden() && kind != EventActorKind::Cargo {
     return operation.await;
   }
@@ -384,10 +418,9 @@ pub async fn with_image_progress<T>(
   let mut events = response;
   let mut buffer = Vec::new();
   let mut layers = HashMap::new();
-  // A fixed set of phase strings keeps observation output and memory bounded,
-  // even if health events repeat or arrive out of order across replicas.
-  let mut observed_phases = HashSet::new();
-  let started = Instant::now();
+  // Retain only the last observation: repeated identical events are quiet,
+  // but recovery and the same phase on another candidate remain visible.
+  let mut previous_observation = None;
   let resource = format!("{}/{key}", kind.to_string().to_lowercase());
   futures::pin_mut!(operation);
   let result = 'observe: loop {
@@ -398,23 +431,17 @@ pub async fn with_image_progress<T>(
           break None;
         };
         for event in events {
-          if let Some(phase) = rollout_phase(&event, key, &kind)
-            && observed_phases.insert(phase)
+          if let Some(phase) =
+            next_rollout_phase(&event, key, &kind, &mut previous_observation)
           {
             if let Some(output) = output {
-              if let Err(err) = output.emit(rollout_output(
-                &resource,
-                phase,
-                summary,
-                started.elapsed(),
-              )) {
+              if let Err(err) =
+                output.emit(rollout_output(&resource, phase, summary, item))
+              {
                 break 'observe Some(Err(err));
               }
             } else {
-              let line = format!(
-                "  {resource}  {phase} [{}s; awaiting operation completion]",
-                started.elapsed().as_secs()
-              );
+              let line = plain_rollout_line(&resource, phase, item.elapsed());
               if progress.is_hidden() {
                 eprintln!("{line}");
               } else {
@@ -548,19 +575,23 @@ mod tests {
     let summary = ProgressBar::hidden();
     summary.set_length(3);
     summary.set_position(1);
+    let item = ProgressBar::hidden().with_elapsed(Duration::from_secs(2));
+    let before = item.elapsed().as_millis() as u64;
     let output = serde_json::to_value(rollout_output(
       "cargo/global.app",
       phase,
       &summary,
-      Duration::from_secs(2),
+      &item,
     ))
     .unwrap();
+    let elapsed = output["elapsed_ms"].as_u64().unwrap();
+    assert!((before..=item.elapsed().as_millis() as u64).contains(&elapsed));
     assert_eq!(
       output,
       json!({
         "type": "item", "resource": "cargo/global.app",
         "status": "observed cargo healthy", "completed": 1,
-        "total": 3, "elapsed_ms": 2000
+        "total": 3, "elapsed_ms": elapsed
       })
     );
     assert_eq!(summary.position(), 1);
@@ -583,6 +614,104 @@ mod tests {
       rollout_phase(&failed, "global.app", &EventActorKind::Cargo),
       Some("observed cargo failure")
     );
+  }
+
+  #[test]
+  fn rollout_observations_suppress_only_consecutive_identical_phases() {
+    let mut previous = None;
+    let mut event = candidate_event("app", "update");
+    let name = event
+      .actor
+      .as_ref()
+      .unwrap()
+      .key
+      .as_deref()
+      .unwrap()
+      .to_owned();
+    for (health, expected) in [
+      ("healthy", "observed candidate healthy"),
+      ("unhealthy", "observed candidate health unhealthy"),
+      ("healthy", "observed candidate healthy"),
+    ] {
+      event.note = Some(format!("process {name} health_status: {health}"));
+      assert_eq!(
+        next_rollout_phase(
+          &event,
+          "global.app",
+          &EventActorKind::Cargo,
+          &mut previous
+        ),
+        Some(expected)
+      );
+      assert!(
+        next_rollout_phase(
+          &event,
+          "global.app",
+          &EventActorKind::Cargo,
+          &mut previous
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
+  fn rollout_observations_preserve_distinct_candidates_and_nodes() {
+    let first = candidate_event("app", "start");
+    let mut second = first.clone();
+    let actor = second.actor.as_mut().unwrap();
+    let name = "global.app-r1-api-ghijkl.candidate.c";
+    actor.key = Some(name.to_owned());
+    let attributes = actor.attributes.as_mut().unwrap();
+    attributes["name"] = json!(name);
+    attributes["io.nanocl.cargo.replica-ordinal"] = json!("1");
+    attributes["io.nanocl.cargo.replica"] =
+      json!("edb8fabc-4621-4e88-9a65-cd12b14359d2");
+    let mut another_node = second.clone();
+    another_node.reporting_node = "node-b".to_owned();
+    let mut previous = None;
+    for event in [&first, &second, &another_node, &first] {
+      assert_eq!(
+        next_rollout_phase(
+          event,
+          "global.app",
+          &EventActorKind::Cargo,
+          &mut previous
+        ),
+        Some("observed candidate app started")
+      );
+    }
+  }
+
+  #[test]
+  fn rollout_observations_use_the_item_clock_and_shared_elapsed_format() {
+    let summary = ProgressBar::hidden();
+    let item = ProgressBar::hidden();
+    for elapsed in [Duration::from_secs(62), Duration::from_secs(3723)] {
+      item.set_elapsed(elapsed);
+      let before = item.elapsed().as_millis() as u64;
+      let output = serde_json::to_value(rollout_output(
+        "cargo/global.app",
+        "observed cargo healthy",
+        &summary,
+        &item,
+      ))
+      .unwrap();
+      let observed = output["elapsed_ms"].as_u64().unwrap();
+      assert!((before..=item.elapsed().as_millis() as u64).contains(&observed));
+    }
+    for (seconds, formatted) in [(62, "1m 02s"), (3723, "1h 02m 03s")] {
+      assert_eq!(
+        plain_rollout_line(
+          "cargo/global.app",
+          "observed cargo healthy",
+          Duration::from_secs(seconds)
+        ),
+        format!(
+          "  cargo/global.app  observed cargo healthy [{formatted}; awaiting operation completion]"
+        )
+      );
+    }
   }
 
   #[test]
