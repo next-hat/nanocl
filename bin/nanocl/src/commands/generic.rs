@@ -194,15 +194,38 @@ where
         "jobs" => Some(EventActorKind::Job),
         _ => None,
       };
+      let mut job_identity = None;
       let waiter = match waiter_kind {
         Some(kind) => {
-          let waiter = utils::process::wait_process_state(
-            key,
-            kind,
-            vec![NativeEventAction::Destroy],
-            client,
-          )
-          .await;
+          let waiter = if object_name == "jobs" {
+            match client.inspect_job(key).await {
+              Ok(job) => {
+                job_identity = Some((job.incarnation_key, job.current_run_key));
+                utils::process::wait_job_deletion(
+                  key,
+                  job.incarnation_key,
+                  job.current_run_key,
+                  client,
+                )
+                .await
+              }
+              Err(HttpClientError::HttpError(error))
+                if error.status == StatusCode::NOT_FOUND =>
+              {
+                finish("Unchanged", false, None)?;
+                continue;
+              }
+              Err(error) => Err(error.into()),
+            }
+          } else {
+            utils::process::wait_process_state(
+              key,
+              kind,
+              vec![NativeEventAction::Destroy],
+              client,
+            )
+            .await
+          };
           match waiter {
             Ok(waiter) => Some(waiter),
             Err(err) => {
@@ -213,13 +236,18 @@ where
         }
         None => None,
       };
-      if let Err(err) = client
-        .send_delete(
-          &format!("/{}/{key}", Self::object_name()),
-          Self::get_query(opts),
-        )
-        .await
-      {
+      let deletion = if let Some((incarnation, run)) = job_identity {
+        client.delete_job_if_current(key, incarnation, run).await
+      } else {
+        client
+          .send_delete(
+            &format!("/{}/{key}", Self::object_name()),
+            Self::get_query(opts),
+          )
+          .await
+          .map(|_| ())
+      };
+      if let Err(err) = deletion {
         if let HttpClientError::HttpError(err) = &err
           && err.status == StatusCode::NOT_FOUND
         {
@@ -228,6 +256,9 @@ where
         }
         failures += 1;
         finish("Failed", true, Some(&err.to_string()))?;
+        if object_name == "jobs" {
+          return Err(err.into());
+        }
         if let Some((display, _)) = progress {
           display.suspend(|| eprintln!("{key}: {err}"));
         } else {

@@ -81,6 +81,8 @@ impl Modify for VersionModifier {
     job::inspect_job,
     job::create_job,
     job::count_job,
+    job::list_job_history,
+    job::inspect_job_history,
     // Cargo
     cargo::list_cargo,
     cargo::inspect_cargo,
@@ -149,7 +151,7 @@ impl Modify for VersionModifier {
     event::inspect_event,
     event::count_event,
   ),
-  components(schemas(Statefile, ResourceProxyRule, ResourceDnsRule)),
+  components(schemas(Statefile, ResourceProxyRule, ResourceDnsRule, nanocl_stubs::job::JobHistoryQuery, nanocl_stubs::job::JobDeleteQuery)),
   tags(
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Networks", description = "Node-scoped Docker network inspection endpoints."),
@@ -175,6 +177,64 @@ mod tests {
     ApiDoc::openapi()
       .to_yaml()
       .expect("OpenAPI must serialize as YAML")
+  }
+
+  #[test]
+  fn generated_openapi_exposes_retained_job_history() {
+    let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let paths = &document["paths"];
+    let list = &paths["/jobs/{name}/histories"]["get"];
+    assert_eq!(
+      list["responses"]["200"]["content"]["application/json"]["schema"]["items"]
+        ["$ref"],
+      "#/components/schemas/JobRun"
+    );
+    for query in ["limit", "offset"] {
+      assert!(
+        list["parameters"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|parameter| {
+            parameter["name"] == query && parameter["in"] == "query"
+          })
+      );
+    }
+    assert_eq!(
+      paths["/jobs/{name}/histories/{run}"]["get"]["responses"]["200"]["content"]
+        ["application/json"]["schema"]["$ref"],
+      "#/components/schemas/JobRunInspect"
+    );
+    let schemas = &document["components"]["schemas"];
+    for model in ["Job", "JobInspect", "JobSummary"] {
+      for field in ["IncarnationKey", "SpecKey", "CurrentRunKey"] {
+        assert!(schemas[model]["properties"][field].is_object());
+      }
+    }
+    for model in [
+      "JobRun",
+      "JobRunStep",
+      "JobRunOperation",
+      "JobRunInspect",
+      "JobHistoryQuery",
+    ] {
+      assert!(schemas[model].is_object(), "missing {model}");
+      assert_local_schema_references(&document, &schemas[model]);
+    }
+    assert!(
+      schemas["JobRunStep"]["properties"]["ExitCode"]["type"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kind| kind == "null")
+    );
+    for private in ["OwnerBootId", "NodeName", "LockDevice", "LockInode"] {
+      assert!(
+        schemas["JobRunOperation"]["properties"]
+          .get(private)
+          .is_none()
+      );
+    }
   }
 
   fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {

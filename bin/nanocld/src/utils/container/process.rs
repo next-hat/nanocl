@@ -174,6 +174,7 @@ pub(crate) async fn delete_instance_owned<G: Send + 'static>(
 }
 
 /// Delete a group of instances (containers) by their names
+#[cfg(test)]
 pub async fn delete_instances(
   instances: &[String],
   state: &SystemState,

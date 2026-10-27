@@ -53,6 +53,7 @@ pub async fn kill_process(
     .docker_api
     .inspect_container(&name, None)
     .await?;
+  super::reject_job_container_action(&runtime)?;
   let id = runtime
     .id
     .as_deref()

@@ -430,6 +430,18 @@ impl OperationDb {
         {
           return Ok(false);
         }
+        // A completed start operation can still own an executing Job run.
+        // Retain its ownership evidence until that run is terminal.
+        if owner.resource_kind == "Job"
+          && diesel::select(diesel::dsl::exists(
+            crate::schema::job_runs::table
+              .filter(crate::schema::job_runs::operation_key.eq(owner.key))
+              .filter(crate::schema::job_runs::finished_at.is_null()),
+          ))
+          .get_result::<bool>(conn)?
+        {
+          return Ok(false);
+        }
         let operation = operations::table
           .find(owner.key)
           .for_update()

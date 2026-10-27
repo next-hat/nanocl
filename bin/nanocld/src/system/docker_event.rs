@@ -569,6 +569,19 @@ async fn exec_docker(
       ),
     }),
   };
+  // Job state is owned by its durable run executor/reconciler. Docker events
+  // retain their exact container and run labels, but must never look up or
+  // update a replacement Job merely because it reused the same name.
+  if kind == EventActorKind::Job {
+    action.clone_into(&mut event.action);
+    state.spawn_emit_event(event);
+    if action == "destroy" {
+      let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;
+    } else if action != "create" {
+      refresh_process_observation(&id, &name, &kind, state).await?;
+    }
+    return Ok(());
+  }
   match action {
     "start" => {
       event.action = NativeEventAction::Start.to_string();

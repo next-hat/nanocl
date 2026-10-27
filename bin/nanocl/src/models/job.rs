@@ -2,11 +2,71 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 use tabled::Tabled;
 
-use nanocld_client::stubs::{job::JobSummary, process::WaitCondition};
+use nanocld_client::stubs::{
+  job::{JobRun, JobSummary},
+  process::WaitCondition,
+};
 
 use super::{
-  GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
+  DisplayFormat, GenericInspectOpts, GenericListOpts, GenericRemoveOpts,
+  GenericStartOpts, GenericStopOpts,
 };
+
+/// `nanocl job history` lists retained executions or inspects a single run.
+#[derive(Clone, Parser)]
+pub struct JobHistoryOpts {
+  /// Job name, including a removed Job
+  pub name: String,
+  /// Inspect a single execution by its run ID
+  #[clap(long, conflicts_with_all = ["limit", "offset"])]
+  pub run: Option<String>,
+  /// Page size, 1 to 100; defaults to 50
+  #[clap(long, value_parser = clap::value_parser!(i64).range(1..=100))]
+  pub limit: Option<i64>,
+  /// Number of executions to skip, newest first
+  #[clap(long, value_parser = clap::value_parser!(i64).range(0..))]
+  pub offset: Option<i64>,
+  /// Display format; list defaults to a table, detail to configured format
+  #[clap(long)]
+  pub display: Option<DisplayFormat>,
+}
+
+/// One retained execution, including its incarnation to distinguish recreation.
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct JobRunRow {
+  pub run: String,
+  pub incarnation: String,
+  pub state: String,
+  #[tabled(rename = "ACCEPTED AT")]
+  pub accepted_at: String,
+  #[tabled(rename = "STARTED AT")]
+  pub started_at: String,
+  #[tabled(rename = "FINISHED AT")]
+  pub finished_at: String,
+  pub reason: String,
+}
+
+impl From<JobRun> for JobRunRow {
+  fn from(run: JobRun) -> Self {
+    let timestamp = |value: chrono::NaiveDateTime| {
+      value
+        .and_utc()
+        .with_timezone(&chrono::Local)
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+    };
+    Self {
+      run: run.key.to_string(),
+      incarnation: run.incarnation_key.to_string(),
+      state: format!("{:?}", run.state),
+      accepted_at: timestamp(run.accepted_at),
+      started_at: run.started_at.map(timestamp).unwrap_or_else(|| "-".into()),
+      finished_at: run.finished_at.map(timestamp).unwrap_or_else(|| "-".into()),
+      reason: run.reason.unwrap_or_default(),
+    }
+  }
+}
 
 /// `nanocl job wait` available options
 #[derive(Clone, Parser)]
@@ -51,12 +111,16 @@ pub enum JobCommand {
   Remove(GenericRemoveOpts),
   /// Inspect a job by its name
   Inspect(GenericInspectOpts),
+  /// List retained executions or inspect a run; Docker logs are not archived
+  History(JobHistoryOpts),
   /// Show logs of a job
   Logs(JobLogsOpts),
   /// Wait for a job to finish
   Wait(JobWaitOpts),
   /// Start a job
   Start(GenericStartOpts),
+  /// Stop the current Job execution
+  Stop(GenericStopOpts),
 }
 
 /// `nanocl job` available subcommands
@@ -164,6 +228,9 @@ mod tests {
     let status = ObjPsStatus::default();
     let expected_status = format!("{}/{}", status.actual, status.wanted);
     let row = JobRow::from(JobSummary {
+      incarnation_key: uuid::Uuid::nil(),
+      spec_key: uuid::Uuid::nil(),
+      current_run_key: None,
       created_at,
       updated_at: chrono::Utc::now().naive_utc(),
       status,
@@ -212,5 +279,73 @@ mod tests {
         "AGE"
       ]
     );
+  }
+
+  #[test]
+  fn job_history_parses_bounded_pages_and_run_detail() {
+    let args = JobArg::try_parse_from([
+      "job",
+      "history",
+      "backup",
+      "--limit",
+      "100",
+      "--offset",
+      "2",
+      "--display",
+      "json",
+    ])
+    .unwrap();
+    let JobCommand::History(options) = args.command else {
+      panic!("expected history command");
+    };
+    assert_eq!(options.name, "backup");
+    assert_eq!(options.limit, Some(100));
+    assert_eq!(options.offset, Some(2));
+    assert!(matches!(options.display, Some(DisplayFormat::Json)));
+    let run = "00000000-0000-0000-0000-000000000001";
+    let args =
+      JobArg::try_parse_from(["job", "history", "backup", "--run", run])
+        .unwrap();
+    let JobCommand::History(options) = args.command else {
+      panic!("expected history command");
+    };
+    assert_eq!(options.run.as_deref(), Some(run));
+    for invalid in [
+      vec!["job", "history", "backup", "--limit", "0"],
+      vec!["job", "history", "backup", "--limit", "101"],
+      vec!["job", "history", "backup", "--offset", "-1"],
+      vec!["job", "history", "backup", "--run", run, "--limit", "1"],
+    ] {
+      assert!(JobArg::try_parse_from(invalid).is_err());
+    }
+    assert!(matches!(
+      JobArg::try_parse_from(["job", "stop", "backup"])
+        .unwrap()
+        .command,
+      JobCommand::Stop(_)
+    ));
+  }
+
+  #[test]
+  fn job_history_row_preserves_identity_and_unknown_timestamps() {
+    let run = JobRun {
+      key: uuid::Uuid::from_u128(1),
+      job_name: "backup".into(),
+      incarnation_key: uuid::Uuid::from_u128(2),
+      spec_key: uuid::Uuid::from_u128(3),
+      operation_key: uuid::Uuid::from_u128(4),
+      accepted_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+      started_at: None,
+      finished_at: None,
+      state: nanocld_client::stubs::job::JobRunState::Unknown,
+      reason: Some("Runtime observation unavailable".into()),
+    };
+    let row = JobRunRow::from(run.clone());
+    assert_eq!(row.run, run.key.to_string());
+    assert_eq!(row.incarnation, run.incarnation_key.to_string());
+    assert_eq!(row.state, "Unknown");
+    assert_eq!(row.started_at, "-");
+    assert_eq!(row.finished_at, "-");
+    assert_eq!(row.reason, "Runtime observation unavailable");
   }
 }

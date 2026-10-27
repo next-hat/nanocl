@@ -119,7 +119,11 @@ pub async fn restart_processes(
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
-  if kind == ProcessKind::Vm {
+  if kind == ProcessKind::Job {
+    return Err(HttpError::conflict(
+      "Jobs execute immutable runs; stop the active run, then start a new run",
+    ));
+  } else if kind == ProcessKind::Vm {
     utils::container::vm::enqueue_lifecycle(&key, None, true, state)
       .await
       .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
@@ -154,6 +158,7 @@ pub async fn restart_process(
     .docker_api
     .inspect_container(&name, None)
     .await?;
+  super::reject_job_container_action(&runtime)?;
   if let Some(key) = super::managed_vm_runtime_key(&runtime, false)? {
     let id = runtime
       .id

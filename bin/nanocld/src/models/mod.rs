@@ -59,6 +59,10 @@ pub use secret::*;
 
 mod job;
 pub use job::*;
+mod job_run;
+pub(crate) use job_run::*;
+mod job_runtime;
+pub(crate) use job_runtime::*;
 
 mod spec;
 pub use spec::*;

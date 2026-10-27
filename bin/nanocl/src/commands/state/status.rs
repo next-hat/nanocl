@@ -696,6 +696,9 @@ mod tests {
   #[test]
   fn status_job_distinguishes_schedule_from_completed_runs() {
     let mut job = JobInspect {
+      incarnation_key: uuid::Uuid::new_v4(),
+      spec_key: uuid::Uuid::new_v4(),
+      current_run_key: None,
       created_at: time(10),
       updated_at: time(10),
       status: Default::default(),

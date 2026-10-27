@@ -284,18 +284,24 @@ async fn state_apply(
         |pg| async move {
           let metadata = insert_nanocl_group(&job.metadata, nanocl_group);
           job.metadata = Some(metadata);
-          if client.inspect_job(&job.name).await.is_ok() {
+          if let Ok(previous) = client.inspect_job(&job.name).await {
             utils::progress::set_state_message(
               &pg, summary, "Clearing", output,
             )?;
-            let waiter = utils::process::wait_process_state(
+            let waiter = utils::process::wait_job_deletion(
               &job.name,
-              EventActorKind::Job,
-              vec![NativeEventAction::Destroy],
+              previous.incarnation_key,
+              previous.current_run_key,
               client,
             )
             .await?;
-            client.delete_job(&job.name).await?;
+            client
+              .delete_job_if_current(
+                &job.name,
+                previous.incarnation_key,
+                previous.current_run_key,
+              )
+              .await?;
             waiter.await.map_err(|err| {
               IoError::interrupted("wait_process_state", &err.to_string())
             })??;
@@ -305,19 +311,9 @@ async fn state_apply(
           }
           utils::progress::set_state_message(&pg, summary, "Creating", output)?;
           client.create_job(&job).await?;
-          let waiter = utils::process::wait_process_state(
-            &job.name,
-            EventActorKind::Job,
-            vec![NativeEventAction::Start],
-            client,
-          )
-          .await?;
           utils::progress::set_state_message(&pg, summary, "Starting", output)?;
           client.start_process("job", &job.name).await?;
-          waiter.await.map_err(|err| {
-            IoError::interrupted("wait_process_state", &err.to_string())
-          })??;
-          Ok("Running")
+          Ok("Accepted")
         },
       )
       .await?;

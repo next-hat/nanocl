@@ -12,8 +12,8 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    BalanceWeights, CapacityQuery, CargoDb, JobDb, JobUpdateDb, MetricDb,
-    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, SystemState, VmDb,
+    BalanceWeights, CapacityQuery, CargoDb, JobDb, MetricDb, NodeDb,
+    ObjPsStatusDb, ObjPsStatusUpdate, SystemState, VmDb,
   },
   repositories::generic::*,
 };
@@ -38,14 +38,6 @@ pub async fn emit(
       state.emit_normal_native_action_sync(&cargo, action).await;
     }
     ProcessKind::Job => {
-      JobDb::update_pk(
-        kind_key,
-        JobUpdateDb {
-          updated_at: Some(chrono::Utc::now().naive_utc()),
-        },
-        &state.inner.pool,
-      )
-      .await?;
       let job =
         JobDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
       state.emit_normal_native_action_sync(&job, action).await;
@@ -106,6 +98,9 @@ pub async fn emit_starting(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
+  if *kind == ProcessKind::Job {
+    return crate::tasks::job::start(kind_key, state).await;
+  }
   if *kind == ProcessKind::Vm {
     let key = kind_key.to_owned();
     let prepare_state = state.clone();
@@ -123,12 +118,7 @@ pub async fn emit_starting(
   log::debug!("starting {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  let wanted = if ProcessKind::Job == *kind {
-    ObjPsStatusKind::Finish
-  } else {
-    ObjPsStatusKind::Start
-  }
-  .to_string();
+  let wanted = ObjPsStatusKind::Start.to_string();
   let status_update = ObjPsStatusUpdate {
     wanted: Some(wanted),
     prev_wanted: Some(current_status.wanted),
@@ -150,6 +140,12 @@ pub async fn emit_stopping(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> IoResult<()> {
+  if *kind == ProcessKind::Job {
+    return Err(IoError::invalid_input(
+      "Job stop",
+      "Use the Job lifecycle to stop the current run",
+    ));
+  }
   log::debug!("stopping {kind:?} {kind_key}");
   let current_status =
     ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
