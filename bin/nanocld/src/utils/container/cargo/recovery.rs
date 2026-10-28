@@ -9,7 +9,10 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::system::{NativeEventAction, ObjPsStatusKind};
 
 use crate::{
-  models::{CargoDb, CargoReplicaDb, OperationDb, ProcessDb, SystemState},
+  models::{
+    CargoDb, CargoReplicaDb, CargoReplicaProcessDb, OperationDb, ProcessDb,
+    SystemState,
+  },
   repositories::generic::*,
   utils,
 };
@@ -87,6 +90,17 @@ pub(crate) async fn recover_one(
       .iter()
       .map(|process| process.key.as_str())
       .collect::<HashSet<_>>();
+    let mut mapped_ids = HashSet::new();
+    for replica in &replicas {
+      for mapping in
+        CargoReplicaProcessDb::list_by_replica(replica.key, &state.inner.pool)
+          .await?
+      {
+        if let Some(id) = mapping.process_key {
+          mapped_ids.insert(id);
+        }
+      }
+    }
     let inventory = state
       .inner
       .docker_api
@@ -102,6 +116,27 @@ pub(crate) async fn recover_one(
       .map_err(|_| {
         deferred("Docker inventory unavailable; operation remains pending")
       })?;
+    if candidate.action == "delete" {
+      if !deletion_observation_settles(
+        inventory.is_empty(),
+        processes.is_empty(),
+        mapped_ids.is_empty(),
+      ) {
+        return Err(deferred(
+          "Cargo deletion is not confirmed by empty runtime inventory, process rows, and attachments",
+        ));
+      }
+      // Runtime removal also removes Process rows before the definition is
+      // deleted. Do not tombstone while stale rows still need reconciliation.
+      return Ok(None);
+    }
+    if candidate.action == "stop"
+      && ids.iter().any(|id| !mapped_ids.contains(*id))
+    {
+      return Err(deferred(
+        "An unmapped process prevents confirming the whole Cargo stopped",
+      ));
+    }
     for container in inventory {
       let id = container
         .id
@@ -131,30 +166,42 @@ pub(crate) async fn recover_one(
         .await?;
     }
     let observed = super::observe(&cargo, state).await?;
-    if !creation_observation_settles(
+    if !runtime_observation_settles(
       &candidate.action,
       observed.actual.as_deref(),
     ) {
       return Err(deferred(
-        "Interrupted creation has no complete ready runtime; operation remains pending",
+        "Runtime observation does not prove the accepted action's effect; operation remains pending",
       ));
     }
-    Ok(observed)
+    Ok(Some(observed))
   };
   let observed = tokio::time::timeout(Duration::from_secs(5), observation)
     .await
     .map_err(|_| {
       deferred("Runtime observation timed out; operation remains pending")
     })??;
-  let finished = CargoDb::finish_operation(candidate, observed, "interrupted", Some(serde_json::json!({
-    "Operation": candidate.key, "Phase": candidate.action,
-    "Failure": "Execution ownership was lost; local runtime observed without replay"
-  })), lease.clone(), &state.inner.pool).await?;
+  let finished = match observed {
+    None => {
+      CargoDb::delete_operation(candidate, lease.clone(), &state.inner.pool)
+        .await?
+    }
+    Some(observed) => CargoDb::finish_operation(candidate, observed, "interrupted", Some(serde_json::json!({
+      "Operation": candidate.key, "Phase": candidate.action,
+      "Failure": "Execution ownership was lost; local runtime observed without replay"
+    })), lease.clone(), &state.inner.pool).await?,
+  };
   if finished {
     if let Err(error) =
       utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
     {
       log::warn!("Cargo recovery owner cleanup deferred: {error}");
+    }
+    if candidate.action == "delete" {
+      state
+        .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
+        .await;
+      return Ok(true);
     }
     let action = match candidate.action.as_str() {
       "start" => NativeEventAction::Starting,
@@ -168,9 +215,24 @@ pub(crate) async fn recover_one(
   Ok(finished)
 }
 
-fn creation_observation_settles(action: &str, actual: Option<&str>) -> bool {
-  !matches!(action, "start" | "update")
-    || actual == Some(ObjPsStatusKind::Start.to_string().as_str())
+fn runtime_observation_settles(action: &str, actual: Option<&str>) -> bool {
+  match action {
+    "start" | "update" => {
+      actual == Some(ObjPsStatusKind::Start.to_string().as_str())
+    }
+    "stop" => actual == Some(ObjPsStatusKind::Stop.to_string().as_str()),
+    // Current aggregate state cannot prove a restart or targeted action ran.
+    // Delete is settled separately by its empty-runtime proof and transaction.
+    _ => false,
+  }
+}
+
+fn deletion_observation_settles(
+  inventory_empty: bool,
+  processes_empty: bool,
+  attachments_empty: bool,
+) -> bool {
+  inventory_empty && processes_empty && attachments_empty
 }
 
 fn accepted_creation_identity(
@@ -237,16 +299,60 @@ mod tests {
   #[test]
   fn interrupted_creation_requires_complete_ready_runtime() {
     for action in ["start", "update"] {
-      assert!(!creation_observation_settles(action, None));
-      assert!(!creation_observation_settles(action, Some("Stop")));
-      assert!(!creation_observation_settles(action, Some("Fail")));
-      assert!(creation_observation_settles(
+      assert!(!runtime_observation_settles(action, None));
+      assert!(!runtime_observation_settles(action, Some("Stop")));
+      assert!(!runtime_observation_settles(action, Some("Fail")));
+      assert!(runtime_observation_settles(
         action,
         Some(&ObjPsStatusKind::Start.to_string())
       ));
     }
-    for action in ["stop", "delete", "restart", "signal"] {
-      assert!(creation_observation_settles(action, Some("Stop")));
+  }
+
+  #[test]
+  fn recovery_does_not_infer_non_idempotent_or_targeted_effects() {
+    let running = ObjPsStatusKind::Start.to_string();
+    let stopped = ObjPsStatusKind::Stop.to_string();
+    assert!(runtime_observation_settles("stop", Some(&stopped)));
+    assert!(!runtime_observation_settles("stop", Some(&running)));
+    assert!(!runtime_observation_settles("stop", None));
+    for action in [
+      "restart",
+      "restart_process",
+      "stop_process",
+      "signal",
+      "delete",
+      "unknown",
+    ] {
+      for actual in [None, Some(running.as_str()), Some(stopped.as_str())] {
+        assert!(
+          !runtime_observation_settles(action, actual),
+          "{action} must remain pending without action-specific proof"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn delete_recovery_requires_empty_inventory_processes_and_mappings() {
+    for inventory_empty in [true, false] {
+      for processes_empty in [true, false] {
+        for attachments_empty in [true, false] {
+          let settled = deletion_observation_settles(
+            inventory_empty,
+            processes_empty,
+            attachments_empty,
+          );
+          if !inventory_empty || !processes_empty || !attachments_empty {
+            assert!(
+              !settled,
+              "Remaining runtime evidence must prevent deleting the definition"
+            );
+          } else {
+            assert!(settled);
+          }
+        }
+      }
     }
   }
 

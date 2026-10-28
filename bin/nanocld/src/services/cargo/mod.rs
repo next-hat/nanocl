@@ -106,7 +106,8 @@ mod tests {
 
   use crate::{
     models::{
-      CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole, ProcessDb,
+      CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+      OperationDb, ProcessDb,
     },
     repositories::generic::*,
     utils::{
@@ -213,6 +214,46 @@ mod tests {
       .and_then(|state| state.started_at.as_deref())
   }
 
+  async fn cargo_completion_events(
+    system: &TestSystem,
+    key: &str,
+    action: NativeEventAction,
+  ) -> crate::models::RawEventReceiver {
+    let mut condition = cargo_event_condition(key, EventKind::Normal, action);
+    condition.kind.push(EventKind::Error);
+    system
+      .state
+      .subscribe_raw(Some(vec![condition]))
+      .await
+      .unwrap()
+  }
+
+  async fn wait_cargo_completion(
+    system: &TestSystem,
+    key: &str,
+    action: NativeEventAction,
+    events: crate::models::RawEventReceiver,
+  ) {
+    let events = collect_events(events).await;
+    let completed =
+      cargo_event_condition(key, EventKind::Normal, action.clone());
+    let failed = cargo_event_condition(key, EventKind::Error, action.clone());
+    assert!(
+      events.iter().any(|event| completed == *event),
+      "Cargo {key} did not complete {action}: {events:?}"
+    );
+    assert!(
+      !events.iter().any(|event| failed == *event),
+      "Cargo {key} failed {action}: {events:?}"
+    );
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+  }
+
   async fn start_cargo(system: &TestSystem, key: &str) {
     let events = system
       .state
@@ -293,7 +334,7 @@ mod tests {
     const OTHER_KEY: &str = "cargo-collection-test.same-name-namespace-test";
 
     let system = gen_default_test_system().await;
-    let client = system.client;
+    let client = &system.client;
     let response = client
       .send_post(
         "/namespaces",
@@ -413,6 +454,25 @@ mod tests {
       http::StatusCode::OK,
       "patch cargo by canonical key"
     );
+    // This test exercises definition/key semantics on a stopped Cargo. The
+    // accepted update may fail because no runtime was started; it must finish
+    // before the independent foreign-history validation is submitted.
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{OTHER_KEY}", EventActorKind::Cargo))
+      .await;
+    let operation =
+      OperationDb::current("Cargo", OTHER_KEY, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .expect("accepted Cargo update operation");
+    assert_eq!(operation.action, "update");
+    assert!(
+      operation.outcome.is_some(),
+      "Cargo update must settle before revert validation"
+    );
 
     let response = client
       .send_get(
@@ -443,7 +503,25 @@ mod tests {
       "reject another Cargo's history even when its name matches"
     );
 
+    let response = client
+      .send_patch(
+        &format!(
+          "{ENDPOINT}/{OTHER_KEY}/histories/{}/revert",
+          uuid::Uuid::new_v4()
+        ),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::NOT_FOUND,
+      "missing Cargo history remains not found"
+    );
+
     for key in [GLOBAL_KEY, OTHER_KEY] {
+      let events =
+        cargo_completion_events(&system, key, NativeEventAction::Destroy).await;
       let response = client
         .send_delete(
           &format!("{ENDPOINT}/{key}"),
@@ -455,6 +533,8 @@ mod tests {
         http::StatusCode::ACCEPTED,
         "delete cargo by canonical key"
       );
+      wait_cargo_completion(&system, key, NativeEventAction::Destroy, events)
+        .await;
     }
   }
 
@@ -613,6 +693,12 @@ mod tests {
       containers: vec![replacement_container],
       ..Default::default()
     };
+    let events = cargo_completion_events(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+    )
+    .await;
     let res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_key}"),
@@ -625,6 +711,13 @@ mod tests {
     assert_eq!(patch_response.spec.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(patch_response.spec.containers, replacement.containers);
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+      events,
+    )
+    .await;
     let res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_key}/histories"),
@@ -644,6 +737,12 @@ mod tests {
       .expect("Expected to find the original Cargo declaration")
       .clone();
     let id = history.key;
+    let events = cargo_completion_events(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+    )
+    .await;
     let res = client
       .send_patch(
         &format!("{ENDPOINT}/{main_test_key}/histories/{id}/revert"),
@@ -666,6 +765,16 @@ mod tests {
     );
     assert_eq!(reverted.spec.init_containers, history.init_containers);
     assert_eq!(reverted.spec.containers, history.containers);
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+      events,
+    )
+    .await;
+    let events =
+      cargo_completion_events(&system, &main_test_key, NativeEventAction::Stop)
+        .await;
     let res = client
       .send_post(
         &format!("/processes/cargo/{main_test_key}/stop"),
@@ -678,7 +787,18 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "basic cargo stop"
     );
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Stop,
+      events,
+    )
+    .await;
     for test_cargo in test_cargoes.iter() {
+      let key = format!("global.{test_cargo}");
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Destroy)
+          .await;
       let res = client
         .send_delete(
           &format!("{ENDPOINT}/global.{test_cargo}"),
@@ -690,6 +810,8 @@ mod tests {
         http::StatusCode::ACCEPTED,
         "basic cargo delete"
       );
+      wait_cargo_completion(&system, &key, NativeEventAction::Destroy, events)
+        .await;
     }
     // test init container
     let mut init = container("init", "alpine:latest");
@@ -714,31 +836,13 @@ mod tests {
     );
     let cargo = TestClient::res_json::<Cargo>(res).await;
     assert_eq!(cargo.spec.name, "init-test-cargo", "Invalid cargo name");
-    let res = client
-      .send_post(
-        "/processes/cargo/global.init-test-cargo/start",
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    assert_eq!(res.status(), http::StatusCode::ACCEPTED, "init cargo start");
-    let res = client
-      .send_post(
-        "/events/watch",
-        Some(vec![EventCondition {
-          actor_key: Some("global.init-test-cargo".to_owned()),
-          actor_kind: Some(EventActorKind::Cargo),
-          related_key: None,
-          related_kind: None,
-          kind: vec![EventKind::Normal],
-          action: vec![NativeEventAction::Start],
-        }]),
-        None::<String>,
-      )
-      .await;
-    assert_eq!(res.status(), http::StatusCode::OK, "init cargo watch");
-    let mut stream = res.into_stream();
-    while let Some(_chunk) = stream.next().await {}
+    start_cargo(&system, "global.init-test-cargo").await;
+    let events = cargo_completion_events(
+      &system,
+      "global.init-test-cargo",
+      NativeEventAction::Destroy,
+    )
+    .await;
     let res = client
       .send_delete(
         &format!("{ENDPOINT}/global.init-test-cargo"),
@@ -750,7 +854,13 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "init cargo delete"
     );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    wait_cargo_completion(
+      &system,
+      "global.init-test-cargo",
+      NativeEventAction::Destroy,
+      events,
+    )
+    .await;
     system.state.wait_event_loop().await;
   }
 

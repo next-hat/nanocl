@@ -281,20 +281,27 @@ impl CargoDb {
     let cargo = Self::read_by_pk(key, pool).await?.0;
     super::operation::run_query_owned(pool, (), move |conn| {
       use crate::{models::OperationTransactionError, schema::specs};
-      specs::table
+      let stored = specs::table
         .find(revision)
-        .filter(specs::kind_name.eq("Cargo"))
-        .filter(specs::kind_key.eq(&cargo.key))
-        .filter(specs::incarnation_key.eq(cargo.incarnation_key))
         .first::<SpecDb>(conn)
         .optional()
         .map_err(OperationTransactionError::from)?
         .ok_or_else(|| {
-          IoError::not_found(
-            "Cargo history",
-            "Revision does not belong to the current Cargo incarnation",
-          )
-        })
+          IoError::not_found("Cargo history", "Revision does not exist")
+        })?;
+      if stored.kind_name != "Cargo" || stored.kind_key != cargo.key {
+        return Err(IoError::invalid_input(
+          "Cargo history",
+          "Cannot revert a cargo using a history from another cargo",
+        ));
+      }
+      if stored.incarnation_key != Some(cargo.incarnation_key) {
+        return Err(IoError::not_found(
+          "Cargo history",
+          "Revision does not belong to the current Cargo incarnation",
+        ));
+      }
+      Ok(stored)
     })
     .await
   }
