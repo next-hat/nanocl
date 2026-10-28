@@ -99,6 +99,8 @@ the current run. Job wait pins that run, or the next observed run of the selecte
 incarnation when subscribed before its first start.
 For Jobs, use the default wait condition or `-c not-running`; Docker's
 `next-exit` and `removed` conditions are not supported for retained runs.
+Both supported forms wait for the pinned run to settle. `Unknown` does not
+prove that its containers stopped, so it does not complete the wait.
 
 History does not archive Docker logs. Logs depend on Docker retaining runtime
 resources. This change adds no history-pruning framework.

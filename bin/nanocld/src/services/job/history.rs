@@ -102,14 +102,8 @@ mod tests {
   /// is simulated through the same guarded step writes as the executor.
   #[ntex::test]
   async fn job_history_api_client_retains_runs_after_delete_and_recreation() {
-    assert!(
-      std::env::var_os("NANOCL_TEST_STORE_ADDR").is_some(),
-      "history integration requires an explicitly selected disposable database"
-    );
-    assert!(
-      std::env::var_os("NANOCL_TEST_STATE_DIR").is_some(),
-      "history integration requires an isolated test state directory"
-    );
+    // Use the shared integration fixture, including its prepared CI defaults.
+    // NANOCL_TEST_STORE_ADDR and NANOCL_TEST_STATE_DIR remain optional overrides.
     let system = gen_default_test_system().await;
     let state = system.state.clone();
     let server = web::test::server(async move |_| {

@@ -13,7 +13,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  models::{JobDb, ProcessDb, SystemState},
+  models::{JobDb, JobRunDb, ProcessDb, SystemState},
   repositories::generic::*,
   utils,
 };
@@ -142,13 +142,15 @@ async fn wait_job(
     let mut run_key = job.current_run_key;
     loop {
       if let Some(run_key) = run_key {
-        let run = JobDb::inspect_run(&key, run_key, &state.inner.pool).await?;
-        if run.run.incarnation_key != job.incarnation_key {
+        let run = JobRunDb::get(run_key, &state.inner.pool).await?;
+        if run.job_name != key || run.incarnation_key != job.incarnation_key {
           return Err(HttpError::conflict(
             "Job incarnation changed while waiting",
           ));
         }
-        if run.run.finished_at.is_some() {
+        if run.finished_at.is_some() {
+          let run =
+            JobDb::inspect_run(&key, run_key, &state.inner.pool).await?;
           return Ok::<_, HttpError>(job_wait_outcome(run));
         }
       } else {

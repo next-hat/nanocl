@@ -114,10 +114,12 @@ pub(crate) async fn reconcile(state: &SystemState) -> IoResult<()> {
   reconcile_ttl(state).await
 }
 
-/// A daemon restart can lose an in-memory TTL timer. Walk live Jobs in bounded
-/// pages and use the same incarnation/run-checked deletion as the timer.
+/// A daemon restart can lose an in-memory TTL timer. Collect expired Jobs in
+/// bounded pages before deleting any, so deletion cannot shift later offsets.
+/// Use the same incarnation/run-checked deletion as the timer.
 async fn reconcile_ttl(state: &SystemState) -> IoResult<()> {
   let mut offset = 0;
+  let mut expired = Vec::new();
   loop {
     let jobs = JobDb::transform_read_by(
       &GenericFilter::new().limit(100).offset(offset),
@@ -141,22 +143,22 @@ async fn reconcile_ttl(state: &SystemState) -> IoResult<()> {
       if elapsed < 0 || u64::try_from(elapsed).unwrap_or(0) < ttl as u64 {
         continue;
       }
-      if let Err(error) = crate::tasks::job::delete_if_current(
-        &job.spec.name,
-        job.incarnation_key,
-        key,
-        state,
-      )
-      .await
-      {
-        log::debug!(
-          "Job {} retained TTL cleanup deferred: {error}",
-          job.spec.name
-        );
-      }
+      expired.push((job.spec.name, job.incarnation_key, key));
     }
     if done {
       break;
+    }
+  }
+  for (name, incarnation_key, run_key) in expired {
+    if let Err(error) = crate::tasks::job::delete_if_current(
+      &name,
+      incarnation_key,
+      run_key,
+      state,
+    )
+    .await
+    {
+      log::debug!("Job {name} retained TTL cleanup deferred: {error}");
     }
   }
   Ok(())

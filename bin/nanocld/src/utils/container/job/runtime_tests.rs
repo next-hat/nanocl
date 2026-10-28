@@ -30,6 +30,10 @@ enum Mode {
   Nonzero,
   StartError,
   WaitError,
+  ProcessSyncError,
+  CreateError(u16),
+  StopAlreadyStopped,
+  StopUnconfirmed,
 }
 
 #[derive(Clone)]
@@ -67,6 +71,12 @@ async fn create(
 ) -> web::HttpResponse {
   let fixture = request.app_state::<DockerFixture>().unwrap();
   fixture.requests.lock().unwrap().push("create".into());
+  if let Mode::CreateError(status) = fixture.mode {
+    return web::HttpResponse::builder(
+      ntex::http::StatusCode::from_u16(status).unwrap(),
+    )
+    .json(&json!({"message":"secret-value-must-not-persist"}));
+  }
   let mut runtimes = fixture.runtimes.lock().unwrap();
   let id = format!("job-mock-{}", uuid::Uuid::new_v4().simple());
   runtimes.push(Runtime {
@@ -135,6 +145,9 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
     return web::HttpResponse::NoContent().build();
   }
   if path.ends_with("/stop") {
+    if fixture.mode == Mode::StopUnconfirmed {
+      return web::HttpResponse::NotModified().build();
+    }
     let mut runtimes = fixture.runtimes.lock().unwrap();
     let runtime = runtimes
       .iter_mut()
@@ -142,10 +155,17 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
       .unwrap();
     runtime.running = false;
     if runtime.started {
-      runtime.exit = Some(137);
+      runtime.exit = Some(if fixture.mode == Mode::StopAlreadyStopped {
+        0
+      } else {
+        137
+      });
     }
     fixture.release.store(true, Ordering::SeqCst);
     fixture.wake.notify_waiters();
+    if fixture.mode == Mode::StopAlreadyStopped {
+      return web::HttpResponse::NotModified().build();
+    }
     return web::HttpResponse::NoContent().build();
   }
   if path.ends_with("/wait") {
@@ -168,8 +188,10 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
         .parse::<i32>()
         .unwrap()
     };
-    let blocked = fixture.mode == Mode::BlockFirst
-      || (fixture.mode == Mode::BlockSecond && index == 1);
+    let blocked = matches!(
+      fixture.mode,
+      Mode::BlockFirst | Mode::StopAlreadyStopped | Mode::StopUnconfirmed
+    ) || (fixture.mode == Mode::BlockSecond && index == 1);
     if blocked {
       fixture.wait_entered.store(true, Ordering::SeqCst);
       loop {
@@ -202,7 +224,14 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
   if path.ends_with("/json") {
     let runtimes = fixture.runtimes.lock().unwrap();
     return match runtimes.iter().find(|runtime| runtime.id == id) {
-      Some(runtime) => web::HttpResponse::Ok().json(&runtime.inspect()),
+      Some(runtime) => {
+        let mut response = runtime.inspect();
+        if fixture.mode == Mode::ProcessSyncError {
+          // Docker state remains valid, but Process snapshot conversion fails.
+          response["Created"] = json!("invalid-process-created-timestamp");
+        }
+        web::HttpResponse::Ok().json(&response)
+      }
       None => web::HttpResponse::NotFound()
         .json(&json!({"message":"No such container"})),
     };
@@ -492,6 +521,159 @@ async fn job_runtime_sequential_success_does_not_finish_after_first_step() {
   assert!(detail.steps.iter().all(|step| step.exit_code == Some(0)));
   assert_ne!(detail.steps[0].container_id, detail.steps[1].container_id);
   fixture.cleanup().await;
+}
+
+#[ntex::test]
+async fn job_runtime_process_sync_failure_keeps_exit_observer() {
+  let fixture = Fixture::new(Mode::ProcessSyncError).await;
+  crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+    .await
+    .unwrap();
+  let run = fixture.wait_state("Succeeded").await;
+  let steps = JobRunDb::steps(run.key, &fixture.state.inner.pool)
+    .await
+    .unwrap();
+  assert_eq!(steps.len(), 2);
+  for step in steps {
+    assert_eq!(step.state, "Succeeded");
+    assert_eq!(step.exit_code, Some(0));
+    let id = step.container_id.unwrap();
+    assert!(
+      ProcessDb::transform_read_by_pk(&id, &fixture.state.inner.pool)
+        .await
+        .is_err()
+    );
+  }
+  assert_eq!(
+    fixture
+      .docker
+      .requests
+      .lock()
+      .unwrap()
+      .iter()
+      .filter(|request| request.ends_with("/wait"))
+      .count(),
+    2
+  );
+  fixture.cleanup().await;
+}
+
+#[ntex::test]
+async fn job_runtime_create_rejection_fails_without_inventing_execution() {
+  for status in [400, 404, 409, 500] {
+    let fixture = Fixture::new(Mode::CreateError(status)).await;
+    crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+      .await
+      .unwrap();
+    let definitive = matches!(status, 400 | 404 | 409);
+    let run = fixture
+      .wait_state(if definitive { "Failed" } else { "Unknown" })
+      .await;
+    let steps = JobRunDb::steps(run.key, &fixture.state.inner.pool)
+      .await
+      .unwrap();
+    assert_eq!(run.finished_at.is_some(), definitive);
+    assert!(run.started_at.is_none());
+    assert_eq!(
+      steps[0].state,
+      if definitive { "Failed" } else { "Unknown" }
+    );
+    assert_eq!(steps[0].finished_at.is_some(), definitive);
+    assert!(steps.iter().all(|step| step.container_id.is_none()
+      && step.exit_code.is_none()
+      && step.started_at.is_none()));
+    assert!(
+      steps[0]
+        .error
+        .as_ref()
+        .unwrap()
+        .contains(&format!("Docker HTTP {status}"))
+    );
+    assert!(!steps[0].error.as_ref().unwrap().contains("secret-value"));
+    assert_eq!(
+      fixture
+        .docker
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|request| *request == "create")
+        .count(),
+      1
+    );
+    assert!(fixture.docker.runtimes.lock().unwrap().is_empty());
+    if !definitive {
+      {
+        let _settled =
+          lifecycle_lock(&fixture.job.spec.name).lock_owned().await;
+      }
+      assert!(
+        crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+          .await
+          .is_err()
+      );
+      crate::tasks::job::stop(&fixture.job.spec.name, &fixture.state)
+        .await
+        .unwrap();
+      fixture.wait_state("Interrupted").await;
+    }
+    fixture.cleanup().await;
+  }
+}
+
+#[ntex::test]
+async fn job_runtime_stop_already_stopped_requires_fresh_confirmation() {
+  for mode in [Mode::StopAlreadyStopped, Mode::StopUnconfirmed] {
+    let fixture = Fixture::new(mode).await;
+    crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+      .await
+      .unwrap();
+    fixture.wait_blocked().await;
+    crate::tasks::job::stop(&fixture.job.spec.name, &fixture.state)
+      .await
+      .unwrap();
+    let confirmed = mode == Mode::StopAlreadyStopped;
+    let run = fixture
+      .wait_state(if confirmed { "Interrupted" } else { "Unknown" })
+      .await;
+    {
+      let _settled = lifecycle_lock(&fixture.job.spec.name).lock_owned().await;
+    }
+    let steps = JobRunDb::steps(run.key, &fixture.state.inner.pool)
+      .await
+      .unwrap();
+    assert_eq!(run.finished_at.is_some(), confirmed);
+    assert_eq!(steps[0].exit_code, confirmed.then_some(0));
+    assert!(steps[1].container_id.is_none());
+    assert!(
+      fixture
+        .docker
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|request| request.ends_with("/stop"))
+    );
+    if !confirmed {
+      assert!(
+        crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+          .await
+          .is_err()
+      );
+      {
+        let mut runtimes = fixture.docker.runtimes.lock().unwrap();
+        runtimes[0].running = false;
+        runtimes[0].exit = Some(0);
+      }
+      crate::tasks::job::stop(&fixture.job.spec.name, &fixture.state)
+        .await
+        .unwrap();
+      fixture.wait_state("Interrupted").await;
+      fixture.docker.release.store(true, Ordering::SeqCst);
+      fixture.docker.wake.notify_waiters();
+    }
+    fixture.cleanup().await;
+  }
 }
 
 #[ntex::test]

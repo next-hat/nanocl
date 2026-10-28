@@ -59,6 +59,16 @@ fn docker_error_kind(error: &bollard_next::errors::Error) -> String {
   }
 }
 
+fn create_rejected(error: &bollard_next::errors::Error) -> bool {
+  matches!(
+    error,
+    bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 400 | 404 | 409,
+      ..
+    }
+  )
+}
+
 fn conflict(message: &str) -> IoError {
   IoError::with_context(
     "Job execution",
@@ -594,6 +604,25 @@ pub(crate) async fn execute(
         .await;
       let id = match created {
         Ok(created) => created.id,
+        Err(error) if create_rejected(&error) => {
+          let reason = format!(
+            "Container creation rejected ({})",
+            docker_error_kind(&error)
+          );
+          // Docker rejected this create request before creating a container.
+          // No exit code or start timestamp exists for this failed step.
+          JobRunDb::update_step(
+            run,
+            index,
+            "Failed",
+            None,
+            Some(reason.clone()),
+            owner.clone(),
+            &state.inner.pool,
+          )
+          .await?;
+          return finish(run, "Failed", Some(reason), owner, state).await;
+        }
         Err(error) => {
           let reason = format!(
             "Container creation outcome is unconfirmed ({})",
@@ -657,9 +686,16 @@ pub(crate) async fn execute(
       .await?;
       if let Ok(runtime) =
         state.inner.docker_api.inspect_container(&id, None).await
+        && utils::system::sync_process(&run.job_name, "job", &runtime, state)
+          .await
+          .is_err()
       {
-        utils::system::sync_process(&run.job_name, "job", &runtime, state)
-          .await?;
+        // Process inventory is disposable; its failure must not abandon the
+        // wait observer after Docker has already started the command.
+        log::warn!(
+          "Job process observation refresh deferred for run {} container {id}",
+          run.key
+        );
       }
       state
         .emit_normal_native_action_sync(job, NativeEventAction::Start)
@@ -804,6 +840,8 @@ pub(crate) async fn control(
     let runtimes = inventory(run, state).await?;
     for (index, id, runtime) in runtimes {
       if observation(&runtime)? == JobRuntimeObservation::Running {
+        // Bollard maps HTTP 304 to AlreadyStopped; both successful results
+        // still require the fresh inspection below before settling the run.
         state
           .inner
           .docker_api
@@ -927,6 +965,24 @@ mod tests {
       }),
       ..Default::default()
     }
+  }
+
+  #[test]
+  fn job_create_rejection_excludes_server_and_transport_uncertainty() {
+    for status_code in [400, 404, 409, 408, 429, 500, 503] {
+      let error = bollard_next::errors::Error::DockerResponseServerError {
+        status_code,
+        message: "secret-value-must-not-persist".into(),
+      };
+      assert_eq!(
+        create_rejected(&error),
+        matches!(status_code, 400 | 404 | 409)
+      );
+      assert!(!docker_error_kind(&error).contains("secret-value"));
+    }
+    assert!(!create_rejected(
+      &bollard_next::errors::Error::RequestTimeoutError
+    ));
   }
 
   #[test]
