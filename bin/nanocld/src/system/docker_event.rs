@@ -506,6 +506,14 @@ async fn handle_cargo_health_event(
   Ok(())
 }
 
+fn normalize_job_observation_action(event: &mut EventPartial, action: &str) {
+  if action.starts_with("health_status:") {
+    event.action = NativeEventAction::Update.to_string();
+  } else {
+    action.clone_into(&mut event.action);
+  }
+}
+
 /// Take actions when a docker event is received
 async fn exec_docker(
   event: &EventMessage,
@@ -569,6 +577,19 @@ async fn exec_docker(
       ),
     }),
   };
+  // Job state is owned by its durable run executor/reconciler. Docker events
+  // retain their exact container and run labels, but must never look up or
+  // update a replacement Job merely because it reused the same name.
+  if kind == EventActorKind::Job {
+    normalize_job_observation_action(&mut event, action);
+    state.spawn_emit_event(event);
+    if action == "destroy" {
+      let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;
+    } else if action != "create" {
+      refresh_process_observation(&id, &name, &kind, state).await?;
+    }
+    return Ok(());
+  }
   match action {
     "start" => {
       event.action = NativeEventAction::Start.to_string();
@@ -809,6 +830,46 @@ mod tests {
   use bollard_next::models::EventActor as DockerEventActor;
 
   use super::*;
+
+  #[test]
+  fn job_health_events_normalize_action_and_preserve_raw_observation() {
+    for (action, expected_action) in [
+      ("health_status: healthy", NativeEventAction::Update),
+      ("health_status: unhealthy", NativeEventAction::Update),
+      ("health_status: starting", NativeEventAction::Update),
+      ("start", NativeEventAction::Start),
+      ("die", NativeEventAction::Die),
+      ("destroy", NativeEventAction::Destroy),
+    ] {
+      let mut event = EventPartial {
+        reporting_controller: "nanocl.io/core".into(),
+        reporting_node: "test-node".into(),
+        kind: EventKind::Normal,
+        action: NativeEventAction::Destroy.to_string(),
+        reason: "state_sync".into(),
+        note: Some(format!("process exact-run-container {action}")),
+        actor: Some(EventActor {
+          key: Some("exact-run-container".into()),
+          kind: EventActorKind::Process,
+          attributes: Some(serde_json::json!({
+            "io.nanocl.j": "backup",
+            "io.nanocl.job.run": "old-run",
+          })),
+        }),
+        related: Some(EventActor {
+          key: Some("backup".into()),
+          kind: EventActorKind::Job,
+          attributes: None,
+        }),
+        metadata: None,
+      };
+      let mut expected = serde_json::to_value(&event).unwrap();
+      expected["Action"] = serde_json::json!(expected_action.to_string());
+      normalize_job_observation_action(&mut event, action);
+      assert_eq!(serde_json::to_value(&event).unwrap(), expected);
+      assert!(event.note.as_ref().unwrap().ends_with(action));
+    }
+  }
 
   fn network_event(action: &str) -> EventMessage {
     EventMessage {

@@ -4,6 +4,7 @@ mod context;
 mod event;
 mod exec;
 mod generic;
+mod history;
 mod info;
 #[cfg(not(target_os = "windows"))]
 mod install;

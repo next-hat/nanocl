@@ -27,6 +27,29 @@ pub use stats::*;
 pub use stop::*;
 pub use wait::*;
 
+/// A managed Job container is one immutable step, not a restartable service.
+/// Treat incomplete ownership metadata conservatively as well.
+fn reject_job_container_action(
+  runtime: &bollard_next::models::ContainerInspectResponse,
+) -> nanocl_error::http::HttpResult<()> {
+  let labels = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref());
+  if labels.is_some_and(|labels| {
+    labels
+      .get("io.nanocl.kind")
+      .is_some_and(|kind| kind == "job")
+      || labels.contains_key("io.nanocl.j")
+      || labels.contains_key("io.nanocl.job.run")
+  }) {
+    return Err(nanocl_error::http::HttpError::conflict(
+      "Individual Job steps cannot be controlled; use nanocl job stop or start for the whole Job",
+    ));
+  }
+  Ok(())
+}
+
 /// Identify a managed VM before choosing a raw Docker lifecycle operation.
 /// Ambiguous VM metadata must never fall back to a Docker power cut.
 fn managed_vm_runtime_key(
@@ -184,6 +207,28 @@ mod tests {
     generic::{GenericClause, GenericFilter, GenericListQuery},
     process::{Process, ProcessStatsQuery},
   };
+
+  #[test]
+  fn managed_job_container_actions_reject_partial_and_complete_ownership() {
+    for labels in [
+      serde_json::json!({"io.nanocl.kind": "job"}),
+      serde_json::json!({"io.nanocl.j": "backup"}),
+      serde_json::json!({"io.nanocl.job.run": "run"}),
+    ] {
+      let runtime = serde_json::from_value(serde_json::json!({
+        "Config": {"Labels": labels}
+      }))
+      .unwrap();
+      let error = super::reject_job_container_action(&runtime).unwrap_err();
+      assert_eq!(error.status, ntex::http::StatusCode::CONFLICT);
+    }
+    assert!(super::reject_job_container_action(&Default::default()).is_ok());
+    let cargo = serde_json::from_value(serde_json::json!({
+      "Config": {"Labels": {"io.nanocl.kind": "cargo"}}
+    }))
+    .unwrap();
+    assert!(super::reject_job_container_action(&cargo).is_ok());
+  }
 
   #[test]
   fn managed_vm_lifecycle_classification_rejects_ambiguous_runtime() {

@@ -7,7 +7,7 @@ use nanocl_stubs::vm::{
   Vm, VmInspect, VmLifecycleOptions, VmResizeOptions, VmResources,
   VmRuntimeStatus, VmSummary,
 };
-use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
 
@@ -205,6 +205,16 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
+  /// List specification revisions for the current VM incarnation.
+  pub async fn list_history_vm(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<Vec<VmSpec>> {
+    let path = Self::vm_lifecycle_path(key, "histories")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
+
   /// Delete a VM by its canonical key.
   ///
   /// ## Example
@@ -263,7 +273,14 @@ mod console_tests {
 
   #[test]
   fn vm_lifecycle_paths_require_canonical_keys() {
-    for action in ["stop", "restart", "status", "resize", "resources"] {
+    for action in [
+      "stop",
+      "restart",
+      "status",
+      "resize",
+      "resources",
+      "histories",
+    ] {
       assert_eq!(
         NanocldClient::vm_lifecycle_path("team.database", action).unwrap(),
         format!("/vms/team.database/{action}")

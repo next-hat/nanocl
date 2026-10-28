@@ -4,7 +4,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::job::JobPartial;
 
 use crate::{
-  models::{JobDb, SystemState},
+  models::{JobDb, JobObjCreateIn, SystemState},
   objects::generic::*,
 };
 
@@ -22,9 +22,13 @@ use crate::{
 pub async fn create_job(
   state: &SystemState,
   _request_state: (),
-  _version: web::types::Path<String>,
+  version: web::types::Path<String>,
   payload: web::types::Json<JobPartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let job = JobDb::create_obj(&payload, &state).await?;
+  let obj = JobObjCreateIn {
+    spec: payload.into_inner(),
+    version: version.into_inner(),
+  };
+  let job = JobDb::create_obj(&obj, &state).await?;
   Ok(web::HttpResponse::Created().json(&job))
 }

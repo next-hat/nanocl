@@ -33,6 +33,9 @@ Remove job by its name
 job-inspect(1)  
 Inspect a job by its name
 
+job-history(1)
+List retained executions or inspect a run
+
 job-logs(1)  
 Show logs of a job
 
@@ -41,6 +44,9 @@ Wait for a job to finish
 
 job-start(1)  
 Start a job
+
+job-stop(1)
+Stop the current Job execution
 
 job-help(1)  
 Print this message or the help of the given subcommand(s)

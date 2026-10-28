@@ -3,12 +3,14 @@ use ntex::web;
 pub mod count;
 pub mod create;
 pub mod delete;
+pub mod history;
 pub mod inspect;
 pub mod list;
 
 pub use count::*;
 pub use create::*;
 pub use delete::*;
+pub use history::*;
 pub use inspect::*;
 pub use list::*;
 
@@ -38,6 +40,18 @@ pub fn ntex_config(
       .name("inspect_job")
       .guard(web::guard::Get())
       .to_with_state(inspect_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}/histories")
+      .name("list_job_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_job_history),
+  );
+  config.service(
+    web::resource("/jobs/{name}/histories/{run}")
+      .name("inspect_job_history")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job_history),
   );
   config.service(
     web::resource("/jobs/count")

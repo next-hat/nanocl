@@ -71,8 +71,9 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         status_key -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
+        spec_key -> Uuid,
+        incarnation_key -> Uuid,
+        current_run_key -> Nullable<Uuid>,
     }
 }
 
@@ -250,6 +251,12 @@ diesel::joinable!(cargo_replica_processes -> processes (process_key));
 diesel::joinable!(cargo_replicas -> cargoes (cargo_key));
 diesel::joinable!(cargo_replicas -> nodes (node_name));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
+diesel::joinable!(jobs -> specs (spec_key));
+diesel::joinable!(jobs -> resource_incarnations (incarnation_key));
+diesel::joinable!(job_run_steps -> job_runs (run_key));
+diesel::joinable!(job_runs -> operations (operation_key));
+diesel::joinable!(job_runs -> specs (spec_key));
+diesel::joinable!(job_runs -> resource_incarnations (incarnation_key));
 diesel::joinable!(networks -> nodes (node_name));
 diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
@@ -270,6 +277,8 @@ diesel::allow_tables_to_appear_in_same_query!(
   distributed_mutexes,
   events,
   jobs,
+  job_runs,
+  job_run_steps,
   metrics,
   namespaces,
   networks,
@@ -285,3 +294,32 @@ diesel::allow_tables_to_appear_in_same_query!(
   resource_incarnations,
   vms,
 );
+
+diesel::table! {
+    job_runs (key) {
+        key -> Uuid,
+        job_name -> Text,
+        incarnation_key -> Uuid,
+        spec_key -> Uuid,
+        operation_key -> Uuid,
+        accepted_at -> Timestamptz,
+        started_at -> Nullable<Timestamptz>,
+        finished_at -> Nullable<Timestamptz>,
+        state -> Text,
+        reason -> Nullable<Text>,
+        cancellation_requested -> Bool,
+    }
+}
+
+diesel::table! {
+    job_run_steps (run_key, step_index) {
+        run_key -> Uuid,
+        step_index -> Int4,
+        container_id -> Nullable<Text>,
+        state -> Text,
+        started_at -> Nullable<Timestamptz>,
+        finished_at -> Nullable<Timestamptz>,
+        exit_code -> Nullable<Int8>,
+        error -> Nullable<Text>,
+    }
+}

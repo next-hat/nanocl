@@ -8,7 +8,8 @@ use nanocld_client::stubs::vm_spec::{
 };
 
 use super::{
-  GenericInspectOpts, GenericRemoveOpts, GenericStartOpts, NamespacedListOpts,
+  GenericHistoryOpts, GenericInspectOpts, GenericRemoveOpts, GenericStartOpts,
+  NamespacedListOpts,
 };
 
 /// `nanocl vm` available commands
@@ -26,6 +27,8 @@ pub enum VmCommand {
   Remove(GenericRemoveOpts),
   /// Inspect a VM by canonical key
   Inspect(GenericInspectOpts),
+  /// List VM specification history or inspect a revision
+  History(GenericHistoryOpts),
   /// Start VMs by canonical keys
   Start(GenericStartOpts),
   /// Shut down VMs by canonical keys

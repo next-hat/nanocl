@@ -17,9 +17,10 @@ fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
     .unwrap_or("unix:///run/nanocl/nanocl.sock".to_owned())
     .replace("unix://", "");
   format!(
-    "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start",
+    "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start?incarnation={}",
     vars::VERSION,
-    &job.spec.name
+    &job.spec.name,
+    job.incarnation_key,
   )
 }
 

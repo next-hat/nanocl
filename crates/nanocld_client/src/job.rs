@@ -2,7 +2,10 @@ use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobInspect, JobPartial, JobSummary},
+  job::{
+    Job, JobDeleteQuery, JobHistoryQuery, JobInspect, JobPartial, JobRun,
+    JobRunInspect, JobSummary,
+  },
 };
 
 use super::http_client::NanocldClient;
@@ -44,6 +47,34 @@ impl NanocldClient {
     let res = self
       .send_get(
         &format!("{}/{name}/inspect", Self::JOB_PATH),
+        None::<String>,
+      )
+      .await?;
+    Self::res_json(res).await
+  }
+
+  /// List retained executions, including executions of deleted Job incarnations.
+  pub async fn list_history_job(
+    &self,
+    name: &str,
+    query: Option<&JobHistoryQuery>,
+  ) -> HttpClientResult<Vec<JobRun>> {
+    let res = self
+      .send_get(&format!("{}/{name}/histories", Self::JOB_PATH), query)
+      .await?;
+    Self::res_json(res).await
+  }
+
+  /// Inspect a retained run, its pinned definition, operation, and ordered steps.
+  /// This does not require a live Job or retained Docker containers/logs.
+  pub async fn inspect_history_job(
+    &self,
+    name: &str,
+    run: &str,
+  ) -> HttpClientResult<JobRunInspect> {
+    let res = self
+      .send_get(
+        &format!("{}/{name}/histories/{run}", Self::JOB_PATH),
         None::<String>,
       )
       .await?;
@@ -92,16 +123,103 @@ impl NanocldClient {
       .await?;
     Ok(())
   }
+
+  /// Delete only if the live Job still has the inspected incarnation and run.
+  /// A missing run requires that this incarnation has not accepted a run.
+  pub async fn delete_job_if_current(
+    &self,
+    name: &str,
+    incarnation: uuid::Uuid,
+    run: Option<uuid::Uuid>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_delete(
+        &format!("{}/{name}", Self::JOB_PATH),
+        Some(JobDeleteQuery {
+          incarnation: Some(incarnation),
+          run,
+        }),
+      )
+      .await?;
+    Ok(())
+  }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::sync::{Arc, Mutex};
+
   use bollard_next::models::ContainerCreateBody as Config;
   use futures::StreamExt;
+  use ntex::web;
 
   use crate::ConnectOpts;
 
   use super::*;
+
+  async fn delete_exact_job_fixture(
+    request: web::HttpRequest,
+    query: web::types::Query<JobDeleteQuery>,
+  ) -> web::HttpResponse {
+    request
+      .app_state::<Arc<Mutex<Vec<String>>>>()
+      .unwrap()
+      .lock()
+      .unwrap()
+      .push(request.query_string().to_owned());
+    if query.run.is_some() {
+      web::HttpResponse::Conflict().json(&serde_json::json!({
+        "msg": "Job run changed before deletion",
+      }))
+    } else {
+      web::HttpResponse::Accepted().build()
+    }
+  }
+
+  #[ntex::test]
+  async fn delete_job_if_current_encodes_optional_run_and_propagates_conflict()
+  {
+    let requests = Arc::new(Mutex::new(Vec::<String>::new()));
+    let server_requests = requests.clone();
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(
+          web::WebAppConfig::new().set_state(server_requests.clone()),
+        )
+        .service(
+          web::resource(format!(
+            "/v{}/jobs/backup",
+            crate::NANOCLD_DEFAULT_VERSION
+          ))
+          .route(web::delete().to(delete_exact_job_fixture)),
+        )
+    });
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: format!("http://localhost:{}", server.addr().port()),
+      ..Default::default()
+    })
+    .unwrap();
+    let incarnation = uuid::Uuid::from_u128(1);
+    let run = uuid::Uuid::from_u128(2);
+    client
+      .delete_job_if_current("backup", incarnation, None)
+      .await
+      .unwrap();
+    let error = client
+      .delete_job_if_current("backup", incarnation, Some(run))
+      .await
+      .unwrap_err();
+    assert!(matches!(error,
+      nanocl_error::http_client::HttpClientError::HttpError(error)
+        if error.status == ntex::http::StatusCode::CONFLICT));
+    assert_eq!(
+      *requests.lock().unwrap(),
+      [
+        format!("incarnation={incarnation}"),
+        format!("incarnation={incarnation}&run={run}"),
+      ]
+    );
+  }
 
   #[ntex::test]
   async fn list_job() {

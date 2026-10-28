@@ -3,6 +3,8 @@ mod cargo_replica;
 mod distributed_mutex;
 mod event;
 mod job;
+mod job_operation;
+mod job_run;
 pub mod metric;
 mod namespace;
 mod network;

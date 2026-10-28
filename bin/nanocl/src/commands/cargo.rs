@@ -17,10 +17,10 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    CargoArg, CargoCommand, CargoCompactRow, CargoCreateOpts, CargoHistoryOpts,
-    CargoLogsOpts, CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow,
-    CargoRunOpts, CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-    ProcessStatsRow,
+    CargoArg, CargoCommand, CargoCompactRow, CargoCreateOpts, CargoLogsOpts,
+    CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow, CargoRunOpts,
+    CargoStatsOpts, GenericHistoryOpts, GenericRemoveForceOpts,
+    GenericRemoveOpts, ProcessStatsRow, SpecHistoryRow,
   },
   utils::{self, cargo::build_cargo_patch},
 };
@@ -28,6 +28,7 @@ use crate::{
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
+  history::{print_revision_history, validate_options},
 };
 
 impl GenericCommand for CargoArg {
@@ -148,12 +149,21 @@ async fn exec_cargo_patch(
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
   _args: &CargoArg,
-  opts: &CargoHistoryOpts,
+  opts: &GenericHistoryOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let histories = client.list_history_cargo(&opts.key).await?;
-  utils::print::print_yml(histories)?;
-  Ok(())
+  validate_options(opts)?;
+  let mut histories = client.list_history_cargo(&opts.key).await?;
+  histories.sort_by_key(|revision| {
+    std::cmp::Reverse((revision.created_at, revision.key))
+  });
+  print_revision_history(
+    opts,
+    &cli_conf.user_config.display_format,
+    histories,
+    |revision| revision.key,
+    SpecHistoryRow::from,
+  )
 }
 
 /// Execute the `nanocl cargo logs` command to list the logs of a cargo
