@@ -343,6 +343,13 @@ coordinator restart does not prove that the remote worker stopped. Such work
 remains pending when completion cannot be established; this release adds no
 distributed failover or participant-recovery protocol.
 
+Stop and restart currently execute on the accepting node. If durable replica
+assignments or existing processes require another node, these requests are
+rejected before operation admission. Remote start errors, including validation
+rejections, remain pending because one rejected request does not prove that no
+other request for the same operation is executing. Safely releasing ownership
+requires durable participant tracking, which is outside this release.
+
 The schema requires a fresh cluster recreated from Statefiles. There is no
 upgrade/backfill or rolling migration path. Recreating an installation remains
 an explicit operator action.

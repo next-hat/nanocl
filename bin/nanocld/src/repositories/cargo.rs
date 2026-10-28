@@ -17,8 +17,9 @@ use nanocl_stubs::{
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
-    CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb, Pool,
-    ProcessDb, ResourceIncarnationDb, SpecDb, SystemState,
+    CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb,
+    OperationTransactionError, Pool, ProcessDb, ResourceIncarnationDb, SpecDb,
+    SystemState,
   },
   objects::generic::*,
   schema::cargoes,
@@ -26,6 +27,16 @@ use crate::{
 };
 
 use super::generic::*;
+
+fn map_create_error(error: diesel::result::Error) -> OperationTransactionError {
+  match error {
+    error @ diesel::result::Error::DatabaseError(
+      diesel::result::DatabaseErrorKind::UniqueViolation,
+      _,
+    ) => OperationTransactionError::State(*CargoDb::map_err(error)),
+    error => OperationTransactionError::Database(error),
+  }
+}
 
 impl RepositoryBase for CargoDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
@@ -229,16 +240,20 @@ impl CargoDb {
         }
         diesel::insert_into(resource_incarnations::table)
           .values(&identity)
-          .execute(conn)?;
+          .execute(conn)
+          .map_err(map_create_error)?;
         let spec = diesel::insert_into(specs::table)
           .values(&spec)
-          .get_result::<SpecDb>(conn)?;
+          .get_result::<SpecDb>(conn)
+          .map_err(map_create_error)?;
         let status = diesel::insert_into(object_process_statuses::table)
           .values(&status)
-          .get_result::<ObjPsStatusDb>(conn)?;
+          .get_result::<ObjPsStatusDb>(conn)
+          .map_err(map_create_error)?;
         let cargo = diesel::insert_into(cargoes::table)
           .values(&cargo)
-          .get_result::<CargoDb>(conn)?;
+          .get_result::<CargoDb>(conn)
+          .map_err(map_create_error)?;
         Ok(Self::transform((cargo, spec, status))?)
       })
     })
@@ -525,5 +540,41 @@ impl CargoDb {
       })
     })
     .await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn duplicate_cargo_creation_preserves_http_conflict() {
+    let error = map_create_error(diesel::result::Error::DatabaseError(
+      diesel::result::DatabaseErrorKind::UniqueViolation,
+      Box::new("duplicate Cargo identity".to_owned()),
+    ));
+    let error = IoError::from(error);
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::AlreadyExists);
+    let error = nanocl_error::http::HttpError::from(error);
+    assert_eq!(error.status, ntex::http::StatusCode::CONFLICT);
+  }
+
+  #[test]
+  fn cargo_creation_preserves_database_errors_for_transaction_retry() {
+    for kind in [
+      diesel::result::DatabaseErrorKind::SerializationFailure,
+      diesel::result::DatabaseErrorKind::ForeignKeyViolation,
+    ] {
+      let error = map_create_error(diesel::result::Error::DatabaseError(
+        kind,
+        Box::new("database failure".to_owned()),
+      ));
+      assert!(matches!(
+        error,
+        OperationTransactionError::Database(
+          diesel::result::Error::DatabaseError(_, _)
+        )
+      ));
+    }
   }
 }

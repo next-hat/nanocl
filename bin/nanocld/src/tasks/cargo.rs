@@ -126,6 +126,26 @@ fn action_name(action: &NativeEventAction) -> HttpResult<&'static str> {
   }
 }
 
+fn validate_local_action<'a>(
+  action: &str,
+  local_node: &str,
+  replica_nodes: impl IntoIterator<Item = Option<&'a str>>,
+  process_nodes: impl IntoIterator<Item = &'a str>,
+) -> HttpResult<()> {
+  if matches!(action, "stop" | "restart")
+    && (replica_nodes
+      .into_iter()
+      .flatten()
+      .any(|node| node != local_node)
+      || process_nodes.into_iter().any(|node| node != local_node))
+  {
+    return Err(HttpError::bad_request(
+      "Cargo stop and restart require every assigned replica and process to be local to this node",
+    ));
+  }
+  Ok(())
+}
+
 pub(crate) async fn accept_task<P, F>(
   key: &str,
   action: NativeEventAction,
@@ -189,7 +209,12 @@ where
     ) {
       Ok(value) => value,
       Err(error) => {
-        let _ = CargoDb::delete_mutex(&mutex.key, &state).await;
+        if let Err(cleanup) = CargoDb::delete_mutex(&mutex.key, &state).await {
+          log::error!(
+            "Cargo acceptance cleanup failed: {key} {}: {cleanup}",
+            mutex.key
+          );
+        }
         let _ = reply.send(Err(http_error(error)));
         return;
       }
@@ -198,11 +223,23 @@ where
     let accepted = match prepare(owner, lease.clone()).await {
       Ok(value) => value,
       Err(error) => {
-        if utils::operation::cleanup_owner(&lease.1, &state.inner.pool)
-          .await
-          .is_ok_and(|absent| absent)
+        match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
         {
-          let _ = CargoDb::delete_mutex(&mutex.key, &state).await;
+          Ok(true) => {
+            if let Err(cleanup) =
+              CargoDb::delete_mutex(&mutex.key, &state).await
+            {
+              log::error!(
+                "Cargo acceptance cleanup failed: {key} {}: {cleanup}",
+                mutex.key
+              );
+            }
+          }
+          Ok(false) => {}
+          Err(cleanup) => log::warn!(
+            "Cargo acceptance cleanup deferred: {key} {}: {cleanup}",
+            mutex.key
+          ),
         }
         let _ = reply.send(Err(error));
         return;
@@ -325,6 +362,26 @@ async fn accept_current(
     let cargo =
       CargoDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
         .await?;
+    // This runs with both the lifecycle and operation owner leases held, before
+    // an operation or desired status is accepted. Only start/delete dispatch
+    // work to other nodes; stop/restart operate on this node's Docker runtime.
+    if matches!(phase, "stop" | "restart") {
+      let replicas =
+        CargoReplicaDb::list_by_cargo(&prepare_key, &prepare_state.inner.pool)
+          .await?;
+      let processes = ProcessDb::read_by_kind_key(
+        &prepare_key,
+        None,
+        &prepare_state.inner.pool,
+      )
+      .await?;
+      validate_local_action(
+        phase,
+        &prepare_state.inner.config.hostname,
+        replicas.iter().map(|replica| replica.node_name.as_deref()),
+        processes.iter().map(|process| process.node_name.as_str()),
+      )?;
+    }
     let operation =
       OperationDb::new(&owner, "Cargo", &prepare_key, cargo.spec.key, phase);
     CargoDb::accept_operation(
@@ -947,6 +1004,40 @@ mod tests {
       http_error(IoError::invalid_input("Cargo", "invalid request")).status,
       ntex::http::StatusCode::BAD_REQUEST,
     );
+  }
+
+  #[test]
+  fn cargo_local_actions_reject_remote_replicas_and_processes_before_admission()
+  {
+    for action in ["stop", "restart"] {
+      assert!(
+        validate_local_action(
+          action,
+          "node-a",
+          [Some("node-a"), None],
+          ["node-a"]
+        )
+        .is_ok()
+      );
+      assert!(validate_local_action(action, "node-a", [], []).is_ok());
+      for (replicas, processes) in [
+        (vec![Some("node-b")], vec!["node-a"]),
+        (vec![Some("node-a")], vec!["node-b"]),
+        (vec![], vec!["node-b"]),
+        (vec![Some("init-test.nanocl.io")], vec![]),
+      ] {
+        let error =
+          validate_local_action(action, "node-a", replicas, processes)
+            .unwrap_err();
+        assert_eq!(error.status, ntex::http::StatusCode::BAD_REQUEST);
+      }
+    }
+    for action in ["start", "delete"] {
+      assert!(
+        validate_local_action(action, "node-a", [Some("node-b")], ["node-b"])
+          .is_ok()
+      );
+    }
   }
 
   fn node(name: &str) -> NodeDb {
