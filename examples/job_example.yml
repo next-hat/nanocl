@@ -1,5 +1,5 @@
 ApiVersion: v0.19
-# Inspect retained executions with: nanocl job history job-example
+# Inspect retained executions with: nanocl job runs job-example
 
 Jobs:
 - Name: job-example

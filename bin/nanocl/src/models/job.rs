@@ -92,8 +92,10 @@ pub enum JobCommand {
   Remove(GenericRemoveOpts),
   /// Inspect a job by its name
   Inspect(GenericInspectOpts),
-  /// List retained executions or inspect a run; Docker logs are not archived
+  /// List saved configuration revisions or inspect one by its ID
   History(GenericHistoryOpts),
+  /// List retained executions or inspect a run; Docker logs are not archived
+  Runs(GenericHistoryOpts),
   /// Show logs of a job
   Logs(JobLogsOpts),
   /// Wait for a job to finish
@@ -267,44 +269,49 @@ mod tests {
   }
 
   #[test]
-  fn job_history_parses_bounded_pages_and_run_detail() {
-    let args = JobArg::try_parse_from([
-      "job",
-      "history",
-      "backup",
-      "--limit",
-      "100",
-      "--offset",
-      "2",
-      "--display",
-      "json",
-    ])
-    .unwrap();
-    let JobCommand::History(options) = args.command else {
-      panic!("expected history command");
-    };
-    assert_eq!(options.key, "backup");
-    assert_eq!(options.limit, Some(100));
-    assert_eq!(options.offset, Some(2));
-    assert!(matches!(
-      options.display,
-      Some(crate::models::DisplayFormat::Json)
-    ));
-    let run = "00000000-0000-0000-0000-000000000001";
-    let args =
-      JobArg::try_parse_from(["job", "history", "backup", "--id", run])
-        .unwrap();
-    let JobCommand::History(options) = args.command else {
-      panic!("expected history command");
-    };
-    assert_eq!(options.id, Some(run.parse().unwrap()));
-    for invalid in [
-      vec!["job", "history", "backup", "--limit", "0"],
-      vec!["job", "history", "backup", "--limit", "101"],
-      vec!["job", "history", "backup", "--offset", "-1"],
-      vec!["job", "history", "backup", "--id", run, "--limit", "1"],
-    ] {
-      assert!(JobArg::try_parse_from(invalid).is_err());
+  fn job_history_and_runs_parse_bounded_pages_and_detail() {
+    for command in ["history", "runs"] {
+      let args = JobArg::try_parse_from([
+        "job",
+        command,
+        "backup",
+        "--limit",
+        "100",
+        "--offset",
+        "2",
+        "--display",
+        "json",
+      ])
+      .unwrap();
+      let options = match (command, args.command) {
+        ("history", JobCommand::History(options)) => options,
+        ("runs", JobCommand::Runs(options)) => options,
+        _ => panic!("expected {command} command"),
+      };
+      assert_eq!(options.key, "backup");
+      assert_eq!(options.limit, Some(100));
+      assert_eq!(options.offset, Some(2));
+      assert!(matches!(
+        options.display,
+        Some(crate::models::DisplayFormat::Json)
+      ));
+      let id = "00000000-0000-0000-0000-000000000001";
+      let args =
+        JobArg::try_parse_from(["job", command, "backup", "--id", id]).unwrap();
+      let options = match (command, args.command) {
+        ("history", JobCommand::History(options)) => options,
+        ("runs", JobCommand::Runs(options)) => options,
+        _ => panic!("expected {command} command"),
+      };
+      assert_eq!(options.id, Some(id.parse().unwrap()));
+      for invalid in [
+        vec!["job", command, "backup", "--limit", "0"],
+        vec!["job", command, "backup", "--limit", "101"],
+        vec!["job", command, "backup", "--offset", "-1"],
+        vec!["job", command, "backup", "--id", id, "--limit", "1"],
+      ] {
+        assert!(JobArg::try_parse_from(invalid).is_err());
+      }
     }
     assert!(matches!(
       JobArg::try_parse_from(["job", "stop", "backup"])
@@ -315,7 +322,7 @@ mod tests {
   }
 
   #[test]
-  fn job_history_row_preserves_identity_and_unknown_timestamps() {
+  fn job_runs_row_preserves_identity_and_unknown_timestamps() {
     let run = JobRun {
       key: uuid::Uuid::from_u128(1),
       job_name: "backup".into(),

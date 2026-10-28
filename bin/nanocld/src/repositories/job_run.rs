@@ -455,7 +455,7 @@ impl JobRunStepDb {
 }
 
 impl JobDb {
-  pub(crate) async fn history(
+  pub(crate) async fn runs(
     name: &str,
     query: &JobHistoryQuery,
     pool: &Pool,
@@ -753,7 +753,7 @@ mod tests {
         .await
         .unwrap()
     );
-    let list = JobDb::history(
+    let list = JobDb::runs(
       &fixture.job.spec.name,
       &JobHistoryQuery::default(),
       fixture.pool(),
@@ -841,7 +841,7 @@ mod tests {
     );
     fixture.refresh().await;
     assert_eq!(fixture.job.current_run_key, None);
-    let page = JobDb::history(
+    let page = JobDb::runs(
       &fixture.job.spec.name,
       &JobHistoryQuery {
         limit: Some(1),
@@ -883,7 +883,7 @@ mod tests {
     assert_eq!(fixture.job.status, status);
     assert_eq!(fixture.job.current_run_key, Some(accepted.run.key));
     assert_eq!(
-      JobDb::history(
+      JobDb::runs(
         &fixture.job.spec.name,
         &JobHistoryQuery::default(),
         fixture.pool()

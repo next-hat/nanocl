@@ -1046,7 +1046,7 @@ async fn job_runtime_real_docker_two_runs_keep_independent_history() {
     assert_eq!(current.instances.len(), 2);
     assert_eq!(current.instance_success, 2);
     assert_eq!(
-      JobDb::history(
+      JobDb::runs(
         &fixture.job.spec.name,
         &Default::default(),
         &fixture.state.inner.pool
@@ -1085,7 +1085,7 @@ async fn job_runtime_real_docker_two_runs_keep_independent_history() {
   }).await.expect("Task-owned Job cleanup could not confirm cancellation; retained fixture state requires inspection");
   // Enumerate only this fixture's retained runs, then verify each immutable ID
   // before removing it. This also cleans already completed historical steps.
-  let history = JobDb::history(
+  let history = JobDb::runs(
     &fixture.job.spec.name,
     &Default::default(),
     &fixture.state.inner.pool,

@@ -86,7 +86,12 @@ fn render_format<T: Serialize>(
       IoError::invalid_data("History output", &error.to_string())
     }),
     DisplayFormat::Toml => toml::to_string(&item).map_err(|error| {
-      IoError::invalid_data("History output", &error.to_string())
+      IoError::invalid_data(
+        "History output",
+        &format!(
+          "TOML cannot represent this history data; use --display json or --display yaml: {error}"
+        ),
+      )
     }),
   }
 }
@@ -144,6 +149,8 @@ fn render_revision_history<T: Serialize, R: Tabled>(
 
 #[cfg(test)]
 mod tests {
+  use nanocld_client::stubs::job::JobSpec;
+
   use super::*;
   use crate::models::SpecHistoryRow;
 
@@ -240,6 +247,52 @@ mod tests {
     let value: toml::Value = toml::from_str(&toml).unwrap();
     assert_eq!(value["Key"].as_str(), Some(item.key.to_string().as_str()));
     assert_eq!(value["Version"].as_str(), Some("revision-1"));
+  }
+
+  #[test]
+  fn job_history_detail_guides_toml_null_metadata_to_lossless_formats() {
+    let mut opts = options();
+    opts.id = Some(Uuid::from_u128(1));
+    let mut item = JobSpec {
+      key: opts.id.unwrap(),
+      job_key: "backup".into(),
+      version: "v0.19".into(),
+      created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+      name: "backup".into(),
+      metadata: Some(serde_json::json!({"nested": {"value": null}})),
+      ..Default::default()
+    };
+    let serializer_error = toml::to_string(&item).unwrap_err().to_string();
+    for explicit in [false, true] {
+      opts.display = explicit.then_some(DisplayFormat::Toml);
+      let default_format = if explicit {
+        DisplayFormat::Yaml
+      } else {
+        DisplayFormat::Toml
+      };
+      let error = render_detail(&opts, &default_format, &item)
+        .unwrap_err()
+        .to_string();
+      for expected in [
+        "TOML cannot represent this history data",
+        "--display json",
+        "--display yaml",
+        &serializer_error,
+      ] {
+        assert!(error.contains(expected), "{error}");
+      }
+    }
+    opts.display = Some(DisplayFormat::Json);
+    let json = render_detail(&opts, &DisplayFormat::Toml, &item).unwrap();
+    assert_eq!(serde_json::from_str::<JobSpec>(&json).unwrap(), item);
+    opts.display = Some(DisplayFormat::Yaml);
+    let yaml = render_detail(&opts, &DisplayFormat::Toml, &item).unwrap();
+    assert_eq!(serde_yaml::from_str::<JobSpec>(&yaml).unwrap(), item);
+
+    item.metadata = Some(serde_json::json!({"nested": {"value": "present"}}));
+    opts.display = None;
+    let toml = render_detail(&opts, &DisplayFormat::Toml, &item).unwrap();
+    assert_eq!(toml::from_str::<JobSpec>(&toml).unwrap(), item);
   }
 
   #[test]

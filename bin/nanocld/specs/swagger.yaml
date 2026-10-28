@@ -556,8 +556,83 @@ paths:
     get:
       tags:
       - Jobs
-      summary: List retained executions of every incarnation of a Job name.
+      summary: List saved configurations of every retained incarnation of a Job name.
       operationId: list_job_history
+      parameters:
+      - name: name
+        in: path
+        description: Job name, including a removed job
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size, 1 to 100; defaults to 50
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        description: Nonnegative offset; defaults to zero
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Configurations, newest creation first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobSpec'
+        '400':
+          description: Invalid pagination
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /jobs/{name}/histories/{id}:
+    get:
+      tags:
+      - Jobs
+      summary: Inspect a saved configuration without requiring the live Job to exist.
+      operationId: inspect_job_history
+      parameters:
+      - name: name
+        in: path
+        description: Job name, including a removed job
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        description: Saved configuration identity
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Saved Job configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobSpec'
+        '404':
+          description: Configuration does not belong to the named Job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /jobs/{name}/runs:
+    get:
+      tags:
+      - Jobs
+      summary: List retained executions of every incarnation of a Job name.
+      operationId: list_job_runs
       parameters:
       - name: name
         in: path
@@ -594,12 +669,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /jobs/{name}/histories/{run}:
+  /jobs/{name}/runs/{run}:
     get:
       tags:
       - Jobs
       summary: Inspect a retained execution without requiring the live Job to exist.
-      operationId: inspect_job_history
+      operationId: inspect_job_run
       parameters:
       - name: name
         in: path
@@ -9548,7 +9623,7 @@ components:
           description: Expected current run. With an incarnation and no run, require no run.
     JobHistoryQuery:
       type: object
-      description: Bounded Job execution history, newest accepted run first.
+      description: Bounded pagination for Job configuration history and retained executions.
       properties:
         limit:
           type:
