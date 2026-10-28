@@ -55,6 +55,8 @@ impl Modify for VersionModifier {
     node::count_node,
     node::start_node_cargo,
     node::delete_node_cargo,
+    node::start_node_cargo_operation,
+    node::delete_node_cargo_operation,
     // Network
     network::list_network,
     network::inspect_network,
@@ -151,7 +153,7 @@ impl Modify for VersionModifier {
     event::inspect_event,
     event::count_event,
   ),
-  components(schemas(Statefile, ResourceProxyRule, ResourceDnsRule, nanocl_stubs::job::JobHistoryQuery, nanocl_stubs::job::JobDeleteQuery)),
+  components(schemas(nanocl_stubs::node::DeleteNodeCargoOperationParams, Statefile, ResourceProxyRule, ResourceDnsRule, nanocl_stubs::job::JobHistoryQuery, nanocl_stubs::job::JobDeleteQuery)),
   tags(
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Networks", description = "Node-scoped Docker network inspection endpoints."),

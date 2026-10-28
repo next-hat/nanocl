@@ -34,6 +34,8 @@ pub async fn start_processes(
   if kind == ProcessKind::Job {
     crate::tasks::job::start_if_incarnation(&key, query.incarnation, state)
       .await?;
+  } else if kind == ProcessKind::Cargo {
+    crate::tasks::cargo::start(&key, state).await?;
   } else {
     utils::container::generic::emit_starting(&key, &kind, &state).await?;
   }

@@ -1,6 +1,9 @@
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::node::{DeleteNodeCargoParams, Node, StartNodeCargoParams};
+use nanocl_stubs::node::{
+  DeleteNodeCargoOperationParams, DeleteNodeCargoParams, Node,
+  StartNodeCargoOperationParams, StartNodeCargoParams,
+};
 
 use super::http_client::NanocldClient;
 
@@ -24,7 +27,29 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Start cargo instances on a node
+  /// Execute an accepted Cargo start on an operation-aware node. Never fall
+  /// back to the legacy endpoint, which cannot validate operation ownership.
+  pub async fn start_node_cargo_operation(
+    &self,
+    params: &StartNodeCargoOperationParams,
+  ) -> HttpClientResult<()> {
+    let path = format!("{}/cargoes/operations/start", Self::NODE_PATH);
+    self.send_post(&path, Some(params), None::<String>).await?;
+    Ok(())
+  }
+
+  /// Delete only the accepted Cargo incarnation on an operation-aware node.
+  pub async fn delete_node_cargo_operation(
+    &self,
+    params: &DeleteNodeCargoOperationParams,
+  ) -> HttpClientResult<()> {
+    let path = format!("{}/cargoes/operations", Self::NODE_PATH);
+    self.send_delete(&path, Some(params)).await?;
+    Ok(())
+  }
+
+  /// Legacy unfenced node request. Operation-aware daemons reject this route;
+  /// use `start_node_cargo_operation` for coordinator-accepted execution.
   ///
   /// ## Arguments
   ///
@@ -56,7 +81,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// Delete cargo instances on a node
+  /// Legacy unfenced node request. Operation-aware daemons reject this route;
+  /// use `delete_node_cargo_operation` for coordinator-accepted deletion.
   ///
   /// ## Arguments
   ///

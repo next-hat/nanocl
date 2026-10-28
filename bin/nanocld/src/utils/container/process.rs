@@ -17,7 +17,32 @@ use nanocl_stubs::{
 
 use crate::models::{ObjPsStatusDb, OperationOwner, ProcessDb, SystemState};
 
+fn create_process_error(
+  kind: &ProcessKind,
+  error: bollard_next::errors::Error,
+) -> IoError {
+  if *kind == ProcessKind::Cargo
+    && matches!(
+      error,
+      bollard_next::errors::Error::DockerResponseServerError {
+        status_code: 400 | 404 | 409,
+        ..
+      }
+    )
+  {
+    // Docker definitively rejected creation; no new runtime can appear later
+    // from this request. Keep uncertain transport/server failures pending.
+    IoError::invalid_input(
+      "Cargo process rejection",
+      "Docker rejected Cargo process creation",
+    )
+  } else {
+    *error.map_err_context(|| "CreateProcess")
+  }
+}
+
 /// Create a process (container) based on the kind and the item
+#[cfg(test)]
 pub async fn create(
   kind: &ProcessKind,
   name: &str,
@@ -64,7 +89,7 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
       config,
     )
     .await
-    .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
+    .map_err(|error| create_process_error(kind, error))?;
   let process_key = res.id;
   let result = async {
     let inspect = state
@@ -107,7 +132,7 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
   }
   .await;
   if result.is_err() {
-    let _ = state
+    let removed = state
       .inner
       .docker_api
       .remove_container(
@@ -118,24 +143,36 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
         }),
       )
       .await;
-    let _ = ProcessDb::delete_owned(
+    if *kind == ProcessKind::Cargo
+      && !matches!(
+        removed,
+        Ok(())
+          | Err(bollard_next::errors::Error::DockerResponseServerError {
+            status_code: 404,
+            ..
+          })
+      )
+    {
+      return Err(IoError::interrupted(
+        "Cargo rollback",
+        "Docker did not confirm cleanup of the newly created Cargo process",
+      ));
+    }
+    let deleted = ProcessDb::delete_owned(
       &process_key,
       owner,
       keepalive,
       &state.inner.pool,
     )
     .await;
+    if *kind == ProcessKind::Cargo && deleted.is_err() {
+      return Err(IoError::interrupted(
+        "Cargo rollback",
+        "Cargo process cleanup could not be committed under its accepted owner",
+      ));
+    }
   }
   result
-}
-
-/// Delete a single instance (container) by his name
-pub async fn delete_instance(
-  pk: &str,
-  opts: Option<RemoveContainerOptions>,
-  state: &SystemState,
-) -> IoResult<()> {
-  delete_instance_owned(pk, opts, None, (), state).await
 }
 
 pub(crate) async fn delete_instance_owned<G: Send + 'static>(
@@ -329,4 +366,43 @@ pub(crate) async fn start_instances_owned<G: Send + 'static>(
       .await?;
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn cargo_create_rejection_is_definitive_without_changing_other_kinds() {
+    let response =
+      |status_code| bollard_next::errors::Error::DockerResponseServerError {
+        status_code,
+        message: "Docker response".into(),
+      };
+    for status in [400, 404, 409] {
+      let error = create_process_error(&ProcessKind::Cargo, response(status));
+      assert_eq!(error.context(), Some("Cargo process rejection"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      for kind in [ProcessKind::Vm, ProcessKind::Job] {
+        assert_eq!(
+          create_process_error(&kind, response(status)).context(),
+          Some("CreateProcess"),
+        );
+      }
+    }
+    assert_eq!(
+      create_process_error(&ProcessKind::Cargo, response(500)).context(),
+      Some("CreateProcess"),
+    );
+    let transport = bollard_next::errors::Error::IOError {
+      err: std::io::Error::new(
+        std::io::ErrorKind::ConnectionReset,
+        "unconfirmed",
+      ),
+    };
+    assert_eq!(
+      create_process_error(&ProcessKind::Cargo, transport).context(),
+      Some("CreateProcess"),
+    );
+  }
 }

@@ -245,6 +245,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     }
     // Recovery also retries when the initial runtime inventory was unavailable.
     utils::container::vm::recovery::spawn(&recovery_state);
+    utils::container::cargo::recovery::spawn(&recovery_state);
     utils::container::job::spawn_reconciliation(&recovery_state);
     Ok::<_, IoError>(())
   });

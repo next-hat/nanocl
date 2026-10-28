@@ -8,6 +8,7 @@ diesel::table! {
         spec_key -> Uuid,
         status_key -> Varchar,
         namespace_name -> Varchar,
+        incarnation_key -> Uuid,
     }
 }
 
@@ -244,6 +245,7 @@ diesel::table! {
 }
 
 diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(cargoes -> resource_incarnations (incarnation_key));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(cargo_replica_processes -> cargo_replicas (replica_key));

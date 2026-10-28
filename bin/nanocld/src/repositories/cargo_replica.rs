@@ -7,8 +7,8 @@ use nanocl_error::io::{IoError, IoResult};
 use crate::{
   models::{
     CargoReplicaAssignment, CargoReplicaDb, CargoReplicaProcessDb,
-    CargoReplicaProcessRole, CargoReplicaProcessUpdateDb, CargoReplicaUpdateDb,
-    NewCargoReplicaDb, NewCargoReplicaProcessDb, Pool,
+    CargoReplicaProcessUpdateDb, CargoReplicaUpdateDb,
+    NewCargoReplicaProcessDb, OperationOwner, Pool,
   },
   schema::{cargo_replica_processes, cargo_replicas, cargoes, nodes},
   utils::{
@@ -25,8 +25,76 @@ use crate::{
 
 use super::generic::RepositoryBase;
 
+#[cfg(test)]
+use crate::models::{CargoReplicaProcessRole, NewCargoReplicaDb};
+
 impl RepositoryBase for CargoReplicaDb {}
 impl RepositoryBase for CargoReplicaProcessDb {}
+
+fn owned_replica(
+  conn: &mut PgConnection,
+  key: uuid::Uuid,
+  owner: Option<&OperationOwner>,
+) -> super::operation::TransactionResult<CargoReplicaDb> {
+  let replica = cargo_replicas::table
+    .find(key)
+    .for_update()
+    .select(CargoReplicaDb::as_select())
+    .first::<CargoReplicaDb>(conn)?;
+  if let Some(owner) = owner {
+    let cargo = cargoes::table
+      .find(&replica.cargo_key)
+      .first::<crate::models::CargoDb>(conn)?;
+    if owner.resource_kind != "Cargo"
+      || owner.resource_key != replica.cargo_key
+      || cargo.incarnation_key != owner.incarnation_key
+    {
+      return Err(super::operation::conflict(
+        "Cargo replica does not belong to its operation",
+      ));
+    }
+  }
+  Ok(replica)
+}
+
+fn validate_attachment(
+  conn: &mut PgConnection,
+  replica: &CargoReplicaDb,
+  process_key: Option<&str>,
+  owner: Option<&OperationOwner>,
+) -> super::operation::TransactionResult<()> {
+  let (Some(key), Some(owner)) = (process_key, owner) else {
+    return Ok(());
+  };
+  let process = crate::schema::processes::table
+    .find(key)
+    .for_update()
+    .first::<crate::models::ProcessDb>(conn)?;
+  process.validate_owned_process(conn, owner, false)?;
+  if process.kind != "cargo"
+    || process.kind_key != owner.resource_key
+    || process
+      .data
+      .get("Config")
+      .and_then(|config| config.get("Labels"))
+      .and_then(|labels| {
+        labels.get(crate::utils::container::cargo_compiler::LABEL_REPLICA)
+      })
+      .and_then(serde_json::Value::as_str)
+      .and_then(|key| key.parse::<uuid::Uuid>().ok())
+      != Some(replica.key)
+    || !replica.node_name.as_deref().is_some_and(|node| {
+      node == process.node_name
+        || (node == "init-test.nanocl.io"
+          && process.node_name == owner.node_name)
+    })
+  {
+    return Err(super::operation::conflict(
+      "Cargo process does not belong to its assigned replica",
+    ));
+  }
+  Ok(())
+}
 
 async fn run_query<T, F>(
   pool: &Pool,
@@ -219,9 +287,46 @@ where
 }
 
 impl CargoReplicaDb {
+  pub(crate) async fn reconcile_assignments_owned<G: Send + 'static>(
+    cargo_key: &str,
+    selection: &SelectionPlan,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Vec<CargoReplicaAssignment>> {
+    let cargo_key = cargo_key.to_owned();
+    let selection = selection.clone();
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      if let Some(owner) = &expected_owner {
+        let cargo = cargoes::table
+          .find(&cargo_key)
+          .for_update()
+          .first::<crate::models::CargoDb>(conn)?;
+        if owner.resource_kind != "Cargo"
+          || owner.resource_key != cargo.key
+          || owner.incarnation_key != cargo.incarnation_key
+        {
+          return Err(super::operation::conflict(
+            "Cargo assignment operation has another identity",
+          ));
+        }
+      }
+      reconcile_assignments_on_conn(conn, &cargo_key, &selection, &mut |_| {
+        Ok(())
+      })
+      .map_err(|error| match error {
+        CargoReplicaTransactionError::Database(error) => error.into(),
+        other => crate::models::OperationTransactionError::State(other.into()),
+      })
+    })
+    .await
+  }
+
   /// Atomically reconcile stable replica identities and node assignments for
   /// one Cargo, returning the committed source-of-truth assignments in ordinal
   /// order.
+  #[cfg(test)]
   pub(crate) async fn reconcile_assignments(
     cargo_key: &str,
     selection: &SelectionPlan,
@@ -236,6 +341,7 @@ impl CargoReplicaDb {
     .await
   }
 
+  #[cfg(test)]
   async fn reconcile_assignments_with_hook<F>(
     cargo_key: &str,
     selection: &SelectionPlan,
@@ -268,6 +374,7 @@ impl CargoReplicaDb {
   }
 
   /// Create one stable Cargo replica identity.
+  #[cfg(test)]
   pub(crate) async fn create(
     replica: NewCargoReplicaDb,
     pool: &Pool,
@@ -325,7 +432,174 @@ impl CargoReplicaDb {
 }
 
 impl CargoReplicaProcessDb {
+  pub(crate) async fn create_owned<G: Send + 'static>(
+    process: NewCargoReplicaProcessDb,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let replica =
+        owned_replica(conn, process.replica_key, expected_owner.as_ref())?;
+      validate_attachment(
+        conn,
+        &replica,
+        process.process_key.as_deref(),
+        expected_owner.as_ref(),
+      )?;
+      Ok(
+        diesel::insert_into(cargo_replica_processes::table)
+          .values(&process)
+          .returning(Self::as_returning())
+          .get_result(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn attach_process_owned<G: Send + 'static>(
+    key: uuid::Uuid,
+    process_key: &str,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    Self::set_process_owned(key, Some(process_key), owner, keepalive, pool)
+      .await
+  }
+
+  pub(crate) async fn clear_process_owned<G: Send + 'static>(
+    key: uuid::Uuid,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    Self::set_process_owned(key, None, owner, keepalive, pool).await
+  }
+
+  async fn set_process_owned<G: Send + 'static>(
+    key: uuid::Uuid,
+    process_key: Option<&str>,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    let update = CargoReplicaProcessUpdateDb::process(process_key);
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let mapping = cargo_replica_processes::table
+        .find(key)
+        .for_update()
+        .select(Self::as_select())
+        .first::<Self>(conn)?;
+      let replica =
+        owned_replica(conn, mapping.replica_key, expected_owner.as_ref())?;
+      validate_attachment(
+        conn,
+        &replica,
+        update.process_key.as_deref(),
+        expected_owner.as_ref(),
+      )?;
+      Ok(
+        diesel::update(cargo_replica_processes::table.find(key))
+          .set(&update)
+          .returning(Self::as_returning())
+          .get_result(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn set_processes_owned<G: Send + 'static>(
+    attachments: Vec<(uuid::Uuid, Option<String>, bool)>,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Vec<Self>> {
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let mut keys = attachments
+        .iter()
+        .map(|(key, _, _)| *key)
+        .collect::<Vec<_>>();
+      keys.sort_unstable();
+      keys.dedup();
+      let mappings = cargo_replica_processes::table
+        .filter(cargo_replica_processes::key.eq_any(&keys))
+        .order(cargo_replica_processes::key.asc())
+        .for_update()
+        .select(Self::as_select())
+        .load::<Self>(conn)?;
+      if mappings
+        .iter()
+        .map(|mapping| mapping.key)
+        .collect::<Vec<_>>()
+        != keys
+      {
+        return Err(diesel::result::Error::NotFound.into());
+      }
+      for mapping in &mappings {
+        let replica =
+          owned_replica(conn, mapping.replica_key, expected_owner.as_ref())?;
+        for (_, process, _) in
+          attachments.iter().filter(|(key, _, _)| *key == mapping.key)
+        {
+          validate_attachment(
+            conn,
+            &replica,
+            process.as_deref(),
+            expected_owner.as_ref(),
+          )?;
+        }
+      }
+      let now = chrono::Utc::now().naive_utc();
+      for (key, process_key, essential) in &attachments {
+        diesel::update(cargo_replica_processes::table.find(key))
+          .set((
+            cargo_replica_processes::process_key.eq(process_key),
+            cargo_replica_processes::essential.eq(essential),
+            cargo_replica_processes::updated_at.eq(now),
+          ))
+          .execute(conn)?;
+      }
+      Ok(
+        cargo_replica_processes::table
+          .filter(cargo_replica_processes::key.eq_any(&keys))
+          .order(cargo_replica_processes::key.asc())
+          .select(Self::as_select())
+          .load(conn)?,
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn delete_owned<G: Send + 'static>(
+    key: uuid::Uuid,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let Some(mapping) = cargo_replica_processes::table
+        .find(key)
+        .for_update()
+        .select(Self::as_select())
+        .first::<Self>(conn)
+        .optional()?
+      else {
+        return Ok(());
+      };
+      owned_replica(conn, mapping.replica_key, expected_owner.as_ref())?;
+      diesel::delete(cargo_replica_processes::table.find(key)).execute(conn)?;
+      Ok(())
+    })
+    .await
+  }
+
   /// Create one stable logical Cargo process mapping.
+  #[cfg(test)]
   pub(crate) async fn create(
     process: NewCargoReplicaProcessDb,
     pool: &Pool,
@@ -368,6 +642,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Find one mapping by its stable logical identity.
+  #[cfg(test)]
   pub(crate) async fn find(
     replica_key: uuid::Uuid,
     role: CargoReplicaProcessRole,
@@ -392,6 +667,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Attach a concrete generic process to this logical mapping.
+  #[cfg(test)]
   pub(crate) async fn attach_process(
     key: uuid::Uuid,
     process_key: &str,
@@ -405,6 +681,7 @@ impl CargoReplicaProcessDb {
   /// Every requested mapping is locked before any update. This keeps a
   /// multi-container replica from exposing a partially promoted generation if
   /// one attachment fails.
+  #[cfg(test)]
   pub(crate) async fn set_processes(
     attachments: Vec<(uuid::Uuid, Option<String>, bool)>,
     pool: &Pool,
@@ -453,6 +730,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Clear a missing or deleted concrete process while preserving identity.
+  #[cfg(test)]
   pub(crate) async fn clear_process(
     key: uuid::Uuid,
     pool: &Pool,
@@ -460,6 +738,7 @@ impl CargoReplicaProcessDb {
     Self::set_process(key, None, pool).await
   }
 
+  #[cfg(test)]
   async fn set_process(
     key: uuid::Uuid,
     process_key: Option<&str>,
@@ -481,6 +760,7 @@ impl CargoReplicaProcessDb {
   }
 
   /// Delete one logical process mapping.
+  #[cfg(test)]
   pub(crate) async fn delete(key: uuid::Uuid, pool: &Pool) -> IoResult<()> {
     run_query(
       pool,

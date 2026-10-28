@@ -4,8 +4,8 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{cargo::Cargo, node::CargoReplicaTask, process::Process};
 
 use crate::models::{
-  CargoReplicaProcessRole, CompileDeclaredOpts, EnsureExistingSlotOpts,
-  SystemState,
+  CargoReplicaProcessRole, CargoRuntimeContext, CompileDeclaredOpts,
+  EnsureExistingSlotOpts,
 };
 
 use super::{
@@ -19,7 +19,7 @@ pub(super) async fn reconcile_containers(
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for declared in &cargo.spec.init_containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -64,7 +64,7 @@ pub(super) async fn create_candidate_containers(
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for declared in &cargo.spec.init_containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -116,7 +116,10 @@ pub(super) async fn create_candidate_containers(
   Ok(())
 }
 
-async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
+async fn wait_init(
+  process: &Process,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
   let inspected = inspect_process(&process.key, state).await?;
   let container_state = inspected.state.as_ref();
   let running = container_state

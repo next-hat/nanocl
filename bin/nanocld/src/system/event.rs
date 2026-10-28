@@ -6,7 +6,7 @@ use nanocl_stubs::{
   generic::GenericFilter,
   system::{
     Event, EventActor, EventActorKind, EventKind, NativeEventAction,
-    ObjPsHealthStatusKind, ObjPsStatusKind,
+    ObjPsStatusKind,
   },
 };
 
@@ -35,10 +35,6 @@ fn starting(
   state: &SystemState,
 ) -> Option<ObjTaskFuture> {
   match actor.kind {
-    EventActorKind::Cargo => {
-      let task = CargoDb::create_start_task(key, state);
-      Some(task)
-    }
     EventActorKind::Vm => {
       let task = VmDb::create_start_task(key, state);
       Some(task)
@@ -56,11 +52,6 @@ fn destroying(
   state: &SystemState,
 ) -> Option<ObjTaskFuture> {
   match actor.kind {
-    EventActorKind::Cargo => {
-      log::debug!("handling delete event for cargo {key}");
-      let task = CargoDb::create_delete_task(key, state);
-      Some(task)
-    }
     EventActorKind::Vm => {
       let task = VmDb::create_delete_task(key, state);
       Some(task)
@@ -75,10 +66,6 @@ fn updating(
   state: &SystemState,
 ) -> Option<ObjTaskFuture> {
   match actor.kind {
-    EventActorKind::Cargo => {
-      let task = CargoDb::create_update_task(key, state);
-      Some(task)
-    }
     EventActorKind::Vm => {
       let task = VmDb::create_update_task(key, state);
       Some(task)
@@ -112,24 +99,35 @@ async fn update(
         }
       };
       log::debug!("found {} cargoes using secret {key}", cargoes.len());
-      for cargo in &cargoes {
-        ObjPsStatusDb::update_health_status(
-          &cargo.spec.cargo_key,
-          &ObjPsHealthStatusKind::Unknown,
-          &state.inner.pool,
-        )
-        .await
-        .ok();
-        ObjPsStatusDb::update_actual_status(
-          &cargo.spec.cargo_key,
-          &ObjPsStatusKind::Updating,
-          &state.inner.pool,
-        )
-        .await
-        .ok();
-        state
-          .emit_normal_native_action_sync(cargo, NativeEventAction::Updating)
-          .await;
+      for cargo in cargoes {
+        // Preserve the existing completion barrier, then accept a refresh of
+        // the captured revision. Waiting outside the serial event loop lets
+        // rollout handoff events reach subscribers before retained cleanup.
+        let state = state.clone();
+        ntex::rt::spawn(async move {
+          state
+            .inner
+            .task_manager
+            .wait_task(&format!("Cargo@{}", cargo.spec.cargo_key))
+            .await;
+          if let Err(error) = crate::tasks::cargo::refresh(
+            &cargo.spec.cargo_key,
+            cargo.spec.key,
+            &state,
+          )
+          .await
+          {
+            log::warn!(
+              "unable to refresh Cargo {} after secret change: {error}",
+              cargo.spec.cargo_key
+            );
+            state.emit_error_native_action(
+              &cargo,
+              NativeEventAction::Update,
+              Some("Secret refresh could not acquire ownership of the captured Cargo revision".into()),
+            );
+          }
+        });
       }
       None
     }
@@ -143,10 +141,6 @@ fn stopping(
   state: &SystemState,
 ) -> Option<ObjTaskFuture> {
   match actor.kind {
-    EventActorKind::Cargo => {
-      let task = CargoDb::create_stop_task(key, state);
-      Some(task)
-    }
     EventActorKind::Vm => {
       let task = VmDb::create_stop_task(key, state);
       Some(task)
@@ -260,9 +254,9 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
       };
       let state = state_ptr.clone();
       let key = actor.key.clone().unwrap_or_default();
-      // VM tasks release only the mutex they acquired, including on failure.
+      // Owned tasks release only the mutex they acquired, including on failure.
       // A generic resource-key cleanup could delete a subsequent operation's lock.
-      if actor.kind != EventActorKind::Vm
+      if !matches!(actor.kind, EventActorKind::Vm | EventActorKind::Cargo)
         && let Err(err) = DistributedMutexDb::del_lock(
           &actor.kind.to_string(),
           &key,
@@ -272,9 +266,9 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
       {
         log::error!("Failed to release lock for {} {key}: {err}", actor.kind);
       }
-      // VM operations record failure/observed state under their lifecycle
+      // Owned operations record failure/observed state under their lifecycle
       // guard. This later callback must not overwrite a newer operation.
-      if actor.kind != EventActorKind::Vm {
+      if !matches!(actor.kind, EventActorKind::Vm | EventActorKind::Cargo) {
         ObjPsStatusDb::update_actual_status(
           &key,
           &ObjPsStatusKind::Fail,

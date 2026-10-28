@@ -8,7 +8,8 @@ use nanocl_stubs::{
 };
 
 use super::{
-  CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole, SystemState,
+  CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+  CargoRuntimeContext, SystemState,
 };
 
 pub(crate) type ProcessesByKey<'a> = HashMap<&'a str, &'a Process>;
@@ -34,7 +35,7 @@ pub(crate) struct EnsureExistingSlotOpts<'a> {
   pub(crate) container_name: &'a str,
   pub(crate) essential: bool,
   pub(crate) config: &'a DockerConfig,
-  pub(crate) state: &'a SystemState,
+  pub(crate) state: &'a CargoRuntimeContext,
 }
 
 pub(crate) struct ValidateRestartSlotOpts<'opts, 'process> {

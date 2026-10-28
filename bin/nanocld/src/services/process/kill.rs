@@ -58,6 +58,17 @@ pub async fn kill_process(
     .id
     .as_deref()
     .ok_or_else(|| HttpError::conflict("Process has no container identity"))?;
+  if let Some(key) = super::stop::managed_cargo_runtime_key(&runtime)? {
+    crate::tasks::cargo::process_action(
+      &key,
+      id,
+      "signal",
+      Some(&payload.signal),
+      state,
+    )
+    .await?;
+    return Ok(web::HttpResponse::Ok().build());
+  }
   let _guard = lock_vm_signal(&runtime, &payload.signal).await?;
   state
     .inner

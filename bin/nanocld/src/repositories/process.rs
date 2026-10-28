@@ -124,6 +124,117 @@ impl ProcessDb {
       && self.node_name == owner.node_name
   }
 
+  /// Cargo workers may execute on an assigned node other than the coordinator.
+  /// Keep the coordinator owner exact and prove process membership in SQL.
+  pub(super) fn validate_owned_process(
+    &self,
+    conn: &mut PgConnection,
+    owner: &OperationOwner,
+    creating: bool,
+  ) -> super::operation::TransactionResult<()> {
+    use crate::{
+      models::{CargoDb, CargoReplicaDb, OperationDb, SpecDb},
+      schema::{cargo_replicas, cargoes, operations, specs},
+      utils::container::{cargo, cargo_compiler},
+    };
+    let reject = || {
+      super::operation::conflict(
+        "Process does not belong to its operation owner",
+      )
+    };
+    if owner.resource_kind != "Cargo" {
+      return if self.belongs_to_operation(owner) {
+        Ok(())
+      } else {
+        Err(reject())
+      };
+    }
+    let live = cargoes::table
+      .find(&owner.resource_key)
+      .for_update()
+      .first::<CargoDb>(conn)?;
+    if self.kind != "cargo"
+      || self.kind_key != owner.resource_key
+      || live.incarnation_key != owner.incarnation_key
+      || self.data.get("Id").and_then(serde_json::Value::as_str)
+        != Some(self.key.as_str())
+    {
+      return Err(reject());
+    }
+    let labels = self
+      .data
+      .get("Config")
+      .and_then(|config| config.get("Labels"))
+      .and_then(serde_json::Value::as_object)
+      .ok_or_else(reject)?;
+    let label = |key: &str| labels.get(key).and_then(serde_json::Value::as_str);
+    if label(cargo_compiler::LABEL_KIND) != Some("cargo")
+      || label(cargo_compiler::LABEL_CARGO_KEY)
+        != Some(owner.resource_key.as_str())
+    {
+      return Err(reject());
+    }
+    let parse = |value: Option<&str>| {
+      value
+        .and_then(|value| value.parse::<uuid::Uuid>().ok())
+        .ok_or_else(reject)
+    };
+    let replica = cargo_replicas::table
+      .find(parse(label(cargo_compiler::LABEL_REPLICA))?)
+      .for_update()
+      .select(CargoReplicaDb::as_select())
+      .first::<CargoReplicaDb>(conn)?;
+    let ordinal = label(cargo_compiler::LABEL_REPLICA_ORDINAL)
+      .and_then(|value| value.parse::<i32>().ok())
+      .ok_or_else(reject)?;
+    if replica.cargo_key != self.kind_key
+      || ordinal < 0
+      || replica.ordinal != ordinal
+      || !replica.node_name.as_deref().is_some_and(|node| {
+        node == self.node_name
+          || (node == "init-test.nanocl.io"
+            && self.node_name == owner.node_name)
+      })
+    {
+      return Err(reject());
+    }
+    let identity_labels = [
+      cargo::LABEL_INCARNATION,
+      cargo::LABEL_SPEC,
+      cargo::LABEL_OPERATION,
+    ];
+    if identity_labels.iter().all(|key| !labels.contains_key(*key)) {
+      // Installer containers predate operation labels. Their durable replica
+      // UUID survives promotion but is deleted with this Cargo incarnation.
+      // New runtime creation still requires the exact accepted operation.
+      return if creating { Err(reject()) } else { Ok(()) };
+    }
+    let incarnation = parse(label(cargo::LABEL_INCARNATION))?;
+    let spec_key = parse(label(cargo::LABEL_SPEC))?;
+    let operation_key = parse(label(cargo::LABEL_OPERATION))?;
+    if incarnation != owner.incarnation_key
+      || (creating && operation_key != owner.key)
+    {
+      return Err(reject());
+    }
+    let operation = operations::table
+      .find(operation_key)
+      .first::<OperationDb>(conn)?;
+    let spec = specs::table.find(spec_key).first::<SpecDb>(conn)?;
+    if operation.incarnation_key != incarnation
+      || operation.resource_kind != "Cargo"
+      || operation.resource_key != self.kind_key
+      || operation.spec_key != spec_key
+      || spec.incarnation_key != Some(incarnation)
+      || spec.kind_name != "Cargo"
+      || spec.kind_key != self.kind_key
+      || (creating && live.spec_key != spec_key)
+    {
+      return Err(reject());
+    }
+    Ok(())
+  }
+
   pub(crate) async fn create_owned<G: Send + 'static>(
     item: &ProcessPartial,
     owner: Option<OperationOwner>,
@@ -131,24 +242,85 @@ impl ProcessDb {
     pool: &Pool,
   ) -> IoResult<Self> {
     let item = Self::from(item);
-    if owner
-      .as_ref()
-      .is_some_and(|owner| !item.belongs_to_operation(owner))
-    {
-      return Err(
-        super::operation::conflict(
-          "Process does not belong to its operation owner",
-        )
-        .into(),
-      );
-    }
+    let expected_owner = owner.clone();
     super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      if let Some(owner) = &expected_owner {
+        item.validate_owned_process(conn, owner, true)?;
+      }
       Ok(
         diesel::insert_into(processes::table)
           .values(&item)
           .get_result(conn)?,
       )
     })
+    .await
+  }
+
+  pub(crate) async fn update_owned<G: Send + 'static>(
+    key: &str,
+    update: ProcessUpdateDb,
+    owner: Option<OperationOwner>,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<Self> {
+    let key = key.to_owned();
+    if update.key.as_ref().is_some_and(|updated| updated != &key) {
+      return Err(
+        super::operation::conflict(
+          "Owned process update cannot change its immutable ID",
+        )
+        .into(),
+      );
+    }
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(pool, keepalive, owner, move |conn| {
+      let process = processes::table
+        .find(&key)
+        .for_update()
+        .first::<Self>(conn)?;
+      if let Some(owner) = &expected_owner {
+        process.validate_owned_process(conn, owner, false)?;
+      }
+      let process = diesel::update(processes::table.find(&key))
+        .set(&update)
+        .get_result::<Self>(conn)?;
+      if let Some(owner) = &expected_owner {
+        process.validate_owned_process(conn, owner, false)?;
+      }
+      Ok(process)
+    })
+    .await
+  }
+
+  /// Verify the exact process before an external Cargo runtime mutation.
+  pub(crate) async fn validate_cargo_owned<G: Send + 'static>(
+    key: &str,
+    owner: OperationOwner,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    if owner.resource_kind != "Cargo" {
+      return Err(
+        super::operation::conflict(
+          "Cargo process validation has no exact operation owner",
+        )
+        .into(),
+      );
+    }
+    let key = key.to_owned();
+    let expected_owner = owner.clone();
+    super::operation::run_mutation_owned(
+      pool,
+      keepalive,
+      Some(owner),
+      move |conn| {
+        let process = processes::table
+          .find(&key)
+          .for_update()
+          .first::<Self>(conn)?;
+        process.validate_owned_process(conn, &expected_owner, false)
+      },
+    )
     .await
   }
 
@@ -164,11 +336,8 @@ impl ProcessDb {
       if let Some(owner) = &expected_owner
         && let Some(process) =
           processes::table.find(&key).first::<Self>(conn).optional()?
-        && !process.belongs_to_operation(owner)
       {
-        return Err(super::operation::conflict(
-          "Process does not belong to its operation owner",
-        ));
+        process.validate_owned_process(conn, owner, false)?;
       }
       diesel::delete(processes::table.find(&key)).execute(conn)?;
       Ok(())
