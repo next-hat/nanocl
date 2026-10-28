@@ -54,6 +54,8 @@ Job. This is the revision's `Key`, not a run UUID.
 Lists support `yaml` or `json` and default to a table. Detail with **--id**
 supports `yaml`, `json`, or `toml` and defaults to the configured inspection
 format, normally YAML. TOML requires **--id**.
+TOML cannot represent every metadata value, such as nested `null`; use
+`--display json` or `--display yaml` in that case.
 
 ## EXAMPLES
 
