@@ -16,13 +16,13 @@ stop - Stop the current Job execution
 
 Request stopping the current execution of each named Job and prevent later
 steps from launching. The command acknowledges the control request; inspect
-history for the confirmed outcome. Retained execution history remains available through
-`nanocl job history`. Runtime observation failures remain visible and do not
+runs for the confirmed outcome. Retained executions remain available through
+`nanocl job runs`. Runtime observation failures remain visible and do not
 invent successful outcomes.
 
 ## EXAMPLES
 
 ```sh
 nanocl job stop backup
-nanocl job history backup
+nanocl job runs backup
 ```

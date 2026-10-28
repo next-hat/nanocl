@@ -5,7 +5,7 @@ use nanocl_stubs::job::JobHistoryQuery;
 
 use crate::models::{JobDb, SystemState};
 
-/// List retained executions of every incarnation of a Job name.
+/// List saved configurations of every retained incarnation of a Job name.
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Jobs",
@@ -16,7 +16,7 @@ use crate::models::{JobDb, SystemState};
     ("offset" = Option<i64>, Query, description = "Nonnegative offset; defaults to zero"),
   ),
   responses(
-    (status = 200, description = "Runs, newest acceptance first", body = Vec<nanocl_stubs::job::JobRun>),
+    (status = 200, description = "Configurations, newest creation first", body = Vec<nanocl_stubs::job::JobSpec>),
     (status = 400, description = "Invalid pagination", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -27,22 +27,22 @@ pub async fn list_job_history(
   query: web::types::Query<JobHistoryQuery>,
 ) -> HttpResult<web::HttpResponse> {
   query.validate().map_err(HttpError::bad_request)?;
-  let runs = JobDb::history(&path.1, &query, &state.inner.pool).await?;
-  Ok(web::HttpResponse::Ok().json(&runs))
+  let specs = JobDb::history(&path.1, &query, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&specs))
 }
 
-/// Inspect a retained execution without requiring the live Job to exist.
+/// Inspect a saved configuration without requiring the live Job to exist.
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Jobs",
-  path = "/jobs/{name}/histories/{run}",
+  path = "/jobs/{name}/histories/{id}",
   params(
     ("name" = String, Path, description = "Job name, including a removed job"),
-    ("run" = uuid::Uuid, Path, description = "Retained execution identity"),
+    ("id" = uuid::Uuid, Path, description = "Saved configuration identity"),
   ),
   responses(
-    (status = 200, description = "Pinned definition, initiating operation, and ordered step results; Docker logs are not archived", body = nanocl_stubs::job::JobRunInspect),
-    (status = 404, description = "Run does not belong to the named Job", body = crate::services::openapi::ApiError),
+    (status = 200, description = "Saved Job configuration", body = nanocl_stubs::job::JobSpec),
+    (status = 404, description = "Configuration does not belong to the named Job", body = crate::services::openapi::ApiError),
   ),
 ))]
 pub async fn inspect_job_history(
@@ -50,8 +50,8 @@ pub async fn inspect_job_history(
   _request_state: (),
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
-  let run = JobDb::inspect_run(&path.1, path.2, &state.inner.pool).await?;
-  Ok(web::HttpResponse::Ok().json(&run))
+  let spec = JobDb::history_spec(&path.1, path.2, &state.inner.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&spec))
 }
 
 #[cfg(test)]
@@ -101,7 +101,7 @@ mod tests {
   /// Real admission/persistence and HTTP/client serialization; runtime evidence
   /// is simulated through the same guarded step writes as the executor.
   #[ntex::test]
-  async fn job_history_api_client_retains_runs_after_delete_and_recreation() {
+  async fn job_history_and_runs_retain_configurations_after_recreation() {
     // Use the shared integration fixture, including its prepared CI defaults.
     // NANOCL_TEST_STORE_ADDR and NANOCL_TEST_STATE_DIR remain optional overrides.
     let system = gen_default_test_system().await;
@@ -129,6 +129,10 @@ mod tests {
     let mut job = JobDb::create_with_spec(&original, "v0.19", pool)
       .await
       .unwrap();
+    // A configuration is visible before its first execution.
+    let revisions = client.list_history_job(&name, None).await.unwrap();
+    assert_eq!(revisions, vec![job.spec.clone()]);
+    assert!(client.list_runs_job(&name, None).await.unwrap().is_empty());
     let mut runs = Vec::new();
     for _ in 0..2 {
       let accepted =
@@ -141,7 +145,7 @@ mod tests {
           .unwrap()
       );
       let detail = client
-        .inspect_history_job(&name, &accepted.run.key.to_string())
+        .inspect_run_job(&name, &accepted.run.key.to_string())
         .await
         .unwrap();
       assert!(detail.operation.completed_at.is_some());
@@ -203,8 +207,12 @@ mod tests {
         .await
         .unwrap()
     );
+    assert_eq!(
+      client.list_history_job(&name, None).await.unwrap(),
+      vec![job.spec.clone()],
+    );
     let first_page = client
-      .list_history_job(
+      .list_runs_job(
         &name,
         Some(&JobHistoryQuery {
           limit: Some(1),
@@ -214,7 +222,7 @@ mod tests {
       .await
       .unwrap();
     let second_page = client
-      .list_history_job(
+      .list_runs_job(
         &name,
         Some(&JobHistoryQuery {
           limit: Some(1),
@@ -239,9 +247,31 @@ mod tests {
     .await
     .unwrap();
     assert_ne!(recreated.incarnation_key, job.incarnation_key);
+    // Statefile replacement must retain the old configuration independently
+    // of run count, and expose the replacement even before it runs.
+    let revisions = client.list_history_job(&name, None).await.unwrap();
+    assert_eq!(revisions, vec![recreated.spec.clone(), job.spec.clone()]);
+    let page = client
+      .list_history_job(
+        &name,
+        Some(&JobHistoryQuery {
+          limit: Some(1),
+          offset: Some(1),
+        }),
+      )
+      .await
+      .unwrap();
+    assert_eq!(page, vec![job.spec.clone()]);
+    for expected in [&job.spec, &recreated.spec] {
+      let revision = client
+        .inspect_history_job(&name, &expected.key.to_string())
+        .await
+        .unwrap();
+      assert_eq!(&revision, expected);
+    }
     for key in runs {
       let detail = client
-        .inspect_history_job(&name, &key.to_string())
+        .inspect_run_job(&name, &key.to_string())
         .await
         .unwrap();
       assert_eq!(detail.run.state, JobRunState::Succeeded);
@@ -282,11 +312,31 @@ mod tests {
         ntex::http::StatusCode::BAD_REQUEST,
       ),
       (
-        format!("/jobs/other-name/histories/{}", first_page[0].key),
+        format!("/jobs/other-name/histories/{}", job.spec_key),
         ntex::http::StatusCode::NOT_FOUND,
       ),
       (
-        format!("/jobs/{name}/histories/{}", uuid::Uuid::nil()),
+        format!("/jobs/{name}/histories/{}", first_page[0].key),
+        ntex::http::StatusCode::NOT_FOUND,
+      ),
+      (
+        format!("/jobs/{name}/runs?limit=0"),
+        ntex::http::StatusCode::BAD_REQUEST,
+      ),
+      (
+        format!("/jobs/{name}/runs?limit=101"),
+        ntex::http::StatusCode::BAD_REQUEST,
+      ),
+      (
+        format!("/jobs/{name}/runs?offset=-1"),
+        ntex::http::StatusCode::BAD_REQUEST,
+      ),
+      (
+        format!("/jobs/other-name/runs/{}", first_page[0].key),
+        ntex::http::StatusCode::NOT_FOUND,
+      ),
+      (
+        format!("/jobs/{name}/runs/{}", uuid::Uuid::nil()),
         ntex::http::StatusCode::NOT_FOUND,
       ),
     ] {
@@ -302,5 +352,10 @@ mod tests {
         .await
         .unwrap()
     );
+    assert_eq!(
+      client.list_history_job(&name, None).await.unwrap(),
+      revisions
+    );
+    assert_eq!(client.list_runs_job(&name, None).await.unwrap().len(), 2);
   }
 }

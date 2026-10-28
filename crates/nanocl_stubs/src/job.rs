@@ -380,7 +380,7 @@ pub struct JobRunInspect {
   pub steps: Vec<JobRunStep>,
 }
 
-/// Bounded Job execution history, newest accepted run first.
+/// Bounded pagination for Job configuration history and retained executions.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

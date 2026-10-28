@@ -85,6 +85,8 @@ impl Modify for VersionModifier {
     job::count_job,
     job::list_job_history,
     job::inspect_job_history,
+    job::list_job_runs,
+    job::inspect_job_run,
     // Cargo
     cargo::list_cargo,
     cargo::inspect_cargo,
@@ -182,10 +184,10 @@ mod tests {
   }
 
   #[test]
-  fn generated_openapi_exposes_retained_job_history() {
+  fn generated_openapi_separates_job_configurations_and_runs() {
     let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
     let paths = &document["paths"];
-    let list = &paths["/jobs/{name}/histories"]["get"];
+    let list = &paths["/jobs/{name}/runs"]["get"];
     assert_eq!(
       list["responses"]["200"]["content"]["application/json"]["schema"]["items"]
         ["$ref"],
@@ -203,10 +205,37 @@ mod tests {
       );
     }
     assert_eq!(
-      paths["/jobs/{name}/histories/{run}"]["get"]["responses"]["200"]["content"]
-        ["application/json"]["schema"]["$ref"],
+      paths["/jobs/{name}/runs/{run}"]["get"]["responses"]["200"]["content"]["application/json"]
+        ["schema"]["$ref"],
       "#/components/schemas/JobRunInspect"
     );
+    let history = &paths["/jobs/{name}/histories"]["get"];
+    assert_eq!(
+      history["responses"]["200"]["content"]["application/json"]["schema"]["items"]
+        ["$ref"],
+      "#/components/schemas/JobSpec"
+    );
+    assert_eq!(
+      paths["/jobs/{name}/histories/{id}"]["get"]["responses"]["200"]["content"]
+        ["application/json"]["schema"]["$ref"],
+      "#/components/schemas/JobSpec"
+    );
+    for query in ["limit", "offset"] {
+      assert!(history["parameters"].as_array().unwrap().iter().any(
+        |parameter| parameter["name"] == query && parameter["in"] == "query"
+      ));
+    }
+    assert!(paths.get("/jobs/{name}/histories/{run}").is_none());
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in [
+      "/jobs/{name}/histories",
+      "/jobs/{name}/histories/{id}",
+      "/jobs/{name}/runs",
+      "/jobs/{name}/runs/{run}",
+    ] {
+      assert_eq!(checked_in["paths"][path], paths[path], "{path}");
+    }
     let schemas = &document["components"]["schemas"];
     for field in ["Key", "JobKey", "Version", "CreatedAt"] {
       assert!(schemas["JobSpec"]["properties"][field].is_object());
@@ -232,6 +261,10 @@ mod tests {
       "JobHistoryQuery",
     ] {
       assert!(schemas[model].is_object(), "missing {model}");
+      assert_eq!(
+        checked_in["components"]["schemas"][model], schemas[model],
+        "{model}"
+      );
       assert_local_schema_references(&document, &schemas[model]);
     }
     assert!(

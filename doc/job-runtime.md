@@ -1,4 +1,4 @@
-# Job executions and retained history
+# Job configurations, executions, and retained history
 
 Jobs execute containers sequentially. Each `nanocl job start` accepts a new run
 with a UUID and fresh containers. One nonterminal run is allowed per incarnation,
@@ -64,48 +64,82 @@ Cron requests carry the incarnation that installed the rule. `Ttl` removes the
 live Job and schedule after execution, not history. An old timer cannot remove
 a successor run or a same-name replacement. Reconciliation handles lost timers.
 
-## History commands
+## Configuration history and execution commands
 
 ```sh
-nanocl job start backup
-nanocl job wait backup
 nanocl job history backup
 nanocl job history backup --limit 20 --offset 20
-nanocl job history backup --id RUN_UUID
-nanocl job history backup --id RUN_UUID --display json
+nanocl job history backup --id SPEC_UUID
+nanocl job history backup --id SPEC_UUID --display json
+nanocl job start backup
+nanocl job wait backup
+nanocl job runs backup
+nanocl job runs backup --limit 20 --offset 20
+nanocl job runs backup --id RUN_UUID
+nanocl job runs backup --id RUN_UUID --display json
 nanocl job stop backup
 ```
 
-History works after removal/TTL and distinguishes multiple incarnations by UUID.
-Detail includes the pinned definition, linked start operation, and ordered steps.
-Job, Cargo, and VM history commands share the same options: a positional key,
-`--id UUID` for detail, `--limit` and `--offset` for lists, and `--display` for
-structured output. Cargo and VM keys are canonical `namespace.name` keys; Job
-keys are global names. Cargo and VM histories contain specification revisions,
-while Job history contains executions. Inspecting history is read-only.
+Job, Cargo, and VM history commands list immutable configuration revisions,
+including the current revision. Job history retains configurations across
+deletion, TTL cleanup, and recreation under the same global name. Statefile
+apply replaces Jobs, so earlier configurations remain available. A Job does not
+need to have executed for its specification to appear in history.
+`job history --id SPEC_UUID` returns the authored configuration and its revision
+metadata; the UUID is the specification's `Key`.
+
+`job runs` lists retained executions and distinguishes multiple incarnations by
+UUID. `job runs --id RUN_UUID` includes the pinned specification, linked start
+operation, and ordered steps. Configuration and execution inspection are
+read-only and remain available after the live Job is removed.
+
+Both Job commands share the history options used by Cargo and VM: a positional
+key, `--id UUID` for detail, `--limit` and `--offset` for lists, and `--display`
+for structured output. Cargo and VM keys are canonical `namespace.name` keys;
+Job keys are global names.
 
 Lists default to a table, with 50 results per page, a maximum limit of 100, and
 offset zero. JSON and YAML lists are also supported. Detail defaults to the
 configured inspection format, normally YAML. TOML requires `--id`, and `--id`
 cannot be combined with pagination options. Results are ordered newest first.
 Cargo and VM commands retrieve their existing revision-history response and
-apply pagination locally; the Job API paginates retained runs on the server.
-VM history uses the existing API's live-VM and current-incarnation scope.
+apply pagination locally; the Job API paginates both revisions and executions
+on the server. VM history uses the existing API's live-VM and
+current-incarnation scope.
 
-The API exposes `GET /jobs/{name}/histories` with `limit` (default 50, maximum 100)
-and nonnegative `offset`, and `GET /jobs/{name}/histories/{run}`. List order is
-acceptance descending, then run UUID descending. Current inspection/status uses
-the current run. Job wait pins that run, or the next observed run of the selected
-incarnation when subscribed before its first start.
-For Jobs, use the default wait condition or `-c not-running`; Docker's
+The API exposes:
+
+- `GET /jobs/{name}/histories`: configuration revisions, ordered by creation
+  time descending, then specification UUID descending.
+- `GET /jobs/{name}/histories/{id}`: one configuration by specification UUID.
+- `GET /jobs/{name}/runs`: executions, ordered by acceptance time descending,
+  then run UUID descending.
+- `GET /jobs/{name}/runs/{run}`: one execution by run UUID, including its pinned
+  specification, operation, and steps.
+
+Both list endpoints accept `limit` (default 50, maximum 100) and nonnegative
+`offset`. The client exposes `list_history_job` and `inspect_history_job` for
+configurations, and `list_runs_job` and `inspect_run_job` for executions.
+
+Execution history previously exposed by `nanocl job history` and the
+`/histories` API now lives under `nanocl job runs` and `/runs`. Update scripts
+and client calls that consume run IDs or outcomes to use the execution commands
+and endpoints. Existing run IDs remain run IDs; `history --id` now expects a
+specification UUID. This split uses the existing retained specifications and
+run records without adding persistent state.
+
+Current inspection/status uses the current run. Job wait pins that run, or the
+next observed run of the selected incarnation when subscribed before its first
+start. For Jobs, use the default wait condition or `-c not-running`; Docker's
 `next-exit` and `removed` conditions are not supported for retained runs.
 Both supported forms wait for the pinned run to settle. `Unknown` does not
 prove that its containers stopped, so it does not complete the wait.
 
-History does not archive Docker logs. Logs depend on Docker retaining runtime
-resources. This change adds no history-pruning framework.
+Execution records do not archive Docker logs. Logs depend on Docker retaining
+runtime resources. This change adds no history-pruning framework.
 If Docker auto-removes a container before a wait result can be observed, its exit
-code remains unknown; history cannot recover an exit code Docker no longer has.
+code remains unknown; retained runs cannot recover an exit code Docker no longer
+has.
 
 ## Fresh-cluster requirement
 
@@ -120,10 +154,12 @@ separate task-owned databases and never reset an existing installation.
   `2026-10-27-000000_job_runs`: normalized definitions and retained execution schema.
 - `bin/nanocld/src/repositories/job_operation.rs`: atomic admission, cancellation,
   shared operation completion, and retained-identity deletion.
+- `bin/nanocld/src/repositories/job.rs`: retained configuration-history queries.
 - `bin/nanocld/src/repositories/job_run.rs`: ordered results, terminal checks,
-  history queries, and live-status fencing.
+  execution queries, and live-status fencing.
 - `bin/nanocld/src/tasks/job.rs` and `utils/container/job.rs`: ownership handoff,
   sequential execution, confirmed stop/delete, and TTL.
 - `bin/nanocld/src/utils/container/job/recovery.rs`: interruption reconciliation.
-- `bin/nanocld/src/services/job/history.rs`, `crates/nanocld_client/src/job.rs`,
-  and `bin/nanocl/src/commands/job.rs`: history API, client, and CLI.
+- `bin/nanocld/src/services/job/{history,runs}.rs`,
+  `crates/nanocld_client/src/job.rs`, and `bin/nanocl/src/commands/job.rs`:
+  configuration/execution API, client, and CLI.

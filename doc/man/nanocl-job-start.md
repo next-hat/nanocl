@@ -17,7 +17,7 @@ start - Start a job
 
 Start a job
 
-The command acknowledges run admission. Inspect `nanocl job history NAME` for
+The command acknowledges run admission. Inspect `nanocl job runs NAME` for
 the execution outcome. Starting a Job with an active or unresolved run returns
 a conflict; it does not enqueue another execution.
 

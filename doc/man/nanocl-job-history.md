@@ -6,7 +6,7 @@ title: Job history
 
 ## NAME
 
-history - List retained Job executions or inspect one run
+history - List retained Job configuration revisions or inspect one revision
 
 ## SYNOPSIS
 
@@ -16,36 +16,38 @@ history - List retained Job executions or inspect one run
 
 ## DESCRIPTION
 
-The positional *KEY* is the global Job name. List executions from newest to
-oldest acceptance. Each result includes a stable
-run ID and incarnation ID, so executions of recreated Jobs with the same name
-remain distinguishable. History remains available after Job removal, TTL cleanup,
-or removal of its Docker containers.
+The positional *KEY* is the global Job name. List immutable configuration
+revisions from newest to oldest creation, including the current configuration.
+Each revision contains its specification UUID, Job key, version, creation time,
+and authored declaration. Secret references are retained without resolved secret
+injection. A revision is available even if the Job has never run.
 
-Inspecting a run returns its exact accepted specification, initiating operation,
-timestamps, outcome or reason, and ordered step results. The definition contains
-authored secret references, without resolved secret injection. A missing exit
-code means it was not observed. An `Unknown` run still blocks a conflicting
-execution until runtime evidence or normal Job stop/delete resolves it.
+Configuration history remains available after Job removal or TTL cleanup and
+includes earlier incarnations of a Job recreated with the same name. Statefile
+apply deletes and recreates Jobs, retaining the previous configurations.
+Inspecting history is read-only and does not restore a revision.
 
-A completed start operation acknowledges execution dispatch; the associated run
-records the workload's eventual result. History retention does not archive Docker
-logs. Use `nanocl job logs` while the relevant runtime logs remain available.
+Like Cargo and VM history, this command displays configurations. Use
+`nanocl job runs` for execution outcomes, pinned definitions, and ordered step
+results. Execution history previously exposed by `nanocl job history` has moved
+to `nanocl job runs`; existing run UUIDs belong to the latter command.
 
 ## OPTIONS
 
 **--limit** *LIMIT*
 
 Page size between 1 and 100. Defaults to 50. Cannot be used with **--id**.
+Pagination is applied by the server.
 
 **--offset** *OFFSET*
 
-Nonnegative number of executions to skip. Defaults to zero. Cannot be used with
+Nonnegative number of revisions to skip. Defaults to zero. Cannot be used with
 **--id**.
 
 **--id** *UUID*
 
-Inspect one retained execution belonging to the named Job.
+Inspect one retained configuration by specification UUID belonging to the named
+Job. This is the revision's `Key`, not a run UUID.
 
 **--display** *FORMAT*
 
@@ -61,4 +63,5 @@ nanocl job history backup --limit 20 --offset 20
 nanocl job history backup --display json
 nanocl job history backup --id 12345678-1234-1234-1234-123456789abc
 nanocl job history backup --id 12345678-1234-1234-1234-123456789abc --display toml
+nanocl job runs backup
 ```

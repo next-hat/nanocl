@@ -11,7 +11,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobPartial, JobSummary},
+  job::{Job, JobHistoryQuery, JobPartial, JobSpec, JobSummary},
   process::ProcessKind,
   system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
 };
@@ -19,8 +19,8 @@ use nanocl_stubs::{
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
-    ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb,
-    ResourceIncarnationDb, SpecDb, SystemState,
+    ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, OperationTransactionError,
+    Pool, ProcessDb, ResourceIncarnationDb, SpecDb, SystemState,
   },
   schema::{jobs, object_process_statuses, resource_incarnations, specs},
   utils,
@@ -222,6 +222,57 @@ impl JobDb {
           .execute(conn)?;
         Ok(job.try_to_spec(&spec, &status)?)
       })
+    })
+    .await
+  }
+
+  /// Retain configurations across delete/recreate, including specs never run.
+  pub(crate) async fn history(
+    name: &str,
+    query: &JobHistoryQuery,
+    pool: &Pool,
+  ) -> IoResult<Vec<JobSpec>> {
+    let (limit, offset) = query
+      .validate()
+      .map_err(|error| IoError::invalid_input("Job history", &error))?;
+    let name = name.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      specs::table
+        .filter(specs::kind_name.eq("Job"))
+        .filter(specs::kind_key.eq(name))
+        .order((specs::created_at.desc(), specs::key.desc()))
+        .limit(limit)
+        .offset(offset)
+        .load::<SpecDb>(conn)
+        .map_err(OperationTransactionError::from)?
+        .iter()
+        .map(SpecDb::try_to_job_spec)
+        .collect()
+    })
+    .await
+  }
+
+  pub(crate) async fn history_spec(
+    name: &str,
+    key: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<JobSpec> {
+    let name = name.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let spec = specs::table
+        .find(key)
+        .filter(specs::kind_name.eq("Job"))
+        .filter(specs::kind_key.eq(name))
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(OperationTransactionError::from)?
+        .ok_or_else(|| {
+          IoError::not_found(
+            "Job configuration",
+            "No retained configuration with this name and identity",
+          )
+        })?;
+      spec.try_to_job_spec()
     })
     .await
   }

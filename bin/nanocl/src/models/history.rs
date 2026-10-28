@@ -1,7 +1,9 @@
-use nanocld_client::stubs::{cargo_spec::CargoSpecRevision, vm_spec::VmSpec};
+use nanocld_client::stubs::{
+  cargo_spec::CargoSpecRevision, job::JobSpec, vm_spec::VmSpec,
+};
 use tabled::Tabled;
 
-/// Shared table columns for immutable Cargo and VM specification revisions.
+/// Shared table columns for immutable Cargo, VM, and Job specification revisions.
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct SpecHistoryRow {
@@ -41,6 +43,21 @@ impl From<VmSpec> for SpecHistoryRow {
   }
 }
 
+impl From<JobSpec> for SpecHistoryRow {
+  fn from(spec: JobSpec) -> Self {
+    Self {
+      id: spec.key.to_string(),
+      version: spec.version,
+      created_at: spec
+        .created_at
+        .and_utc()
+        .with_timezone(&chrono::Local)
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string(),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -62,12 +79,24 @@ mod tests {
       name: "backup".into(),
       ..Default::default()
     };
+    let job = JobSpec {
+      key,
+      job_key: "backup".into(),
+      version: "v0.19".into(),
+      created_at,
+      name: "backup".into(),
+      ..Default::default()
+    };
     let expected_time = created_at
       .and_utc()
       .with_timezone(&chrono::Local)
       .format("%Y-%m-%d %H:%M:%S")
       .to_string();
-    for row in [SpecHistoryRow::from(cargo), SpecHistoryRow::from(vm)] {
+    for row in [
+      SpecHistoryRow::from(cargo),
+      SpecHistoryRow::from(vm),
+      SpecHistoryRow::from(job),
+    ] {
       assert_eq!(row.id, key.to_string());
       assert_eq!(row.version, "v0.19");
       assert_eq!(row.created_at, expected_time);

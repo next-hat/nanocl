@@ -138,12 +138,12 @@ pub struct GenericInspectOpts {
   pub key: String,
 }
 
-/// Shared interface for browsing resource history and inspecting an entry.
+/// Shared interface for browsing configuration history or execution runs.
 #[derive(Clone, Parser)]
 pub struct GenericHistoryOpts {
   /// Canonical resource key or global Job name
   pub key: String,
-  /// Inspect one history entry by its ID
+  /// Inspect one entry by its ID
   #[clap(long, value_name = "UUID", conflicts_with_all = ["limit", "offset"])]
   pub id: Option<uuid::Uuid>,
   /// Page size, 1 to 100; defaults to 50
@@ -177,8 +177,8 @@ mod tests {
         _ => panic!("expected VM history"),
       },
       Command::Job(arg) => match arg.command {
-        JobCommand::History(opts) => opts,
-        _ => panic!("expected Job history"),
+        JobCommand::History(opts) | JobCommand::Runs(opts) => opts,
+        _ => panic!("expected Job history or runs"),
       },
       _ => panic!("expected resource history"),
     }
@@ -187,13 +187,14 @@ mod tests {
   #[test]
   fn history_commands_share_arguments_and_validation() {
     let id = "00000000-0000-0000-0000-000000000001";
-    for (resource, key) in [
-      ("cargo", "global.api"),
-      ("vm", "global.worker"),
-      ("job", "daily-report"),
+    for (resource, command, key) in [
+      ("cargo", "history", "global.api"),
+      ("vm", "history", "global.worker"),
+      ("job", "history", "daily-report"),
+      ("job", "runs", "daily-report"),
     ] {
       let options = history_options(
-        Cli::try_parse_from(["nanocl", resource, "history", key]).unwrap(),
+        Cli::try_parse_from(["nanocl", resource, command, key]).unwrap(),
       );
       assert_eq!(options.key, key);
       assert!(options.id.is_none());
@@ -205,7 +206,7 @@ mod tests {
         Cli::try_parse_from([
           "nanocl",
           resource,
-          "history",
+          command,
           key,
           "--limit",
           "100",
@@ -225,7 +226,7 @@ mod tests {
           Cli::try_parse_from([
             "nanocl",
             resource,
-            "history",
+            command,
             key,
             "--id",
             id,
@@ -247,7 +248,7 @@ mod tests {
         vec!["--id", id, "--offset", "0"],
         vec!["--run", id],
       ] {
-        let mut args = vec!["nanocl", resource, "history", key];
+        let mut args = vec!["nanocl", resource, command, key];
         args.extend(flags);
         assert!(Cli::try_parse_from(args.clone()).is_err(), "{args:?}");
       }

@@ -4,7 +4,7 @@ use nanocl_stubs::{
   generic::GenericFilter,
   job::{
     Job, JobDeleteQuery, JobHistoryQuery, JobInspect, JobPartial, JobRun,
-    JobRunInspect, JobSummary,
+    JobRunInspect, JobSpec, JobSummary,
   },
 };
 
@@ -53,28 +53,56 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// List retained executions, including executions of deleted Job incarnations.
+  /// List retained configuration revisions, including revisions of deleted Jobs.
   pub async fn list_history_job(
     &self,
     name: &str,
     query: Option<&JobHistoryQuery>,
-  ) -> HttpClientResult<Vec<JobRun>> {
+  ) -> HttpClientResult<Vec<JobSpec>> {
     let res = self
       .send_get(&format!("{}/{name}/histories", Self::JOB_PATH), query)
       .await?;
     Self::res_json(res).await
   }
 
+  /// Inspect an immutable configuration revision belonging to the named Job.
+  /// This does not require a live Job or a run using the revision.
+  pub async fn inspect_history_job(
+    &self,
+    name: &str,
+    spec: &str,
+  ) -> HttpClientResult<JobSpec> {
+    let res = self
+      .send_get(
+        &format!("{}/{name}/histories/{spec}", Self::JOB_PATH),
+        None::<String>,
+      )
+      .await?;
+    Self::res_json(res).await
+  }
+
+  /// List retained executions, including executions of deleted Job incarnations.
+  pub async fn list_runs_job(
+    &self,
+    name: &str,
+    query: Option<&JobHistoryQuery>,
+  ) -> HttpClientResult<Vec<JobRun>> {
+    let res = self
+      .send_get(&format!("{}/{name}/runs", Self::JOB_PATH), query)
+      .await?;
+    Self::res_json(res).await
+  }
+
   /// Inspect a retained run, its pinned definition, operation, and ordered steps.
   /// This does not require a live Job or retained Docker containers/logs.
-  pub async fn inspect_history_job(
+  pub async fn inspect_run_job(
     &self,
     name: &str,
     run: &str,
   ) -> HttpClientResult<JobRunInspect> {
     let res = self
       .send_get(
-        &format!("{}/{name}/histories/{run}", Self::JOB_PATH),
+        &format!("{}/{name}/runs/{run}", Self::JOB_PATH),
         None::<String>,
       )
       .await?;

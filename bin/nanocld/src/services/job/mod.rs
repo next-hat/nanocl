@@ -6,6 +6,7 @@ pub mod delete;
 pub mod history;
 pub mod inspect;
 pub mod list;
+pub mod runs;
 
 pub use count::*;
 pub use create::*;
@@ -13,6 +14,7 @@ pub use delete::*;
 pub use history::*;
 pub use inspect::*;
 pub use list::*;
+pub use runs::*;
 
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
@@ -48,10 +50,22 @@ pub fn ntex_config(
       .to_with_state(list_job_history),
   );
   config.service(
-    web::resource("/jobs/{name}/histories/{run}")
+    web::resource("/jobs/{name}/histories/{id}")
       .name("inspect_job_history")
       .guard(web::guard::Get())
       .to_with_state(inspect_job_history),
+  );
+  config.service(
+    web::resource("/jobs/{name}/runs")
+      .name("list_job_runs")
+      .guard(web::guard::Get())
+      .to_with_state(list_job_runs),
+  );
+  config.service(
+    web::resource("/jobs/{name}/runs/{run}")
+      .name("inspect_job_run")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job_run),
   );
   config.service(
     web::resource("/jobs/count")

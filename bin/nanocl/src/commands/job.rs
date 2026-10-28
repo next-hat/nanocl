@@ -14,7 +14,7 @@ use crate::{
   models::{
     GenericDefaultOpts, GenericHistoryOpts, GenericStartOpts, GenericStopOpts,
     JobArg, JobCommand, JobCompactRow, JobLogsOpts, JobRow, JobRunRow,
-    JobWaitOpts,
+    JobWaitOpts, SpecHistoryRow,
   },
   utils,
 };
@@ -73,7 +73,7 @@ impl GenericCommandInspect for JobArg {
   type ApiItem = JobInspect;
 }
 
-/// Show durable run history independently of live Jobs and Docker log retention.
+/// Show saved configuration revisions independently of live Jobs.
 async fn exec_job_history(
   cli_conf: &CliConfig,
   opts: &GenericHistoryOpts,
@@ -90,9 +90,39 @@ async fn exec_job_history(
       history,
     );
   }
-  let runs = cli_conf
+  let revisions = cli_conf
     .client
     .list_history_job(
+      &opts.key,
+      Some(&JobHistoryQuery {
+        limit: opts.limit,
+        offset: opts.offset,
+      }),
+    )
+    .await?;
+  super::history::print_list(opts, revisions, SpecHistoryRow::from)
+}
+
+/// Show durable executions independently of live Jobs and Docker log retention.
+async fn exec_job_runs(
+  cli_conf: &CliConfig,
+  opts: &GenericHistoryOpts,
+) -> IoResult<()> {
+  super::history::validate_options(opts)?;
+  if let Some(id) = &opts.id {
+    let run = cli_conf
+      .client
+      .inspect_run_job(&opts.key, &id.to_string())
+      .await?;
+    return super::history::print_detail(
+      opts,
+      &cli_conf.user_config.display_format,
+      run,
+    );
+  }
+  let runs = cli_conf
+    .client
+    .list_runs_job(
       &opts.key,
       Some(&JobHistoryQuery {
         limit: opts.limit,
@@ -169,6 +199,7 @@ pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
     JobCommand::Remove(opts) => JobArg::exec_rm(&cli_conf.client, opts).await,
     JobCommand::Inspect(opts) => JobArg::exec_inspect(cli_conf, opts).await,
     JobCommand::History(opts) => exec_job_history(cli_conf, opts).await,
+    JobCommand::Runs(opts) => exec_job_runs(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,
     JobCommand::Wait(opts) => exec_job_wait(cli_conf, opts).await,
     JobCommand::Start(opts) => JobArg::exec_start(&cli_conf.client, opts).await,
@@ -210,9 +241,15 @@ mod tests {
       .push((request.path().to_owned(), request.query_string().to_owned()));
     if request.path().contains("/jobs/missing/") {
       return web::HttpResponse::NotFound()
-        .json(&serde_json::json!({"msg": "Retained execution was not found"}));
+        .json(&serde_json::json!({"msg": "Retained entry was not found"}));
     }
     if request.path().ends_with("/histories") {
+      return web::HttpResponse::Ok().json(&vec![fixture.history.spec.clone()]);
+    }
+    if request.path().contains("/histories/") {
+      return web::HttpResponse::Ok().json(&fixture.history.spec);
+    }
+    if request.path().ends_with("/runs") {
       return web::HttpResponse::Ok().json(&vec![fixture.history.run.clone()]);
     }
     web::HttpResponse::Ok().json(&fixture.history)
@@ -284,7 +321,19 @@ mod tests {
         )
         .service(
           web::resource(format!(
-            "/v{NANOCLD_DEFAULT_VERSION}/jobs/{{name}}/histories/{{run}}"
+            "/v{NANOCLD_DEFAULT_VERSION}/jobs/{{name}}/histories/{{id}}"
+          ))
+          .route(web::get().to(serve_history)),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/jobs/{{name}}/runs"
+          ))
+          .route(web::get().to(serve_history)),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/jobs/{{name}}/runs/{{run}}"
           ))
           .route(web::get().to(serve_history)),
         )
@@ -304,20 +353,40 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn job_history_command_lists_pages_without_live_job_inspection() {
+  async fn job_history_and_runs_list_pages_without_live_job_inspection() {
     let (cli, _server, fixture) = history_fixture();
-    let args = JobArg::try_parse_from([
-      "job", "history", "backup", "--limit", "2", "--offset", "1",
-    ])
-    .unwrap();
-    exec_job(&cli, &args).await.unwrap();
+    for command in ["history", "runs"] {
+      let args = JobArg::try_parse_from([
+        "job", command, "backup", "--limit", "2", "--offset", "1",
+      ])
+      .unwrap();
+      exec_job(&cli, &args).await.unwrap();
+    }
     assert_eq!(
       *fixture.requests.lock().unwrap(),
-      vec![(
-        format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/histories"),
-        "limit=2&offset=1".into(),
-      )]
+      vec![
+        (
+          format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/histories"),
+          "limit=2&offset=1".into(),
+        ),
+        (
+          format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/runs"),
+          "limit=2&offset=1".into(),
+        ),
+      ]
     );
+    let table = utils::print::render_table([SpecHistoryRow::from(
+      fixture.history.spec.clone(),
+    )]);
+    for expected in [
+      "ID",
+      "VERSION",
+      "CREATED AT",
+      "v0.19",
+      &fixture.history.spec.key.to_string(),
+    ] {
+      assert!(table.contains(expected), "{table}");
+    }
     let table = utils::print::render_table([JobRunRow::from(
       fixture.history.run.clone(),
     )]);
@@ -334,84 +403,96 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn job_history_command_limits_toml_to_run_detail() {
+  async fn job_history_and_runs_limit_toml_to_detail() {
     let (cli, _server, fixture) = history_fixture();
-    let args =
-      JobArg::try_parse_from(["job", "history", "backup", "--display", "toml"])
-        .unwrap();
-    let error = exec_job(&cli, &args).await.unwrap_err();
-    assert!(error.to_string().contains("TOML output requires --id"));
+    for command in ["history", "runs"] {
+      let args =
+        JobArg::try_parse_from(["job", command, "backup", "--display", "toml"])
+          .unwrap();
+      let error = exec_job(&cli, &args).await.unwrap_err();
+      assert!(error.to_string().contains("TOML output requires --id"));
+    }
     assert!(fixture.requests.lock().unwrap().is_empty());
 
-    let key = fixture.history.run.key.to_string();
-    let args = JobArg::try_parse_from([
-      "job",
-      "history",
-      "backup",
-      "--id",
-      &key,
-      "--display",
-      "toml",
-    ])
-    .unwrap();
-    exec_job(&cli, &args).await.unwrap();
-    assert_eq!(
-      *fixture.requests.lock().unwrap(),
-      vec![(
-        format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/histories/{key}"),
-        String::new(),
-      )]
-    );
+    for (command, path, key) in [
+      ("history", "histories", fixture.history.spec.key),
+      ("runs", "runs", fixture.history.run.key),
+    ] {
+      let key = key.to_string();
+      let args = JobArg::try_parse_from([
+        "job",
+        command,
+        "backup",
+        "--id",
+        &key,
+        "--display",
+        "toml",
+      ])
+      .unwrap();
+      exec_job(&cli, &args).await.unwrap();
+      assert_eq!(
+        fixture.requests.lock().unwrap().pop().unwrap(),
+        (
+          format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/{path}/{key}"),
+          String::new(),
+        )
+      );
+      assert!(fixture.requests.lock().unwrap().is_empty());
+    }
   }
 
   #[ntex::test]
-  async fn job_history_command_formats_detail_as_json_or_configured_yaml() {
+  async fn job_history_and_runs_format_detail_as_json_or_configured_yaml() {
     let (cli, _server, fixture) = history_fixture();
     assert!(matches!(
       cli.user_config.display_format,
       DisplayFormat::Yaml
     ));
-    let key = fixture.history.run.key.to_string();
-    for display in [None, Some("json")] {
-      let mut arguments =
-        vec!["job", "history", "backup", "--id", key.as_str()];
-      if let Some(display) = display {
-        arguments.extend(["--display", display]);
+    for (command, path, key) in [
+      ("history", "histories", fixture.history.spec.key),
+      ("runs", "runs", fixture.history.run.key),
+    ] {
+      let key = key.to_string();
+      for display in [None, Some("json")] {
+        let mut arguments =
+          vec!["job", command, "backup", "--id", key.as_str()];
+        if let Some(display) = display {
+          arguments.extend(["--display", display]);
+        }
+        exec_job(&cli, &JobArg::try_parse_from(arguments).unwrap())
+          .await
+          .unwrap();
       }
-      exec_job(&cli, &JobArg::try_parse_from(arguments).unwrap())
-        .await
-        .unwrap();
+      assert_eq!(
+        *fixture.requests.lock().unwrap(),
+        vec![
+          (
+            format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/{path}/{key}"),
+            String::new(),
+          );
+          2
+        ]
+      );
+      fixture.requests.lock().unwrap().clear();
     }
-    assert_eq!(
-      *fixture.requests.lock().unwrap(),
-      vec![
-        (
-          format!("/v{NANOCLD_DEFAULT_VERSION}/jobs/backup/histories/{key}"),
-          String::new(),
-        );
-        2
-      ]
-    );
   }
 
   #[ntex::test]
-  async fn job_history_command_propagates_history_errors() {
+  async fn job_history_and_runs_propagate_errors() {
     let (cli, _server, fixture) = history_fixture();
-    let args = JobArg::try_parse_from([
-      "job",
-      "history",
-      "missing",
-      "--id",
-      "00000000-0000-0000-0000-000000000001",
-    ])
-    .unwrap();
-    let error = exec_job(&cli, &args).await.unwrap_err();
-    assert!(
-      error
-        .to_string()
-        .contains("Retained execution was not found")
-    );
-    assert_eq!(fixture.requests.lock().unwrap().len(), 1);
+    for command in ["history", "runs"] {
+      let args = JobArg::try_parse_from([
+        "job",
+        command,
+        "missing",
+        "--id",
+        "00000000-0000-0000-0000-000000000001",
+      ])
+      .unwrap();
+      let error = exec_job(&cli, &args).await.unwrap_err();
+      assert!(error.to_string().contains("Retained entry was not found"));
+    }
+    assert_eq!(fixture.requests.lock().unwrap().len(), 2);
   }
 
   struct RemovalFixture {

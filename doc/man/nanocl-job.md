@@ -34,6 +34,9 @@ job-inspect(1)
 Inspect a job by its name
 
 job-history(1)
+List retained configuration revisions or inspect a revision
+
+job-runs(1)
 List retained executions or inspect a run
 
 job-logs(1)  
