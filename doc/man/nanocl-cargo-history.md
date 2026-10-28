@@ -19,7 +19,7 @@ history - List Cargo specification revisions or inspect one revision
 
 List specification revisions for the Cargo identified by its canonical
 `namespace.name` key, newest first. Each row identifies a revision that can be
-inspected with **--id**. Cargo history describes definitions, while Job history
+inspected with **--id**. Cargo history describes definitions, while Job runs
 describes individual executions.
 
 This command is read-only. Inspecting a revision does not apply it to the live
