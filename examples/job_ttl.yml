@@ -1,5 +1,5 @@
 ApiVersion: v0.19
-# Ttl removes the live Job; nanocl job history job-autoremove remains available.
+# Ttl removes the live Job; nanocl job runs job-autoremove remains available.
 
 Jobs:
 - Name: job-autoremove
