@@ -66,7 +66,7 @@ mod tests {
       DistributedMutexDb, DistributedMutexPartial, JobRunDb, OperationDb,
       OperationOwner, Pool,
     },
-    repositories::generic::RepositoryCreate,
+    repositories::generic::{RepositoryCreate, RepositoryReadByTransform},
     services,
     utils::tests::gen_default_test_system,
     vars,
@@ -126,9 +126,10 @@ mod tests {
       containers: vec![ContainerCreateBody::default(); 2],
       ..Default::default()
     };
-    let mut job = JobDb::create_with_spec(&original, "v0.19", pool)
+    JobDb::create_with_spec(&original, "v0.19", pool)
       .await
       .unwrap();
+    let mut job = JobDb::transform_read_by_pk(&name, pool).await.unwrap();
     // A configuration is visible before its first execution.
     let revisions = client.list_history_job(&name, None).await.unwrap();
     assert_eq!(revisions, vec![job.spec.clone()]);
@@ -235,7 +236,7 @@ mod tests {
     assert_eq!(second_page.len(), 1);
     assert_eq!(first_page[0].key, runs[1]);
     assert_eq!(second_page[0].key, runs[0]);
-    let recreated = JobDb::create_with_spec(
+    JobDb::create_with_spec(
       &JobPartial {
         name: name.clone(),
         metadata: Some(serde_json::json!({"definition": "replacement"})),
@@ -246,6 +247,7 @@ mod tests {
     )
     .await
     .unwrap();
+    let recreated = JobDb::transform_read_by_pk(&name, pool).await.unwrap();
     assert_ne!(recreated.incarnation_key, job.incarnation_key);
     // Statefile replacement must retain the old configuration independently
     // of run count, and expose the replacement even before it runs.
