@@ -257,6 +257,10 @@ A completed init container is retained as an observation. Starting or
 restarting an unchanged Cargo does not rerun a successfully completed init
 container.
 
+A confirmed nonzero init exit fails the accepted local operation and retains
+its exit code, allowing a later lifecycle request. An unavailable or ambiguous
+Docker wait result remains pending until the outcome can be safely observed.
+
 ### 8.2 Restart
 
 Explicit Cargo restart validates the complete persisted topology, then issues
@@ -331,9 +335,13 @@ not be reconstructed. Retired or foreign operation labels cannot resurrect a
 deleted Cargo or attach its containers to a replacement.
 
 Recovery first establishes whether the local execution owner is abandoned,
-then inspects the captured incarnation and exact runtime. It does not replay
-init commands, rollouts, or cleanup, and it does not promote a partial candidate.
-Unavailable or ambiguous evidence keeps the operation pending.
+then inspects the captured incarnation and exact runtime. A safely observed
+local operation can finish as `interrupted`, recording the current runtime
+state without claiming that its requested action succeeded. Reused containers
+retain their validated creation operation identity. Recovery does not replay
+init commands, restarts, signals, rollouts, or cleanup, and it does not promote
+a partial candidate. Unavailable or ambiguous evidence keeps the operation
+pending. Deletion still requires separate proof that runtime removal finished.
 
 Remote start and delete retain their existing node dispatch. Operation-aware
 node routes require the accepted operation, incarnation, specification, and

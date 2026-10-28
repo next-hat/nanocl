@@ -302,6 +302,16 @@ impl CargoDb {
           &outcome,
           diagnostic.as_ref(),
         )?;
+        #[cfg(test)]
+        if completion_fault::take(&operation) {
+          return Err(
+            nanocl_error::io::IoError::other(
+              "Cargo completion fixture",
+              "Injected failure after operation completion writes",
+            )
+            .into(),
+          );
+        }
         Ok(true)
       })
     })
@@ -441,6 +451,76 @@ impl CargoDb {
       })
     })
     .await
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod completion_fault {
+  use std::{
+    collections::HashMap,
+    sync::{
+      Arc, LazyLock, Mutex,
+      atomic::{AtomicBool, Ordering},
+    },
+  };
+
+  use crate::models::OperationDb;
+
+  type Faults = HashMap<(String, String), Arc<AtomicBool>>;
+  static FAULTS: LazyLock<Mutex<Faults>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+  pub(crate) struct CompletionFault {
+    identity: (String, String),
+    triggered: Arc<AtomicBool>,
+  }
+
+  impl CompletionFault {
+    pub(crate) fn was_triggered(&self) -> bool {
+      self.triggered.load(Ordering::SeqCst)
+    }
+  }
+
+  impl Drop for CompletionFault {
+    fn drop(&mut self) {
+      let mut faults = FAULTS.lock().unwrap();
+      if faults
+        .get(&self.identity)
+        .is_some_and(|fault| Arc::ptr_eq(fault, &self.triggered))
+      {
+        faults.remove(&self.identity);
+      }
+    }
+  }
+
+  /// Fail only this Cargo/action after its normal completion SQL, forcing
+  /// rollback of both the terminal outcome and exact mutex removal.
+  pub(crate) fn fail_next_completion(
+    key: &str,
+    action: &str,
+  ) -> CompletionFault {
+    let identity = (key.to_owned(), action.to_owned());
+    let triggered = Arc::new(AtomicBool::new(false));
+    assert!(
+      FAULTS
+        .lock()
+        .unwrap()
+        .insert(identity.clone(), triggered.clone())
+        .is_none(),
+      "completion fault already armed for this Cargo/action"
+    );
+    CompletionFault {
+      identity,
+      triggered,
+    }
+  }
+
+  pub(super) fn take(operation: &OperationDb) -> bool {
+    FAULTS
+      .lock()
+      .unwrap()
+      .get(&(operation.resource_key.clone(), operation.action.clone()))
+      .is_some_and(|triggered| !triggered.swap(true, Ordering::SeqCst))
   }
 }
 

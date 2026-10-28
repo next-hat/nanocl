@@ -784,7 +784,15 @@ async fn execute(
             ..Default::default()
           }
         };
-        let diagnostic = serde_json::json!({"Phase": action, "Failure": "Accepted Cargo operation failed; inspect the observed runtime before retrying"});
+        // Init exit diagnostics contain only the confirmed numeric exit code,
+        // not arbitrary Docker error text or container output.
+        let failure = if error.context() == Some("CargoInitContainerExit") {
+          error.inner.to_string()
+        } else {
+          "Accepted Cargo operation failed; inspect the observed runtime before retrying".to_owned()
+        };
+        let diagnostic =
+          serde_json::json!({"Phase": action, "Failure": failure});
         if let Err(error) = CargoDb::finish_operation(
           &accepted.operation,
           update,
@@ -991,6 +999,20 @@ mod tests {
       "Cargo process rejection",
       "rejected"
     )));
+  }
+
+  #[test]
+  fn confirmed_init_exit_can_settle_but_unknown_wait_remains_pending() {
+    assert!(!uncertain_runtime_error(&IoError::interrupted(
+      "CargoInitContainerExit",
+      "Init container exited with code 17"
+    )));
+    for context in ["CargoInitContainer", "Cargo remote execution"] {
+      assert!(uncertain_runtime_error(&IoError::interrupted(
+        context,
+        "outcome is not established"
+      )));
+    }
   }
 
   #[test]

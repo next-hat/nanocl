@@ -6,7 +6,7 @@ use std::{
 
 use bollard_next::query_parameters::ListContainersOptions;
 use nanocl_error::io::{IoError, IoResult};
-use nanocl_stubs::system::{NativeEventAction, ObjPsStatusKind};
+use nanocl_stubs::system::NativeEventAction;
 
 use crate::{
   models::{
@@ -130,13 +130,14 @@ pub(crate) async fn recover_one(
       // deleted. Do not tombstone while stale rows still need reconciliation.
       return Ok(None);
     }
-    if candidate.action == "stop"
-      && ids.iter().any(|id| !mapped_ids.contains(*id))
+    if ids.iter().any(|id| !mapped_ids.contains(*id))
+      || mapped_ids.iter().any(|id| !ids.contains(id.as_str()))
     {
       return Err(deferred(
-        "An unmapped process prevents confirming the whole Cargo stopped",
+        "Runtime process rows and current attachments do not fully agree",
       ));
     }
+    let mut inventory_ids = HashSet::new();
     for container in inventory {
       let id = container
         .id
@@ -150,20 +151,62 @@ pub(crate) async fn recover_one(
           "An unassociated Cargo container makes execution uncertain",
         ));
       }
+      if container.names.as_ref().is_some_and(|names| {
+        names
+          .iter()
+          .any(|name| super::is_rollout_process_name(name))
+      }) {
+        return Err(deferred(
+          "A retained or candidate runtime requires explicit reconciliation",
+        ));
+      }
+      let process =
+        super::validate_target(&cargo, candidate.incarnation_key, id, state)
+          .await?;
+      let persisted_labels = process
+        .data
+        .config
+        .as_ref()
+        .and_then(|config| config.labels.as_ref());
+      if !observed_identity_matches(container.labels.as_ref(), persisted_labels)
+      {
+        return Err(deferred(
+          "Docker runtime labels do not match the owned process identity",
+        ));
+      }
       if matches!(candidate.action.as_str(), "start" | "update")
         && !accepted_creation_identity(
           container.labels.as_ref(),
+          persisted_labels,
           candidate.incarnation_key,
           candidate.spec_key,
-          candidate.key,
         )
       {
         return Err(deferred(
-          "Ready runtime does not prove execution of the accepted creation operation",
+          "Runtime creation identity does not match its owned accepted specification",
         ));
+      }
+      inventory_ids.insert(id.to_owned());
+    }
+    for id in ids {
+      if inventory_ids.contains(id) {
+        continue;
       }
       super::validate_target(&cargo, candidate.incarnation_key, id, state)
         .await?;
+      // A runtime with changed Cargo labels disappears from the filtered
+      // inventory. Only a confirmed absent immutable ID may be omitted.
+      match state.inner.docker_api.inspect_container(id, None).await {
+        Err(bollard_next::errors::Error::DockerResponseServerError {
+          status_code: 404,
+          ..
+        }) => {}
+        _ => {
+          return Err(deferred(
+            "A mapped process is not confirmed absent from Docker inventory",
+          ));
+        }
+      }
     }
     let observed = super::observe(&cargo, state).await?;
     if !runtime_observation_settles(
@@ -171,7 +214,7 @@ pub(crate) async fn recover_one(
       observed.actual.as_deref(),
     ) {
       return Err(deferred(
-        "Runtime observation does not prove the accepted action's effect; operation remains pending",
+        "Runtime observation cannot safely settle the abandoned operation",
       ));
     }
     Ok(Some(observed))
@@ -216,15 +259,20 @@ pub(crate) async fn recover_one(
 }
 
 fn runtime_observation_settles(action: &str, actual: Option<&str>) -> bool {
-  match action {
-    "start" | "update" => {
-      actual == Some(ObjPsStatusKind::Start.to_string().as_str())
-    }
-    "stop" => actual == Some(ObjPsStatusKind::Stop.to_string().as_str()),
-    // Current aggregate state cannot prove a restart or targeted action ran.
-    // Delete is settled separately by its empty-runtime proof and transaction.
-    _ => false,
-  }
+  // These observations do not prove the requested action succeeded. Once the
+  // caller has proved abandoned local ownership and associated runtime, they
+  // allow recording that state with an interrupted outcome without replay.
+  // Delete still requires its separate empty-runtime proof and transaction.
+  matches!(
+    action,
+    "start"
+      | "update"
+      | "stop"
+      | "restart"
+      | "stop_process"
+      | "restart_process"
+      | "signal"
+  ) && matches!(actual, Some("start" | "stop" | "fail"))
 }
 
 fn deletion_observation_settles(
@@ -235,25 +283,69 @@ fn deletion_observation_settles(
   inventory_empty && processes_empty && attachments_empty
 }
 
+fn observed_identity_matches(
+  labels: Option<&HashMap<String, String>>,
+  persisted_labels: Option<&HashMap<String, String>>,
+) -> bool {
+  use crate::utils::container::cargo_compiler::{
+    LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_KIND,
+    LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+  };
+  let (Some(labels), Some(persisted)) = (labels, persisted_labels) else {
+    return false;
+  };
+  // validate_target proves ownership of the persisted identity. Compare the
+  // actual Docker identity exactly, including retained creation labels rather
+  // than substituting the currently accepted operation or specification.
+  [
+    LABEL_KIND,
+    LABEL_CARGO_KEY,
+    LABEL_REPLICA,
+    LABEL_REPLICA_ORDINAL,
+    LABEL_CONTAINER,
+    LABEL_ROLE,
+    LABEL_ESSENTIAL,
+  ]
+  .iter()
+  .all(|label| {
+    persisted
+      .get(*label)
+      .is_some_and(|expected| labels.get(*label) == Some(expected))
+  }) && [
+    super::LABEL_INCARNATION,
+    super::LABEL_SPEC,
+    super::LABEL_OPERATION,
+  ]
+  .iter()
+  .all(|label| labels.get(*label) == persisted.get(*label))
+}
+
 fn accepted_creation_identity(
   labels: Option<&HashMap<String, String>>,
+  persisted_labels: Option<&HashMap<String, String>>,
   incarnation: uuid::Uuid,
   spec: uuid::Uuid,
-  operation: uuid::Uuid,
 ) -> bool {
+  let parsed = |labels: Option<&HashMap<String, String>>, label: &str| {
+    labels
+      .and_then(|labels| labels.get(label))
+      .and_then(|value| value.parse::<uuid::Uuid>().ok())
+  };
+  let Some(operation) = parsed(persisted_labels, super::LABEL_OPERATION) else {
+    return false;
+  };
+  // validate_target has checked this retained creation operation's resource,
+  // incarnation and specification. Reused containers keep that operation ID;
+  // it need not equal the operation being recovered.
   [
     (super::LABEL_INCARNATION, incarnation),
     (super::LABEL_SPEC, spec),
-    (super::LABEL_OPERATION, operation),
   ]
   .iter()
   .all(|(label, expected)| {
-    labels
-      .and_then(|labels| labels.get(*label))
-      .and_then(|value| value.parse::<uuid::Uuid>().ok())
-      .as_ref()
-      == Some(expected)
-  })
+    parsed(labels, label) == Some(*expected)
+      && parsed(persisted_labels, label) == Some(*expected)
+  }) && parsed(labels, super::LABEL_OPERATION) == Some(operation)
 }
 
 pub(crate) fn spawn(state: &SystemState) {
@@ -295,40 +387,45 @@ pub(crate) fn spawn(state: &SystemState) {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use nanocl_stubs::system::ObjPsStatusKind;
 
   #[test]
-  fn interrupted_creation_requires_complete_ready_runtime() {
-    for action in ["start", "update"] {
-      assert!(!runtime_observation_settles(action, None));
-      assert!(!runtime_observation_settles(action, Some("Stop")));
-      assert!(!runtime_observation_settles(action, Some("Fail")));
-      assert!(runtime_observation_settles(
-        action,
-        Some(&ObjPsStatusKind::Start.to_string())
-      ));
-    }
-  }
-
-  #[test]
-  fn recovery_does_not_infer_non_idempotent_or_targeted_effects() {
-    let running = ObjPsStatusKind::Start.to_string();
-    let stopped = ObjPsStatusKind::Stop.to_string();
-    assert!(runtime_observation_settles("stop", Some(&stopped)));
-    assert!(!runtime_observation_settles("stop", Some(&running)));
-    assert!(!runtime_observation_settles("stop", None));
+  fn abandoned_local_actions_accept_observed_state_without_success_inference() {
     for action in [
+      "start",
+      "update",
+      "stop",
       "restart",
       "restart_process",
       "stop_process",
       "signal",
-      "delete",
-      "unknown",
     ] {
-      for actual in [None, Some(running.as_str()), Some(stopped.as_str())] {
+      for state in [
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Stop,
+        ObjPsStatusKind::Fail,
+      ] {
+        assert!(runtime_observation_settles(
+          action,
+          Some(&state.to_string())
+        ));
+      }
+      for actual in [
+        None,
+        Some("starting"),
+        Some("stopping"),
+        Some("updating"),
+        Some("<unknown>"),
+      ] {
         assert!(
           !runtime_observation_settles(action, actual),
-          "{action} must remain pending without action-specific proof"
+          "{action} must remain pending without a known observed state"
         );
+      }
+    }
+    for action in ["delete", "unknown"] {
+      for actual in [None, Some("start"), Some("stop"), Some("fail")] {
+        assert!(!runtime_observation_settles(action, actual));
       }
     }
   }
@@ -357,11 +454,12 @@ mod tests {
   }
 
   #[test]
-  fn creation_recovery_rejects_previous_and_unproven_generations() {
+  fn creation_recovery_accepts_reused_owned_identity_but_rejects_unproven_generations()
+   {
     let incarnation = uuid::Uuid::new_v4();
     let spec = uuid::Uuid::new_v4();
     let operation = uuid::Uuid::new_v4();
-    let mut labels = HashMap::from([
+    let labels = HashMap::from([
       (
         super::super::LABEL_INCARNATION.into(),
         incarnation.to_string(),
@@ -371,34 +469,105 @@ mod tests {
     ]);
     assert!(accepted_creation_identity(
       Some(&labels),
+      Some(&labels),
       incarnation,
       spec,
-      operation
     ));
     assert!(!accepted_creation_identity(
+      Some(&labels),
       Some(&labels),
       incarnation,
       uuid::Uuid::new_v4(),
-      operation
     ));
     assert!(!accepted_creation_identity(
       Some(&labels),
-      incarnation,
+      Some(&labels),
+      uuid::Uuid::new_v4(),
       spec,
-      uuid::Uuid::new_v4()
     ));
     assert!(!accepted_creation_identity(
       None,
-      incarnation,
-      spec,
-      operation
-    ));
-    labels.remove(super::super::LABEL_OPERATION);
-    assert!(!accepted_creation_identity(
       Some(&labels),
       incarnation,
       spec,
-      operation
+    ));
+    for value in [
+      None,
+      Some("invalid".to_owned()),
+      Some(uuid::Uuid::new_v4().to_string()),
+    ] {
+      let mut observed = labels.clone();
+      match value {
+        Some(value) => {
+          observed.insert(super::super::LABEL_OPERATION.into(), value);
+        }
+        None => {
+          observed.remove(super::super::LABEL_OPERATION);
+        }
+      }
+      assert!(!accepted_creation_identity(
+        Some(&observed),
+        Some(&labels),
+        incarnation,
+        spec
+      ));
+    }
+    assert!(!accepted_creation_identity(
+      Some(&labels),
+      None,
+      incarnation,
+      spec
+    ));
+  }
+
+  #[test]
+  fn recovery_requires_actual_docker_identity_to_match_owned_process() {
+    use crate::utils::container::cargo_compiler::{
+      LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_KIND,
+      LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
+    };
+    let labels = HashMap::from([
+      (LABEL_KIND.into(), "cargo".into()),
+      (LABEL_CARGO_KEY.into(), "global.api".into()),
+      (LABEL_REPLICA.into(), uuid::Uuid::new_v4().to_string()),
+      (LABEL_REPLICA_ORDINAL.into(), "0".into()),
+      (LABEL_CONTAINER.into(), "api".into()),
+      (LABEL_ROLE.into(), "app".into()),
+      (LABEL_ESSENTIAL.into(), "true".into()),
+      (
+        super::super::LABEL_INCARNATION.into(),
+        uuid::Uuid::new_v4().to_string(),
+      ),
+      (
+        super::super::LABEL_SPEC.into(),
+        uuid::Uuid::new_v4().to_string(),
+      ),
+      (
+        super::super::LABEL_OPERATION.into(),
+        uuid::Uuid::new_v4().to_string(),
+      ),
+    ]);
+    assert!(observed_identity_matches(Some(&labels), Some(&labels)));
+    assert!(!observed_identity_matches(None, Some(&labels)));
+    assert!(!observed_identity_matches(Some(&labels), None));
+    for label in labels.keys() {
+      let mut changed = labels.clone();
+      changed.insert(label.clone(), "different".into());
+      assert!(
+        !observed_identity_matches(Some(&changed), Some(&labels)),
+        "{label}"
+      );
+      changed.remove(label);
+      assert!(
+        !observed_identity_matches(Some(&changed), Some(&labels)),
+        "{label}"
+      );
+    }
+    let mut missing_slot = labels.clone();
+    missing_slot.remove(LABEL_REPLICA);
+    assert!(!observed_identity_matches(
+      Some(&missing_slot),
+      Some(&missing_slot)
     ));
   }
 }

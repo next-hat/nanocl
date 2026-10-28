@@ -62,6 +62,8 @@ pub(crate) use identity::{
 use identity::{
   process_identity, replica_ordinal, validate_observed_identities,
 };
+#[cfg(test)]
+pub(crate) use init::fail_next_init_wait;
 use init::{create_candidate_containers, reconcile_containers};
 
 pub use readiness::has_container_healthcheck;
