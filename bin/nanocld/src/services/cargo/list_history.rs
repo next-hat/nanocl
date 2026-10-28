@@ -1,9 +1,9 @@
 use ntex::web;
 
-use nanocl_error::{http::HttpResult, io::IoResult};
+use nanocl_error::http::HttpResult;
 
 use crate::{
-  models::{SpecDb, SystemState},
+  models::{CargoDb, SystemState},
   utils,
 };
 
@@ -26,11 +26,6 @@ pub async fn list_cargo_history(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
-  let histories =
-    SpecDb::read_by_kind_key("Cargo", key.as_str(), &state.inner.pool)
-      .await?
-      .into_iter()
-      .map(|e| e.try_to_cargo_spec_revision())
-      .collect::<IoResult<Vec<_>>>()?;
+  let histories = CargoDb::history(key.as_str(), &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }

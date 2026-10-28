@@ -13,6 +13,18 @@ pub fn ntex_config(
 ) {
   config
     .service(
+      web::resource("/nodes/cargoes/operations/start")
+        .name("start_node_cargo_operation")
+        .guard(web::guard::Post())
+        .to_with_state(start_node_cargo_operation),
+    )
+    .service(
+      web::resource("/nodes/cargoes/operations")
+        .name("delete_node_cargo_operation")
+        .guard(web::guard::Delete())
+        .to_with_state(delete_node_cargo_operation),
+    )
+    .service(
       web::resource("/nodes/cargoes/start")
         .name("start_node_cargo")
         .guard(web::guard::Post())

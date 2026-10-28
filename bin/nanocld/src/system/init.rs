@@ -245,6 +245,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     }
     // Recovery also retries when the initial runtime inventory was unavailable.
     utils::container::vm::recovery::spawn(&recovery_state);
+    utils::container::cargo::recovery::spawn(&recovery_state);
     utils::container::job::spawn_reconciliation(&recovery_state);
     Ok::<_, IoError>(())
   });
@@ -277,7 +278,9 @@ mod tests {
         "postgresql://root:root@store.nanocl.internal:26258/defaultdb"
           .to_owned(),
       ),
-      hostname: Some("init-test.nanocl.io".to_owned()),
+      // Reuse the test daemon identity so this initialization does not leave a
+      // synthetic node eligible for later Cargo placement in the shared store.
+      hostname: Some("nanocl.internal".to_owned()),
       gateway: Some("127.0.0.1".to_owned()),
       conf_dir: String::from("/etc/nanocl"),
       nodes: Vec::default(),

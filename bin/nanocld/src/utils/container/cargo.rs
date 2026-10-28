@@ -16,7 +16,7 @@ use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{CargoNetworkMode, Config as DockerConfig, ContainerSpec},
   generic::{GenericClause, GenericFilter, ImagePullPolicy},
-  node::{CargoReplicaTask, DeleteNodeCargoParams},
+  node::{CargoReplicaTask, DeleteNodeCargoOperationParams},
   process::{Process, ProcessKind},
   system::{NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind},
 };
@@ -24,9 +24,9 @@ use nanocl_stubs::{
 use crate::{
   models::{
     CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
-    CompileDeclaredOpts, EnsureExistingSlotOpts, NewCargoReplicaProcessDb,
-    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, ProcessUpdateDb,
-    SystemState,
+    CargoRuntimeContext, CompileDeclaredOpts, EnsureExistingSlotOpts,
+    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    ProcessDb, ProcessUpdateDb, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -42,9 +42,19 @@ use super::{
 
 mod identity;
 mod init;
+mod lifecycle;
 mod readiness;
+pub(crate) mod recovery;
 mod replacement;
 mod restart;
+
+pub(crate) use lifecycle::{
+  ensure_current, lifecycle_lock, observe, process_action, stop,
+  validate_target,
+};
+pub(crate) const LABEL_INCARNATION: &str = "io.nanocl.cargo.incarnation";
+pub(crate) const LABEL_SPEC: &str = "io.nanocl.cargo.spec";
+pub(crate) const LABEL_OPERATION: &str = "io.nanocl.cargo.operation";
 
 pub(crate) use identity::{
   is_candidate_process_name, is_retained_process_name, is_rollout_process_name,
@@ -52,6 +62,8 @@ pub(crate) use identity::{
 use identity::{
   process_identity, replica_ordinal, validate_observed_identities,
 };
+#[cfg(test)]
+pub(crate) use init::fail_next_init_wait;
 use init::{create_candidate_containers, reconcile_containers};
 
 pub use readiness::has_container_healthcheck;
@@ -532,7 +544,7 @@ async fn ensure_mapping(
   role: CargoReplicaProcessRole,
   container_name: &str,
   essential: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<CargoReplicaProcessDb> {
   let mappings =
     CargoReplicaProcessDb::list_by_replica(task.key, &state.inner.pool).await?;
@@ -541,8 +553,10 @@ async fn ensure_mapping(
   }) {
     return Ok(mapping);
   }
-  CargoReplicaProcessDb::create(
+  CargoReplicaProcessDb::create_owned(
     NewCargoReplicaProcessDb::new(task.key, container_name, role, essential),
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await
@@ -550,7 +564,7 @@ async fn ensure_mapping(
 
 async fn mapped_process(
   mapping: &CargoReplicaProcessDb,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<Option<Process>> {
   let Some(process_key) = mapping.process_key.as_deref() else {
     return Ok(None);
@@ -558,8 +572,13 @@ async fn mapped_process(
   match ProcessDb::transform_read_by_pk(process_key, &state.inner.pool).await {
     Ok(process) => Ok(Some(process)),
     Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      CargoReplicaProcessDb::clear_process(mapping.key, &state.inner.pool)
-        .await?;
+      CargoReplicaProcessDb::clear_process_owned(
+        mapping.key,
+        Some(state.operation.owner()),
+        state.lease.clone(),
+        &state.inner.pool,
+      )
+      .await?;
       Ok(None)
     }
     Err(error) => Err(error),
@@ -573,14 +592,25 @@ async fn create_process(
   container_name: &str,
   config: &DockerConfig,
   pending: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<Process> {
+  ensure_current(state).await?;
   let name = process_name(cargo, task, role, container_name, pending);
-  super::process::create(
+  let mut config = config.clone();
+  let labels = config.labels.get_or_insert_with(HashMap::new);
+  labels.insert(
+    LABEL_INCARNATION.into(),
+    state.operation.incarnation_key.to_string(),
+  );
+  labels.insert(LABEL_SPEC.into(), state.operation.spec_key.to_string());
+  labels.insert(LABEL_OPERATION.into(), state.operation.key.to_string());
+  super::process::create_owned(
     &ProcessKind::Cargo,
     &name,
     &cargo.spec.cargo_key,
-    config,
+    &config,
+    Some(state.operation.owner()),
+    state.lease.clone(),
     state,
   )
   .await
@@ -589,16 +619,18 @@ async fn create_process(
 async fn attach_process(
   mapping: &CargoReplicaProcessDb,
   process: &Process,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
-  if let Err(error) = CargoReplicaProcessDb::attach_process(
+  if let Err(error) = CargoReplicaProcessDb::attach_process_owned(
     mapping.key,
     &process.key,
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await
   {
-    let _ = super::process::delete_instance(
+    let cleanup = lifecycle::delete_instance(
       &process.key,
       Some(RemoveContainerOptions {
         force: true,
@@ -607,6 +639,7 @@ async fn attach_process(
       state,
     )
     .await;
+    rollback_result(cleanup.is_err())?;
     return Err(error);
   }
   Ok(())
@@ -626,7 +659,11 @@ async fn inspect_process(
   )
 }
 
-async fn start_process(process: &Process, state: &SystemState) -> IoResult<()> {
+async fn start_process(
+  process: &Process,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  lifecycle::validate_process(&process.key, state).await?;
   let inspected = inspect_process(&process.key, state).await?;
   if inspected
     .state
@@ -636,18 +673,28 @@ async fn start_process(process: &Process, state: &SystemState) -> IoResult<()> {
   {
     return Ok(());
   }
-  Ok(
-    state
-      .inner
-      .docker_api
-      .start_container(&process.key, None::<StartContainerOptions>)
-      .await
-      .map(|_| ())
-      .map_err(|error| error.map_err_context(|| "StartCargoProcess"))?,
-  )
+  match state
+    .inner
+    .docker_api
+    .start_container(&process.key, None::<StartContainerOptions>)
+    .await
+  {
+    Ok(_)
+    | Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 304,
+      ..
+    }) => Ok(()),
+    Err(error) => {
+      Err(lifecycle::runtime_docker_error(error, "StartCargoProcess"))
+    }
+  }
 }
 
-async fn stop_process(process: &Process, state: &SystemState) -> IoResult<()> {
+async fn stop_process(
+  process: &Process,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  lifecycle::validate_process(&process.key, state).await?;
   let inspected = inspect_process(&process.key, state).await?;
   if !inspected
     .state
@@ -657,15 +704,19 @@ async fn stop_process(process: &Process, state: &SystemState) -> IoResult<()> {
   {
     return Ok(());
   }
-  Ok(
-    state
-      .inner
-      .docker_api
-      .stop_container(&process.key, None::<StopContainerOptions>)
-      .await
-      .map(|_| ())
-      .map_err(|error| error.map_err_context(|| "StopCargoProcess"))?,
-  )
+  match state
+    .inner
+    .docker_api
+    .stop_container(&process.key, None::<StopContainerOptions>)
+    .await
+  {
+    Ok(_)
+    | Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 304,
+      ..
+    }) => Ok(()),
+    Err(error) => Err(*error.map_err_context(|| "StopCargoProcess")),
+  }
 }
 
 async fn wait_until_ready(
@@ -750,20 +801,22 @@ async fn wait_until_ready(
 
 async fn refresh_slot_observations(
   slots: &mut [RuntimeSlot],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for slot in slots {
     let inspected = inspect_process(&slot.process.key, state).await?;
     let data = serde_json::to_value(&inspected)
       .map_err(|error| error.map_err_context(|| "ObserveCargoProcess"))?;
     let updated_at = chrono::Utc::now().naive_utc();
-    ProcessDb::update_pk(
+    ProcessDb::update_owned(
       &slot.process.key,
       ProcessUpdateDb {
         data: Some(data),
         updated_at: Some(updated_at),
         ..Default::default()
       },
+      Some(state.operation.owner()),
+      state.lease.clone(),
       &state.inner.pool,
     )
     .await?;
@@ -824,8 +877,9 @@ async fn ensure_existing_slot(
 async fn reconcile_replica(
   cargo: &Cargo,
   task: &CargoReplicaTask,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<ReplicaRuntime> {
+  ensure_current(state).await?;
   preflight_replica(cargo, task, state).await?;
   let gateway = internal_gateway(cargo, state).await?;
   let attempt_id = uuid::Uuid::new_v4().to_string();
@@ -962,10 +1016,10 @@ async fn preflight_cargo_restart(
 
 async fn mark_cargo_restarting(
   cargo_key: &str,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   let current = ObjPsStatusDb::read_by_pk(cargo_key, &state.inner.pool).await?;
-  ObjPsStatusDb::update_pk(
+  ObjPsStatusDb::update_owned(
     cargo_key,
     ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Start.to_string()),
@@ -974,6 +1028,8 @@ async fn mark_cargo_restarting(
       prev_actual: Some(current.actual),
       health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
     },
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await?;
@@ -983,8 +1039,12 @@ async fn mark_cargo_restarting(
 /// Docker-restart every mapped application while preserving the sandbox and
 /// completed init containers, then publish success only after full essential
 /// readiness is restored.
-pub async fn restart(key: &str, state: &SystemState) -> IoResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+pub(crate) async fn restart(
+  cargo: &Cargo,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  ensure_current(state).await?;
+  let key = &cargo.spec.cargo_key;
   let replicas = CargoReplicaDb::list_by_cargo(key, &state.inner.pool).await?;
   let mut mappings = Vec::new();
   for replica in &replicas {
@@ -996,7 +1056,7 @@ pub async fn restart(key: &str, state: &SystemState) -> IoResult<()> {
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
   let mut plan = plan_cargo_restart(
-    &cargo,
+    cargo,
     &replicas,
     &mappings,
     &processes,
@@ -1010,6 +1070,7 @@ pub async fn restart(key: &str, state: &SystemState) -> IoResult<()> {
     .iter()
     .filter(|slot| slot.role == CargoReplicaProcessRole::App)
   {
+    lifecycle::validate_process(&slot.process.key, state).await?;
     state
       .inner
       .docker_api
@@ -1040,21 +1101,18 @@ pub async fn restart(key: &str, state: &SystemState) -> IoResult<()> {
     ));
   }
   if any_healthcheck {
-    ObjPsStatusDb::update_health_status(
-      key,
-      &ObjPsHealthStatusKind::Healthy,
-      &state.inner.pool,
-    )
-    .await?;
+    lifecycle::set_health(key, &ObjPsHealthStatusKind::Healthy, state).await?;
   }
-  ObjPsStatusDb::update_actual_status(
+  ObjPsStatusDb::update_actual_status_owned(
     key,
     &ObjPsStatusKind::Start,
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await?;
   for action in promotion_actions(any_healthcheck) {
-    state.emit_normal_native_action_sync(&cargo, action).await;
+    state.emit_normal_native_action_sync(cargo, action).await;
   }
   Ok(())
 }
@@ -1063,8 +1121,9 @@ pub async fn restart(key: &str, state: &SystemState) -> IoResult<()> {
 pub async fn start(
   cargo: &Cargo,
   replicas: &[CargoReplicaTask],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
+  ensure_current(state).await?;
   let mut replicas = replicas.to_vec();
   replicas.sort_by_key(|replica| replica.ordinal);
   validate_local_fixed_port_ownership(cargo, replicas.len())?;
@@ -1098,7 +1157,7 @@ pub async fn start(
 
 async fn active_slots(
   task: &CargoReplicaTask,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<Vec<RuntimeSlot>> {
   let mappings =
     CargoReplicaProcessDb::list_by_replica(task.key, &state.inner.pool).await?;
@@ -1133,17 +1192,20 @@ async fn active_slots(
 
 async fn rename_old_slots(
   slots: &mut [RuntimeSlot],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for slot in slots {
+    lifecycle::validate_process(&slot.process.key, state).await?;
     if is_retained_process_name(&slot.process.name) {
-      ProcessDb::update_pk(
+      ProcessDb::update_owned(
         &slot.process.key,
         ProcessUpdateDb {
           name: Some(slot.process.name.clone()),
           updated_at: Some(chrono::Utc::now().naive_utc()),
           ..Default::default()
         },
+        Some(state.operation.owner()),
+        state.lease.clone(),
         &state.inner.pool,
       )
       .await?;
@@ -1160,13 +1222,15 @@ async fn rename_old_slots(
       .await
       .map_err(|error| error.map_err_context(|| "RenameCargoProcess"))?;
     slot.process.name = name.clone();
-    ProcessDb::update_pk(
+    ProcessDb::update_owned(
       &slot.process.key,
       ProcessUpdateDb {
         name: Some(name.clone()),
         updated_at: Some(chrono::Utc::now().naive_utc()),
         ..Default::default()
       },
+      Some(state.operation.owner()),
+      state.lease.clone(),
       &state.inner.pool,
     )
     .await?;
@@ -1177,9 +1241,10 @@ async fn rename_old_slots(
 async fn set_candidate_marker(
   slots: &mut [RuntimeSlot],
   pending: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for slot in slots {
+    lifecycle::validate_process(&slot.process.key, state).await?;
     let (name, rename) = if pending {
       if is_candidate_process_name(&slot.process.name) {
         (slot.process.name.clone(), false)
@@ -1204,13 +1269,15 @@ async fn set_candidate_marker(
         .map_err(|error| error.map_err_context(|| "MarkCargoCandidate"))?;
       slot.process.name = name.clone();
     }
-    ProcessDb::update_pk(
+    ProcessDb::update_owned(
       &slot.process.key,
       ProcessUpdateDb {
         name: Some(name),
         updated_at: Some(chrono::Utc::now().naive_utc()),
         ..Default::default()
       },
+      Some(state.operation.owner()),
+      state.lease.clone(),
       &state.inner.pool,
     )
     .await?;
@@ -1220,7 +1287,7 @@ async fn set_candidate_marker(
 
 async fn activate_candidate_slots(
   slots: &mut [RuntimeSlot],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   // The proxy requires the exact essential application set before selecting
   // an active attempt. Activate infrastructure and nonessential processes
@@ -1240,7 +1307,7 @@ async fn activate_candidate_slots(
 async fn retain_old_slots(
   slots: &mut [RuntimeSlot],
   restart: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   // The persisted declaration is already the candidate declaration. Keep the
   // old generation marked as retained so the proxy can validate it from its
@@ -1266,7 +1333,7 @@ async fn retain_old_slots(
 
 async fn stop_slots(
   slots: &[RuntimeSlot],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for slot in slots
     .iter()
@@ -1285,11 +1352,11 @@ async fn stop_slots(
 
 async fn delete_slots(
   slots: &[RuntimeSlot],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for role in RUNTIME_DELETION_ORDER {
     for slot in slots.iter().filter(|slot| slot.role == role) {
-      super::process::delete_instance(
+      lifecycle::delete_instance(
         &slot.process.key,
         Some(RemoveContainerOptions {
           force: true,
@@ -1306,7 +1373,7 @@ async fn delete_slots(
 async fn create_candidate(
   cargo: &Cargo,
   task: &CargoReplicaTask,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<ReplicaRuntime> {
   let gateway = internal_gateway(cargo, state).await?;
   let attempt_id = uuid::Uuid::new_v4().to_string();
@@ -1414,7 +1481,7 @@ async fn create_candidate(
   match result {
     Ok(_) => Ok(ReplicaRuntime { slots }),
     Err(error) => {
-      let _ = delete_slots(&slots, state).await;
+      rollback_result(delete_slots(&slots, state).await.is_err())?;
       Err(error)
     }
   }
@@ -1423,7 +1490,7 @@ async fn create_candidate(
 async fn remove_stale_mappings(
   task: &CargoReplicaTask,
   candidate: &ReplicaRuntime,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   let desired = candidate
     .slots
@@ -1434,7 +1501,13 @@ async fn remove_stale_mappings(
     CargoReplicaProcessDb::list_by_replica(task.key, &state.inner.pool).await?;
   for mapping in mappings {
     if !desired.contains(&(mapping.role, mapping.container_name.as_str())) {
-      CargoReplicaProcessDb::delete(mapping.key, &state.inner.pool).await?;
+      CargoReplicaProcessDb::delete_owned(
+        mapping.key,
+        Some(state.operation.owner()),
+        state.lease.clone(),
+        &state.inner.pool,
+      )
+      .await?;
     }
   }
   Ok(())
@@ -1445,16 +1518,16 @@ async fn prepare_replica_update(
   task: &CargoReplicaTask,
   stop_first: bool,
   remove_first: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<PreparedReplicaUpdate> {
   preflight_replica(cargo, task, state).await?;
   let mut old = active_slots(task, state).await?;
   if let Err(error) = rename_old_slots(&mut old, state).await {
-    let _ = retain_old_slots(&mut old, false, state).await;
+    rollback_result(retain_old_slots(&mut old, false, state).await.is_err())?;
     return Err(error);
   }
   if stop_first && let Err(error) = stop_slots(&old, state).await {
-    let _ = retain_old_slots(&mut old, true, state).await;
+    rollback_result(retain_old_slots(&mut old, true, state).await.is_err())?;
     return Err(error);
   }
   if remove_first {
@@ -1466,6 +1539,7 @@ async fn prepare_replica_update(
           cargo.spec.cargo_key,
           task.key
         );
+        rollback_result(true)?;
       }
       return Err(error);
     }
@@ -1484,6 +1558,7 @@ async fn prepare_replica_update(
           cargo.spec.cargo_key,
           task.key
         );
+        rollback_result(true)?;
       }
       return Err(error);
     }
@@ -1491,8 +1566,10 @@ async fn prepare_replica_update(
   if let Err(error) =
     refresh_slot_observations(&mut candidate.slots, state).await
   {
-    let _ = delete_slots(&candidate.slots, state).await;
-    let _ = retain_old_slots(&mut old, stop_first, state).await;
+    let cleanup_failed = delete_slots(&candidate.slots, state).await.is_err();
+    let restore_failed =
+      retain_old_slots(&mut old, stop_first, state).await.is_err();
+    rollback_result(cleanup_failed || restore_failed)?;
     return Err(error);
   }
   Ok(PreparedReplicaUpdate {
@@ -1535,10 +1612,22 @@ fn previous_attachments(
     .collect()
 }
 
+fn rollback_result(failed: bool) -> IoResult<()> {
+  if failed {
+    Err(IoError::interrupted(
+      "Cargo rollback",
+      "Cargo cleanup or restoration was not fully confirmed; operation remains pending",
+    ))
+  } else {
+    Ok(())
+  }
+}
+
 async fn rollback_prepared_updates(
   prepared: &mut [PreparedReplicaUpdate],
-  state: &SystemState,
-) {
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  let mut failed = false;
   for replica in prepared.iter_mut().rev() {
     if let Err(error) =
       set_candidate_marker(&mut replica.candidate.slots, true, state).await
@@ -1547,6 +1636,7 @@ async fn rollback_prepared_updates(
         "Unable to mark failed Cargo replica {} candidate as pending: {error}",
         replica.task.key
       );
+      failed = true;
     }
   }
   for replica in prepared.iter().rev() {
@@ -1555,6 +1645,7 @@ async fn rollback_prepared_updates(
         "Unable to delete failed Cargo replica {} candidate: {error}",
         replica.task.key
       );
+      failed = true;
     }
   }
   for replica in prepared.iter_mut().rev() {
@@ -1565,6 +1656,7 @@ async fn rollback_prepared_updates(
         "Unable to restore Cargo replica {} after rollout failure: {error}",
         replica.task.key
       );
+      failed = true;
       continue;
     }
     if let Err(error) = refresh_slot_observations(&mut replica.old, state).await
@@ -1573,13 +1665,15 @@ async fn rollback_prepared_updates(
         "Unable to refresh restored Cargo replica {} observations: {error}",
         replica.task.key
       );
+      failed = true;
     }
   }
+  rollback_result(failed)
 }
 
 async fn revalidate_prepared_candidates(
   prepared: &mut [PreparedReplicaUpdate],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<bool> {
   let mut any_healthcheck = false;
   for replica in prepared {
@@ -1612,8 +1706,8 @@ fn rollback_candidate_cleanup(
 
 async fn restore_retained_updates(
   prepared: &mut [PreparedReplicaUpdate],
-  state: &SystemState,
-) -> bool {
+  state: &CargoRuntimeContext,
+) -> IoResult<bool> {
   let mut all_ready = true;
   for replica in prepared {
     if let Err(error) =
@@ -1641,13 +1735,14 @@ async fn restore_retained_updates(
       all_ready = false;
     }
   }
-  all_ready
+  rollback_result(!all_ready)?;
+  Ok(all_ready)
 }
 
 async fn snapshot_prepared_candidate_readiness(
   cargo: &Cargo,
   prepared: &mut [PreparedReplicaUpdate],
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<bool> {
   if prepared.iter().any(|replica| {
     !required_candidate_topology_complete(
@@ -1700,13 +1795,15 @@ async fn snapshot_prepared_candidate_readiness(
     let data = serde_json::to_value(&inspected)
       .map_err(|error| error.map_err_context(|| "ObserveCargoProcess"))?;
     let updated_at = chrono::Utc::now().naive_utc();
-    ProcessDb::update_pk(
+    ProcessDb::update_owned(
       &slot.process.key,
       ProcessUpdateDb {
         data: Some(data),
         updated_at: Some(updated_at),
         ..Default::default()
       },
+      Some(state.operation.owner()),
+      state.lease.clone(),
       &state.inner.pool,
     )
     .await?;
@@ -1729,8 +1826,9 @@ async fn rollback_committed_update(
   cargo: &Cargo,
   prepared: &mut [PreparedReplicaUpdate],
   previous_attachments: &[(uuid::Uuid, Option<String>, bool)],
-  state: &SystemState,
-) {
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  let mut failed = false;
   for replica in prepared.iter_mut().rev() {
     if let Err(error) =
       set_candidate_marker(&mut replica.candidate.slots, true, state).await
@@ -1739,10 +1837,13 @@ async fn rollback_committed_update(
         "Unable to hide Cargo replica {} candidate during rollback: {error}",
         replica.task.key
       );
+      failed = true;
     }
   }
-  let attachments_restored = match CargoReplicaProcessDb::set_processes(
+  let attachments_restored = match CargoReplicaProcessDb::set_processes_owned(
     previous_attachments.to_vec(),
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await
@@ -1753,6 +1854,7 @@ async fn rollback_committed_update(
         "Unable to restore Cargo {:?} process mappings during rollback: {error}",
         cargo.spec.cargo_key
       );
+      failed = true;
       false
     }
   };
@@ -1766,17 +1868,23 @@ async fn rollback_committed_update(
           "Unable to release Cargo replica {} candidate before restoring its retained fixed-port generation: {error}",
           replica.task.key
         );
+        failed = true;
       }
     }
   }
-  let retained_ready =
-    restore_retained_updates(prepared, state).await && attachments_restored;
+  let retained_ready = match restore_retained_updates(prepared, state).await {
+    Ok(ready) => ready && attachments_restored,
+    Err(_) => {
+      failed = true;
+      false
+    }
+  };
   let candidate_cleanup =
     rollback_candidate_cleanup(stop_first, retained_ready);
-  if let Err(error) = ObjPsStatusDb::update_health_status(
+  if let Err(error) = lifecycle::set_health(
     &cargo.spec.cargo_key,
     &ObjPsHealthStatusKind::Unhealthy,
-    &state.inner.pool,
+    state,
   )
   .await
   {
@@ -1784,8 +1892,9 @@ async fn rollback_committed_update(
       "Unable to mark rolled-back Cargo {:?} unhealthy: {error}",
       cargo.spec.cargo_key
     );
+    failed = true;
   }
-  if let Err(error) = ObjPsStatusDb::update_pk(
+  if let Err(error) = ObjPsStatusDb::update_owned(
     &cargo.spec.cargo_key,
     ObjPsStatusUpdate {
       actual: Some(ObjPsStatusKind::Fail.to_string()),
@@ -1795,6 +1904,8 @@ async fn rollback_committed_update(
       prev_actual: Some(ObjPsStatusKind::Updating.to_string()),
       ..Default::default()
     },
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await
@@ -1803,6 +1914,7 @@ async fn rollback_committed_update(
       "Unable to mark rolled-back Cargo {:?} failed: {error}",
       cargo.spec.cargo_key
     );
+    failed = true;
   }
   if candidate_cleanup != RollbackCandidateCleanup::PreserveForLiveness {
     state
@@ -1820,6 +1932,7 @@ async fn rollback_committed_update(
             "Unable to delete Cargo replica {} candidate after rollback route handoff: {error}",
             replica.task.key
           );
+          failed = true;
         }
       }
     }
@@ -1830,14 +1943,19 @@ async fn rollback_committed_update(
       );
     }
   }
+  rollback_result(failed)
 }
 
 /// Replace every locally assigned replica serially. Replicas without Cargo
 /// port bindings keep their old serving sandbox until the candidate is ready.
 /// Port-bound or host-network replicas are explicitly stopped first so Docker
 /// cannot race the old listener for the same host socket.
-pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+pub(crate) async fn update(
+  cargo: &Cargo,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  ensure_current(state).await?;
+  let key = &cargo.spec.cargo_key;
   let replicas = CargoReplicaDb::list_by_cargo(key, &state.inner.pool).await?;
   if replicas.len() != cargo.spec.replicas
     || replicas.iter().any(|replica| replica.node_name.is_none())
@@ -1872,20 +1990,20 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
       ordinal: replica.ordinal,
     })
     .collect::<Vec<_>>();
-  validate_local_fixed_port_ownership(&cargo, tasks.len())?;
+  validate_local_fixed_port_ownership(cargo, tasks.len())?;
   for task in &tasks {
-    preflight_replica(&cargo, task, state).await?;
+    preflight_replica(cargo, task, state).await?;
   }
-  let stop_first = requires_stop_before_replacement(&cargo);
-  let remove_first = requires_removal_before_replacement(&cargo);
+  let stop_first = requires_stop_before_replacement(cargo);
+  let remove_first = requires_removal_before_replacement(cargo);
   let mut prepared = Vec::with_capacity(tasks.len());
   for task in &tasks {
-    match prepare_replica_update(&cargo, task, stop_first, remove_first, state)
+    match prepare_replica_update(cargo, task, stop_first, remove_first, state)
       .await
     {
       Ok(replica) => prepared.push(replica),
       Err(error) => {
-        rollback_prepared_updates(&mut prepared, state).await;
+        rollback_prepared_updates(&mut prepared, state).await?;
         return Err(error);
       }
     }
@@ -1894,31 +2012,32 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
     match revalidate_prepared_candidates(&mut prepared, state).await {
       Ok(any_healthcheck) => any_healthcheck,
       Err(error) => {
-        rollback_prepared_updates(&mut prepared, state).await;
+        rollback_prepared_updates(&mut prepared, state).await?;
         return Err(error);
       }
     };
-  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
-    .await
+  match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
   {
     Ok(true) => {}
     Ok(false) => {
-      rollback_prepared_updates(&mut prepared, state).await;
+      rollback_prepared_updates(&mut prepared, state).await?;
       return Err(candidate_readiness_error(key, "pre-promotion snapshot"));
     }
     Err(error) => {
-      rollback_prepared_updates(&mut prepared, state).await;
+      rollback_prepared_updates(&mut prepared, state).await?;
       return Err(error);
     }
   }
   let previous_attachments = previous_attachments(&prepared);
-  if let Err(error) = CargoReplicaProcessDb::set_processes(
+  if let Err(error) = CargoReplicaProcessDb::set_processes_owned(
     candidate_attachments(&prepared),
+    Some(state.operation.owner()),
+    state.lease.clone(),
     &state.inner.pool,
   )
   .await
   {
-    rollback_prepared_updates(&mut prepared, state).await;
+    rollback_prepared_updates(&mut prepared, state).await?;
     return Err(error);
   }
   // Keep the aggregate status Updating while candidates become visible. The
@@ -1929,63 +2048,60 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
       activate_candidate_slots(&mut replica.candidate.slots, state).await
     {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(error);
     }
   }
   if let Err(error) = revalidate_prepared_candidates(&mut prepared, state).await
   {
     rollback_committed_update(
-      &cargo,
+      cargo,
       &mut prepared,
       &previous_attachments,
       state,
     )
-    .await;
+    .await?;
     return Err(error);
   }
-  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
-    .await
+  match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
   {
     Ok(true) => {}
     Ok(false) => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(candidate_readiness_error(key, "promotion snapshot"));
     }
     Err(error) => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(error);
     }
   }
   let status_result = async {
     if any_healthcheck {
-      ObjPsStatusDb::update_health_status(
-        key,
-        &ObjPsHealthStatusKind::Healthy,
-        &state.inner.pool,
-      )
-      .await?;
+      lifecycle::set_health(key, &ObjPsHealthStatusKind::Healthy, state)
+        .await?;
     }
-    ObjPsStatusDb::update_actual_status(
+    ObjPsStatusDb::update_actual_status_owned(
       key,
       &ObjPsStatusKind::Start,
+      Some(state.operation.owner()),
+      state.lease.clone(),
       &state.inner.pool,
     )
     .await
@@ -1993,70 +2109,70 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   .await;
   if let Err(error) = status_result {
     rollback_committed_update(
-      &cargo,
+      cargo,
       &mut prepared,
       &previous_attachments,
       state,
     )
-    .await;
+    .await?;
     return Err(error);
   }
-  match snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state)
-    .await
+  match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
   {
     Ok(true) => {}
     Ok(false) => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(candidate_readiness_error(key, "status commit"));
     }
     Err(error) => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(error);
     }
   }
   for action in promotion_actions(any_healthcheck) {
-    state.emit_normal_native_action_sync(&cargo, action).await;
+    state.emit_normal_native_action_sync(cargo, action).await;
   }
   ntex::time::sleep(ROUTE_HANDOFF_GRACE).await;
   let handoff_ready =
-    snapshot_prepared_candidate_readiness(&cargo, &mut prepared, state).await;
+    snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await;
   let status = ObjPsStatusDb::read_by_pk(key, &state.inner.pool).await;
   match (handoff_ready, status) {
     (Ok(true), Ok(status))
       if status.actual == ObjPsStatusKind::Start.to_string() => {}
     (Err(error), _) | (_, Err(error)) => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(error);
     }
     _ => {
       rollback_committed_update(
-        &cargo,
+        cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
-      .await;
+      .await?;
       return Err(candidate_readiness_error(key, "route handoff"));
     }
   }
+  let mut cleanup_failed = false;
   for replica in &prepared {
     if let Err(error) = delete_slots(&replica.old, state).await {
       log::error!(
@@ -2064,6 +2180,7 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
         cargo.spec.cargo_key,
         replica.task.key
       );
+      cleanup_failed = true;
       continue;
     }
     if let Err(error) =
@@ -2074,17 +2191,20 @@ pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
         cargo.spec.cargo_key,
         replica.task.key
       );
+      cleanup_failed = true;
     }
   }
-  Ok(())
+  rollback_result(cleanup_failed)
 }
 
 /// Delete Cargo processes on this node (or all nodes when requested).
 pub async fn delete_instances(
   key: &str,
   all: bool,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
+  ensure_current(state).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let node_name = state.inner.config.hostname.clone();
   let mut filter = GenericFilter::new();
   if !all {
@@ -2112,7 +2232,14 @@ pub async fn delete_instances(
     }
   });
   for process in local {
-    super::process::delete_instance(
+    validate_target(
+      &cargo,
+      state.operation.incarnation_key,
+      &process.key,
+      state,
+    )
+    .await?;
+    lifecycle::delete_instance(
       &process.key,
       Some(RemoveContainerOptions {
         force: true,
@@ -2123,6 +2250,7 @@ pub async fn delete_instances(
     .await?;
   }
   for remote_node in remote_nodes {
+    ensure_current(state).await?;
     let node = NodeDb::read_by_pk(&remote_node, &state.inner.pool).await?;
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: node.endpoint,
@@ -2130,23 +2258,31 @@ pub async fn delete_instances(
       version: Some(node.version),
     })?;
     client
-      .delete_node_cargo(&DeleteNodeCargoParams {
+      .delete_node_cargo_operation(&DeleteNodeCargoOperationParams {
         cargo_key: key.to_owned(),
+        operation_key: state.operation.key,
+        incarnation_key: state.operation.incarnation_key,
+        spec_key: state.operation.spec_key,
       })
-      .await?;
+      .await
+      .map_err(|_| {
+        IoError::interrupted(
+          "Cargo remote execution",
+          "Node did not confirm deletion of the accepted Cargo runtime",
+        )
+      })?;
   }
   Ok(())
 }
 
 /// Delete Cargo runtime and desired state.
-pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
-  delete_instances(key, true, state).await?;
-  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
-  CargoDb::clear_by_pk(key, &state.inner.pool).await?;
-  state
-    .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
-    .await;
-  Ok(())
+pub(crate) async fn delete(
+  key: &str,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  // The coordinator atomically deletes the live definition and completes the
+  // operation only after every node acknowledges runtime removal.
+  delete_instances(key, true, state).await
 }
 
 #[cfg(test)]

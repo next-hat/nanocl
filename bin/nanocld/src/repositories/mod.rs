@@ -1,4 +1,5 @@
 mod cargo;
+pub(crate) mod cargo_operation;
 mod cargo_replica;
 mod distributed_mutex;
 mod event;

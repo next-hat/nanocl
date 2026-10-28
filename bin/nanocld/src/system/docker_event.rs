@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use futures_util::StreamExt;
 use ntex::rt;
@@ -16,8 +16,8 @@ use nanocl_stubs::system::{
 
 use crate::{
   models::{
-    CargoDb, CargoReplicaDb, ObjPsStatusDb, OperationDb, ProcessDb,
-    ProcessUpdateDb, SystemState, VmDb, VmLifecycleObservationGuard,
+    CargoDb, CargoReplicaDb, CargoReplicaProcessDb, ObjPsStatusDb, OperationDb,
+    ProcessDb, ProcessUpdateDb, SystemState, VmDb, VmLifecycleObservationGuard,
   },
   repositories::generic::*,
   utils, vars,
@@ -414,16 +414,69 @@ fn current_process_name(
 
 async fn reduce_cargo_runtime_readiness(
   kind_key: &str,
+  trigger_id: &str,
   trigger: &str,
   state: &SystemState,
-) -> IoResult<bool> {
-  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
+) -> IoResult<Option<bool>> {
+  let lock = utils::container::cargo::lifecycle_lock(kind_key);
+  let guard = match lock.clone().try_lock_owned() {
+    Ok(guard) => guard,
+    Err(_) => {
+      // Recheck after the owning task without blocking the serial Docker
+      // stream or losing a crash during the final operation commit.
+      let key = kind_key.to_owned();
+      let id = trigger_id.to_owned();
+      let trigger = trigger.to_owned();
+      let state = state.clone();
+      rt::spawn(async move {
+        let guard = std::sync::Arc::new(lock.lock_owned().await);
+        if let Err(error) = reduce_cargo_runtime_readiness_owned(
+          &key, &id, &trigger, &state, guard,
+        )
+        .await
+        {
+          log::warn!("event::docker deferred Cargo readiness: {error}");
+        }
+      });
+      return Ok(None);
+    }
+  };
+  let guard = std::sync::Arc::new(guard);
+  reduce_cargo_runtime_readiness_owned(
+    kind_key, trigger_id, trigger, state, guard,
+  )
+  .await
+}
+
+async fn reduce_cargo_runtime_readiness_owned(
+  kind_key: &str,
+  trigger_id: &str,
+  trigger: &str,
+  state: &SystemState,
+  guard: std::sync::Arc<tokio::sync::OwnedMutexGuard<()>>,
+) -> IoResult<Option<bool>> {
+  let operation =
+    OperationDb::current("Cargo", kind_key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Ok(None);
+  }
+  let (live, _, status) =
+    match CargoDb::read_by_pk(kind_key, &state.inner.pool).await {
+      Ok(current) => current,
+      Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+        return Ok(None);
+      }
+      Err(error) => return Err(error),
+    };
   if status.wanted != ObjPsStatusKind::Start.to_string() {
     log::debug!(
       "ignore Cargo readiness trigger while wanted={}: key={kind_key} trigger={trigger}",
       status.wanted
     );
-    return Ok(false);
+    return Ok(None);
   }
   if reconciliation_owns_cargo_health(&status.actual, &status.prev_actual) {
     // Cargo reconciliation performs a synchronous, per-replica readiness
@@ -434,75 +487,116 @@ async fn reduce_cargo_runtime_readiness(
       "ignore Cargo readiness trigger during {}: key={kind_key} trigger={trigger}",
       status.actual
     );
-    return Ok(false);
+    return Ok(None);
   }
   let cargo =
     CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-  let instances =
+  let mut instances =
     ProcessDb::read_by_kind_key(kind_key, None, &state.inner.pool).await?;
+  let replicas =
+    CargoReplicaDb::list_by_cargo(kind_key, &state.inner.pool).await?;
+  let mut mapped_ids = HashSet::new();
+  for replica in &replicas {
+    for mapping in
+      CargoReplicaProcessDb::list_by_replica(replica.key, &state.inner.pool)
+        .await?
+    {
+      if let Some(id) = mapping.process_key {
+        mapped_ids.insert(id);
+      }
+    }
+  }
+  instances.retain(|process| {
+    mapped_ids.contains(&process.key)
+      && cargo_observation_identity_matches(
+        live.incarnation_key,
+        process
+          .data
+          .config
+          .as_ref()
+          .and_then(|config| config.labels.as_ref()),
+      )
+  });
+  if !instances.iter().any(|process| process.key == trigger_id) {
+    return Ok(None);
+  }
   let desired_replica_keys =
-    CargoReplicaDb::list_by_cargo(kind_key, &state.inner.pool)
-      .await?
-      .into_iter()
-      .map(|replica| replica.key)
-      .collect();
+    replicas.into_iter().map(|replica| replica.key).collect();
   let ready = utils::container::cargo::all_desired_replicas_ready(
     &cargo,
     &desired_replica_keys,
     &instances,
   );
-  if !ready {
-    let health_changed = ObjPsStatusDb::update_health_status(
-      kind_key,
-      &ObjPsHealthStatusKind::Unhealthy,
-      &state.inner.pool,
-    )
-    .await?;
-    let actual_changed = status.actual != ObjPsStatusKind::Fail.to_string();
-    if actual_changed {
-      ObjPsStatusDb::update_actual_status(
-        kind_key,
-        &ObjPsStatusKind::Fail,
-        &state.inner.pool,
-      )
-      .await?;
-    }
-    if health_changed || actual_changed {
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
-        .await;
-    }
-    return Ok(false);
-  }
-  let health_changed = ObjPsStatusDb::update_health_status(
-    kind_key,
-    &ObjPsHealthStatusKind::Healthy,
+  let (actual, health) = if ready {
+    (ObjPsStatusKind::Start, ObjPsHealthStatusKind::Healthy)
+  } else {
+    (ObjPsStatusKind::Fail, ObjPsHealthStatusKind::Unhealthy)
+  };
+  let actual_changed = status.actual != actual.to_string();
+  let health_changed = status.health != health.to_string();
+  if !CargoDb::observe_runtime_status(
+    &cargo,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    actual,
+    health,
+    guard.clone(),
     &state.inner.pool,
   )
-  .await?;
-  let actual_changed = status.actual != ObjPsStatusKind::Start.to_string();
-  if actual_changed {
-    ObjPsStatusDb::update_actual_status(
-      kind_key,
-      &ObjPsStatusKind::Start,
-      &state.inner.pool,
-    )
-    .await?;
+  .await?
+  {
+    return Ok(None);
+  }
+  if !ready {
+    state
+      .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
+      .await;
+    return Ok(Some(false));
   }
   for action in
     successful_cargo_readiness_actions(actual_changed, health_changed)
   {
     state.emit_normal_native_action_sync(&cargo, action).await;
   }
-  Ok(true)
+  Ok(Some(true))
+}
+
+// Legacy/bootstrap containers may have no operation labels, but callers must
+// first establish their exact durable mapping. An unchanged slot may retain
+// its creation revision after a completed rollout. Partial or foreign
+// incarnation identities never qualify as observations of the current Cargo.
+fn cargo_observation_identity_matches(
+  incarnation: uuid::Uuid,
+  labels: Option<&HashMap<String, String>>,
+) -> bool {
+  let Some(labels) = labels else {
+    return false;
+  };
+  use utils::container::cargo::{
+    LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC,
+  };
+  match (
+    labels.get(LABEL_INCARNATION),
+    labels.get(LABEL_SPEC),
+    labels.get(LABEL_OPERATION),
+  ) {
+    (None, None, None) => true,
+    (Some(current_incarnation), Some(current_spec), Some(operation)) => {
+      current_incarnation.parse::<uuid::Uuid>() == Ok(incarnation)
+        && current_spec.parse::<uuid::Uuid>().is_ok()
+        && operation.parse::<uuid::Uuid>().is_ok()
+    }
+    _ => false,
+  }
 }
 
 async fn handle_cargo_health_event(
   kind_key: &str,
+  id: &str,
   action: &str,
   state: &SystemState,
 ) -> IoResult<()> {
-  let _ = reduce_cargo_runtime_readiness(kind_key, action, state).await?;
+  let _ = reduce_cargo_runtime_readiness(kind_key, id, action, state).await?;
   Ok(())
 }
 
@@ -619,9 +713,13 @@ async fn exec_docker(
             )
             && actual_status.wanted == ObjPsStatusKind::Start.to_string() =>
         {
-          let _ =
-            reduce_cargo_runtime_readiness(&kind_key, "container start", state)
-              .await?;
+          let _ = reduce_cargo_runtime_readiness(
+            &kind_key,
+            &id,
+            "container start",
+            state,
+          )
+          .await?;
         }
         (EventActorKind::Vm, status)
           if status != &ObjPsStatusKind::Start.to_string()
@@ -662,7 +760,7 @@ async fn exec_docker(
           Some(&attributes),
         )
         && let Err(err) =
-          handle_cargo_health_event(&kind_key, action, state).await
+          handle_cargo_health_event(&kind_key, &id, action, state).await
       {
         log::warn!("event::docker health_status: {err}");
       }
@@ -709,12 +807,14 @@ async fn exec_docker(
             let cargo =
               CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
                 .await?;
-            if !reduce_cargo_runtime_readiness(
+            if reduce_cargo_runtime_readiness(
               &kind_key,
+              &id,
               "container die",
               state,
             )
             .await?
+              == Some(false)
             {
               state.emit_error_native_action(
                 &cargo,
@@ -825,6 +925,45 @@ pub fn analyze(state: &SystemState) {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn cargo_observation_rejects_foreign_and_partial_runtime_identity() {
+    use super::cargo_observation_identity_matches;
+    use crate::utils::container::cargo::{
+      LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC,
+    };
+    let incarnation = uuid::Uuid::new_v4();
+    let spec = uuid::Uuid::new_v4();
+    let mut labels = std::collections::HashMap::from([
+      (LABEL_INCARNATION.into(), incarnation.to_string()),
+      (LABEL_SPEC.into(), spec.to_string()),
+      (LABEL_OPERATION.into(), uuid::Uuid::new_v4().to_string()),
+    ]);
+    assert!(cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    assert!(!cargo_observation_identity_matches(
+      uuid::Uuid::new_v4(),
+      Some(&labels)
+    ));
+    labels.insert(LABEL_SPEC.into(), uuid::Uuid::new_v4().to_string());
+    assert!(
+      cargo_observation_identity_matches(incarnation, Some(&labels)),
+      "exact mapped slots can retain an earlier creation revision"
+    );
+    labels.remove(LABEL_OPERATION);
+    assert!(!cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    labels.clear();
+    assert!(cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    assert!(!cargo_observation_identity_matches(incarnation, None));
+  }
+
   use std::collections::HashMap;
 
   use bollard_next::models::EventActor as DockerEventActor;

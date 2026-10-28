@@ -57,9 +57,81 @@ pub struct DeleteNodeCargoParams {
   pub cargo_key: String,
 }
 
+/// A coordinator-accepted start sent only to operation-aware node routes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StartNodeCargoOperationParams {
+  pub cargo_key: String,
+  pub operation_key: uuid::Uuid,
+  pub incarnation_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
+  /// Exact durable replicas assigned to the receiving node.
+  pub replicas: Vec<CargoReplicaTask>,
+}
+
+/// An accepted deletion of this incarnation's runtime on the receiving node.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct DeleteNodeCargoOperationParams {
+  pub cargo_key: String,
+  pub operation_key: uuid::Uuid,
+  pub incarnation_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
+}
+
 #[cfg(all(test, feature = "serde"))]
 mod tests {
   use super::*;
+
+  #[test]
+  fn cargo_node_operation_envelopes_require_every_identity() {
+    let value = serde_json::json!({
+      "CargoKey": "global.api",
+      "OperationKey": "11111111-1111-4111-8111-111111111111",
+      "IncarnationKey": "22222222-2222-4222-8222-222222222222",
+      "SpecKey": "33333333-3333-4333-8333-333333333333",
+      "Replicas": [{
+        "Key": "44444444-4444-4444-8444-444444444444",
+        "Ordinal": 2
+      }],
+    });
+    let start =
+      serde_json::from_value::<StartNodeCargoOperationParams>(value.clone())
+        .unwrap();
+    assert_eq!(serde_json::to_value(start).unwrap(), value);
+    assert!(
+      serde_json::from_value::<DeleteNodeCargoOperationParams>(value.clone())
+        .is_ok()
+    );
+    for field in ["CargoKey", "OperationKey", "IncarnationKey", "SpecKey"] {
+      let mut missing = value.clone();
+      missing.as_object_mut().unwrap().remove(field);
+      assert!(
+        serde_json::from_value::<StartNodeCargoOperationParams>(
+          missing.clone()
+        )
+        .is_err(),
+        "{field}"
+      );
+      assert!(
+        serde_json::from_value::<DeleteNodeCargoOperationParams>(missing)
+          .is_err(),
+        "{field}"
+      );
+    }
+    let mut missing_replicas = value;
+    missing_replicas.as_object_mut().unwrap().remove("Replicas");
+    assert!(
+      serde_json::from_value::<StartNodeCargoOperationParams>(missing_replicas)
+        .is_err()
+    );
+  }
 
   #[test]
   fn cargo_replica_task_uses_pascal_case_wire_fields() {
