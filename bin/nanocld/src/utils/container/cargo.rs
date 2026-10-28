@@ -62,9 +62,9 @@ pub(crate) use identity::{
 use identity::{
   process_identity, replica_ordinal, validate_observed_identities,
 };
-#[cfg(test)]
-pub(crate) use init::fail_next_init_wait;
 use init::{create_candidate_containers, reconcile_containers};
+#[cfg(test)]
+pub(crate) use init::{fail_next_init_wait, pause_next_init_start};
 
 pub use readiness::has_container_healthcheck;
 pub(crate) use readiness::{all_desired_replicas_ready, promotion_actions};
@@ -73,9 +73,11 @@ use readiness::{
   required_candidate_topology_complete, requires_steady_state_readiness,
   restart_required_slots_ready,
 };
+#[cfg(test)]
+pub(crate) use replacement::stop_fault::forget_next_init_stop;
 use replacement::{
-  requires_removal_before_replacement, requires_stop_before_replacement,
-  validate_local_fixed_port_ownership,
+  confirm_init_stopped, requires_removal_before_replacement,
+  requires_stop_before_replacement, validate_local_fixed_port_ownership,
 };
 use restart::{CargoRestartPlan, plan_cargo_restart};
 
@@ -1340,6 +1342,19 @@ async fn stop_slots(
     .filter(|slot| slot.role == CargoReplicaProcessRole::App)
   {
     stop_process(&slot.process, state).await?;
+  }
+  for slot in slots
+    .iter()
+    .filter(|slot| slot.role == CargoReplicaProcessRole::Init)
+  {
+    stop_process(&slot.process, state).await?;
+    let inspected = inspect_process(&slot.process.key, state).await?;
+    #[cfg(test)]
+    let inspected =
+      replacement::stop_fault::observe(&slot.process.kind_key, inspected);
+    // A successful stop request alone must not release the replacement init.
+    // Require explicit stopped evidence, including for an already-stopped init.
+    confirm_init_stopped(&inspected)?;
   }
   for slot in slots
     .iter()

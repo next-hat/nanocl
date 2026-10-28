@@ -81,7 +81,7 @@ pub fn ntex_config(
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::models::HealthConfig;
+  use bollard_next::models::{HealthConfig, HostConfig};
   use futures::{StreamExt, TryStreamExt};
   use ntex::http;
 
@@ -604,6 +604,296 @@ mod tests {
     );
     assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
     delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  async fn recovered_host_init_fixture()
+  -> (TestSystem, CargoSpec, OperationDb, String) {
+    use crate::utils::container::cargo::{
+      fail_next_init_wait, recovery::recover_one,
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("replace-host-init-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let mut spec =
+      operation_fixture_spec(&name, "trap 'exit 0' TERM; sleep 3600 & wait $!");
+    spec.init_containers[0].container_config.host_config = Some(HostConfig {
+      network_mode: Some("host".to_owned()),
+      ..Default::default()
+    });
+    assert!(spec.port_bindings.is_none());
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let fault = fail_next_init_wait(&key);
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Start).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_failure(&system, &key, NativeEventAction::Start, events).await;
+    drop(fault);
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_no_application(&inspected);
+    let init_id = active_cargo_process(&inspected, "init", "prepare")
+      .key
+      .clone();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(before[&init_id]["Running"], true);
+    assert!(recover_one(&pending, &system.state).await.unwrap());
+    let recovered = OperationDb::get(pending.key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.outcome.as_deref(), Some("interrupted"));
+    assert!(recovered.completed_at.is_some());
+    // Recovery observes the still-running init without replaying or stopping it.
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+    (system, spec, recovered, init_id)
+  }
+
+  #[ntex::test]
+  async fn stop_first_replacement_stops_recovered_host_init_before_start() {
+    use crate::utils::container::cargo::{
+      LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC, pause_next_init_start,
+      recovery::recover_one,
+    };
+
+    let (system, mut replacement, recovered, old_init_id) =
+      recovered_host_init_fixture().await;
+    let key = &recovered.resource_key;
+    replacement.init_containers[0].container_config.cmd =
+      Some(vec!["true".to_owned()]);
+    let mut barrier = pause_next_init_start(key);
+    let events =
+      cargo_completion_events(&system, key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let accepted = response.json::<Cargo>().await.unwrap();
+    let candidate_id = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      barrier.wait_start(),
+    )
+    .await
+    .expect("replacement init did not reach its start barrier");
+    let at_start = cargo_runtime_snapshot(&system, key).await;
+    // The old init must still exist (stop-first, not remove-first) and be
+    // stopped before the barrier allows any replacement init command to run.
+    assert_eq!(at_start[&old_init_id]["Running"], false);
+    assert_ne!(candidate_id, old_init_id);
+    assert_eq!(at_start[&candidate_id]["Running"], false);
+    let updating = OperationDb::current("Cargo", key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_ne!(updating.key, recovered.key);
+    assert_eq!(updating.action, "update");
+    assert_eq!(updating.incarnation_key, recovered.incarnation_key);
+    assert_eq!(updating.spec_key, accepted.spec.key);
+    assert!(updating.outcome.is_none());
+    for (label, expected) in [
+      (LABEL_INCARNATION, updating.incarnation_key),
+      (LABEL_SPEC, updating.spec_key),
+      (LABEL_OPERATION, updating.key),
+    ] {
+      assert_eq!(
+        at_start[&candidate_id]["Labels"][label],
+        expected.to_string()
+      );
+    }
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &updating.key.to_string(),
+        &system.state.inner.pool,
+      )
+      .await
+      .is_ok()
+    );
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    barrier.release();
+    wait_cargo_completion(&system, key, NativeEventAction::Update, events)
+      .await;
+    let completed =
+      OperationDb::current("Cargo", key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(completed.key, updating.key);
+    assert_eq!(completed.outcome.as_deref(), Some("completed"));
+    assert!(completed.completed_at.is_some());
+    assert!(!recover_one(&recovered, &system.state).await.unwrap());
+    let inspected = inspect_cargo_fixture(&system, key).await;
+    assert_eq!(inspected.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(
+      active_cargo_process(&inspected, "init", "prepare").key,
+      candidate_id
+    );
+    let runtime = cargo_runtime_snapshot(&system, key).await;
+    assert!(!runtime.contains_key(&old_init_id));
+    assert_eq!(runtime[&candidate_id]["ExitCode"], 0);
+    let app = active_cargo_process(&inspected, "app", "main");
+    assert_eq!(runtime[&app.key]["Running"], true);
+    let events =
+      cargo_completion_events(&system, key, NativeEventAction::Stop).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(&system, key, NativeEventAction::Stop, events).await;
+    delete_cargo_fixture(&system, key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn unconfirmed_old_init_stop_prevents_replacement_without_replay() {
+    use crate::models::ObjPsStatusUpdate;
+    use crate::utils::container::cargo::{
+      forget_next_init_stop, lifecycle_lock, pause_next_init_start,
+      recovery::recover_one,
+    };
+    use crate::utils::operation::{abandoned_owner, cleanup_owner};
+
+    let (system, mut replacement, recovered, old_init_id) =
+      recovered_host_init_fixture().await;
+    let key = &recovered.resource_key;
+    let before = cargo_runtime_snapshot(&system, key).await;
+    replacement.init_containers[0].container_config.cmd =
+      Some(vec!["true".to_owned()]);
+    let _fault = forget_next_init_stop(key);
+    let mut barrier = pause_next_init_start(key);
+    let events =
+      cargo_completion_events(&system, key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    {
+      let failure =
+        wait_cargo_failure(&system, key, NativeEventAction::Update, events);
+      let start = barrier.wait_start();
+      futures::pin_mut!(failure, start);
+      if let futures::future::Either::Right((id, _)) =
+        futures::future::select(failure, start).await
+      {
+        panic!(
+          "candidate {id} reached startup without confirmed init shutdown"
+        );
+      }
+    }
+    drop(barrier);
+    let pending = OperationDb::current("Cargo", key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_ne!(pending.key, recovered.key);
+    assert_eq!(pending.action, "update");
+    assert_eq!(pending.incarnation_key, recovered.incarnation_key);
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    let after = cargo_runtime_snapshot(&system, key).await;
+    assert_eq!(
+      before.keys().collect::<Vec<_>>(),
+      after.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(after[&old_init_id]["Running"], false);
+    assert_eq!(
+      after[&old_init_id]["StartedAt"],
+      before[&old_init_id]["StartedAt"]
+    );
+    assert_eq!(
+      after[&old_init_id]["RestartCount"],
+      before[&old_init_id]["RestartCount"]
+    );
+    assert!(recover_one(&pending, &system.state).await.is_err());
+    assert_eq!(
+      OperationDb::get(pending.key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap(),
+      pending
+    );
+    assert_eq!(cargo_runtime_snapshot(&system, key).await, after);
+    // Retained generations keep real recovery conservative and pending. Only
+    // fixture teardown settles its exact owner, allowing ordinary deletion.
+    {
+      let guard = lifecycle_lock(key).lock_owned().await;
+      let owner = abandoned_owner(
+        &pending.owner(),
+        &system.state.inner.config.hostname,
+        &system.state.inner.config.state_dir,
+      )
+      .unwrap()
+      .expect("failed fixture must release its operation owner");
+      let lease = (std::sync::Arc::new(guard), owner);
+      assert!(
+        CargoDb::finish_operation(
+          &pending,
+          ObjPsStatusUpdate {
+            actual: Some(ObjPsStatusKind::Fail.to_string()),
+            ..Default::default()
+          },
+          "interrupted",
+          Some(serde_json::json!({"Fixture": "required init stop teardown"})),
+          lease.clone(),
+          &system.state.inner.pool,
+        )
+        .await
+        .unwrap()
+      );
+      cleanup_owner(&lease.1, &system.state.inner.pool)
+        .await
+        .unwrap();
+    }
+    delete_cargo_fixture(&system, key).await;
     system.state.wait_event_loop().await;
   }
 

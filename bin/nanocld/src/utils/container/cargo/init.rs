@@ -17,7 +17,7 @@ use super::{
 };
 
 #[cfg(test)]
-pub(crate) use wait_fault::fail_next_init_wait;
+pub(crate) use wait_fault::{fail_next_init_wait, pause_next_init_start};
 
 pub(super) async fn reconcile_containers(
   cargo: &Cargo,
@@ -137,7 +137,11 @@ async fn wait_init(
   let exit_code = container_state.and_then(|state| state.exit_code);
   match init_container_disposition(running, status.as_deref(), exit_code) {
     InitContainerDisposition::Complete => return Ok(()),
-    InitContainerDisposition::Start => start_process(process, state).await?,
+    InitContainerDisposition::Start => {
+      #[cfg(test)]
+      wait_fault::before_start(&process.kind_key, &process.key).await?;
+      start_process(process, state).await?;
+    }
     InitContainerDisposition::Wait => {}
   }
   #[cfg(test)]
@@ -221,7 +225,15 @@ mod wait_fault {
     sync::{LazyLock, Mutex},
   };
 
-  static FAULTS: LazyLock<Mutex<HashMap<String, bool>>> =
+  use nanocl_error::io::{IoError, IoResult};
+  use tokio::sync::oneshot;
+
+  enum Hook {
+    WaitFailure(bool),
+    BeforeStart(oneshot::Sender<String>, oneshot::Receiver<()>),
+  }
+
+  static FAULTS: LazyLock<Mutex<HashMap<String, Hook>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
   pub(crate) struct InitWaitFaultGuard {
@@ -243,18 +255,75 @@ mod wait_fault {
       !faults.contains_key(key),
       "init wait fault already registered"
     );
-    faults.insert(key.to_owned(), true);
+    faults.insert(key.to_owned(), Hook::WaitFailure(true));
     InitWaitFaultGuard {
       key: key.to_owned(),
     }
   }
 
   pub(super) fn take(key: &str) -> bool {
-    FAULTS
-      .lock()
-      .expect("init wait fault lock")
-      .get_mut(key)
-      .is_some_and(std::mem::take)
+    let mut faults = FAULTS.lock().expect("init wait fault lock");
+    match faults.get_mut(key) {
+      Some(Hook::WaitFailure(pending)) => std::mem::take(pending),
+      _ => false,
+    }
+  }
+
+  pub(crate) struct InitStartBarrier {
+    _guard: InitWaitFaultGuard,
+    entered: oneshot::Receiver<String>,
+    release: Option<oneshot::Sender<()>>,
+  }
+
+  impl InitStartBarrier {
+    pub(crate) async fn wait_start(&mut self) -> String {
+      (&mut self.entered)
+        .await
+        .expect("init start barrier dropped")
+    }
+
+    pub(crate) fn release(mut self) {
+      let _ = self.release.take().unwrap().send(());
+    }
+  }
+
+  pub(crate) fn pause_next_init_start(key: &str) -> InitStartBarrier {
+    let (entered, receiver) = oneshot::channel();
+    let (release, resume) = oneshot::channel();
+    let mut faults = FAULTS.lock().expect("init wait fault lock");
+    assert!(
+      !faults.contains_key(key),
+      "init wait fault already registered"
+    );
+    faults.insert(key.to_owned(), Hook::BeforeStart(entered, resume));
+    InitStartBarrier {
+      _guard: InitWaitFaultGuard {
+        key: key.to_owned(),
+      },
+      entered: receiver,
+      release: Some(release),
+    }
+  }
+
+  pub(super) async fn before_start(key: &str, id: &str) -> IoResult<()> {
+    let hook = {
+      let mut faults = FAULTS.lock().expect("init wait fault lock");
+      if matches!(faults.get(key), Some(Hook::BeforeStart(..))) {
+        faults.remove(key)
+      } else {
+        None
+      }
+    };
+    if let Some(Hook::BeforeStart(entered, release)) = hook {
+      let _ = entered.send(id.to_owned());
+      release.await.map_err(|_| {
+        IoError::interrupted(
+          "CargoInitContainer",
+          "init start barrier cancelled",
+        )
+      })?;
+    }
+    Ok(())
   }
 }
 
@@ -277,6 +346,31 @@ mod tests {
     let guard = fail_next_init_wait(&key);
     drop(guard);
     assert!(!wait_fault::take(&key));
+  }
+
+  #[test]
+  fn init_start_barrier_is_scoped_one_shot_and_cancels_on_drop() {
+    let key = format!("global.init-start-barrier-{}", uuid::Uuid::new_v4());
+    let mut barrier = pause_next_init_start(&key);
+    assert!(
+      block_on(wait_fault::before_start("global.other", "other")).is_ok()
+    );
+    let start = wait_fault::before_start(&key, "candidate-id");
+    futures::pin_mut!(start);
+    assert!(start.as_mut().now_or_never().is_none());
+    assert_eq!(block_on(barrier.wait_start()), "candidate-id");
+    barrier.release();
+    assert!(block_on(start).is_ok());
+    assert!(block_on(wait_fault::before_start(&key, "next-id")).is_ok());
+
+    let barrier = pause_next_init_start(&key);
+    let start = wait_fault::before_start(&key, "cancelled-id");
+    futures::pin_mut!(start);
+    assert!(start.as_mut().now_or_never().is_none());
+    drop(barrier);
+    assert!(block_on(start).is_err());
+    drop(pause_next_init_start(&key));
+    assert!(block_on(wait_fault::before_start(&key, "after-drop")).is_ok());
   }
 
   #[test]
