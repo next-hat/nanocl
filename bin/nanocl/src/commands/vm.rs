@@ -31,7 +31,8 @@ use crate::{
   config::CliConfig,
   models::{
     GenericDefaultOpts, GenericHistoryOpts, SpecHistoryRow, VmArg, VmCommand,
-    VmCompactRow, VmCreateOpts, VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
+    VmCompactRow, VmCreateOpts, VmLifecycleOpts, VmPatchOpts, VmRevertOpts,
+    VmRow, VmRunOpts,
   },
   utils,
 };
@@ -220,6 +221,42 @@ async fn exec_vm_history(
   )
 }
 
+/// Restore a saved specification and wait for its accepted update operation.
+async fn exec_vm_revert(
+  cli_conf: &CliConfig,
+  opts: &VmRevertOpts,
+) -> IoResult<()> {
+  let client = &cli_conf.client;
+  let mut vm = None;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Vm,
+    NativeEventAction::Update,
+    client,
+    async {
+      let (response, operation) = client
+        .revert_vm_operation(&opts.key, &opts.history_id.to_string())
+        .await?;
+      vm = Some(response);
+      Ok(operation)
+    },
+  )
+  .await?;
+  let vm = vm.ok_or_else(|| {
+    IoError::invalid_data("VM revert", "Accepted response is unavailable")
+  })?;
+  utils::print::display_format(&cli_conf.user_config.display_format, vm)
+    .map_err(|error| {
+      error.map_err_context(|| {
+        format!(
+          "VM revert succeeded; displaying its response as {} failed. Inspect the vm with --display json or --display yaml instead of repeating the revert",
+          cli_conf.user_config.display_format,
+        )
+      })
+    })?;
+  Ok(())
+}
+
 fn vm_process_name(key: &str) -> IoResult<String> {
   let key = key
     .parse::<ResourceKey>()
@@ -379,35 +416,27 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
     VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
     VmCommand::History(opts) => exec_vm_history(cli_conf, opts).await,
+    VmCommand::Revert(opts) => exec_vm_revert(cli_conf, opts).await,
     VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
     VmCommand::Stop(opts) => exec_vm_lifecycle(client, opts, false).await,
     VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,
     VmCommand::Status { key } => {
       let status = client.vm_status(key).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&status)
-          .map_err(|err| err.map_err_context(|| "VM runtime status"))?
-      );
-      Ok(())
+      utils::print::display_format(&cli_conf.user_config.display_format, status)
     }
     VmCommand::Resize(options) => {
       let resources = client.resize_vm(&options.key, &options.into()).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&resources)
-          .map_err(|err| err.map_err_context(|| "VM resources"))?
-      );
-      Ok(())
+      utils::print::display_format(
+        &cli_conf.user_config.display_format,
+        resources,
+      )
     }
     VmCommand::Resources { key } => {
       let resources = client.vm_resources(key).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&resources)
-          .map_err(|err| err.map_err_context(|| "VM resources"))?
-      );
-      Ok(())
+      utils::print::display_format(
+        &cli_conf.user_config.display_format,
+        resources,
+      )
     }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,

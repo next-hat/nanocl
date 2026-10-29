@@ -627,6 +627,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /jobs/{name}/histories/{id}/revert:
+    patch:
+      tags:
+      - Jobs
+      summary: Restore a retained configuration without executing the replacement Job.
+      operationId: revert_job
+      parameters:
+      - name: name
+        in: path
+        description: Name of the live Job to replace
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        description: Saved configuration identity belonging to this Job
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Job configuration restored without starting a run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          description: Saved configuration is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Job or its saved configuration does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Job identity changed or another lifecycle action is pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /jobs/{name}/runs:
     get:
       tags:
@@ -2220,6 +2265,12 @@ paths:
         required: true
         schema:
           type: string
+      - name: filter
+        in: query
+        description: Optional pagination JSON with limit and offset only. Omit pagination to return the complete history.
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: The virtual machine histories have been listed
@@ -2229,6 +2280,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VmSpec'
+        '400':
+          description: Invalid pagination or unsupported filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: The virtual machine does not exist
           content:
@@ -2496,6 +2553,56 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '504':
           description: VM operation timed out; check runtime status before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms/{vm_key}/histories/{history_key}/revert:
+    patch:
+      tags:
+      - Vms
+      summary: Revert a virtual machine to a specific history record.
+      operationId: revert_vm
+      parameters:
+      - name: vm_key
+        in: path
+        description: Canonical VM key in `{namespace}.{name}` format
+        required: true
+        schema:
+          type: string
+      - name: history_key
+        in: path
+        description: Specification UUID of the VM history
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Virtual machine revert accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vm'
+          headers:
+            X-Nanocl-Operation:
+              schema:
+                type: string
+              description: Accepted operation UUID. Match terminal event Metadata.Operation to confirm completion.
+        '400':
+          description: Invalid key or history from another resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Virtual machine or history does not exist in the current incarnation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Another VM lifecycle operation is active
           content:
             application/json:
               schema:

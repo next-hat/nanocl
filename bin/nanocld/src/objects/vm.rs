@@ -339,6 +339,42 @@ impl ObjPatchByPk for VmDb {
 }
 
 impl VmDb {
+  pub(crate) async fn revert_to_history_with_receipt(
+    pk: &str,
+    history_key: uuid::Uuid,
+    version: &str,
+    state: &SystemState,
+  ) -> HttpResult<(Vm, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let version = version.to_owned();
+    let prepare_state = state.clone();
+    crate::tasks::vm::accept_task_with_receipt(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let _guard = mac_allocation_lock().lock().await;
+        let vm =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let stored =
+          Self::history_spec(&key, history_key, &prepare_state.inner.pool)
+            .await?;
+        let spec = stored.try_to_vm_spec()?;
+        if spec.name != vm.spec.name {
+          return Err(HttpError::bad_request(
+            "Cannot revert a VM to a history with another resource name",
+          ));
+        }
+        let obj = VmObjPutIn {
+          spec: spec.into(),
+          version,
+        };
+        Self::put_spec_unlocked(&key, &obj, &prepare_state, owner, lease).await
+      },
+    )
+    .await
+  }
+
   pub(crate) async fn delete_with_receipt(
     pk: &str,
     state: &SystemState,

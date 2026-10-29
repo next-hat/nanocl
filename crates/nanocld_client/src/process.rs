@@ -561,6 +561,7 @@ pub(crate) mod receipt_test {
     status: StatusCode,
     operation: Option<String>,
     unchanged: Option<String>,
+    body: Option<serde_json::Value>,
     requests: Requests,
   }
 
@@ -586,6 +587,8 @@ pub(crate) mod receipt_test {
       || configured.status.is_server_error()
     {
       response.json(&serde_json::json!({"msg": "fixture admission rejected"}))
+    } else if let Some(body) = &configured.body {
+      response.json(body)
     } else {
       response.build()
     }
@@ -598,11 +601,21 @@ pub(crate) mod receipt_test {
     operation: Option<&str>,
     unchanged: Option<&str>,
   ) -> (NanocldClient, Requests, web::test::TestServer) {
+    client_with_body(status, operation, unchanged, None)
+  }
+
+  pub(crate) fn client_with_body(
+    status: StatusCode,
+    operation: Option<&str>,
+    unchanged: Option<&str>,
+    body: Option<serde_json::Value>,
+  ) -> (NanocldClient, Requests, web::test::TestServer) {
     let requests = Requests::default();
     let response = Response {
       status,
       operation: operation.map(str::to_owned),
       unchanged: unchanged.map(str::to_owned),
+      body,
       requests: requests.clone(),
     };
     let server = web::test::server(async move |_| {

@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use nanocl_error::{http::HttpResult, io::IoResult};
+use nanocl_error::{
+  http::HttpResult,
+  io::{IoError, IoResult},
+};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
@@ -24,6 +27,22 @@ use crate::{
 };
 
 use super::generic::*;
+
+fn validate_history_owner(vm: &VmDb, stored: &SpecDb) -> IoResult<()> {
+  if stored.kind_name != "Vm" || stored.kind_key != vm.key {
+    return Err(IoError::invalid_input(
+      "VM history",
+      "Cannot revert a VM using a history from another resource",
+    ));
+  }
+  if stored.incarnation_key != Some(vm.incarnation_key) {
+    return Err(IoError::not_found(
+      "VM history",
+      "Revision does not belong to the current VM incarnation",
+    ));
+  }
+  Ok(())
+}
 
 impl RepositoryBase for VmDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
@@ -187,17 +206,61 @@ impl VmDb {
     .await
   }
 
-  pub(crate) async fn history(key: &str, pool: &Pool) -> IoResult<Vec<SpecDb>> {
+  fn history_query(
+    key: &str,
+    incarnation: uuid::Uuid,
+    limit: Option<i64>,
+    offset: Option<i64>,
+  ) -> specs::BoxedQuery<'_, diesel::pg::Pg> {
+    let mut query = specs::table
+      .filter(specs::kind_name.eq("Vm"))
+      .filter(specs::kind_key.eq(key))
+      .filter(specs::incarnation_key.eq(incarnation))
+      .order((specs::created_at.desc(), specs::key.desc()))
+      .into_boxed();
+    if let Some(limit) = limit {
+      query = query.limit(limit);
+    }
+    if let Some(offset) = offset {
+      query = query.offset(offset);
+    }
+    query
+  }
+
+  pub(crate) async fn history(
+    key: &str,
+    limit: Option<i64>,
+    offset: Option<i64>,
+    pool: &Pool,
+  ) -> IoResult<Vec<SpecDb>> {
     let vm = Self::read_by_pk(key, pool).await?.0;
     super::operation::run_query_owned(pool, (), move |conn| {
       Ok(
-        specs::table
-          .filter(specs::kind_name.eq("Vm"))
-          .filter(specs::incarnation_key.eq(vm.incarnation_key))
-          .order(specs::created_at.desc())
+        Self::history_query(&vm.key, vm.incarnation_key, limit, offset)
           .load(conn)
           .map_err(crate::models::OperationTransactionError::from)?,
       )
+    })
+    .await
+  }
+
+  pub(crate) async fn history_spec(
+    key: &str,
+    revision: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<SpecDb> {
+    let vm = Self::read_by_pk(key, pool).await?.0;
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let stored = specs::table
+        .find(revision)
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(crate::models::OperationTransactionError::from)?
+        .ok_or_else(|| {
+          IoError::not_found("VM history", "Revision does not exist")
+        })?;
+      validate_history_owner(&vm, &stored)?;
+      Ok(stored)
     })
     .await
   }
@@ -360,5 +423,91 @@ impl VmDb {
       })
     })
     .await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn vm_history_query_paginates_before_loading_with_scoped_order() {
+    let incarnation = uuid::Uuid::from_u128(42);
+    let query =
+      VmDb::history_query("team.guest", incarnation, Some(100), Some(20));
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(sql.contains("\"specs\".\"kind_name\" = $1"), "{sql}");
+    assert!(sql.contains("\"specs\".\"kind_key\" = $2"), "{sql}");
+    assert!(sql.contains("\"specs\".\"incarnation_key\" = $3"), "{sql}");
+    assert!(
+      sql.contains(
+        "ORDER BY \"specs\".\"created_at\" DESC, \"specs\".\"key\" DESC"
+      ),
+      "{sql}"
+    );
+    assert!(sql.contains("LIMIT $4 OFFSET $5"), "{sql}");
+    assert!(sql.contains(&incarnation.to_string()), "{sql}");
+    assert!(sql.contains("100, 20]"), "{sql}");
+
+    let query = VmDb::history_query("team.guest", incarnation, None, None);
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(!sql.contains("LIMIT"), "{sql}");
+    assert!(!sql.contains("OFFSET"), "{sql}");
+  }
+
+  #[test]
+  fn vm_history_owner_rejects_foreign_and_previous_incarnations() {
+    let vm = VmDb {
+      key: "global.guest".into(),
+      name: "guest".into(),
+      created_at: chrono::Utc::now().naive_utc(),
+      namespace_name: "global".into(),
+      status_key: "global.guest".into(),
+      spec_key: uuid::Uuid::new_v4(),
+      incarnation_key: uuid::Uuid::new_v4(),
+    };
+    let mut revision = SpecDb::try_from_vm_partial(
+      &vm.key,
+      "v0.17",
+      &VmSpecPartial {
+        name: vm.name.clone(),
+        image: "/guest.qcow2".into(),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    revision.incarnation_key = Some(vm.incarnation_key);
+    validate_history_owner(&vm, &revision).unwrap();
+
+    for foreign_key in ["global.other", "other.guest"] {
+      revision.kind_key = foreign_key.into();
+      assert_eq!(
+        validate_history_owner(&vm, &revision)
+          .unwrap_err()
+          .inner
+          .kind(),
+        std::io::ErrorKind::InvalidInput
+      );
+    }
+    revision.kind_key = vm.key.clone();
+    revision.kind_name = "Cargo".into();
+    assert_eq!(
+      validate_history_owner(&vm, &revision)
+        .unwrap_err()
+        .inner
+        .kind(),
+      std::io::ErrorKind::InvalidInput
+    );
+    revision.kind_name = "Vm".into();
+    for incarnation in [None, Some(uuid::Uuid::new_v4())] {
+      revision.incarnation_key = incarnation;
+      assert_eq!(
+        validate_history_owner(&vm, &revision)
+          .unwrap_err()
+          .inner
+          .kind(),
+        std::io::ErrorKind::NotFound
+      );
+    }
   }
 }

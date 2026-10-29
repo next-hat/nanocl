@@ -29,6 +29,8 @@ pub enum VmCommand {
   Inspect(GenericInspectOpts),
   /// List VM specification history or inspect a revision
   History(GenericHistoryOpts),
+  /// Revert a VM to a saved specification revision
+  Revert(VmRevertOpts),
   /// Start VMs by canonical keys
   Start(GenericStartOpts),
   /// Shut down VMs by canonical keys
@@ -54,6 +56,15 @@ pub enum VmCommand {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+/// `nanocl vm revert` available options.
+#[derive(Clone, Parser)]
+pub struct VmRevertOpts {
+  /// Canonical key of the VM to revert
+  pub key: String,
+  /// ID of the saved specification revision
+  pub history_id: uuid::Uuid,
 }
 
 /// Options for VM shutdown and restart.
@@ -445,6 +456,26 @@ pub struct VmArg {
 mod tests {
   use clap::Parser;
   use nanocld_client::stubs::{system::ObjPsStatus, vm_spec::VmSpec};
+
+  #[test]
+  fn vm_cli_revert_requires_target_and_revision() {
+    let id = uuid::Uuid::from_u128(42);
+    let args =
+      VmArg::try_parse_from(["vm", "revert", "team.guest", &id.to_string()])
+        .unwrap();
+    let VmCommand::Revert(opts) = args.command else {
+      panic!("revert");
+    };
+    assert_eq!(opts.key, "team.guest");
+    assert_eq!(opts.history_id, id);
+    for words in [
+      vec!["vm", "revert"],
+      vec!["vm", "revert", "team.guest"],
+      vec!["vm", "revert", "team.guest", "invalid-revision"],
+    ] {
+      assert!(VmArg::try_parse_from(words).is_err());
+    }
+  }
 
   #[test]
   fn vm_cli_resize_requires_positive_totals_and_accepts_multiple_resources() {

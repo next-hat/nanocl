@@ -7,6 +7,6 @@ use crate::{config::CliConfig, utils};
 pub async fn exec_info(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
   let info = client.info().await?;
-  utils::print::print_yml(info)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, info)?;
   Ok(())
 }

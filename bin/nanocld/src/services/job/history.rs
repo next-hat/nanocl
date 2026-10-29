@@ -54,6 +54,31 @@ pub async fn inspect_job_history(
   Ok(web::HttpResponse::Ok().json(&spec))
 }
 
+/// Restore a retained configuration without executing the replacement Job.
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Jobs",
+  path = "/jobs/{name}/histories/{id}/revert",
+  params(
+    ("name" = String, Path, description = "Name of the live Job to replace"),
+    ("id" = uuid::Uuid, Path, description = "Saved configuration identity belonging to this Job"),
+  ),
+  responses(
+    (status = 200, description = "Job configuration restored without starting a run", body = nanocl_stubs::job::Job),
+    (status = 400, description = "Saved configuration is invalid", body = crate::services::openapi::ApiError),
+    (status = 404, description = "Job or its saved configuration does not exist", body = crate::services::openapi::ApiError),
+    (status = 409, description = "Job identity changed or another lifecycle action is pending", body = crate::services::openapi::ApiError),
+  ),
+))]
+pub async fn revert_job(
+  state: &SystemState,
+  _request_state: (),
+  path: web::types::Path<(String, String, uuid::Uuid)>,
+) -> HttpResult<web::HttpResponse> {
+  let job = JobDb::revert_to_history(&path.1, path.2, &path.0, state).await?;
+  Ok(web::HttpResponse::Ok().json(&job))
+}
+
 #[cfg(test)]
 mod tests {
   use bollard_next::models::ContainerCreateBody;
@@ -345,8 +370,65 @@ mod tests {
       let response = system.client.send_get(&path, None::<String>).await;
       assert_eq!(response.status(), status, "{path}");
     }
-    let delete = operation(&recreated, "delete", pool).await;
-    JobDb::accept_control(&recreated, delete.clone(), None, (), pool)
+    // Reverting must scope the selected revision before changing the live Job.
+    let foreign = JobDb::create_with_spec(
+      &JobPartial {
+        name: format!("{name}-foreign"),
+        ..Default::default()
+      },
+      "v0.19",
+      pool,
+    )
+    .await
+    .unwrap();
+    for key in [foreign.spec_key, first_page[0].key, uuid::Uuid::nil()] {
+      let response = system
+        .client
+        .send_patch(
+          &format!("/jobs/{name}/histories/{key}/revert"),
+          None::<String>,
+          None::<String>,
+        )
+        .await;
+      assert_eq!(response.status(), ntex::http::StatusCode::NOT_FOUND);
+      assert_eq!(
+        JobDb::transform_read_by_pk(&name, pool).await.unwrap(),
+        recreated
+      );
+    }
+    crate::tasks::job::delete_for_replacement(&foreign, &system.state)
+      .await
+      .unwrap();
+    let restored = client
+      .revert_job(&name, &job.spec_key.to_string())
+      .await
+      .unwrap();
+    assert_ne!(restored.incarnation_key, recreated.incarnation_key);
+    assert_ne!(restored.spec_key, job.spec_key);
+    assert_ne!(restored.spec_key, recreated.spec_key);
+    assert_eq!(JobPartial::from(restored.spec.clone()), original);
+    assert!(restored.current_run_key.is_none());
+    assert_eq!(client.list_runs_job(&name, None).await.unwrap().len(), 2);
+    assert_eq!(
+      client
+        .inspect_history_job(&name, &job.spec_key.to_string())
+        .await
+        .unwrap(),
+      job.spec,
+    );
+    // The current revision is also a valid target and still does not run.
+    let restored_again = client
+      .revert_job(&name, &restored.spec_key.to_string())
+      .await
+      .unwrap();
+    assert_ne!(restored_again.incarnation_key, restored.incarnation_key);
+    assert_eq!(JobPartial::from(restored_again.spec.clone()), original);
+    assert!(restored_again.current_run_key.is_none());
+    let revisions = client.list_history_job(&name, None).await.unwrap();
+    assert_eq!(revisions.len(), 4);
+    assert_eq!(&revisions[2..], &[recreated.spec.clone(), job.spec.clone()]);
+    let delete = operation(&restored_again, "delete", pool).await;
+    JobDb::accept_control(&restored_again, delete.clone(), None, (), pool)
       .await
       .unwrap();
     assert!(
@@ -359,5 +441,14 @@ mod tests {
       revisions
     );
     assert_eq!(client.list_runs_job(&name, None).await.unwrap().len(), 2);
+    let response = system
+      .client
+      .send_patch(
+        &format!("/jobs/{name}/histories/{}/revert", job.spec_key),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), ntex::http::StatusCode::NOT_FOUND);
   }
 }

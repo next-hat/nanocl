@@ -85,6 +85,7 @@ impl Modify for VersionModifier {
     job::count_job,
     job::list_job_history,
     job::inspect_job_history,
+    job::revert_job,
     job::list_job_runs,
     job::inspect_job_run,
     // Cargo
@@ -104,6 +105,7 @@ impl Modify for VersionModifier {
     vm::create_vm,
     vm::count_vm,
     vm::list_vm_history,
+    vm::revert_vm,
     vm::patch_vm,
     vm::console_vm,
     vm::stop_vm,
@@ -281,6 +283,67 @@ mod tests {
           .is_none()
       );
     }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_job_and_vm_history_reverts() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for (path, model, operation) in [
+      ("/jobs/{name}/histories/{id}/revert", "Job", "revert_job"),
+      (
+        "/vms/{vm_key}/histories/{history_key}/revert",
+        "Vm",
+        "revert_vm",
+      ),
+    ] {
+      let endpoint = &generated["paths"][path]["patch"];
+      assert_eq!(endpoint["operationId"], operation);
+      assert!(endpoint.get("requestBody").is_none());
+      assert_eq!(
+        endpoint["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+        format!("#/components/schemas/{model}")
+      );
+      assert!(endpoint["responses"]["404"].is_object());
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "checked-in revert contract differs for {path}"
+      );
+    }
+    let history_path = "/vms/{key}/histories";
+    assert_eq!(
+      checked_in["paths"][history_path], generated["paths"][history_path],
+      "checked-in VM history pagination contract differs"
+    );
+    let vm = &generated["paths"]["/vms/{vm_key}/histories/{history_key}/revert"]
+      ["patch"];
+    assert!(
+      vm["responses"]["200"]["headers"]["X-Nanocl-Operation"].is_object()
+    );
+    assert_eq!(
+      vm["responses"]["409"]["description"],
+      "Another VM lifecycle operation is active"
+    );
+    assert_eq!(
+      vm["responses"]["409"]["content"]["application/json"]["schema"]["$ref"],
+      "#/components/schemas/ApiError"
+    );
+    let revision = vm["parameters"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .find(|parameter| parameter["name"] == "history_key")
+      .unwrap();
+    assert_eq!(revision["schema"]["type"], "string");
+    assert_eq!(revision["schema"]["format"], "uuid");
+    let job =
+      &generated["paths"]["/jobs/{name}/histories/{id}/revert"]["patch"];
+    assert!(
+      job["responses"]["200"]["headers"]
+        .get("X-Nanocl-Operation")
+        .is_none()
+    );
   }
 
   fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
