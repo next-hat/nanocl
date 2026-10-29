@@ -245,7 +245,15 @@ async fn exec_vm_revert(
   let vm = vm.ok_or_else(|| {
     IoError::invalid_data("VM revert", "Accepted response is unavailable")
   })?;
-  utils::print::display_format(&cli_conf.user_config.display_format, vm)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, vm)
+    .map_err(|error| {
+      error.map_err_context(|| {
+        format!(
+          "VM revert succeeded; displaying its response as {} failed. Inspect the vm with --display json or --display yaml instead of repeating the revert",
+          cli_conf.user_config.display_format,
+        )
+      })
+    })?;
   Ok(())
 }
 

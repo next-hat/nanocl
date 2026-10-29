@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use ntex::rt;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::stubs::{
   cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
   generic::{GenericFilter, GenericListQueryNsp},
@@ -260,7 +260,15 @@ async fn exec_cargo_revert(
   let cargo = cargo.ok_or_else(|| {
     IoError::invalid_data("Cargo revert", "Accepted response is unavailable")
   })?;
-  utils::print::display_format(&cli_conf.user_config.display_format, cargo)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, cargo)
+    .map_err(|error| {
+      error.map_err_context(|| {
+        format!(
+          "Cargo revert succeeded; displaying its response as {} failed. Inspect the cargo with --display json or --display yaml instead of repeating the revert",
+          cli_conf.user_config.display_format,
+        )
+      })
+    })?;
   Ok(())
 }
 

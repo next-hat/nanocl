@@ -86,7 +86,15 @@ async fn exec_job_revert(
     .client
     .revert_job(&opts.name, &opts.history_id.to_string())
     .await?;
-  utils::print::display_format(&cli_conf.user_config.display_format, job)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, job)
+    .map_err(|error| {
+      error.map_err_context(|| {
+        format!(
+          "Job revert succeeded; displaying its response as {} failed. Inspect the job with --display json or --display yaml instead of repeating the revert",
+          cli_conf.user_config.display_format,
+        )
+      })
+    })?;
   Ok(())
 }
 
