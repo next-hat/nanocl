@@ -25,10 +25,14 @@ mean the runtime operation has finished.
 The CLI subscribes before sending the request, then waits for the same actor
 kind, canonical key, and `Metadata.Operation` UUID. It accepts a normal terminal
 event for the requested action or reports an error from that exact operation.
-Terminal events also include `Metadata.SpecKey`; success is published after the
-operation's durable completion. API clients implementing the same wait must use
-an unconditioned event subscription, since name-only server conditions can close
-the stream on an unrelated operation.
+Terminal events also include `Metadata.SpecKey` and are published only after the
+operation is durably settled. If settlement cannot be confirmed, the daemon sends
+a correlated warning with action and reason `operation_pending` instead. The CLI
+returns an interrupted, outcome-unknown error for that warning; it does not claim
+the operation has completed or retry it. Inspect runtime and pending operation
+state before deciding whether to retry. API clients implementing the same wait
+must handle these warnings and use an unconditioned event subscription, since
+name-only server conditions can close the stream on an unrelated operation.
 
 Job start and stop acknowledge dispatch and display `Accepted`. VM stop and
 restart commands use the synchronous `/vms/{key}/stop` and

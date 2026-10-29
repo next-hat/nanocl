@@ -232,6 +232,7 @@ where
     let completion_actor: EventActor = vm.clone().into();
     let completion = completion_action(&action);
     let error_state = state.clone();
+    let error_key = key.clone();
     let error_action = action.clone();
     let error_actor: EventActor = vm.clone().into();
     let (start, ready) = tokio::sync::oneshot::channel();
@@ -325,24 +326,22 @@ where
       // while the mutation/owner lease is still held.
       drop(lease);
       if let Some(action) = completion {
-        let (kind, note) = match &result {
-          Ok(()) => (EventKind::Normal, format!("Vm {key}")),
-          Err(error) => (EventKind::Error, error.to_string()),
-        };
+        let (action, kind, reason, note) =
+          completion_notification(action, &result, completed, &key);
         task_state
           .emit_action_sync(
             &completion_actor,
             action,
             kind,
-            "state_sync",
+            reason,
             Some(note),
             Some(
               serde_json::json!({"Operation": operation, "SpecKey": revision}),
             ),
           )
           .await;
-        // The terminal event owns this operation result. Returning its error
-        // would make TaskManager publish the same failure a second time.
+        // The notification owns this operation result. Returning its error
+        // would make TaskManager publish it a second time.
         return Ok(());
       }
       if let Some(restart) = restart {
@@ -355,13 +354,15 @@ where
       .task_manager
       .add_task(&task_key, action.clone(), task, move |error| async move {
         if let Some(action) = completion_action(&error_action) {
-          // Report an execution owner that stopped before emitting its result.
+          // An owner exit cannot establish a durable operation outcome.
+          let (action, kind, reason, note) =
+            completion_notification(action, &Err(error), false, &error_key);
           error_state.emit_action(
             &error_actor,
             action,
-            EventKind::Error,
-            "state_sync",
-            Some(error.to_string()),
+            kind,
+            reason,
+            Some(note),
             Some(
               serde_json::json!({"Operation": operation, "SpecKey": revision}),
             ),
@@ -423,6 +424,29 @@ fn completion_action(action: &NativeEventAction) -> Option<NativeEventAction> {
     NativeEventAction::Destroying => Some(NativeEventAction::Destroy),
     _ => None,
   }
+}
+
+fn completion_notification(
+  action: NativeEventAction,
+  result: &IoResult<()>,
+  completed: bool,
+  key: &str,
+) -> (NativeEventAction, EventKind, &'static str, String) {
+  if !completed {
+    return (
+      NativeEventAction::Other("operation_pending".to_owned()),
+      EventKind::Warning,
+      "operation_pending",
+      format!(
+        "VM {key} operation outcome is unknown and may remain pending recovery; inspect the runtime and operation before retrying"
+      ),
+    );
+  }
+  let (kind, note) = match result {
+    Ok(()) => (EventKind::Normal, format!("Vm {key}")),
+    Err(error) => (EventKind::Error, error.to_string()),
+  };
+  (action, kind, "state_sync", note)
 }
 
 fn require_committed_result(
@@ -563,6 +587,51 @@ mod tests {
       assert_eq!(super::completion_action(&acceptance), Some(terminal));
     }
     assert_eq!(super::completion_action(&NativeEventAction::Restart), None);
+  }
+
+  #[test]
+  fn vm_completion_notifications_distinguish_pending_operations() {
+    for action in [
+      NativeEventAction::Start,
+      NativeEventAction::Update,
+      NativeEventAction::Destroy,
+    ] {
+      for result in [Ok(()), Err(IoError::other("runtime", "execution failed"))]
+      {
+        let (pending_action, kind, reason, note) =
+          completion_notification(action.clone(), &result, false, "global.vm");
+        assert_eq!(
+          pending_action,
+          NativeEventAction::Other("operation_pending".to_owned())
+        );
+        assert_eq!(kind, EventKind::Warning);
+        assert_eq!(reason, "operation_pending");
+        assert!(note.contains("outcome is unknown"));
+        assert!(
+          note.contains("inspect the runtime and operation before retrying")
+        );
+
+        let (terminal_action, kind, reason, note) =
+          completion_notification(action.clone(), &result, true, "global.vm");
+        assert_eq!(terminal_action, action);
+        assert_eq!(
+          kind,
+          if result.is_ok() {
+            EventKind::Normal
+          } else {
+            EventKind::Error
+          }
+        );
+        assert_eq!(reason, "state_sync");
+        assert_eq!(
+          note,
+          match &result {
+            Ok(()) => "Vm global.vm".to_owned(),
+            Err(error) => error.to_string(),
+          }
+        );
+      }
+    }
   }
 
   #[test]

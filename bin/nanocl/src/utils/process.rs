@@ -88,6 +88,18 @@ fn operation_event_result(
   {
     return None;
   }
+  if event.reason == "operation_pending" {
+    return Some(Err(IoError::interrupted(
+      "Process operation pending",
+      &format!(
+        "Outcome unknown for {key} (operation {operation}); inspect its runtime and pending operation before retrying. {}",
+        event
+          .note
+          .as_deref()
+          .unwrap_or("Durable completion was not confirmed"),
+      ),
+    )));
+  }
   if event.kind == EventKind::Error {
     return Some(Err(IoError::interrupted(
       "Process operation",
@@ -218,6 +230,14 @@ mod tests {
     value["Action"] = json!("updating");
     let failure = result(value.clone()).unwrap().unwrap_err();
     assert!(failure.to_string().contains("Exact Job deletion failed"));
+    value["Kind"] = json!("warning");
+    value["Action"] = json!("operation_pending");
+    value["Reason"] = json!("operation_pending");
+    let pending = result(value.clone()).unwrap().unwrap_err();
+    assert_eq!(pending.context(), Some("Process operation pending"));
+    assert_eq!(pending.inner.kind(), std::io::ErrorKind::Interrupted);
+    assert!(pending.to_string().contains("Outcome unknown"));
+    assert!(pending.to_string().contains(&operation.to_string()));
     value["Metadata"]["Operation"] = json!(uuid::Uuid::from_u128(2));
     assert!(result(value).is_none());
   }
@@ -271,6 +291,43 @@ mod tests {
     .await
     .unwrap_err();
     assert!(error.to_string().contains("Exact Job deletion failed"));
+  }
+
+  #[ntex::test]
+  async fn operation_stream_reports_pending_without_waiting_for_completion() {
+    let operation = uuid::Uuid::from_u128(1);
+    for kind in [EventActorKind::Cargo, EventActorKind::Vm] {
+      let mut pending =
+        deletion_event(operation, None, "warning", "operation_pending");
+      pending["Actor"]["Key"] = json!("global.api");
+      pending["Actor"]["Kind"] = json!(kind);
+      pending["Metadata"] = json!({"Operation": operation});
+      pending["Reason"] = json!("operation_pending");
+      pending["Note"] = json!("Execution stopped without durable settlement");
+      let mut stale = pending.clone();
+      stale["Metadata"]["Operation"] = json!(uuid::Uuid::from_u128(2));
+      let stream = futures::stream::iter(vec![
+        Ok(serde_json::from_value::<Event>(stale).unwrap()),
+        Ok(serde_json::from_value::<Event>(pending).unwrap()),
+      ])
+      .chain(futures::stream::pending());
+      let error = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        wait_operation_events(
+          stream,
+          "global.api",
+          kind,
+          NativeEventAction::Start,
+          operation,
+        ),
+      )
+      .await
+      .expect("pending receipt must not wait for a terminal event")
+      .unwrap_err();
+      assert!(error.to_string().contains("Outcome unknown"));
+      assert!(error.to_string().contains(&operation.to_string()));
+      assert!(error.to_string().contains("before retrying"));
+    }
   }
 
   fn deletion_event(

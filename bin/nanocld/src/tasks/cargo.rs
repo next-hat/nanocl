@@ -287,9 +287,11 @@ where
         task,
         move |error| async move {
           if !is_targeted_action(phase) {
+            log::warn!("Cargo operation {operation} executor stopped: {error}");
+            let (action, kind, reason) = operation_event(phase, false, true);
             error_state.emit_action(
-              &error_actor, completion_action(phase), EventKind::Error,
-              "state_sync", Some(error.to_string()),
+              &error_actor, action, kind, reason,
+              Some(format!("Cargo operation {operation} ({phase}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying")),
               Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
             );
           }
@@ -660,6 +662,29 @@ fn completion_action(action: &str) -> NativeEventAction {
   }
 }
 
+fn operation_event(
+  action: &str,
+  settled: bool,
+  failed: bool,
+) -> (NativeEventAction, EventKind, &'static str) {
+  if !settled {
+    return (
+      NativeEventAction::Other("operation_pending".to_owned()),
+      EventKind::Warning,
+      "operation_pending",
+    );
+  }
+  (
+    completion_action(action),
+    if failed {
+      EventKind::Error
+    } else {
+      EventKind::Normal
+    },
+    "state_sync",
+  )
+}
+
 fn uncertain_runtime_error(error: &IoError) -> bool {
   matches!(
     error.context(),
@@ -732,6 +757,7 @@ async fn execute(
       ),
     )
   });
+  let mut settled = false;
   match result {
     Ok(()) => {
       let finished = if action == "delete" {
@@ -752,7 +778,7 @@ async fn execute(
         .await
       };
       match finished {
-        Ok(true) => {}
+        Ok(true) => settled = true,
         Ok(false) => {
           log::warn!(
             "Cargo operation {} lost completion ownership",
@@ -823,7 +849,7 @@ async fn execute(
         };
         let diagnostic =
           serde_json::json!({"Phase": action, "Failure": failure});
-        if let Err(error) = CargoDb::finish_operation(
+        match CargoDb::finish_operation(
           &accepted.operation,
           update,
           "failed",
@@ -833,10 +859,15 @@ async fn execute(
         )
         .await
         {
-          log::warn!(
+          Ok(true) => settled = true,
+          Ok(false) => log::warn!(
+            "Cargo operation {} lost failure settlement ownership",
+            accepted.operation.key
+          ),
+          Err(error) => log::warn!(
             "Cargo operation {} failure settlement deferred: {error}",
             accepted.operation.key
-          );
+          ),
         }
       }
       log::warn!(
@@ -857,25 +888,26 @@ async fn execute(
   if !is_targeted_action(action) {
     // Earlier readiness events still drive routing. Only this exact owner's
     // committed completion can satisfy an operation-aware command waiter.
-    let (kind, note) = if reported.is_ok() {
-      (
-        EventKind::Normal,
-        format!("Cargo {}", accepted.operation.resource_key),
+    let (event_action, kind, reason) =
+      operation_event(action, settled, reported.is_err());
+    let note = if !settled {
+      format!(
+        "Cargo operation {} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying",
+        accepted.operation.key
       )
+    } else if reported.is_ok() {
+      format!("Cargo {}", accepted.operation.resource_key)
     } else {
-      (
-        EventKind::Error,
-        format!(
-          "Cargo operation {} ({action}) could not complete; inspect its runtime and pending operation before retrying",
-          accepted.operation.key
-        ),
+      format!(
+        "Cargo operation {} ({action}) failed; inspect its runtime and operation before retrying",
+        accepted.operation.key
       )
     };
     event_state.emit_action_sync(
       &accepted.cargo.clone().into(),
-      completion_action(action),
+      event_action,
       kind,
-      "state_sync",
+      reason,
       Some(note),
       Some(serde_json::json!({"Operation": accepted.operation.key, "SpecKey": accepted.operation.spec_key})),
     ).await;
@@ -998,6 +1030,34 @@ mod tests {
   use crate::vars;
 
   use super::*;
+
+  #[test]
+  fn cargo_receipts_require_durable_settlement_for_terminal_events() {
+    for (operation, terminal) in [
+      ("start", NativeEventAction::Start),
+      ("stop", NativeEventAction::Stop),
+      ("restart", NativeEventAction::Restart),
+      ("update", NativeEventAction::Update),
+      ("delete", NativeEventAction::Destroy),
+    ] {
+      // A successful runtime call with a rejected commit and an uncertain
+      // runtime failure must both leave the durable outcome unresolved.
+      for failed in [false, true] {
+        let (action, kind, reason) = operation_event(operation, false, failed);
+        assert_eq!(action.to_string(), "operation_pending");
+        assert_eq!(kind, EventKind::Warning);
+        assert_eq!(reason, "operation_pending");
+      }
+      for (failed, expected_kind) in
+        [(false, EventKind::Normal), (true, EventKind::Error)]
+      {
+        let (action, kind, reason) = operation_event(operation, true, failed);
+        assert_eq!(action, terminal);
+        assert_eq!(kind, expected_kind);
+        assert_eq!(reason, "state_sync");
+      }
+    }
+  }
 
   #[ntex::test]
   async fn cancelled_cargo_waiter_retains_executor_ownership_until_completion()
