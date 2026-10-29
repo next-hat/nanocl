@@ -149,7 +149,7 @@ fn render_revision_history<T: Serialize, R: Tabled>(
 
 #[cfg(test)]
 mod tests {
-  use nanocld_client::stubs::job::JobSpec;
+  use nanocld_client::stubs::{job::JobSpec, resource::ResourceSpec};
 
   use super::*;
   use crate::models::SpecHistoryRow;
@@ -343,6 +343,61 @@ mod tests {
     let value: serde_json::Value =
       serde_json::from_str(&render_revisions(&opts).unwrap()).unwrap();
     assert_eq!(value, serde_json::json!([]));
+  }
+
+  #[test]
+  fn resource_history_pages_and_detail_preserve_revision_data() {
+    let revisions = || {
+      (1..=120)
+        .map(|index| ResourceSpec {
+          key: Uuid::from_u128(index),
+          version: "v1".into(),
+          created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+          resource_key: "web-route".into(),
+          data: serde_json::json!({"Revision": index}),
+          metadata: Some(serde_json::json!({"Owner": "routing"})),
+        })
+        .collect::<Vec<_>>()
+    };
+    let mut opts = options();
+    opts.key = "web-route".into();
+    let render = |opts: &GenericHistoryOpts| {
+      render_revision_history(
+        opts,
+        &DisplayFormat::Yaml,
+        revisions(),
+        |item| item.key,
+        SpecHistoryRow::from,
+      )
+    };
+    let table = render(&opts).unwrap();
+    for column in ["ID", "VERSION", "CREATED AT"] {
+      assert!(table.contains(column), "{table}");
+    }
+    opts.display = Some(DisplayFormat::Json);
+    opts.offset = Some(100);
+    opts.limit = Some(2);
+    let page: serde_json::Value =
+      serde_json::from_str(&render(&opts).unwrap()).unwrap();
+    assert_eq!(page.as_array().unwrap().len(), 2);
+    assert_eq!(page[0]["Data"]["Revision"], 101);
+    assert_eq!(page[1]["Data"]["Revision"], 102);
+
+    opts.offset = None;
+    opts.limit = None;
+    opts.id = Some(Uuid::from_u128(120));
+    opts.display = None;
+    let revision: ResourceSpec =
+      serde_yaml::from_str(&render(&opts).unwrap()).unwrap();
+    assert_eq!(revision.key, Uuid::from_u128(120));
+    assert_eq!(revision.resource_key, "web-route");
+    assert_eq!(revision.data, serde_json::json!({"Revision": 120}));
+    assert_eq!(
+      revision.metadata,
+      Some(serde_json::json!({"Owner": "routing"}))
+    );
+    opts.id = Some(Uuid::from_u128(121));
+    assert!(render(&opts).unwrap_err().to_string().contains("web-route"));
   }
 
   #[test]

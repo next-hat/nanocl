@@ -165,6 +165,27 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Patch a Cargo and return its accepted operation ID.
+  pub async fn patch_cargo_operation(
+    &self,
+    key: &str,
+    spec: &CargoSpecPatch,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}", Self::CARGO_PATH),
+        Some(spec),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
   /// Put a cargo by its canonical key.
   /// It will create a new cargo spec and store old one in history
   ///
@@ -213,6 +234,27 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+
+  /// Replace a Cargo specification and return its accepted operation ID.
+  pub async fn put_cargo_operation(
+    &self,
+    key: &str,
+    spec: &CargoSpec,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_put(
+        &format!("{}/{key}", Self::CARGO_PATH),
+        Some(spec),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
   }
 
   /// List cargo histories
@@ -270,6 +312,27 @@ impl NanocldClient {
       )
       .await?;
     Self::res_json(res).await
+  }
+  /// Revert a Cargo and return its response plus the accepted operation ID.
+  pub async fn revert_cargo_operation(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<(Cargo, uuid::Uuid)> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}/histories/{id}/revert", Self::CARGO_PATH),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+    let operation = Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )?;
+    Ok((Self::res_json(response).await?, operation))
   }
 }
 

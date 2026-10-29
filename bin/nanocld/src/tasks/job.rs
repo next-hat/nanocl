@@ -4,7 +4,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   job::Job,
-  system::{EventActorKind, NativeEventAction},
+  system::{EventActorKind, EventKind, NativeEventAction},
 };
 
 use super::generic::ObjTask;
@@ -87,9 +87,9 @@ pub(crate) async fn start_if_incarnation(
   state: &SystemState,
 ) -> HttpResult<()> {
   let lock = utils::container::job::lifecycle_lock(key);
-  let serialized = lock
-    .try_lock_owned()
-    .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+  // Serialize admission through the preceding action's event publication.
+  // Durable acceptance still rejects an unfinished run or pending operation.
+  let serialized = lock.lock_owned().await;
   let key = key.to_owned();
   let state = state.clone();
   let (reply, response) = tokio::sync::oneshot::channel();
@@ -131,16 +131,18 @@ pub(crate) async fn start_if_incarnation(
       &state.inner.pool,
     )
     .await;
-    drop(serialized);
     match completed {
       Ok(true) => {
-        let _ = reply.send(Ok(()));
         state
           .emit_normal_native_action_sync(
             &accepted.job,
             NativeEventAction::Starting,
           )
           .await;
+        // A stop/delete accepted after this reply must not publish its event
+        // before the delayed Starting event of the run it just cancelled.
+        drop(serialized);
+        let _ = reply.send(Ok(()));
         if let Err(error) =
           utils::container::job::execute(&accepted, &owner, &state).await
         {
@@ -182,9 +184,7 @@ async fn control(
   state: &SystemState,
 ) -> HttpResult<Job> {
   let lock = utils::container::job::lifecycle_lock(key);
-  let serialized = lock
-    .try_lock_owned()
-    .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+  let serialized = lock.lock_owned().await;
   let key = key.to_owned();
   let state = state.clone();
   let (reply, response) = tokio::sync::oneshot::channel();
@@ -223,9 +223,19 @@ async fn control(
       }
     };
     let _ = reply.send(Ok(accepted.job.clone()));
-    let result =
-      utils::container::job::control(&accepted, &owner, &state).await;
-    if let Err(error) = result {
+    let result = utils::container::job::control(&accepted, &owner, &state)
+      .await
+      .and_then(|completed| {
+        if completed {
+          Ok(())
+        } else {
+          Err(IoError::interrupted(
+            "Job control",
+            "Operation completion was not recorded",
+          ))
+        }
+      });
+    if let Err(error) = &result {
       log::warn!("Job {} {} failed: {error}", accepted.job.spec.name, action);
       if let Some(run) = &accepted.run {
         let _ = JobRunDb::mark_unknown(
@@ -244,16 +254,33 @@ async fn control(
         &state.inner.pool,
       )
       .await;
-      state.emit_error_native_action(
-        &accepted.job,
-        if action == "delete" {
-          NativeEventAction::Destroy
-        } else {
-          NativeEventAction::Stop
-        },
-        Some(error.to_string()),
-      );
     }
+    let action = if action == "delete" {
+      NativeEventAction::Destroy
+    } else {
+      NativeEventAction::Stop
+    };
+    match result {
+      Ok(()) => {
+        state
+          .emit_normal_native_action_sync(&accepted.job, action)
+          .await;
+      }
+      Err(error) => {
+        state
+          .emit_action_sync(
+            &accepted.job.clone().into(),
+            action,
+            EventKind::Error,
+            "state_sync",
+            Some(error.to_string()),
+            None,
+          )
+          .await;
+      }
+    }
+    // Publish the predecessor's terminal event before a successor can publish
+    // Starting. Event-driven follow-ups wait for this short admission boundary.
     drop(serialized);
     cleanup(&owner, &state).await;
   });

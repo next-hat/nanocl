@@ -1,19 +1,16 @@
 use bollard_next::query_parameters::InspectNetworkOptions;
-use nanocl_error::{
-  http::HttpResult,
-  io::{IoError, IoResult},
-};
+use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{ConstraintOp, NodeConstraint},
   process::{Process, ProcessKind},
-  system::{NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind},
+  system::NativeEventAction,
 };
 
 use crate::{
   models::{
     BalanceWeights, CapacityQuery, CargoDb, JobDb, MetricDb, NodeDb,
-    ObjPsStatusDb, ObjPsStatusUpdate, SystemState, VmDb,
+    SystemState, VmDb,
   },
   repositories::generic::*,
 };
@@ -87,82 +84,6 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
     instance_success,
     instance_running,
   )
-}
-
-/// Emit a starting event to the system for the related process object (job, cargo, vm)
-/// This will update the status of the process and emit a event
-/// So the system start to start the group of processes in the background
-///
-pub async fn emit_starting(
-  kind_key: &str,
-  kind: &ProcessKind,
-  state: &SystemState,
-) -> HttpResult<()> {
-  if *kind == ProcessKind::Job {
-    return crate::tasks::job::start(kind_key, state).await;
-  }
-  if *kind == ProcessKind::Vm {
-    let key = kind_key.to_owned();
-    let prepare_state = state.clone();
-    crate::tasks::vm::accept_task(
-      kind_key,
-      NativeEventAction::Starting,
-      state,
-      move |owner, lease| async move {
-        VmDb::prepare_start(&key, owner, lease, &prepare_state).await
-      },
-    )
-    .await?;
-    return Ok(());
-  }
-  log::debug!("starting {kind:?} {kind_key}");
-  let current_status =
-    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  let wanted = ObjPsStatusKind::Start.to_string();
-  let status_update = ObjPsStatusUpdate {
-    wanted: Some(wanted),
-    prev_wanted: Some(current_status.wanted),
-    actual: Some(ObjPsStatusKind::Starting.to_string()),
-    prev_actual: Some(current_status.actual),
-    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-  };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
-  emit(kind_key, kind, NativeEventAction::Starting, state).await?;
-  Ok(())
-}
-
-/// Emit a stopping event to the system for the related process object (job, cargo, vm)
-/// This will update the status of the process and emit a event
-/// So the system start to stop the group of processes in the background
-///
-pub async fn emit_stopping(
-  kind_key: &str,
-  kind: &ProcessKind,
-  state: &SystemState,
-) -> IoResult<()> {
-  if *kind == ProcessKind::Job {
-    return Err(IoError::invalid_input(
-      "Job stop",
-      "Use the Job lifecycle to stop the current run",
-    ));
-  }
-  log::debug!("stopping {kind:?} {kind_key}");
-  let current_status =
-    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  if current_status.actual == ObjPsStatusKind::Stop.to_string() {
-    log::debug!("{kind:?} {kind_key} already stopped",);
-    return Ok(());
-  }
-  let status_update = ObjPsStatusUpdate {
-    wanted: Some(ObjPsStatusKind::Stop.to_string()),
-    prev_wanted: Some(current_status.wanted),
-    actual: Some(ObjPsStatusKind::Stopping.to_string()),
-    prev_actual: Some(current_status.actual),
-    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-  };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
-  emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
-  Ok(())
 }
 
 /// Resolve the gateway used by the Cargo compiler for

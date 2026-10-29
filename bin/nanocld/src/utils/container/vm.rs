@@ -34,7 +34,8 @@ pub(crate) mod recovery;
 mod resize;
 pub(crate) use lifecycle::{
   enqueue_lifecycle, inspect_runtime, lifecycle_lock, restart_with_options,
-  run_restart_owned, runtime_status, socket_directory, stop_with_options,
+  run_restart_owned, runtime_status, socket_directory, state_is_unchanged,
+  stop_with_options, stop_with_outcome,
 };
 pub(crate) use resize::{resize, runtime_resources};
 
@@ -1439,10 +1440,12 @@ async fn delete_unlocked<G: Clone + Send + 'static>(
   } else {
     VmDb::clear_by_pk_owned(&vm.spec.vm_key, keepalive, &state.inner.pool)
       .await?;
+    state
+      .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
+      .await;
   }
-  state
-    .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
-    .await;
+  // Accepted operations publish their correlated completion from the owning
+  // task after releasing its lease.
   Ok(())
 }
 

@@ -56,7 +56,8 @@ fn selected_object(matches: &ArgMatches, kind: CompletionKind) -> Option<&str> {
   let (operation, opts) = group_matches.subcommand()?;
   let field = match (kind, group, operation) {
     (CompletionKind::CargoContainer, "cargo", "patch")
-    | (CompletionKind::CargoHistory, "cargo", "revert") => "key",
+    | (CompletionKind::CargoHistory, "cargo", "revert" | "history")
+    | (CompletionKind::ResourceHistory, "resource", "history") => "key",
     (CompletionKind::ResourceHistory, "resource", "revert") => "name",
     _ => return None,
   };
@@ -236,6 +237,15 @@ mod tests {
       selected_object(&matches, CompletionKind::CargoHistory),
       Some("system.api")
     );
+    for (group, key, kind) in [
+      ("cargo", "system.api", CompletionKind::CargoHistory),
+      ("resource", "route", CompletionKind::ResourceHistory),
+    ] {
+      let matches =
+        partial_matches(&words(&["nanocl", group, "history", key, "--id"]))
+          .unwrap();
+      assert_eq!(selected_object(&matches, kind), Some(key));
+    }
     let matches = partial_matches(&words(&[
       "nanocl",
       "exec",

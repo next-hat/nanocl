@@ -1,20 +1,16 @@
 use futures::StreamExt;
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
-use nanocld_client::{
-  NanocldClient,
-  stubs::{
-    job::{JobHistoryQuery, JobInspect},
-    process::{ProcessLogQuery, ProcessWaitQuery},
-  },
+use nanocld_client::stubs::{
+  job::{JobHistoryQuery, JobInspect},
+  process::{ProcessLogQuery, ProcessWaitQuery},
 };
 
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, GenericHistoryOpts, GenericStartOpts, GenericStopOpts,
-    JobArg, JobCommand, JobCompactRow, JobLogsOpts, JobRow, JobRunRow,
-    JobWaitOpts, SpecHistoryRow,
+    GenericDefaultOpts, GenericHistoryOpts, JobArg, JobCommand, JobCompactRow,
+    JobLogsOpts, JobRow, JobRunRow, JobWaitOpts, SpecHistoryRow,
   },
   utils,
 };
@@ -43,31 +39,9 @@ impl GenericCommandLs for JobArg {
 
 impl GenericCommandRm<GenericDefaultOpts, String> for JobArg {}
 
-impl GenericCommandStart for JobArg {
-  async fn exec_start(
-    client: &NanocldClient,
-    opts: &GenericStartOpts,
-  ) -> IoResult<()> {
-    // Admission is authoritative; legacy current status cannot establish
-    // whether a retained run is active. Do not wait on name-only events.
-    for key in &opts.keys {
-      client.start_process("job", key).await?;
-    }
-    Ok(())
-  }
-}
+impl GenericCommandStart for JobArg {}
 
-impl GenericCommandStop for JobArg {
-  async fn exec_stop(
-    client: &NanocldClient,
-    opts: &GenericStopOpts,
-  ) -> IoResult<()> {
-    for key in &opts.keys {
-      client.stop_process("job", key).await?;
-    }
-    Ok(())
-  }
-}
+impl GenericCommandStop for JobArg {}
 
 impl GenericCommandInspect for JobArg {
   type ApiItem = JobInspect;
@@ -213,7 +187,7 @@ mod tests {
 
   use clap::Parser;
   use nanocld_client::{
-    ConnectOpts, NANOCLD_DEFAULT_VERSION,
+    ConnectOpts, NANOCLD_DEFAULT_VERSION, NanocldClient,
     stubs::job::{
       JobRun, JobRunInspect, JobRunOperation, JobRunState, JobRunStep, JobSpec,
       JobStepState,
@@ -224,7 +198,7 @@ mod tests {
   use super::*;
   use crate::{
     config::UserConfig,
-    models::{Context, DisplayFormat},
+    models::{Context, DisplayFormat, GenericStartOpts, GenericStopOpts},
   };
 
   struct HistoryFixture {
@@ -601,5 +575,64 @@ mod tests {
       *fixture.query.lock().unwrap(),
       Some(format!("incarnation={incarnation_key}&run={run_key}"))
     );
+  }
+  #[ntex::test]
+  async fn job_state_lifecycle_uses_admission_without_status_or_events() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let server_calls = calls.clone();
+    let server = web::test::server(async move |_| {
+      let calls = server_calls.clone();
+      web::App::new().service(
+        web::resource(format!(
+          "/v{NANOCLD_DEFAULT_VERSION}/processes/job/{name}/{action}",
+          name = "{name}",
+          action = "{action}"
+        ))
+        .route(web::post().to(move |request: web::HttpRequest| {
+          let calls = calls.clone();
+          async move {
+            calls.lock().unwrap().push(request.path().to_owned());
+            if request.match_info().get("name") == Some("rejected") {
+              web::HttpResponse::Conflict()
+                .json(&serde_json::json!({"msg": "active lifecycle"}))
+            } else {
+              web::HttpResponse::Accepted().body("")
+            }
+          }
+        })),
+      )
+    });
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: format!("http://localhost:{}", server.addr().port()),
+      ..Default::default()
+    })
+    .unwrap();
+    for name in ["backup", "rejected"] {
+      let expected = usize::from(name == "rejected");
+      let keys = vec![name.to_owned()];
+      assert_eq!(
+        JobArg::exec_start_with_progress(
+          &client,
+          &GenericStartOpts { keys: keys.clone() },
+          None,
+          None
+        )
+        .await
+        .unwrap(),
+        expected
+      );
+      assert_eq!(
+        JobArg::exec_stop_with_progress(
+          &client,
+          &GenericStopOpts { keys },
+          None,
+          None
+        )
+        .await
+        .unwrap(),
+        expected
+      );
+    }
+    assert_eq!(calls.lock().unwrap().len(), 4);
   }
 }

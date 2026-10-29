@@ -267,30 +267,7 @@ impl ObjDelByPk for VmDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let key = pk.to_owned();
-    let prepare_state = state.clone();
-    crate::tasks::vm::accept_task(
-      pk,
-      NativeEventAction::Destroying,
-      state,
-      move |owner, lease| async move {
-        let vm =
-          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
-        let operation =
-          OperationDb::new(&owner, "Vm", &key, vm.spec.key, "delete");
-        Ok(
-          Self::accept_operation(
-            &vm,
-            None,
-            operation,
-            lease,
-            &prepare_state.inner.pool,
-          )
-          .await?,
-        )
-      },
-    )
-    .await
+    Self::delete_with_receipt(pk, state).await.map(|(vm, _)| vm)
   }
 
   async fn fn_del_obj_by_pk(
@@ -347,21 +324,9 @@ impl ObjPatchByPk for VmDb {
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let key = pk.to_owned();
-    let prepare_state = state.clone();
-    let obj = VmObjPatchIn {
-      spec: obj.spec.clone(),
-      version: obj.version.clone(),
-    };
-    crate::tasks::vm::accept_task(
-      pk,
-      NativeEventAction::Updating,
-      state,
-      move |owner, lease| async move {
-        Self::prepare_patch(&key, &obj, &prepare_state, owner, lease).await
-      },
-    )
-    .await
+    Self::patch_with_receipt(pk, obj, state)
+      .await
+      .map(|(vm, _)| vm)
   }
 
   async fn fn_patch_obj_by_pk(
@@ -374,6 +339,58 @@ impl ObjPatchByPk for VmDb {
 }
 
 impl VmDb {
+  pub(crate) async fn delete_with_receipt(
+    pk: &str,
+    state: &SystemState,
+  ) -> HttpResult<(Vm, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let prepare_state = state.clone();
+    crate::tasks::vm::accept_task_with_receipt(
+      pk,
+      NativeEventAction::Destroying,
+      state,
+      move |owner, lease| async move {
+        let vm =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let operation =
+          OperationDb::new(&owner, "Vm", &key, vm.spec.key, "delete");
+        Ok(
+          Self::accept_operation(
+            &vm,
+            None,
+            operation,
+            lease,
+            &prepare_state.inner.pool,
+          )
+          .await?,
+        )
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn patch_with_receipt(
+    pk: &str,
+    obj: &VmObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<(Vm, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let prepare_state = state.clone();
+    let obj = VmObjPatchIn {
+      spec: obj.spec.clone(),
+      version: obj.version.clone(),
+    };
+    crate::tasks::vm::accept_task_with_receipt(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        Self::prepare_patch(&key, &obj, &prepare_state, owner, lease).await
+      },
+    )
+    .await
+  }
+
   async fn prepare_patch(
     pk: &str,
     obj: &VmObjPatchIn,

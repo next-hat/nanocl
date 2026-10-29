@@ -19,7 +19,10 @@ use nanocl_stubs::process::ProcessKind;
     ("incarnation" = Option<uuid::Uuid>, Query, description = "For Jobs, reject a stale scheduled invocation from another incarnation"),
   ),
   responses(
-    (status = 202, description = "Process instances started"),
+    (status = 200, description = "Cargo or VM is already started, verified under lifecycle admission"),
+    (status = 202, description = "Start accepted", headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID for Cargo and VM; omitted for other kinds. Match terminal event Metadata.Operation to confirm completion.")
+    )),
   ),
 ))]
 pub async fn start_processes(
@@ -31,13 +34,21 @@ pub async fn start_processes(
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
-  if kind == ProcessKind::Job {
-    crate::tasks::job::start_if_incarnation(&key, query.incarnation, state)
-      .await?;
-  } else if kind == ProcessKind::Cargo {
-    crate::tasks::cargo::start(&key, state).await?;
-  } else {
-    utils::container::generic::emit_starting(&key, &kind, &state).await?;
-  }
-  Ok(web::HttpResponse::Accepted().build())
+  let operation = match kind {
+    ProcessKind::Job => {
+      crate::tasks::job::start_if_incarnation(&key, query.incarnation, state)
+        .await?;
+      return Ok(web::HttpResponse::Accepted().build());
+    }
+    ProcessKind::Cargo => {
+      crate::tasks::cargo::start_operation(&key, state).await?
+    }
+    ProcessKind::Vm => crate::tasks::vm::start_operation(&key, state).await?,
+  };
+  let Some(operation) = operation else {
+    return Ok(web::HttpResponse::Ok().build());
+  };
+  let mut response = web::HttpResponse::Accepted();
+  response.set_header("X-Nanocl-Operation", operation.to_string());
+  Ok(response.build())
 }

@@ -5,7 +5,6 @@ use nanocl_stubs::cargo::CargoDeleteQuery;
 
 use crate::{
   models::{CargoDb, SystemState},
-  objects::generic::*,
   utils,
 };
 
@@ -19,7 +18,9 @@ use crate::{
     ("force" = bool, Query, description = "If true forces the delete operation even if the cargo is started"),
   ),
   responses(
-    (status = 202, description = "Cargo deleted"),
+    (status = 202, description = "Cargo deletion accepted", headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID. Match terminal event Metadata.Operation to confirm completion.")
+    )),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -30,6 +31,11 @@ pub async fn delete_cargo(
   qs: web::types::Query<CargoDeleteQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;
-  CargoDb::del_obj_by_pk(key.as_str(), &qs, &state).await?;
-  Ok(web::HttpResponse::Accepted().build())
+  let (_, operation) =
+    CargoDb::delete_with_operation(key.as_str(), &qs, &state).await?;
+  Ok(
+    web::HttpResponse::Accepted()
+      .set_header("X-Nanocl-Operation", operation.to_string())
+      .build(),
+  )
 }

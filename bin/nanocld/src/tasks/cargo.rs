@@ -156,8 +156,28 @@ where
   P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
 {
+  accept_task_with_operation(key, action, state, prepare)
+    .await
+    .map(|(cargo, _)| cargo)
+}
+
+pub(crate) async fn accept_task_with_operation<P, F>(
+  key: &str,
+  action: NativeEventAction,
+  state: &SystemState,
+  prepare: P,
+) -> HttpResult<(Cargo, uuid::Uuid)>
+where
+  P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
+  F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
+{
   let phase = action_name(&action)?;
-  accept_owned(key, phase, action, state, prepare, None).await
+  let (cargo, operation) =
+    accept_owned(key, phase, action, state, prepare, None, false).await?;
+  let operation = operation.ok_or_else(|| {
+    HttpError::internal_server_error("Cargo mutation returned no operation")
+  })?;
+  Ok((cargo, operation))
 }
 
 async fn accept_owned<P, F>(
@@ -167,7 +187,8 @@ async fn accept_owned<P, F>(
   state: &SystemState,
   prepare: P,
   target: Option<(String, Option<String>)>,
-) -> HttpResult<Cargo>
+  allow_unchanged: bool,
+) -> HttpResult<(Cargo, Option<uuid::Uuid>)>
 where
   P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
@@ -220,7 +241,18 @@ where
       }
     };
     let lease = (std::sync::Arc::new(guard), owner_guard);
-    let accepted = match prepare(owner, lease.clone()).await {
+    let prepared: HttpResult<(Cargo, Option<OperationDb>)> = async {
+      if allow_unchanged
+        && let Some(cargo) =
+          unchanged_current(&key, phase, incarnation, &state).await?
+      {
+        return Ok((cargo, None));
+      }
+      let accepted = prepare(owner, lease.clone()).await?;
+      Ok((accepted.cargo, Some(accepted.operation)))
+    }
+    .await;
+    let (cargo, operation) = match prepared {
       Ok(value) => value,
       Err(error) => {
         match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
@@ -245,8 +277,30 @@ where
         return;
       }
     };
-    let cargo = accepted.cargo.clone();
+    let Some(operation) = operation else {
+      let released = async {
+        if !utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await?
+        {
+          return Err(IoError::interrupted(
+            "Cargo unchanged",
+            "No-op ownership could not be released",
+          ));
+        }
+        CargoDb::delete_mutex(&mutex.key, &state).await
+      }
+      .await;
+      drop(lease);
+      let _ = reply.send(released.map(|()| (cargo, None)).map_err(http_error));
+      return;
+    };
+    let accepted = AcceptedCargoOperation {
+      cargo: cargo.clone(),
+      operation,
+    };
     let operation = accepted.operation.key;
+    let revision = accepted.operation.spec_key;
+    let error_state = state.clone();
+    let error_actor = cargo.clone().into();
     let context = CargoRuntimeContext {
       operation: accepted.operation.clone(),
       lease: (lease.0, Some(lease.1)),
@@ -267,7 +321,21 @@ where
         &format!("Cargo@{key}"),
         event.clone(),
         task,
-        |_error| async { Ok(()) },
+        move |error| async move {
+          if !is_targeted_action(phase) {
+            log::warn!("Cargo operation {operation} executor stopped: {error}");
+            let (actions, kind, reason) =
+              operation_events(phase, false, true, false);
+            for action in actions {
+              error_state.emit_action(
+                &error_actor, action, kind.clone(), reason,
+                Some(format!("Cargo operation {operation} ({phase}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying")),
+                Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
+              );
+            }
+          }
+          Ok(())
+        },
       )
       .await;
     if event != NativeEventAction::Restart {
@@ -299,7 +367,7 @@ where
         }
       }
     }
-    let _ = reply.send(Ok(cargo));
+    let _ = reply.send(Ok((cargo, Some(operation))));
   });
   response.await.map_err(|_| {
     HttpError::internal_server_error(
@@ -350,63 +418,155 @@ async fn publish_acceptance(
   state.inner.event_emitter_raw.emit(&event)
 }
 
+fn unchanged_status_matches(cargo: &Cargo, action: &str) -> bool {
+  let requested = match action {
+    "start" => ObjPsStatusKind::Start,
+    "stop" => ObjPsStatusKind::Stop,
+    _ => return false,
+  };
+  cargo.status.wanted == requested && cargo.status.actual == requested
+}
+
+async fn unchanged_current(
+  key: &str,
+  action: &str,
+  incarnation: uuid::Uuid,
+  state: &SystemState,
+) -> HttpResult<Option<Cargo>> {
+  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation {
+    return Err(HttpError::conflict(
+      "Cargo incarnation changed during admission",
+    ));
+  }
+  let operation = OperationDb::current("Cargo", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Err(HttpError::conflict(
+      "Cargo has an unresolved pending operation",
+    ));
+  }
+  if !unchanged_status_matches(&cargo, action)
+    || operation.as_ref().is_some_and(|operation| {
+      operation.incarnation_key != incarnation
+        || operation.spec_key != cargo.spec.key
+    })
+  {
+    return Ok(None);
+  }
+  let observed = tokio::time::timeout(
+    std::time::Duration::from_secs(5),
+    utils::container::cargo::runtime_is_unchanged(
+      &cargo,
+      incarnation,
+      &cargo.status.actual,
+      state,
+    ),
+  )
+  .await;
+  if !matches!(observed, Ok(Ok(true))) {
+    return Ok(None);
+  }
+  // Keep the same owner while checking that observation still belongs to the
+  // same settled definition. A no-op never creates or settles an operation.
+  let current = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation
+    || current.spec.key != cargo.spec.key
+    || !unchanged_status_matches(&current, action)
+    || OperationDb::current("Cargo", key, &state.inner.pool).await? != operation
+  {
+    return Err(HttpError::conflict(
+      "Cargo changed during no-op observation",
+    ));
+  }
+  Ok(Some(current))
+}
+
 async fn accept_current(
   key: &str,
   event: NativeEventAction,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> HttpResult<Option<uuid::Uuid>> {
   let phase = action_name(&event)?;
   let prepare_key = key.to_owned();
   let prepare_state = state.clone();
-  accept_task(key, event, state, move |owner, lease| async move {
-    let cargo =
-      CargoDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
-        .await?;
-    // This runs with both the lifecycle and operation owner leases held, before
-    // an operation or desired status is accepted. Only start/delete dispatch
-    // work to other nodes; stop/restart operate on this node's Docker runtime.
-    if matches!(phase, "stop" | "restart") {
-      let replicas =
-        CargoReplicaDb::list_by_cargo(&prepare_key, &prepare_state.inner.pool)
+  accept_owned(
+    key,
+    phase,
+    event,
+    state,
+    move |owner, lease| async move {
+      let cargo =
+        CargoDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
           .await?;
-      let processes = ProcessDb::read_by_kind_key(
-        &prepare_key,
+      // This runs with both the lifecycle and operation owner leases held, before
+      // an operation or desired status is accepted. Only start/delete dispatch
+      // work to other nodes; stop/restart operate on this node's Docker runtime.
+      if matches!(phase, "stop" | "restart") {
+        let replicas = CargoReplicaDb::list_by_cargo(
+          &prepare_key,
+          &prepare_state.inner.pool,
+        )
+        .await?;
+        let processes = ProcessDb::read_by_kind_key(
+          &prepare_key,
+          None,
+          &prepare_state.inner.pool,
+        )
+        .await?;
+        validate_local_action(
+          phase,
+          &prepare_state.inner.config.hostname,
+          replicas.iter().map(|replica| replica.node_name.as_deref()),
+          processes.iter().map(|process| process.node_name.as_str()),
+        )?;
+      }
+      let operation =
+        OperationDb::new(&owner, "Cargo", &prepare_key, cargo.spec.key, phase);
+      CargoDb::accept_operation(
+        &cargo,
         None,
+        operation,
+        lease,
         &prepare_state.inner.pool,
       )
-      .await?;
-      validate_local_action(
-        phase,
-        &prepare_state.inner.config.hostname,
-        replicas.iter().map(|replica| replica.node_name.as_deref()),
-        processes.iter().map(|process| process.node_name.as_str()),
-      )?;
-    }
-    let operation =
-      OperationDb::new(&owner, "Cargo", &prepare_key, cargo.spec.key, phase);
-    CargoDb::accept_operation(
-      &cargo,
-      None,
-      operation,
-      lease,
-      &prepare_state.inner.pool,
-    )
-    .await
-    .map_err(http_error)
-  })
+      .await
+      .map_err(http_error)
+    },
+    None,
+    matches!(phase, "start" | "stop"),
+  )
   .await
-  .map(|_| ())
+  .map(|(_, operation)| operation)
 }
 
-pub(crate) async fn start(key: &str, state: &SystemState) -> HttpResult<()> {
+pub(crate) async fn restart_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<uuid::Uuid> {
+  accept_current(key, NativeEventAction::Restart, state)
+    .await?
+    .ok_or_else(|| {
+      HttpError::internal_server_error("Cargo restart returned no operation")
+    })
+}
+/// Return the exact accepted operation, even if a successor starts before reply.
+pub(crate) async fn start_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<Option<uuid::Uuid>> {
   accept_current(key, NativeEventAction::Starting, state).await
 }
-pub(crate) async fn stop(key: &str, state: &SystemState) -> HttpResult<()> {
+
+pub(crate) async fn stop_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<Option<uuid::Uuid>> {
   accept_current(key, NativeEventAction::Stopping, state).await
 }
-pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
-  accept_current(key, NativeEventAction::Restart, state).await
-}
+
 pub(crate) async fn refresh(
   key: &str,
   expected_spec: uuid::Uuid,
@@ -496,6 +656,7 @@ pub(crate) async fn process_action(
       .map_err(http_error)
     },
     Some((id.to_owned(), signal.map(str::to_owned))),
+    false,
   )
   .await
   .map(|_| ())
@@ -542,7 +703,7 @@ async fn dispatch_start(
 async fn execute_start(
   cargo: &Cargo,
   state: &CargoRuntimeContext,
-) -> IoResult<()> {
+) -> IoResult<bool> {
   let key = &cargo.spec.cargo_key;
   let selection =
     utils::container::generic::plan_selection(cargo, state).await?;
@@ -569,7 +730,9 @@ async fn execute_start(
   .await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
-  if utils::container::cargo::has_container_healthcheck(cargo, &processes) {
+  let has_healthcheck =
+    utils::container::cargo::has_container_healthcheck(cargo, &processes);
+  if has_healthcheck {
     ObjPsStatusDb::update_owned(
       key,
       ObjPsStatusUpdate {
@@ -590,12 +753,8 @@ async fn execute_start(
     &state.inner.pool,
   )
   .await?;
-  for action in utils::container::cargo::promotion_actions(
-    utils::container::cargo::has_container_healthcheck(cargo, &processes),
-  ) {
-    state.emit_normal_native_action_sync(cargo, action).await;
-  }
-  Ok(())
+  // Publish readiness only after this operation's durable completion.
+  Ok(has_healthcheck)
 }
 
 fn completion_action(action: &str) -> NativeEventAction {
@@ -606,6 +765,34 @@ fn completion_action(action: &str) -> NativeEventAction {
     "delete" => NativeEventAction::Destroy,
     _ => NativeEventAction::Restart,
   }
+}
+
+fn operation_events(
+  action: &str,
+  settled: bool,
+  failed: bool,
+  has_healthcheck: bool,
+) -> (Vec<NativeEventAction>, EventKind, &'static str) {
+  if !settled {
+    return (
+      vec![NativeEventAction::Other("operation_pending".to_owned())],
+      EventKind::Warning,
+      "operation_pending",
+    );
+  }
+  let mut actions = vec![completion_action(action)];
+  if action == "start" && !failed && has_healthcheck {
+    actions.push(NativeEventAction::Healthy);
+  }
+  (
+    actions,
+    if failed {
+      EventKind::Error
+    } else {
+      EventKind::Normal
+    },
+    "state_sync",
+  )
 }
 
 fn uncertain_runtime_error(error: &IoError) -> bool {
@@ -636,10 +823,13 @@ async fn execute(
   target: Option<(String, Option<String>)>,
 ) -> IoResult<()> {
   let action = accepted.operation.action.as_str();
+  let mut start_has_healthcheck = false;
   let result = match utils::container::cargo::ensure_current(&state).await {
     Err(error) => Err(error),
     Ok(()) => match action {
-      "start" => execute_start(&accepted.cargo, &state).await,
+      "start" => execute_start(&accepted.cargo, &state)
+        .await
+        .map(|has_healthcheck| start_has_healthcheck = has_healthcheck),
       "restart" => {
         utils::container::cargo::restart(&accepted.cargo, &state).await
       }
@@ -680,6 +870,7 @@ async fn execute(
       ),
     )
   });
+  let mut settled = false;
   match result {
     Ok(()) => {
       let finished = if action == "delete" {
@@ -699,18 +890,8 @@ async fn execute(
         )
         .await
       };
-      let settled = matches!(&finished, Ok(true));
       match finished {
-        Ok(true) => {
-          if action != "start" && !is_targeted_action(action) {
-            state
-              .emit_normal_native_action_sync(
-                &accepted.cargo,
-                completion_action(action),
-              )
-              .await;
-          }
-        }
+        Ok(true) => settled = true,
         Ok(false) => {
           log::warn!(
             "Cargo operation {} lost completion ownership",
@@ -731,18 +912,6 @@ async fn execute(
             "Operation completion remains pending",
           ));
         }
-      }
-      if !settled
-        && !is_targeted_action(action)
-        && CargoDb::validate_operation(
-          &accepted.operation,
-          state.lease.clone(),
-          &state.inner.pool,
-        )
-        .await
-        .unwrap_or(false)
-      {
-        state.emit_error_native_action(&accepted.cargo, completion_action(action), Some(format!("Cargo operation {} ({action}) runtime work finished but completion could not be recorded; the operation remains pending", accepted.operation.key)));
       }
     }
     Err(error) => {
@@ -793,7 +962,7 @@ async fn execute(
         };
         let diagnostic =
           serde_json::json!({"Phase": action, "Failure": failure});
-        if let Err(error) = CargoDb::finish_operation(
+        match CargoDb::finish_operation(
           &accepted.operation,
           update,
           "failed",
@@ -803,10 +972,15 @@ async fn execute(
         )
         .await
         {
-          log::warn!(
+          Ok(true) => settled = true,
+          Ok(false) => log::warn!(
+            "Cargo operation {} lost failure settlement ownership",
+            accepted.operation.key
+          ),
+          Err(error) => log::warn!(
             "Cargo operation {} failure settlement deferred: {error}",
             accepted.operation.key
-          );
+          ),
         }
       }
       log::warn!(
@@ -814,9 +988,6 @@ async fn execute(
         accepted.operation.key,
         error.context()
       );
-      if owns_failure && !is_targeted_action(action) {
-        state.emit_error_native_action(&accepted.cargo, completion_action(action), Some(format!("Cargo operation {} ({action}) could not complete; inspect its runtime and pending operation before retrying", accepted.operation.key)));
-      }
     }
   }
   if let Some(owner) = &state.lease.1
@@ -824,6 +995,57 @@ async fn execute(
       utils::operation::cleanup_owner(owner, &state.inner.pool).await
   {
     log::warn!("Cargo operation owner cleanup deferred: {error}");
+  }
+  let event_state = state.state.clone();
+  drop(state);
+  if !is_targeted_action(action) {
+    // This exact owner's committed Start precedes any Healthy notification.
+    // Both are published after releasing the operation lease.
+    let (actions, kind, reason) = operation_events(
+      action,
+      settled,
+      reported.is_err(),
+      start_has_healthcheck,
+    );
+    let note = if !settled {
+      format!(
+        "Cargo operation {} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying",
+        accepted.operation.key
+      )
+    } else if reported.is_ok() {
+      format!("Cargo {}", accepted.operation.resource_key)
+    } else {
+      format!(
+        "Cargo operation {} ({action}) failed; inspect its runtime and operation before retrying",
+        accepted.operation.key
+      )
+    };
+    for event_action in actions {
+      // Do not publish Healthy when recording or delivering Start failed.
+      if let Err(error) = event_state
+        .emit_event(EventPartial {
+          reporting_controller: crate::vars::CONTROLLER_NAME.to_owned(),
+          reporting_node: event_state.inner.config.hostname.clone(),
+          kind: kind.clone(),
+          action: event_action.to_string(),
+          reason: reason.to_owned(),
+          note: Some(note.clone()),
+          actor: Some(accepted.cargo.clone().into()),
+          related: None,
+          metadata: Some(serde_json::json!({
+            "Operation": accepted.operation.key,
+            "SpecKey": accepted.operation.spec_key,
+          })),
+        })
+        .await
+      {
+        log::warn!(
+          "Cargo operation {} notification failed: {error}",
+          accepted.operation.key
+        );
+        return Err(error);
+      }
+    }
   }
   reported
 }
@@ -943,6 +1165,97 @@ mod tests {
   use crate::vars;
 
   use super::*;
+
+  #[test]
+  fn cargo_noop_status_requires_matching_desired_and_observed_state() {
+    for (action, requested) in [
+      ("start", ObjPsStatusKind::Start),
+      ("stop", ObjPsStatusKind::Stop),
+    ] {
+      let mut cargo = Cargo::default();
+      cargo.status.wanted = requested.clone();
+      cargo.status.actual = requested.clone();
+      assert!(unchanged_status_matches(&cargo, action));
+      for other in [
+        ObjPsStatusKind::Create,
+        ObjPsStatusKind::Starting,
+        ObjPsStatusKind::Updating,
+        ObjPsStatusKind::Stopping,
+        ObjPsStatusKind::Fail,
+        ObjPsStatusKind::Finish,
+        ObjPsStatusKind::Unknown,
+      ] {
+        cargo.status.actual = other.clone();
+        assert!(!unchanged_status_matches(&cargo, action));
+        cargo.status.actual = requested.clone();
+        cargo.status.wanted = other;
+        assert!(!unchanged_status_matches(&cargo, action));
+        cargo.status.wanted = requested.clone();
+      }
+      assert!(!unchanged_status_matches(&cargo, "restart"));
+      assert!(!unchanged_status_matches(&cargo, "delete"));
+    }
+  }
+
+  #[test]
+  fn cargo_receipts_require_durable_settlement_for_terminal_events() {
+    for (operation, terminal) in [
+      ("start", NativeEventAction::Start),
+      ("stop", NativeEventAction::Stop),
+      ("restart", NativeEventAction::Restart),
+      ("update", NativeEventAction::Update),
+      ("delete", NativeEventAction::Destroy),
+    ] {
+      // A successful runtime call with a rejected commit and an uncertain
+      // runtime failure must both leave the durable outcome unresolved.
+      for failed in [false, true] {
+        let (actions, kind, reason) =
+          operation_events(operation, false, failed, true);
+        assert_eq!(
+          actions,
+          vec![NativeEventAction::Other("operation_pending".to_owned())]
+        );
+        assert_eq!(kind, EventKind::Warning);
+        assert_eq!(reason, "operation_pending");
+      }
+      for (failed, expected_kind) in
+        [(false, EventKind::Normal), (true, EventKind::Error)]
+      {
+        let (actions, kind, reason) =
+          operation_events(operation, true, failed, false);
+        assert_eq!(actions, vec![terminal.clone()]);
+        assert_eq!(kind, expected_kind);
+        assert_eq!(reason, "state_sync");
+      }
+    }
+  }
+
+  #[test]
+  fn cargo_healthy_follows_only_a_successfully_settled_start() {
+    for settled in [false, true] {
+      for failed in [false, true] {
+        let (actions, _, _) = operation_events("start", settled, failed, true);
+        assert_eq!(
+          actions.contains(&NativeEventAction::Healthy),
+          settled && !failed
+        );
+        if settled && !failed {
+          assert_eq!(
+            actions,
+            vec![NativeEventAction::Start, NativeEventAction::Healthy]
+          );
+        }
+      }
+    }
+    for operation in ["start", "stop", "restart", "update", "delete"] {
+      let (actions, _, _) = operation_events(operation, true, false, false);
+      assert_eq!(actions, vec![completion_action(operation)]);
+    }
+    for operation in ["stop", "restart", "update", "delete"] {
+      let (actions, _, _) = operation_events(operation, true, false, true);
+      assert_eq!(actions, vec![completion_action(operation)]);
+    }
+  }
 
   #[ntex::test]
   async fn cancelled_cargo_waiter_retains_executor_ownership_until_completion()

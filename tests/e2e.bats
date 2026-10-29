@@ -22,7 +22,7 @@ cleanup_nanocl_artifacts() {
     e2e-private-peer \
     e2e-default-client
   do
-    nanocl cargo rm -yf "$cargo" >/dev/null 2>&1 || true
+    nanocl cargo rm -yf "global.$cargo" >/dev/null 2>&1 || true
   done
   docker network rm e2e-private >/dev/null 2>&1 || true
 }
@@ -172,8 +172,21 @@ teardown_file() {
   run nanocl cargo run test nginx:latest
   [ "$status" -eq 0 ]
 
+  # Existing Cargo operations require a canonical namespace.name key.
+  # A rejected batch item must fail the command and leave the Cargo intact.
   run nanocl cargo rm -yf test
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"400 Bad Request"* ]]
+
+  run nanocl cargo inspect global.test
   [ "$status" -eq 0 ]
+
+  run nanocl cargo rm -yf global.test
+  [ "$status" -eq 0 ]
+
+  run nanocl cargo inspect global.test
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"404 Not Found"* ]]
 }
 
 @test "nanocl applies, renders, serves, and removes a deployment Statefile" {

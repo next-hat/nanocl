@@ -5,7 +5,6 @@ use nanocl_stubs::vm_spec::VmSpecUpdate;
 
 use crate::{
   models::{SystemState, VmDb, VmObjPatchIn},
-  objects::generic::*,
   utils,
 };
 
@@ -19,7 +18,9 @@ use crate::{
     ("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
   ),
   responses(
-    (status = 200, description = "Updated virtual machine", body = nanocl_stubs::vm::Vm),
+    (status = 200, description = "Virtual machine update accepted", body = nanocl_stubs::vm::Vm, headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID. Match terminal event Metadata.Operation to confirm completion.")
+    )),
     (status = 404, description = "Virtual machine not found", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -44,6 +45,11 @@ pub async fn patch_vm(
     spec: payload.into_inner(),
     version: version.clone(),
   };
-  let vm = VmDb::patch_obj_by_pk(key.as_str(), obj, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&vm))
+  let (vm, operation) =
+    VmDb::patch_with_receipt(key.as_str(), obj, state).await?;
+  Ok(
+    web::HttpResponse::Ok()
+      .set_header("X-Nanocl-Operation", operation.to_string())
+      .json(&vm),
+  )
 }

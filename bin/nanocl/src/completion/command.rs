@@ -115,21 +115,30 @@ fn object_kind(path: &[&str], id: &str) -> Option<CompletionKind> {
       "key" | "keys",
     ) => Some(Cargo),
     (["cargo", "patch"], "container") => Some(CargoContainer),
-    (["cargo", "revert"], "history_id") => Some(CargoHistory),
+    (["cargo", "revert"], "history_id") | (["cargo", "history"], "id") => {
+      Some(CargoHistory)
+    }
     (
       [
         "vm",
-        "remove" | "inspect" | "start" | "stop" | "attach" | "patch",
+        "remove" | "inspect" | "start" | "stop" | "restart" | "attach"
+        | "patch" | "history" | "status" | "resize" | "resources",
       ],
       "key" | "keys",
     ) => Some(Vm),
     (
-      ["job", "remove" | "inspect" | "logs" | "wait" | "start"],
+      [
+        "job",
+        "remove" | "inspect" | "logs" | "wait" | "start" | "stop" | "history"
+        | "runs",
+      ],
       "key" | "keys" | "name",
     ) => Some(Job),
-    (["resource", "remove" | "inspect"], "key" | "keys")
-    | (["resource", "history" | "revert"], "name") => Some(Resource),
-    (["resource", "revert"], "key") => Some(ResourceHistory),
+    (["resource", "remove" | "inspect" | "history"], "key" | "keys")
+    | (["resource", "revert"], "name") => Some(Resource),
+    (["resource", "revert"], "key") | (["resource", "history"], "id") => {
+      Some(ResourceHistory)
+    }
     (["namespace", "remove" | "inspect"], "key" | "keys") => Some(Namespace),
     (["secret", "remove" | "inspect"], "key" | "keys")
     | (["secret", "patch"], "name") => Some(Secret),
@@ -202,8 +211,19 @@ mod tests {
       (&["cargo", "remove"], "keys"),
       (&["cargo", "patch"], "container"),
       (&["cargo", "revert"], "history_id"),
+      (&["cargo", "history"], "id"),
       (&["vm", "attach"], "key"),
+      (&["vm", "history"], "key"),
+      (&["vm", "restart"], "keys"),
+      (&["vm", "status"], "key"),
+      (&["vm", "resize"], "key"),
+      (&["vm", "resources"], "key"),
       (&["job", "wait"], "name"),
+      (&["job", "history"], "key"),
+      (&["job", "runs"], "key"),
+      (&["job", "stop"], "keys"),
+      (&["resource", "history"], "key"),
+      (&["resource", "history"], "id"),
       (&["resource", "revert"], "name"),
       (&["resource", "revert"], "key"),
       (&["namespace", "inspect"], "key"),

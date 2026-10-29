@@ -1,7 +1,6 @@
 use clap::{Args, Parser};
-use serde::Deserialize;
 
-use nanocld_client::stubs::{generic::GenericFilter, system::ObjPsStatus};
+use nanocld_client::stubs::generic::GenericFilter;
 
 use super::DisplayFormat;
 
@@ -14,13 +13,6 @@ impl From<GenericDefaultOpts> for GenericFilter {
   fn from(_: GenericDefaultOpts) -> Self {
     Self::default()
   }
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct GenericProcessStatus {
-  /// Status of the cargo
-  pub status: ObjPsStatus,
 }
 
 /// Generic list options for the list command
@@ -41,11 +33,15 @@ where
   /// Offset the results to navigate through the results
   #[clap(long, short)]
   pub offset: Option<usize>,
-  /// Filters
-  #[clap(long)]
+  /// Unsupported; use dedicated command filter options where available
+  #[clap(long, value_parser = unsupported_list_filter)]
   pub filters: Option<Vec<String>>,
   #[clap(flatten)]
   pub others: Option<T>,
+}
+
+fn unsupported_list_filter(_: &str) -> Result<String, String> {
+  Err("--filters is not supported; use dedicated command filter options where available".into())
 }
 
 /// Format a creation timestamp using the compact units shared by list commands.
@@ -141,7 +137,7 @@ pub struct GenericInspectOpts {
 /// Shared interface for browsing configuration history or execution runs.
 #[derive(Clone, Parser)]
 pub struct GenericHistoryOpts {
-  /// Canonical resource key or global Job name
+  /// Canonical key or global resource name
   pub key: String,
   /// Inspect one entry by its ID
   #[clap(long, value_name = "UUID", conflicts_with_all = ["limit", "offset"])]
@@ -180,6 +176,10 @@ mod tests {
         JobCommand::History(opts) | JobCommand::Runs(opts) => opts,
         _ => panic!("expected Job history or runs"),
       },
+      Command::Resource(arg) => match arg.command {
+        ResourceCommand::History(opts) => opts,
+        _ => panic!("expected Resource history"),
+      },
       _ => panic!("expected resource history"),
     }
   }
@@ -192,6 +192,7 @@ mod tests {
       ("vm", "history", "global.worker"),
       ("job", "history", "daily-report"),
       ("job", "runs", "daily-report"),
+      ("resource", "history", "web-route"),
     ] {
       let options = history_options(
         Cli::try_parse_from(["nanocl", resource, command, key]).unwrap(),
@@ -317,17 +318,8 @@ mod tests {
     ] {
       for alias in ["list", "ls"] {
         let mut args = vec![
-          "nanocl",
-          command,
-          alias,
-          "--wide",
-          "--quiet",
-          "--limit",
-          "5",
-          "--offset",
-          "2",
-          "--filters",
-          "name=app",
+          "nanocl", command, alias, "--wide", "--quiet", "--limit", "5",
+          "--offset", "2",
         ];
         if matches!(command, "cargo" | "vm") {
           args.extend(["--namespace", "production"]);
@@ -337,7 +329,7 @@ mod tests {
         assert!(opts.quiet);
         assert_eq!(opts.limit, Some(5));
         assert_eq!(opts.offset, Some(2));
-        assert_eq!(opts.filters, Some(vec!["name=app".into()]));
+        assert!(opts.filters.is_none());
       }
     }
     for alias in ["list", "ls"] {
@@ -357,6 +349,40 @@ mod tests {
       }
     }
     assert!(!GenericListOpts::<GenericDefaultOpts>::default().wide);
+  }
+
+  #[test]
+  fn list_and_ps_commands_reject_unsupported_generic_filters() {
+    let mut commands = vec![vec!["nanocl", "ps"]];
+    for resource in [
+      "cargo",
+      "vm",
+      "job",
+      "namespace",
+      "node",
+      "resource",
+      "secret",
+      "event",
+      "metric",
+    ] {
+      for alias in ["list", "ls"] {
+        commands.push(vec!["nanocl", resource, alias]);
+      }
+    }
+    for command in commands {
+      for value in ["name=app", "{}", ""] {
+        let mut args = command.clone();
+        args.extend(["--filters", value]);
+        let error = Cli::try_parse_from(args.clone())
+          .err()
+          .expect("unsupported filters must fail before dispatch");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
+        assert!(
+          error.to_string().contains("--filters is not supported"),
+          "{args:?}: {error}"
+        );
+      }
+    }
   }
 
   #[test]

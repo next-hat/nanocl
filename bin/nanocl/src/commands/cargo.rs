@@ -4,14 +4,11 @@ use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use ntex::rt;
 
 use nanocl_error::io::{IoError, IoResult};
-use nanocld_client::{
-  NanocldClient,
-  stubs::{
-    cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
-    generic::{GenericFilter, GenericListQueryNsp},
-    process::{ProcessLogQuery, ProcessStatsQuery},
-    system::{EventActorKind, NativeEventAction},
-  },
+use nanocld_client::stubs::{
+  cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
+  generic::{GenericFilter, GenericListQueryNsp},
+  process::{ProcessLogQuery, ProcessStatsQuery},
+  system::{EventActorKind, NativeEventAction},
 };
 
 use crate::{
@@ -79,21 +76,6 @@ impl GenericCommandInspect for CargoArg {
   type ApiItem = CargoInspect;
 }
 
-async fn wait_cargo_state(
-  key: &str,
-  action: NativeEventAction,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let waiter = utils::process::wait_process_state(
-    key,
-    EventActorKind::Cargo,
-    [action].to_vec(),
-    client,
-  )
-  .await?;
-  Ok(waiter)
-}
-
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
@@ -117,12 +99,14 @@ async fn exec_cargo_restart(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for key in &opts.keys {
-    let waiter =
-      wait_cargo_state(key, NativeEventAction::Restart, client).await?;
-    client.restart_process("cargo", key).await?;
-    waiter.await.map_err(|err| {
-      IoError::interrupted("wait_cargo_state", &err.to_string())
-    })??;
+    utils::process::wait_process_operation(
+      key,
+      EventActorKind::Cargo,
+      NativeEventAction::Restart,
+      client,
+      client.restart_process_operation("cargo", key),
+    )
+    .await?;
   }
   Ok(())
 }
@@ -136,12 +120,14 @@ async fn exec_cargo_patch(
   let client = &cli_conf.client;
   let cargo = client.inspect_cargo(&opts.key).await?;
   let patch = build_cargo_patch(opts, &cargo.spec.containers)?;
-  let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
-  client.patch_cargo(&opts.key, &patch).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Cargo,
+    NativeEventAction::Update,
+    client,
+    client.patch_cargo_operation(&opts.key, &patch),
+  )
+  .await?;
   Ok(())
 }
 
@@ -256,12 +242,24 @@ async fn exec_cargo_revert(
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
-  let cargo = client.revert_cargo(&opts.key, &opts.history_id).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
+  let mut cargo = None;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Cargo,
+    NativeEventAction::Update,
+    client,
+    async {
+      let (response, operation) = client
+        .revert_cargo_operation(&opts.key, &opts.history_id)
+        .await?;
+      cargo = Some(response);
+      Ok(operation)
+    },
+  )
+  .await?;
+  let cargo = cargo.ok_or_else(|| {
+    IoError::invalid_data("Cargo revert", "Accepted response is unavailable")
+  })?;
   utils::print::print_yml(cargo)?;
   Ok(())
 }
@@ -276,13 +274,14 @@ async fn exec_cargo_run(
   let cargo = client
     .create_cargo(&opts.clone().into(), opts.namespace.as_deref())
     .await?;
-  let waiter =
-    wait_cargo_state(&cargo.spec.cargo_key, NativeEventAction::Start, client)
-      .await?;
-  client.start_process("cargo", &cargo.spec.cargo_key).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &cargo.spec.cargo_key,
+    EventActorKind::Cargo,
+    NativeEventAction::Start,
+    client,
+    client.start_process_operation("cargo", &cargo.spec.cargo_key),
+  )
+  .await?;
   Ok(())
 }
 

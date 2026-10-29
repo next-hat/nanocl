@@ -76,7 +76,7 @@ names. Process commands (`exec`, `kill`, `logs`, `inspect`, and `stats`) suggest
 concrete process names or full IDs. Context names come from local configuration.
 Cargo container names and recent cargo/resource history IDs are also suggested.
 Event and metric inspection accepts ID suggestions. History suggestions cover the
-latest 100 revisions exposed by the existing history endpoints; event and metric
+revisions exposed by the existing history endpoints; event and metric
 ID searches page through the existing list endpoints within the same deadline.
 
 New object names, passwords, secret contents, arbitrary environment values, and

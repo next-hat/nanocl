@@ -1,4 +1,4 @@
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   job::{Job, JobInspect},
   system::NativeEventAction,
@@ -20,13 +20,70 @@ impl ObjCreate for JobDb {
     obj: &Self::ObjCreateIn,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    let job =
-      JobDb::create_with_spec(&obj.spec, &obj.version, &state.inner.pool)
-        .await?;
-    if let Some(schedule) = &job.spec.schedule {
-      utils::cron::add_cron_rule(&job, schedule, state).await?;
-    }
-    Ok(job)
+    // A cancelled run can briefly reacquire this lock after deletion completes.
+    // Wait for its final observation before admitting the replacement.
+    let serialized = std::sync::Arc::new(
+      utils::container::job::lifecycle_lock(&obj.spec.name)
+        .lock_owned()
+        .await,
+    );
+    let spec = obj.spec.clone();
+    let version = obj.version.clone();
+    let state = state.clone();
+    let (reply, response) = tokio::sync::oneshot::channel();
+    // Once creation begins, its owner keeps registration ordered with
+    // start/delete even if the request stops waiting for the response.
+    ntex::rt::spawn(async move {
+      let _serialized = serialized;
+      let result = async {
+        let job =
+          JobDb::create_with_spec(&spec, &version, &state.inner.pool).await?;
+        if let Some(schedule) = &job.spec.schedule
+          && let Err(error) =
+            utils::cron::add_cron_rule(&job, schedule, &state).await
+        {
+          // Installation may have succeeded before its result was lost. Try
+          // to remove its exact incarnation-scoped rule before undoing the
+          // unpublished database creation, retaining admission throughout.
+          let cron_cleanup = utils::cron::remove_cron_rule(&job, &state).await;
+          let rollback = JobDb::rollback_creation(
+            &job,
+            _serialized.clone(),
+            &state.inner.pool,
+          )
+          .await;
+          let mut error: HttpError = error.into();
+          match rollback {
+            Ok(()) => {
+              error.msg.push_str("; failed Job creation was rolled back");
+            }
+            Err(rollback) => {
+              error.msg.push_str(&format!(
+                "; Job creation rollback could not be confirmed: {rollback}; inspect the Job before retrying"
+              ));
+            }
+          }
+          if let Err(cleanup) = cron_cleanup {
+            // Every cron request carries the original incarnation, so a
+            // residual rule cannot start a replacement with the same name.
+            error.msg.push_str(&format!(
+              "; cron rule cleanup could not be confirmed: {cleanup}; any residual rule remains bound to the original Job incarnation"
+            ));
+          }
+          return Err(error);
+        }
+        Ok::<_, HttpError>(job)
+      }
+      .await;
+      // Release admission before the caller can immediately start this Job.
+      drop(_serialized);
+      let _ = reply.send(result);
+    });
+    response.await.map_err(|_| {
+      HttpError::internal_server_error(
+        "Job creation owner stopped before replying",
+      )
+    })?
   }
 }
 

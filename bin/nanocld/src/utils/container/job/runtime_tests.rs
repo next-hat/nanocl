@@ -740,6 +740,70 @@ async fn job_runtime_stop_cancels_next_step_and_wait_error_preserves_active_slot
 }
 
 #[ntex::test]
+async fn job_runtime_stop_publication_precedes_immediate_successor_start() {
+  use nanocl_stubs::system::{Event, EventActorKind, EventKind};
+
+  let fixture = Fixture::new(Mode::BlockFirst).await;
+  let mut events = fixture.system.state.subscribe_raw(None).await.unwrap();
+  crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+    .await
+    .unwrap();
+  fixture.wait_blocked().await;
+  let predecessor = fixture.current().await;
+  tokio::time::timeout(Duration::from_secs(30), async {
+    crate::tasks::job::stop(&fixture.job.spec.name, &fixture.state)
+      .await
+      .unwrap();
+    // Admission may still be publishing the predecessor's terminal event.
+    // An immediate follow-up must wait for that publication, then succeed.
+    crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+      .await
+      .unwrap();
+    let successor = fixture.current().await;
+    assert_ne!(predecessor.key, successor.key);
+    let mut stopped = false;
+    while let Some(bytes) = events.0.recv().await {
+      if bytes.is_empty() {
+        continue;
+      }
+      let event: Event = serde_json::from_slice(&bytes).unwrap();
+      let Some(actor) = event.actor.as_ref() else {
+        continue;
+      };
+      let Some(attributes) = actor.attributes.as_ref() else {
+        continue;
+      };
+      if actor.kind != EventActorKind::Job
+        || actor.key.as_deref() != Some(fixture.job.spec.name.as_str())
+        || attributes["IncarnationKey"] != json!(fixture.job.incarnation_key)
+        || attributes["SpecKey"] != json!(fixture.job.spec_key)
+        || event.kind != EventKind::Normal
+      {
+        continue;
+      }
+      if event.action == NativeEventAction::Stop.to_string()
+        && attributes["RunKey"] == json!(predecessor.key)
+      {
+        stopped = true;
+      }
+      if event.action == NativeEventAction::Starting.to_string()
+        && attributes["RunKey"] == json!(successor.key)
+      {
+        assert!(stopped, "Successor Starting preceded predecessor Stop");
+        return;
+      }
+    }
+    panic!("Event stream ended before successor Starting");
+  })
+  .await
+  .expect("Immediate successor admission or event publication timed out");
+  // Stopping the predecessor releases the shared mock wait gate, so the
+  // successor finishes naturally instead of requiring another cancellation.
+  fixture.wait_state("Succeeded").await;
+  fixture.cleanup().await;
+}
+
+#[ntex::test]
 async fn job_runtime_delete_active_run_stops_it_and_retains_history() {
   let fixture = Fixture::new(Mode::BlockFirst).await;
   crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)

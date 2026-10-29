@@ -4,7 +4,9 @@ use tabled::Tabled;
 
 use nanocld_client::stubs::resource::Resource;
 
-use super::{GenericInspectOpts, GenericListOpts, GenericRemoveOpts};
+use super::{
+  GenericHistoryOpts, GenericInspectOpts, GenericListOpts, GenericRemoveOpts,
+};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
@@ -12,13 +14,13 @@ pub enum ResourceCommand {
   /// Remove existing resource
   #[clap(alias("rm"))]
   Remove(GenericRemoveOpts),
-  /// List existing namespaces
+  /// List existing resources
   #[clap(alias("ls"))]
   List(GenericListOpts),
   /// Inspect a resource
   Inspect(GenericInspectOpts),
-  /// Browse history of a resource
-  History(ResourceHistoryOpts),
+  /// List resource specification history or inspect a revision
+  History(GenericHistoryOpts),
   /// Revert a resource to a specific history
   Revert(ResourceRevertOpts),
 }
@@ -93,13 +95,6 @@ impl From<Resource> for ResourceRow {
       age,
     }
   }
-}
-
-/// `nanocl resource history` available options
-#[derive(Clone, Parser)]
-pub struct ResourceHistoryOpts {
-  /// The name of the resource to browse history
-  pub name: String,
 }
 
 /// `nanocl resource revert` available options

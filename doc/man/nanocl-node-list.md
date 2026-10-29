@@ -33,7 +33,7 @@ Limit the number of results default to 100
 Offset the results to navigate through the results
 
 **--filters** *\<FILTERS\>*  
-Filters
+Unsupported; use dedicated command filter options where available.
 
 **--wide**\
 Show all columns and exact creation timestamps

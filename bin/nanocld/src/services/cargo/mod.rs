@@ -228,6 +228,69 @@ mod tests {
       .unwrap()
   }
 
+  async fn cargo_pending_events(
+    system: &TestSystem,
+    key: &str,
+  ) -> crate::models::RawEventReceiver {
+    system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        key,
+        EventKind::Warning,
+        NativeEventAction::Other("operation_pending".to_owned()),
+      )]))
+      .await
+      .unwrap()
+  }
+
+  async fn wait_cargo_pending(
+    system: &TestSystem,
+    key: &str,
+    events: crate::models::RawEventReceiver,
+  ) {
+    // collect_events bounds the wait and retains events before the warning.
+    let events = collect_events(events).await;
+    let condition = cargo_event_condition(
+      key,
+      EventKind::Warning,
+      NativeEventAction::Other("operation_pending".to_owned()),
+    );
+    let pending = events
+      .iter()
+      .find(|event| condition == **event)
+      .unwrap_or_else(|| {
+        panic!("Cargo {key} did not report pending: {events:?}")
+      });
+    assert_eq!(pending.reason, "operation_pending");
+    let operation =
+      OperationDb::current("Cargo", key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+      pending
+        .metadata
+        .as_ref()
+        .and_then(|data| data.get("Operation")),
+      Some(&serde_json::json!(operation.key))
+    );
+    assert!(operation.outcome.is_none());
+    assert!(operation.completed_at.is_none());
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+    let guard = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      crate::utils::container::cargo::lifecycle_lock(key).lock_owned(),
+    )
+    .await
+    .expect("Cargo executor did not release its lifecycle guard");
+    drop(guard);
+  }
+
   async fn wait_cargo_completion(
     system: &TestSystem,
     key: &str,
@@ -530,8 +593,7 @@ mod tests {
       .await;
     assert_eq!(response.status(), http::StatusCode::CREATED);
     let _fault = fail_next_init_wait(&key);
-    let events =
-      cargo_completion_events(&system, &key, NativeEventAction::Start).await;
+    let events = cargo_pending_events(&system, &key).await;
     let response = system
       .client
       .send_post(
@@ -541,7 +603,7 @@ mod tests {
       )
       .await;
     assert_eq!(response.status(), http::StatusCode::ACCEPTED);
-    wait_cargo_failure(&system, &key, NativeEventAction::Start, events).await;
+    wait_cargo_pending(&system, &key, events).await;
     let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
       .await
       .unwrap()
@@ -629,8 +691,7 @@ mod tests {
       .await;
     assert_eq!(response.status(), http::StatusCode::CREATED);
     let fault = fail_next_init_wait(&key);
-    let events =
-      cargo_completion_events(&system, &key, NativeEventAction::Start).await;
+    let events = cargo_pending_events(&system, &key).await;
     let response = system
       .client
       .send_post(
@@ -640,7 +701,7 @@ mod tests {
       )
       .await;
     assert_eq!(response.status(), http::StatusCode::ACCEPTED);
-    wait_cargo_failure(&system, &key, NativeEventAction::Start, events).await;
+    wait_cargo_pending(&system, &key, events).await;
     drop(fault);
     let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
       .await
@@ -805,8 +866,7 @@ mod tests {
       Some(vec!["true".to_owned()]);
     let _fault = forget_next_init_stop(key);
     let mut barrier = pause_next_init_start(key);
-    let events =
-      cargo_completion_events(&system, key, NativeEventAction::Update).await;
+    let events = cargo_pending_events(&system, key).await;
     let response = system
       .client
       .send_put(
@@ -817,8 +877,7 @@ mod tests {
       .await;
     assert_eq!(response.status(), http::StatusCode::OK);
     {
-      let failure =
-        wait_cargo_failure(&system, key, NativeEventAction::Update, events);
+      let failure = wait_cargo_pending(&system, key, events);
       let start = barrier.wait_start();
       futures::pin_mut!(failure, start);
       if let futures::future::Either::Right((id, _)) =
@@ -920,8 +979,7 @@ mod tests {
     let original = inspect_cargo_fixture(&system, &key).await;
     let app_id = active_cargo_process(&original, "app", "main").key.clone();
     let fault = fail_next_completion(&key, "restart");
-    let events =
-      cargo_completion_events(&system, &key, NativeEventAction::Restart).await;
+    let events = cargo_pending_events(&system, &key).await;
     let response = system
       .client
       .send_post(
@@ -931,7 +989,7 @@ mod tests {
       )
       .await;
     assert_eq!(response.status(), http::StatusCode::ACCEPTED);
-    wait_cargo_failure(&system, &key, NativeEventAction::Restart, events).await;
+    wait_cargo_pending(&system, &key, events).await;
     assert!(fault.was_triggered());
     let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
       .await

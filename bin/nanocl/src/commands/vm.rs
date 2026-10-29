@@ -79,21 +79,6 @@ impl GenericCommandInspect for VmArg {
   type ApiItem = VmInspect;
 }
 
-async fn wait_vm_state(
-  key: &str,
-  action: NativeEventAction,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let waiter = utils::process::wait_process_state(
-    key,
-    EventActorKind::Vm,
-    [action].to_vec(),
-    client,
-  )
-  .await?;
-  Ok(waiter)
-}
-
 fn read_cloud_init_user_data(reader: impl Read) -> IoResult<String> {
   const MAX_BYTES: usize = 64 * 1024;
   let mut data = Vec::new();
@@ -168,12 +153,14 @@ pub async fn exec_vm_run(
     load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
       .map(VmCloudInitUserData::Raw);
   let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
-  let waiter =
-    wait_vm_state(&vm.spec.vm_key, NativeEventAction::Start, client).await?;
-  client.start_process("vm", &vm.spec.vm_key).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_process_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &vm.spec.vm_key,
+    EventActorKind::Vm,
+    NativeEventAction::Start,
+    client,
+    client.start_process_operation("vm", &vm.spec.vm_key),
+  )
+  .await?;
   ntex::time::sleep(Duration::from_secs(10)).await;
   if options.attach {
     #[cfg(not(target_os = "windows"))]
@@ -203,12 +190,14 @@ pub async fn exec_vm_patch(
     load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
       .map(VmCloudInitUserData::Raw)
   };
-  let waiter =
-    wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
-  client.patch_vm(&options.key, &vm).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_process_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &options.key,
+    EventActorKind::Vm,
+    NativeEventAction::Update,
+    client,
+    client.patch_vm_operation(&options.key, &vm),
+  )
+  .await?;
   Ok(())
 }
 
@@ -247,9 +236,9 @@ async fn exec_vm_lifecycle(
   let request = &request;
   run_vm_lifecycle(&options.keys, |key| async move {
     if restart {
-      client.restart_vm(key, request).await.map(|_| ())
+      client.restart_vm(key, request).await.map(|_| false)
     } else {
-      client.stop_vm(key, request).await.map(|_| ())
+      client.stop_vm_with_outcome(key, request).await
     }
     .map_err(IoError::from)
   })
@@ -262,12 +251,13 @@ async fn run_vm_lifecycle<'a, F, Fut>(
 ) -> IoResult<()>
 where
   F: FnMut(&'a str) -> Fut,
-  Fut: std::future::Future<Output = IoResult<()>>,
+  Fut: std::future::Future<Output = IoResult<bool>>,
 {
   let mut first_error = None;
   for key in keys {
     match action(key).await {
-      Ok(()) => println!("{key}"),
+      Ok(true) => println!("{key} (Unchanged)"),
+      Ok(false) => println!("{key}"),
       Err(error) => {
         eprintln!("{key}: {error}");
         first_error.get_or_insert(error);
@@ -453,7 +443,7 @@ mod tests {
       std::future::ready(if key == "global.first" || key == "global.third" {
         Err(IoError::other("VM lifecycle", key))
       } else {
-        Ok(())
+        Ok(true)
       })
     }));
     assert_eq!(attempted, keys);
@@ -461,7 +451,7 @@ mod tests {
     let mut completed = 0;
     futures::executor::block_on(run_vm_lifecycle(&keys, |_| {
       completed += 1;
-      std::future::ready(Ok(()))
+      std::future::ready(Ok(completed == 2))
     }))
     .unwrap();
     assert_eq!(completed, keys.len());

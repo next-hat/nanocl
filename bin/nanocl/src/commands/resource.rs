@@ -4,8 +4,8 @@ use nanocld_client::stubs::resource::Resource;
 use crate::{
   config::CliConfig,
   models::{
-    GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceCompactRow,
-    ResourceHistoryOpts, ResourceRevertOpts, ResourceRow,
+    GenericDefaultOpts, GenericHistoryOpts, ResourceArg, ResourceCommand,
+    ResourceCompactRow, ResourceRevertOpts, ResourceRow, SpecHistoryRow,
   },
   utils,
 };
@@ -40,12 +40,17 @@ impl GenericCommandInspect for ResourceArg {
 /// Function that execute when running `nanocl resource history`
 async fn exec_resource_history(
   cli_conf: &CliConfig,
-  opts: &ResourceHistoryOpts,
+  opts: &GenericHistoryOpts,
 ) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let history = client.list_history_resource(&opts.name).await?;
-  utils::print::print_yml(history)?;
-  Ok(())
+  super::history::validate_options(opts)?;
+  let history = cli_conf.client.list_history_resource(&opts.key).await?;
+  super::history::print_revision_history(
+    opts,
+    &cli_conf.user_config.display_format,
+    history,
+    |item| item.key,
+    SpecHistoryRow::from,
+  )
 }
 
 /// Function that execute when running `nanocl resource revert`

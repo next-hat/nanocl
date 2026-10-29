@@ -28,13 +28,13 @@ resource-remove(1)
 Remove existing resource
 
 resource-list(1)  
-List existing namespaces
+List existing resources
 
 resource-inspect(1)  
 Inspect a resource
 
 resource-history(1)  
-Browse history of a resource
+List resource specification history or inspect a revision
 
 resource-revert(1)  
 Revert a resource to a specific history

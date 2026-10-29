@@ -7,7 +7,7 @@ sidebar_position: 50
 
 # NAME
 
-list - List existing namespaces
+list - List existing resources
 
 ## SYNOPSIS
 
@@ -16,7 +16,7 @@ list - List existing namespaces
 
 ## DESCRIPTION
 
-List existing namespaces
+List existing resources
 
 By default, the compact table shows AGE in seconds (`s`), minutes (`m`),
 hours (`h`), or days (`d`). Use `--wide` to show exact creation and update timestamps.
@@ -33,7 +33,7 @@ Limit the number of results default to 100
 Offset the results to navigate through the results
 
 **--filters** *\<FILTERS\>*  
-Filters
+Unsupported; use dedicated command filter options where available.
 
 **--wide**\
 Show all columns and exact creation timestamps

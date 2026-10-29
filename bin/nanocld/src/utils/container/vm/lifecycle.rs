@@ -470,6 +470,61 @@ async fn restore_observed_status<G: Send + 'static>(
   set_status(&vm.spec.vm_key, wanted, actual, None, guard, state).await
 }
 
+/// Called only while the caller holds lifecycle admission. Recovery observation
+/// is read-only and also excludes active auxiliary or renamed runtimes.
+pub(crate) async fn state_is_unchanged(
+  vm: &Vm,
+  wanted: ObjPsStatusKind,
+  state: &SystemState,
+) -> IoResult<bool> {
+  if vm.status.wanted != wanted || vm.status.actual != wanted {
+    return Ok(false);
+  }
+  let observation = timeout_at(
+    Instant::now() + Duration::from_secs(5),
+    super::recovery::observe(vm, state),
+  )
+  .await
+  .map_err(|_| {
+    IoError::with_context(
+      "VM state observation",
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "Runtime state could not be confirmed within 5 seconds; no VM mutation was started",
+      ),
+    )
+  })?;
+  if !observation_confirms_state(wanted.clone(), observation)? {
+    return Ok(false);
+  }
+  let confirmed =
+    VmDb::transform_read_by_pk(&vm.spec.vm_key, &state.inner.pool).await?;
+  if confirmed.spec.key != vm.spec.key
+    || confirmed.status.wanted != wanted
+    || confirmed.status.actual != wanted
+  {
+    return Err(conflict("VM identity or state changed during observation"));
+  }
+  Ok(true)
+}
+
+fn observation_confirms_state(
+  wanted: ObjPsStatusKind,
+  observation: IoResult<(ObjPsStatusKind, serde_json::Value)>,
+) -> IoResult<bool> {
+  let (actual, evidence) = observation?;
+  Ok(
+    actual == wanted
+      && match wanted {
+        ObjPsStatusKind::Start => {
+          evidence["AcceptedGenerationObserved"].as_bool() == Some(true)
+        }
+        ObjPsStatusKind::Stop => true,
+        _ => false,
+      },
+  )
+}
+
 async fn run_lifecycle<G: Clone + Send + 'static>(
   key: &str,
   options: &VmLifecycleOptions,
@@ -478,7 +533,7 @@ async fn run_lifecycle<G: Clone + Send + 'static>(
   owner: Option<OperationOwner>,
   guard: G,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<bool> {
   let vm = VmDb::transform_read_by_pk(key, &state.inner.pool).await?;
   if crate::models::OperationDb::current("Vm", key, &state.inner.pool)
     .await?
@@ -507,6 +562,12 @@ async fn run_lifecycle<G: Clone + Send + 'static>(
     )
   {
     return Err(conflict("A VM lifecycle transition is pending"));
+  }
+  if !restart && state_is_unchanged(&vm, ObjPsStatusKind::Stop, state).await? {
+    state
+      .emit_normal_native_action_sync(&vm, NativeEventAction::Stop)
+      .await;
+    return Ok(true);
   }
   set_status(
     key,
@@ -549,7 +610,7 @@ async fn run_lifecycle<G: Clone + Send + 'static>(
       .emit_normal_native_action_sync(&vm, NativeEventAction::Stop)
       .await;
   }
-  Ok(())
+  Ok(false)
 }
 
 async fn complete_lifecycle<G: Clone + Send + 'static>(
@@ -648,7 +709,8 @@ pub(crate) async fn run_restart_owned(
     lease.clone(),
     state,
   )
-  .await;
+  .await
+  .map(|_| ());
   super::record_task_outcome_owned(key, result, owner, lease.clone(), state)
     .await
 }
@@ -659,7 +721,7 @@ async fn begin_lifecycle(
   restart: bool,
   expected_id: Option<&str>,
   state: &SystemState,
-) -> IoResult<tokio::sync::oneshot::Receiver<IoResult<()>>> {
+) -> IoResult<tokio::sync::oneshot::Receiver<IoResult<bool>>> {
   options
     .validate()
     .map_err(|err| IoError::invalid_input("VM shutdown", &err))?;
@@ -690,7 +752,17 @@ async fn begin_lifecycle(
         std::io::Error::new(kind, error),
       )
     })?;
-    return Ok(receiver);
+    let (send, receive) = tokio::sync::oneshot::channel();
+    ntex::rt::spawn(async move {
+      let result = receiver.await.unwrap_or_else(|_| {
+        Err(IoError::interrupted(
+          "VM lifecycle",
+          "Lifecycle task was interrupted",
+        ))
+      });
+      let _ = send.send(result.map(|()| false));
+    });
+    return Ok(receive);
   }
   let guard = Arc::new(lifecycle_lock(key).try_lock_owned().await?);
   // Validate existence before an asynchronous process endpoint accepts work.
@@ -738,7 +810,7 @@ async fn lifecycle(
   restart: bool,
   expected_id: Option<&str>,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<bool> {
   let rx = begin_lifecycle(key, options, restart, expected_id, state).await?;
   rx.await.map_err(|_| {
     IoError::interrupted("VM lifecycle", "Lifecycle task was interrupted")
@@ -760,12 +832,20 @@ pub(crate) async fn enqueue_lifecycle(
   Ok(())
 }
 
+pub(crate) async fn stop_with_outcome(
+  key: &str,
+  options: &VmLifecycleOptions,
+  state: &SystemState,
+) -> IoResult<bool> {
+  lifecycle(key, options, false, None, state).await
+}
+
 pub(crate) async fn stop_with_options(
   key: &str,
   options: &VmLifecycleOptions,
   state: &SystemState,
 ) -> IoResult<()> {
-  lifecycle(key, options, false, None, state).await
+  stop_with_outcome(key, options, state).await.map(|_| ())
 }
 
 pub(crate) async fn restart_with_options(
@@ -773,7 +853,7 @@ pub(crate) async fn restart_with_options(
   options: &VmLifecycleOptions,
   state: &SystemState,
 ) -> IoResult<()> {
-  lifecycle(key, options, true, None, state).await
+  lifecycle(key, options, true, None, state).await.map(|_| ())
 }
 
 #[cfg(test)]
@@ -791,6 +871,58 @@ mod tests {
       "Mounts":[{"Type":"bind","Source":format!("/run/vms/global.test/{generation}"),"Destination":"/run/nanocl-vm","RW":true}]
     })).unwrap();
     (vm, runtime)
+  }
+
+  #[test]
+  fn vm_unchanged_requires_confirmed_runtime_and_current_start_generation() {
+    let observed = |actual, current| {
+      Ok((
+        actual,
+        serde_json::json!({"AcceptedGenerationObserved": current}),
+      ))
+    };
+    assert!(
+      observation_confirms_state(
+        ObjPsStatusKind::Start,
+        observed(ObjPsStatusKind::Start, true),
+      )
+      .unwrap()
+    );
+    for observation in [
+      observed(ObjPsStatusKind::Start, false),
+      Ok((ObjPsStatusKind::Start, serde_json::json!({}))),
+      observed(ObjPsStatusKind::Stop, true),
+    ] {
+      assert!(
+        !observation_confirms_state(ObjPsStatusKind::Start, observation)
+          .unwrap()
+      );
+    }
+    assert!(
+      observation_confirms_state(
+        ObjPsStatusKind::Stop,
+        observed(ObjPsStatusKind::Stop, false),
+      )
+      .unwrap()
+    );
+    assert!(
+      !observation_confirms_state(
+        ObjPsStatusKind::Stop,
+        observed(ObjPsStatusKind::Start, true),
+      )
+      .unwrap()
+    );
+    for wanted in [ObjPsStatusKind::Start, ObjPsStatusKind::Stop] {
+      let error = observation_confirms_state(
+        wanted,
+        Err(IoError::invalid_data(
+          "VM runtime",
+          "identity or running state is unknown",
+        )),
+      )
+      .unwrap_err();
+      assert_eq!(error.context(), Some("VM runtime"));
+    }
   }
 
   #[test]

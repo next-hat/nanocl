@@ -4,7 +4,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::resource::ResourcePartial;
 
 use crate::{
-  models::{ResourceDb, SpecDb, SystemState},
+  models::{ResourceDb, SystemState},
   objects::generic::*,
   repositories::generic::*,
 };
@@ -28,7 +28,8 @@ pub async fn revert_resource(
   _request_state: (),
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
-  let history = SpecDb::read_by_pk(&path.2, &state.inner.pool).await?;
+  let history =
+    ResourceDb::history_spec(&path.1, path.2, &state.inner.pool).await?;
   let resource =
     ResourceDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
   let new_resource = ResourcePartial {

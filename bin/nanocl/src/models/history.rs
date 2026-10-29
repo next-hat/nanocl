@@ -1,9 +1,10 @@
 use nanocld_client::stubs::{
-  cargo_spec::CargoSpecRevision, job::JobSpec, vm_spec::VmSpec,
+  cargo_spec::CargoSpecRevision, job::JobSpec, resource::ResourceSpec,
+  vm_spec::VmSpec,
 };
 use tabled::Tabled;
 
-/// Shared table columns for immutable Cargo, VM, and Job specification revisions.
+/// Shared table columns for immutable resource specification revisions.
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct SpecHistoryRow {
@@ -58,6 +59,21 @@ impl From<JobSpec> for SpecHistoryRow {
   }
 }
 
+impl From<ResourceSpec> for SpecHistoryRow {
+  fn from(spec: ResourceSpec) -> Self {
+    Self {
+      id: spec.key.to_string(),
+      version: spec.version,
+      created_at: spec
+        .created_at
+        .and_utc()
+        .with_timezone(&chrono::Local)
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string(),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -87,6 +103,14 @@ mod tests {
       name: "backup".into(),
       ..Default::default()
     };
+    let resource = ResourceSpec {
+      key,
+      resource_key: "backup".into(),
+      version: "v0.19".into(),
+      created_at,
+      data: serde_json::json!({"Target": "global.backup"}),
+      metadata: None,
+    };
     let expected_time = created_at
       .and_utc()
       .with_timezone(&chrono::Local)
@@ -96,6 +120,7 @@ mod tests {
       SpecHistoryRow::from(cargo),
       SpecHistoryRow::from(vm),
       SpecHistoryRow::from(job),
+      SpecHistoryRow::from(resource),
     ] {
       assert_eq!(row.id, key.to_string());
       assert_eq!(row.version, "v0.19");
