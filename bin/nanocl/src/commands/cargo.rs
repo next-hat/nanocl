@@ -260,7 +260,7 @@ async fn exec_cargo_revert(
   let cargo = cargo.ok_or_else(|| {
     IoError::invalid_data("Cargo revert", "Accepted response is unavailable")
   })?;
-  utils::print::print_yml(cargo)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, cargo)?;
   Ok(())
 }
 

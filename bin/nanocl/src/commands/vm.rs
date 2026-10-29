@@ -245,7 +245,7 @@ async fn exec_vm_revert(
   let vm = vm.ok_or_else(|| {
     IoError::invalid_data("VM revert", "Accepted response is unavailable")
   })?;
-  utils::print::print_yml(vm)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, vm)?;
   Ok(())
 }
 
@@ -414,30 +414,21 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,
     VmCommand::Status { key } => {
       let status = client.vm_status(key).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&status)
-          .map_err(|err| err.map_err_context(|| "VM runtime status"))?
-      );
-      Ok(())
+      utils::print::display_format(&cli_conf.user_config.display_format, status)
     }
     VmCommand::Resize(options) => {
       let resources = client.resize_vm(&options.key, &options.into()).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&resources)
-          .map_err(|err| err.map_err_context(|| "VM resources"))?
-      );
-      Ok(())
+      utils::print::display_format(
+        &cli_conf.user_config.display_format,
+        resources,
+      )
     }
     VmCommand::Resources { key } => {
       let resources = client.vm_resources(key).await?;
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&resources)
-          .map_err(|err| err.map_err_context(|| "VM resources"))?
-      );
-      Ok(())
+      utils::print::display_format(
+        &cli_conf.user_config.display_format,
+        resources,
+      )
     }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,

@@ -60,7 +60,7 @@ async fn exec_resource_revert(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let resource = client.revert_resource(&opts.name, &opts.key).await?;
-  utils::print::print_yml(resource)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, resource)?;
   Ok(())
 }
 

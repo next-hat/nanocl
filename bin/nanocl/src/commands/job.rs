@@ -86,7 +86,7 @@ async fn exec_job_revert(
     .client
     .revert_job(&opts.name, &opts.history_id.to_string())
     .await?;
-  utils::print::print_yml(job)?;
+  utils::print::display_format(&cli_conf.user_config.display_format, job)?;
   Ok(())
 }
 
