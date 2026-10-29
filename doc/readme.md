@@ -58,3 +58,10 @@ An accepted mutation response must include a valid receipt. Without it, the CLI
 reports that the request was accepted but completion cannot be correlated;
 it does not infer success from another operation's event. Do not retry blindly:
 inspect workload status and recent events before deciding whether to retry.
+
+## Resource revision completion
+
+Resource revision completion suggests matching IDs among the newest 100 revisions.
+The history command retains access to the complete revision history. The resource
+history API accepts optional `limit` and `offset` fields in its JSON `filter` query
+parameter; omitting them preserves the complete result. Filtering and custom ordering are not supported by that endpoint.

@@ -120,8 +120,8 @@ pub(super) async fn candidates(
         .map(|container| container.name)
         .collect()
     }
-    // History endpoints return revisions without prefix filters. Match the
-    // requested prefix locally; completion still caps the emitted candidates.
+    // Cargo history has no query filters. Match the requested prefix locally;
+    // completion still caps the emitted candidates.
     CompletionKind::CargoHistory => {
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
         return Ok(Vec::new());
@@ -137,8 +137,10 @@ pub(super) async fn candidates(
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
         return Ok(Vec::new());
       };
+      // Completion is best effort over the newest revisions. Bound the SQL
+      // result and response before applying the prefix locally.
       client
-        .list_history_resource(key)
+        .list_history_resource_page(key, PAGE_SIZE, 0)
         .await?
         .into_iter()
         .map(|revision| revision.key.to_string())

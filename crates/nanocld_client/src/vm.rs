@@ -251,10 +251,20 @@ impl NanocldClient {
   /// let res = client.delete_vm("global.my-vm").await;
   /// ```
   pub async fn delete_vm(&self, key: &str) -> HttpClientResult<()> {
+    self.delete_vm_operation(key).await.map(|_| ())
+  }
+
+  /// Delete a VM by its canonical key and return the accepted operation ID.
+  pub async fn delete_vm_operation(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let key = key
+      .parse::<nanocl_stubs::resource_key::ResourceKey>()
+      .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
     self
-      .send_delete(&format!("{}/{key}", Self::VM_PATH), None::<String>)
-      .await?;
-    Ok(())
+      .delete_process_operation("vm", key.as_str(), None::<String>)
+      .await
   }
 
   /// Inspect a VM by its canonical key.
