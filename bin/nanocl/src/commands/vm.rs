@@ -21,7 +21,7 @@ use nanocld_client::{
     generic::{GenericFilter, GenericListQueryNsp},
     process::{OutputKind, OutputLog},
     resource_key::ResourceKey,
-    system::{EventActorKind, NativeEventAction},
+    system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
     vm::VmInspect,
     vm_spec::{VmCloudInitUserData, VmSpecPartial, VmSpecUpdate},
   },
@@ -39,6 +39,7 @@ use crate::{
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
+  generic::inspect_lifecycle_unchanged,
   history::{print_revision_history, validate_options},
 };
 
@@ -235,11 +236,18 @@ async fn exec_vm_lifecycle(
   let request = options.into();
   let request = &request;
   run_vm_lifecycle(&options.keys, |key| async move {
-    if restart {
-      client.restart_vm(key, request).await.map(|_| ())
-    } else {
-      client.stop_vm(key, request).await.map(|_| ())
+    if !restart
+      && inspect_lifecycle_unchanged(client, "vms", key, &ObjPsStatusKind::Stop)
+        .await?
+    {
+      return Ok(true);
     }
+    if restart {
+      client.restart_vm(key, request).await
+    } else {
+      client.stop_vm(key, request).await
+    }
+    .map(|_| false)
     .map_err(IoError::from)
   })
   .await
@@ -251,12 +259,13 @@ async fn run_vm_lifecycle<'a, F, Fut>(
 ) -> IoResult<()>
 where
   F: FnMut(&'a str) -> Fut,
-  Fut: std::future::Future<Output = IoResult<()>>,
+  Fut: std::future::Future<Output = IoResult<bool>>,
 {
   let mut first_error = None;
   for key in keys {
     match action(key).await {
-      Ok(()) => println!("{key}"),
+      Ok(true) => println!("{key} (Unchanged)"),
+      Ok(false) => println!("{key}"),
       Err(error) => {
         eprintln!("{key}: {error}");
         first_error.get_or_insert(error);
@@ -442,7 +451,7 @@ mod tests {
       std::future::ready(if key == "global.first" || key == "global.third" {
         Err(IoError::other("VM lifecycle", key))
       } else {
-        Ok(())
+        Ok(true)
       })
     }));
     assert_eq!(attempted, keys);
@@ -450,7 +459,7 @@ mod tests {
     let mut completed = 0;
     futures::executor::block_on(run_vm_lifecycle(&keys, |_| {
       completed += 1;
-      std::future::ready(Ok(()))
+      std::future::ready(Ok(completed == 2))
     }))
     .unwrap();
     assert_eq!(completed, keys.len());

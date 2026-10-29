@@ -3,14 +3,14 @@ use indicatif::{MultiProgress, ProgressBar};
 use ntex::http::StatusCode;
 
 use nanocl_error::{
-  http_client::HttpClientError,
+  http_client::{HttpClientError, HttpClientResult},
   io::{FromIo, IoError, IoResult},
 };
 use nanocld_client::{
   NanocldClient,
   stubs::{
     generic::{GenericFilter, GenericListQuery},
-    system::NativeEventAction,
+    system::{NativeEventAction, ObjPsStatus, ObjPsStatusKind},
   },
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -34,6 +34,33 @@ fn lifecycle_result(action: &str, failures: usize) -> IoResult<()> {
       &format!("{failures} item(s) failed"),
     ))
   }
+}
+
+fn lifecycle_is_unchanged(
+  object_name: &str,
+  status: &ObjPsStatus,
+  requested: &ObjPsStatusKind,
+) -> bool {
+  matches!(object_name, "cargoes" | "vms")
+    && matches!(requested, ObjPsStatusKind::Start | ObjPsStatusKind::Stop)
+    && status.wanted == *requested
+    && status.actual == *requested
+}
+
+pub(super) async fn inspect_lifecycle_unchanged(
+  client: &NanocldClient,
+  object_name: &str,
+  key: &str,
+  requested: &ObjPsStatusKind,
+) -> HttpClientResult<bool> {
+  let status = match object_name {
+    "cargoes" => client.inspect_cargo(key).await?.status,
+    "vms" => client.inspect_vm(key).await?.status,
+    _ => return Ok(false),
+  };
+  // Unchanged describes this observation; it does not acknowledge a new
+  // operation or assert that another caller's operation has committed.
+  Ok(lifecycle_is_unchanged(object_name, &status, requested))
 }
 
 pub trait GenericCommand {
@@ -321,7 +348,19 @@ pub trait GenericCommandStart: GenericCommand {
           }
           Ok(())
         };
-      let result = if object_name == "jobs" {
+      let unchanged = inspect_lifecycle_unchanged(
+        client,
+        object_name,
+        key,
+        &ObjPsStatusKind::Start,
+      )
+      .await;
+      let result = if let Err(error) = unchanged {
+        Err(error)
+      } else if matches!(unchanged, Ok(true)) {
+        finish("Unchanged", false, None)?;
+        continue;
+      } else if object_name == "jobs" {
         client.start_process(&kind, key).await
       } else {
         utils::process::wait_process_operation(
@@ -404,7 +443,19 @@ pub trait GenericCommandStop: GenericCommand {
           }
           Ok(())
         };
-      let result = if object_name == "vms" {
+      let unchanged = inspect_lifecycle_unchanged(
+        client,
+        object_name,
+        key,
+        &ObjPsStatusKind::Stop,
+      )
+      .await;
+      let result = if let Err(error) = unchanged {
+        Err(error)
+      } else if matches!(unchanged, Ok(true)) {
+        finish("Unchanged", false, None)?;
+        continue;
+      } else if object_name == "vms" {
         // This endpoint returns only after confirmed shutdown, unlike Job admission.
         client.stop_vm(key, &Default::default()).await
       } else if object_name == "jobs" {
@@ -474,6 +525,79 @@ pub trait GenericCommandInspect: GenericCommand {
 mod tests {
   use super::*;
   use crate::models::GenericDefaultOpts;
+
+  #[test]
+  fn lifecycle_noop_requires_matching_wanted_and_actual_status() {
+    for object_name in ["cargoes", "vms"] {
+      for requested in [ObjPsStatusKind::Start, ObjPsStatusKind::Stop] {
+        let settled = ObjPsStatus {
+          wanted: requested.clone(),
+          actual: requested.clone(),
+          ..Default::default()
+        };
+        assert!(lifecycle_is_unchanged(object_name, &settled, &requested));
+        for other in [
+          ObjPsStatusKind::Create,
+          ObjPsStatusKind::Starting,
+          ObjPsStatusKind::Start,
+          ObjPsStatusKind::Updating,
+          ObjPsStatusKind::Update,
+          ObjPsStatusKind::Destroying,
+          ObjPsStatusKind::Destroy,
+          ObjPsStatusKind::Stopping,
+          ObjPsStatusKind::Stop,
+          ObjPsStatusKind::Fail,
+          ObjPsStatusKind::Finish,
+          ObjPsStatusKind::Unknown,
+        ] {
+          if other == requested {
+            continue;
+          }
+          let different_wanted = ObjPsStatus {
+            wanted: other.clone(),
+            ..settled.clone()
+          };
+          let different_actual = ObjPsStatus {
+            actual: other,
+            ..settled.clone()
+          };
+          assert!(!lifecycle_is_unchanged(
+            object_name,
+            &different_wanted,
+            &requested,
+          ));
+          assert!(!lifecycle_is_unchanged(
+            object_name,
+            &different_actual,
+            &requested,
+          ));
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn lifecycle_noop_excludes_jobs_and_nonterminal_requests() {
+    for requested in [ObjPsStatusKind::Start, ObjPsStatusKind::Stop] {
+      let status = ObjPsStatus {
+        wanted: requested.clone(),
+        actual: requested.clone(),
+        ..Default::default()
+      };
+      assert!(!lifecycle_is_unchanged("jobs", &status, &requested));
+      assert!(!lifecycle_is_unchanged("resources", &status, &requested));
+    }
+    for requested in [ObjPsStatusKind::Starting, ObjPsStatusKind::Unknown] {
+      let status = ObjPsStatus {
+        wanted: requested.clone(),
+        actual: requested.clone(),
+        ..Default::default()
+      };
+      for object_name in ["cargoes", "vms"] {
+        assert!(!lifecycle_is_unchanged(object_name, &status, &requested));
+      }
+    }
+  }
 
   struct FailedBatch;
 

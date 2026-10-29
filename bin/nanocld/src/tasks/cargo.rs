@@ -288,12 +288,15 @@ where
         move |error| async move {
           if !is_targeted_action(phase) {
             log::warn!("Cargo operation {operation} executor stopped: {error}");
-            let (action, kind, reason) = operation_event(phase, false, true);
-            error_state.emit_action(
-              &error_actor, action, kind, reason,
-              Some(format!("Cargo operation {operation} ({phase}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying")),
-              Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
-            );
+            let (actions, kind, reason) =
+              operation_events(phase, false, true, false);
+            for action in actions {
+              error_state.emit_action(
+                &error_actor, action, kind.clone(), reason,
+                Some(format!("Cargo operation {operation} ({phase}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying")),
+                Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
+              );
+            }
           }
           Ok(())
         },
@@ -592,7 +595,7 @@ async fn dispatch_start(
 async fn execute_start(
   cargo: &Cargo,
   state: &CargoRuntimeContext,
-) -> IoResult<()> {
+) -> IoResult<bool> {
   let key = &cargo.spec.cargo_key;
   let selection =
     utils::container::generic::plan_selection(cargo, state).await?;
@@ -619,7 +622,9 @@ async fn execute_start(
   .await?;
   let processes =
     ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
-  if utils::container::cargo::has_container_healthcheck(cargo, &processes) {
+  let has_healthcheck =
+    utils::container::cargo::has_container_healthcheck(cargo, &processes);
+  if has_healthcheck {
     ObjPsStatusDb::update_owned(
       key,
       ObjPsStatusUpdate {
@@ -640,16 +645,8 @@ async fn execute_start(
     &state.inner.pool,
   )
   .await?;
-  // Start is emitted once by execute, after durable completion and lease release.
-  for action in utils::container::cargo::promotion_actions(
-    utils::container::cargo::has_container_healthcheck(cargo, &processes),
-  )
-  .into_iter()
-  .filter(|action| *action != NativeEventAction::Start)
-  {
-    state.emit_normal_native_action_sync(cargo, action).await;
-  }
-  Ok(())
+  // Publish readiness only after this operation's durable completion.
+  Ok(has_healthcheck)
 }
 
 fn completion_action(action: &str) -> NativeEventAction {
@@ -662,20 +659,25 @@ fn completion_action(action: &str) -> NativeEventAction {
   }
 }
 
-fn operation_event(
+fn operation_events(
   action: &str,
   settled: bool,
   failed: bool,
-) -> (NativeEventAction, EventKind, &'static str) {
+  has_healthcheck: bool,
+) -> (Vec<NativeEventAction>, EventKind, &'static str) {
   if !settled {
     return (
-      NativeEventAction::Other("operation_pending".to_owned()),
+      vec![NativeEventAction::Other("operation_pending".to_owned())],
       EventKind::Warning,
       "operation_pending",
     );
   }
+  let mut actions = vec![completion_action(action)];
+  if action == "start" && !failed && has_healthcheck {
+    actions.push(NativeEventAction::Healthy);
+  }
   (
-    completion_action(action),
+    actions,
     if failed {
       EventKind::Error
     } else {
@@ -713,10 +715,13 @@ async fn execute(
   target: Option<(String, Option<String>)>,
 ) -> IoResult<()> {
   let action = accepted.operation.action.as_str();
+  let mut start_has_healthcheck = false;
   let result = match utils::container::cargo::ensure_current(&state).await {
     Err(error) => Err(error),
     Ok(()) => match action {
-      "start" => execute_start(&accepted.cargo, &state).await,
+      "start" => execute_start(&accepted.cargo, &state)
+        .await
+        .map(|has_healthcheck| start_has_healthcheck = has_healthcheck),
       "restart" => {
         utils::container::cargo::restart(&accepted.cargo, &state).await
       }
@@ -886,10 +891,14 @@ async fn execute(
   let event_state = state.state.clone();
   drop(state);
   if !is_targeted_action(action) {
-    // Earlier readiness events still drive routing. Only this exact owner's
-    // committed completion can satisfy an operation-aware command waiter.
-    let (event_action, kind, reason) =
-      operation_event(action, settled, reported.is_err());
+    // This exact owner's committed Start precedes any Healthy notification.
+    // Both are published after releasing the operation lease.
+    let (actions, kind, reason) = operation_events(
+      action,
+      settled,
+      reported.is_err(),
+      start_has_healthcheck,
+    );
     let note = if !settled {
       format!(
         "Cargo operation {} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying",
@@ -903,14 +912,32 @@ async fn execute(
         accepted.operation.key
       )
     };
-    event_state.emit_action_sync(
-      &accepted.cargo.clone().into(),
-      event_action,
-      kind,
-      reason,
-      Some(note),
-      Some(serde_json::json!({"Operation": accepted.operation.key, "SpecKey": accepted.operation.spec_key})),
-    ).await;
+    for event_action in actions {
+      // Do not publish Healthy when recording or delivering Start failed.
+      if let Err(error) = event_state
+        .emit_event(EventPartial {
+          reporting_controller: crate::vars::CONTROLLER_NAME.to_owned(),
+          reporting_node: event_state.inner.config.hostname.clone(),
+          kind: kind.clone(),
+          action: event_action.to_string(),
+          reason: reason.to_owned(),
+          note: Some(note.clone()),
+          actor: Some(accepted.cargo.clone().into()),
+          related: None,
+          metadata: Some(serde_json::json!({
+            "Operation": accepted.operation.key,
+            "SpecKey": accepted.operation.spec_key,
+          })),
+        })
+        .await
+      {
+        log::warn!(
+          "Cargo operation {} notification failed: {error}",
+          accepted.operation.key
+        );
+        return Err(error);
+      }
+    }
   }
   reported
 }
@@ -1043,19 +1070,51 @@ mod tests {
       // A successful runtime call with a rejected commit and an uncertain
       // runtime failure must both leave the durable outcome unresolved.
       for failed in [false, true] {
-        let (action, kind, reason) = operation_event(operation, false, failed);
-        assert_eq!(action.to_string(), "operation_pending");
+        let (actions, kind, reason) =
+          operation_events(operation, false, failed, true);
+        assert_eq!(
+          actions,
+          vec![NativeEventAction::Other("operation_pending".to_owned())]
+        );
         assert_eq!(kind, EventKind::Warning);
         assert_eq!(reason, "operation_pending");
       }
       for (failed, expected_kind) in
         [(false, EventKind::Normal), (true, EventKind::Error)]
       {
-        let (action, kind, reason) = operation_event(operation, true, failed);
-        assert_eq!(action, terminal);
+        let (actions, kind, reason) =
+          operation_events(operation, true, failed, false);
+        assert_eq!(actions, vec![terminal.clone()]);
         assert_eq!(kind, expected_kind);
         assert_eq!(reason, "state_sync");
       }
+    }
+  }
+
+  #[test]
+  fn cargo_healthy_follows_only_a_successfully_settled_start() {
+    for settled in [false, true] {
+      for failed in [false, true] {
+        let (actions, _, _) = operation_events("start", settled, failed, true);
+        assert_eq!(
+          actions.contains(&NativeEventAction::Healthy),
+          settled && !failed
+        );
+        if settled && !failed {
+          assert_eq!(
+            actions,
+            vec![NativeEventAction::Start, NativeEventAction::Healthy]
+          );
+        }
+      }
+    }
+    for operation in ["start", "stop", "restart", "update", "delete"] {
+      let (actions, _, _) = operation_events(operation, true, false, false);
+      assert_eq!(actions, vec![completion_action(operation)]);
+    }
+    for operation in ["stop", "restart", "update", "delete"] {
+      let (actions, _, _) = operation_events(operation, true, false, true);
+      assert_eq!(actions, vec![completion_action(operation)]);
     }
   }
 

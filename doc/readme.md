@@ -34,16 +34,16 @@ state before deciding whether to retry. API clients implementing the same wait
 must handle these warnings and use an unconditioned event subscription, since
 name-only server conditions can close the stream on an unrelated operation.
 
-Explicit Cargo and VM start/stop commands reach daemon admission even when a
-previous status read would already match the requested state. Admission and
-runtime verification decide the result; the CLI does not skip the request using
-an unlocked status snapshot. Statefile reconciliation can still report an
-unchanged, running specification as `Unchanged`.
+Repeated Cargo and VM start/stop commands report `Unchanged` when the observed
+wanted and actual states already match the requested state. Transitional or
+conflicting states still reach daemon admission. An unchanged result describes
+the inspected state; it does not claim completion of a concurrent operation.
+Job start/stop always use admission because retained run status does not indicate
+whether a new execution should be dispatched.
 
-For a healthchecked Cargo, `healthy` reports observed runtime readiness and can
-precede the receipt-tagged terminal `start`. That terminal event confirms durable
-operation settlement and lease release; readiness alone does not complete the
-command. These notifications represent different stages.
+A successful healthchecked Cargo start emits one receipt-tagged terminal `start`,
+then `healthy`. Both follow confirmed durable operation settlement and lease
+release. Failed or unsettled starts do not publish a successful readiness event.
 
 Job start and stop acknowledge dispatch and display `Accepted`. VM stop and
 restart commands use the synchronous `/vms/{key}/stop` and
