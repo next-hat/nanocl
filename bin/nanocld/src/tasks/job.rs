@@ -184,8 +184,30 @@ async fn control(
   wait_for_completion: bool,
   state: &SystemState,
 ) -> HttpResult<Job> {
-  let lock = utils::container::job::lifecycle_lock(key);
-  let serialized = lock.lock_owned().await;
+  let serialized = std::sync::Arc::new(
+    utils::container::job::lifecycle_lock(key)
+      .lock_owned()
+      .await,
+  );
+  control_with_lifecycle_lock(
+    key,
+    action,
+    expected,
+    wait_for_completion,
+    state,
+    serialized,
+  )
+  .await
+}
+
+async fn control_with_lifecycle_lock(
+  key: &str,
+  action: &'static str,
+  expected: Option<(uuid::Uuid, Option<uuid::Uuid>)>,
+  wait_for_completion: bool,
+  state: &SystemState,
+  serialized: std::sync::Arc<tokio::sync::OwnedMutexGuard<()>>,
+) -> HttpResult<Job> {
   let key = key.to_owned();
   let state = state.clone();
   let (reply, response) = tokio::sync::oneshot::channel();
@@ -327,7 +349,8 @@ pub(crate) async fn delete_if_identity(
   control(key, "delete", Some((incarnation, run)), false, state).await
 }
 
-/// Replace only after the inspected incarnation's runtime and cron are removed.
+/// Test cleanup waits for the exact incarnation's runtime and cron removal.
+#[cfg(test)]
 pub(crate) async fn delete_for_replacement(
   expected: &Job,
   state: &SystemState,
@@ -338,6 +361,24 @@ pub(crate) async fn delete_for_replacement(
     Some((expected.incarnation_key, expected.current_run_key)),
     true,
     state,
+  )
+  .await
+  .map(|_| ())
+}
+
+/// Keep a caller's name reservation while completing the exact deletion.
+pub(crate) async fn delete_for_replacement_with_lifecycle_lock(
+  expected: &Job,
+  state: &SystemState,
+  serialized: std::sync::Arc<tokio::sync::OwnedMutexGuard<()>>,
+) -> HttpResult<()> {
+  control_with_lifecycle_lock(
+    &expected.spec.name,
+    "delete",
+    Some((expected.incarnation_key, expected.current_run_key)),
+    true,
+    state,
+    serialized,
   )
   .await
   .map(|_| ())

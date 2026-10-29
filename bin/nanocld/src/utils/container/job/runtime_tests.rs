@@ -16,7 +16,8 @@ use serde_json::json;
 
 use super::*;
 use crate::{
-  models::{NodeDb, OperationDb, SystemStateInner},
+  models::{JobObjCreateIn, NodeDb, OperationDb, SystemStateInner},
+  objects::generic::ObjCreate,
   repositories::operation::{run_query_owned, transaction},
   tasks::generic::ObjTask,
   utils::tests::{TestSystem, gen_test_system},
@@ -1452,9 +1453,26 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   })
   .await
   .unwrap();
+  // A competing creator queues behind the deletion before its name is free.
+  // Revert must retain admission through recreation instead of yielding to it.
+  let mut competing_spec = JobPartial::from(expected_spec.clone());
+  competing_spec.metadata = Some(json!({"definition": "competing creator"}));
+  let competitor = JobObjCreateIn {
+    spec: competing_spec,
+    version: "v0.19".into(),
+  };
+  let mut competing_create =
+    Box::pin(JobDb::create_obj(&competitor, &fixture.state));
+  assert!(futures::poll!(competing_create.as_mut()).is_pending());
   drop(revert);
   fixture.docker.release.store(true, Ordering::SeqCst);
   fixture.docker.wake.notify_waiters();
+  let conflict =
+    tokio::time::timeout(Duration::from_secs(30), competing_create)
+      .await
+      .expect("Competing creation remained blocked after replacement")
+      .unwrap_err();
+  assert_eq!(conflict.status, ntex::http::StatusCode::CONFLICT);
   let restored = tokio::time::timeout(Duration::from_secs(30), async {
     loop {
       if let Ok(job) = JobDb::transform_read_by_pk(

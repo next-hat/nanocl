@@ -668,7 +668,7 @@ mod tests {
     assert_eq!(current.spec.key, fixture.vm.spec.key);
     assert_eq!(current.status, fixture.vm.status);
     assert_eq!(
-      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::history(&fixture.vm.spec.vm_key, None, None, fixture.pool())
         .await
         .unwrap()
         .len(),
@@ -729,7 +729,7 @@ mod tests {
     assert_eq!(accepted.operation, operation);
     assert_eq!(fixture.current().await, accepted.operation);
     assert_eq!(
-      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::history(&fixture.vm.spec.vm_key, None, None, fixture.pool())
         .await
         .unwrap()
         .len(),
@@ -776,7 +776,7 @@ mod tests {
     assert_eq!(current.status, fixture.vm.status);
     assert!(current.spec.mac_address.is_none());
     assert_eq!(
-      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::history(&fixture.vm.spec.vm_key, None, None, fixture.pool())
         .await
         .unwrap()
         .len(),
@@ -1178,7 +1178,7 @@ mod tests {
         .is_none()
     );
     assert_eq!(
-      VmDb::history(&fixture.vm.spec.vm_key, fixture.pool())
+      VmDb::history(&fixture.vm.spec.vm_key, None, None, fixture.pool())
         .await
         .unwrap()
         .len(),

@@ -135,6 +135,11 @@ request body. HTTP 200 returns the accepted VM and `X-Nanocl-Operation`; clients
 use that operation UUID to match terminal events. The SDK exposes `revert_vm`
 and `revert_vm_operation` for callers that need the receipt.
 
+Revision completion uses bounded history pages. `GET /vms/{vm_key}/histories`
+accepts the existing JSON `filter` query with `limit` and `offset`; omitting them
+keeps the complete-history response. The SDK exposes `list_history_vm_page` for
+paged reads. Results are ordered by creation time and revision UUID, newest first.
+
 ## Live resource growth
 
 Reserve CPU and memory ceilings when creating the VM. `HostConfig.MaxCpu` and `HostConfig.MaxMemory` are optional; omitted values use the initial `Cpu` and `Memory`, leaving no capacity for live growth of that resource. Memory values are MiB. The ceilings cannot be changed by a live resize: changing them through PATCH replaces the runtime and requires guest shutdown. `HostConfig` PATCH merges only supplied fields under the VM lifecycle lock; omitted fields retain their current values and explicit null clears nullable settings.

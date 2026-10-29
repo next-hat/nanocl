@@ -23,7 +23,8 @@ wait for deletion, and recreate its saved configuration and schedule. An active
 run is stopped through the normal deletion path. Previous configurations and
 execution records remain available. The replacement has a new incarnation and
 revision and does not immediately execute; restored cron schedules can start
-future runs.
+future runs. The name remains reserved until replacement finishes, preventing
+concurrent creation from claiming it between deletion and recreation.
 
 Replacement is not atomic. A creation failure after deletion leaves the old Job
 removed and reports an error. Inspect the Job and retained history before retrying.

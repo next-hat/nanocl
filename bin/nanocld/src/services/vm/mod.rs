@@ -423,6 +423,21 @@ mod tests {
     for revision in [vm.spec.key, patched.spec.key, reverted.spec.key] {
       assert!(history.iter().any(|spec| spec.key == revision));
     }
+    let query = nanocl_stubs::generic::GenericListQuery::try_from(
+      GenericFilter::new().limit(1).offset(1),
+    )
+    .unwrap();
+    let response = client
+      .send_get(&format!("/vms/{OTHER_KEY}/histories"), Some(query))
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::OK,
+      "page VM history"
+    );
+    let page = response.json::<Vec<VmSpec>>().await.unwrap();
+    assert_eq!(page.len(), 1);
+    assert_eq!(page[0].key, history[1].key);
 
     for key in [GLOBAL_KEY, OTHER_KEY] {
       let deletion =

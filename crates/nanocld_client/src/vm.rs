@@ -2,7 +2,7 @@ use nanocl_error::http_client::HttpClientResult;
 use nanocl_error::io::{FromIo, IoError};
 use ntex::{io, ws};
 
-use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
+use nanocl_stubs::generic::{GenericFilter, GenericFilterNsp, GenericNspQuery};
 use nanocl_stubs::vm::{
   Vm, VmInspect, VmLifecycleOptions, VmResizeOptions, VmResources,
   VmRuntimeStatus, VmSummary,
@@ -240,6 +240,21 @@ impl NanocldClient {
     Self::res_json(response).await
   }
 
+  /// List a bounded page of current-incarnation VM revisions, newest first.
+  /// Omitting pagination with `list_history_vm` still returns the full history.
+  pub async fn list_history_vm_page(
+    &self,
+    key: &str,
+    limit: usize,
+    offset: usize,
+  ) -> HttpClientResult<Vec<VmSpec>> {
+    let path = Self::vm_lifecycle_path(key, "histories")?;
+    let filter = GenericFilter::new().limit(limit).offset(offset);
+    let query = Self::convert_query(Some(&filter))?;
+    let response = self.send_get(&path, Some(query)).await?;
+    Self::res_json(response).await
+  }
+
   /// Revert a VM to a revision of its current incarnation.
   pub async fn revert_vm(&self, key: &str, id: &str) -> HttpClientResult<Vm> {
     let path = Self::vm_revert_path(key, id)?;
@@ -360,6 +375,57 @@ impl NanocldClient {
 #[cfg(test)]
 mod console_tests {
   use super::*;
+
+  #[ntex::test]
+  async fn vm_history_pagination_preserves_optional_query_contract() {
+    use nanocl_stubs::generic::GenericListQuery;
+    use ntex::{http::StatusCode, web::types::Query};
+
+    let (client, requests, _server) =
+      crate::process::receipt_test::client_with_body(
+        StatusCode::OK,
+        None,
+        None,
+        Some(serde_json::json!([])),
+      );
+    assert!(
+      client
+        .list_history_vm_page("team.guest", 100, 20)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(
+      client
+        .list_history_vm("team.guest")
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(client.list_history_vm_page("guest", 100, 0).await.is_err());
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 2);
+    for request in recorded.iter() {
+      assert_eq!(request.method, "GET");
+      assert_eq!(
+        request.path,
+        format!(
+          "/v{}/vms/team.guest/histories",
+          crate::NANOCLD_DEFAULT_VERSION,
+        ),
+      );
+      assert!(request.body.is_empty());
+    }
+    let query = Query::<GenericListQuery>::from_query(&recorded[0].query)
+      .unwrap()
+      .into_inner();
+    let filter = GenericFilter::try_from(query).unwrap();
+    assert_eq!(filter.limit, Some(100));
+    assert_eq!(filter.offset, Some(20));
+    assert!(filter.r#where.is_none());
+    assert!(filter.order_by.is_none());
+    assert!(recorded[1].query.is_empty());
+  }
 
   #[test]
   fn vm_revert_path_validates_key_and_revision() {

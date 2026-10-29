@@ -27,6 +27,17 @@ impl ObjCreate for JobDb {
         .lock_owned()
         .await,
     );
+    Self::create_with_lifecycle_lock(obj, state, serialized).await
+  }
+}
+
+impl JobDb {
+  /// The caller may retain admission across deletion and this creation.
+  async fn create_with_lifecycle_lock(
+    obj: &JobObjCreateIn,
+    state: &SystemState,
+    serialized: std::sync::Arc<tokio::sync::OwnedMutexGuard<()>>,
+  ) -> HttpResult<Job> {
     let spec = obj.spec.clone();
     let version = obj.version.clone();
     let state = state.clone();
@@ -156,21 +167,35 @@ impl JobDb {
       spec,
       version: version.to_owned(),
     };
+    // Reserve this name through both lifecycle phases and their events.
+    let serialized = std::sync::Arc::new(
+      utils::container::job::lifecycle_lock(name)
+        .lock_owned()
+        .await,
+    );
     let state = state.clone();
     let (reply, response) = tokio::sync::oneshot::channel();
     // Retain ownership of the whole replacement if the HTTP caller disconnects.
     ntex::rt::spawn(async move {
       let result = async {
-        crate::tasks::job::delete_for_replacement(&current, &state).await?;
-        Self::create_obj(&obj, &state).await.map_err(|mut error| {
+        crate::tasks::job::delete_for_replacement_with_lifecycle_lock(
+          &current,
+          &state,
+          serialized.clone(),
+        )
+        .await?;
+        let job = Self::create_with_lifecycle_lock(&obj, &state, serialized.clone()).await.map_err(|mut error| {
           error.msg = format!(
             "Job {} was removed, but its restored configuration could not be created: {}; retained configurations and runs remain available",
             current.spec.name, error.msg,
           );
           error
-        })
+        })?;
+        state.emit_normal_native_action_sync(&job, NativeEventAction::Create).await;
+        Ok(job)
       }
       .await;
+      drop(serialized);
       let _ = reply.send(result);
     });
     response.await.map_err(|_| {

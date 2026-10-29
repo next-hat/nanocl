@@ -206,14 +206,37 @@ impl VmDb {
     .await
   }
 
-  pub(crate) async fn history(key: &str, pool: &Pool) -> IoResult<Vec<SpecDb>> {
+  fn history_query(
+    key: &str,
+    incarnation: uuid::Uuid,
+    limit: Option<i64>,
+    offset: Option<i64>,
+  ) -> specs::BoxedQuery<'_, diesel::pg::Pg> {
+    let mut query = specs::table
+      .filter(specs::kind_name.eq("Vm"))
+      .filter(specs::kind_key.eq(key))
+      .filter(specs::incarnation_key.eq(incarnation))
+      .order((specs::created_at.desc(), specs::key.desc()))
+      .into_boxed();
+    if let Some(limit) = limit {
+      query = query.limit(limit);
+    }
+    if let Some(offset) = offset {
+      query = query.offset(offset);
+    }
+    query
+  }
+
+  pub(crate) async fn history(
+    key: &str,
+    limit: Option<i64>,
+    offset: Option<i64>,
+    pool: &Pool,
+  ) -> IoResult<Vec<SpecDb>> {
     let vm = Self::read_by_pk(key, pool).await?.0;
     super::operation::run_query_owned(pool, (), move |conn| {
       Ok(
-        specs::table
-          .filter(specs::kind_name.eq("Vm"))
-          .filter(specs::incarnation_key.eq(vm.incarnation_key))
-          .order(specs::created_at.desc())
+        Self::history_query(&vm.key, vm.incarnation_key, limit, offset)
           .load(conn)
           .map_err(crate::models::OperationTransactionError::from)?,
       )
@@ -406,6 +429,31 @@ impl VmDb {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vm_history_query_paginates_before_loading_with_scoped_order() {
+    let incarnation = uuid::Uuid::from_u128(42);
+    let query =
+      VmDb::history_query("team.guest", incarnation, Some(100), Some(20));
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(sql.contains("\"specs\".\"kind_name\" = $1"), "{sql}");
+    assert!(sql.contains("\"specs\".\"kind_key\" = $2"), "{sql}");
+    assert!(sql.contains("\"specs\".\"incarnation_key\" = $3"), "{sql}");
+    assert!(
+      sql.contains(
+        "ORDER BY \"specs\".\"created_at\" DESC, \"specs\".\"key\" DESC"
+      ),
+      "{sql}"
+    );
+    assert!(sql.contains("LIMIT $4 OFFSET $5"), "{sql}");
+    assert!(sql.contains(&incarnation.to_string()), "{sql}");
+    assert!(sql.contains("100, 20]"), "{sql}");
+
+    let query = VmDb::history_query("team.guest", incarnation, None, None);
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(!sql.contains("LIMIT"), "{sql}");
+    assert!(!sql.contains("OFFSET"), "{sql}");
+  }
 
   #[test]
   fn vm_history_owner_rejects_foreign_and_previous_incarnations() {

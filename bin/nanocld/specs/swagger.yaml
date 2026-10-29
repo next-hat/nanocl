@@ -2265,6 +2265,12 @@ paths:
         required: true
         schema:
           type: string
+      - name: filter
+        in: query
+        description: Optional pagination JSON with limit and offset only. Omit pagination to return the complete history.
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: The virtual machine histories have been listed
@@ -2274,6 +2280,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VmSpec'
+        '400':
+          description: Invalid pagination or unsupported filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: The virtual machine does not exist
           content:

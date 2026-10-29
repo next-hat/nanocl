@@ -138,25 +138,30 @@ pub(super) async fn candidates(
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
         return Ok(Vec::new());
       };
-      client
-        .list_history_vm(key)
-        .await?
-        .into_iter()
-        .map(|revision| revision.key.to_string())
-        .collect()
+      revision_history_candidates(current, |offset| async move {
+        Ok(
+          client
+            .list_history_vm_page(key, PAGE_SIZE, offset)
+            .await?
+            .into_iter()
+            .map(|revision| revision.key.to_string())
+            .collect(),
+        )
+      })
+      .await?
     }
     CompletionKind::JobHistory => {
       let Some(name) = selected.filter(|name| !name.is_empty()) else {
         return Ok(Vec::new());
       };
-      job_history_candidates(current, |offset| async move {
+      revision_history_candidates(current, |offset| async move {
         Ok(
           client
             .list_history_job(
               name,
               Some(&JobHistoryQuery {
                 limit: Some(PAGE_SIZE as i64),
-                offset: Some(offset),
+                offset: Some(offset as i64),
               }),
             )
             .await?
@@ -192,12 +197,12 @@ pub(super) async fn candidates(
 /// A typed revision prefix can select older history. Keep empty-prefix
 /// suggestions to the newest page, and let the outer completion deadline bound
 /// the entire paginated lookup.
-async fn job_history_candidates<F, Fut>(
+async fn revision_history_candidates<F, Fut>(
   current: &str,
   mut fetch_page: F,
 ) -> IoResult<Vec<String>>
 where
-  F: FnMut(i64) -> Fut,
+  F: FnMut(usize) -> Fut,
   Fut: std::future::Future<Output = IoResult<Vec<String>>>,
 {
   let mut candidates = Vec::new();
@@ -213,7 +218,7 @@ where
       candidates.truncate(PAGE_SIZE);
       return Ok(candidates);
     }
-    offset += page_len as i64;
+    offset += page_len;
   }
 }
 
@@ -267,7 +272,8 @@ mod tests {
   use super::*;
 
   #[ntex::test]
-  async fn job_history_completion_finds_older_prefix_and_caps_candidates() {
+  async fn revision_history_completion_finds_older_prefix_and_caps_candidates()
+  {
     let history: Vec<_> = (0..450)
       .map(|index| {
         let prefix = if index < 125 { '0' } else { 'f' };
@@ -275,12 +281,12 @@ mod tests {
       })
       .collect();
     let mut offsets = Vec::new();
-    let candidates = job_history_candidates("f", |offset| {
+    let candidates = revision_history_candidates("f", |offset| {
       offsets.push(offset);
       std::future::ready(Ok(
         history
           .iter()
-          .skip(offset as usize)
+          .skip(offset)
           .take(PAGE_SIZE)
           .cloned()
           .collect(),
@@ -293,7 +299,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn job_history_completion_bounds_empty_prefix_and_exhausts_missing_prefix()
+  async fn revision_history_completion_bounds_empty_prefix_and_exhausts_missing_prefix()
    {
     let history: Vec<_> = (0..245)
       .map(|index| format!("00000000-0000-0000-0000-{index:012x}"))
@@ -301,12 +307,12 @@ mod tests {
     for (prefix, expected_offsets) in [("", vec![0]), ("f", vec![0, 100, 200])]
     {
       let mut offsets = Vec::new();
-      let candidates = job_history_candidates(prefix, |offset| {
+      let candidates = revision_history_candidates(prefix, |offset| {
         offsets.push(offset);
         std::future::ready(Ok(
           history
             .iter()
-            .skip(offset as usize)
+            .skip(offset)
             .take(PAGE_SIZE)
             .cloned()
             .collect(),

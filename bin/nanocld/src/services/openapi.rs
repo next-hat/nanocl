@@ -311,6 +311,11 @@ mod tests {
         "checked-in revert contract differs for {path}"
       );
     }
+    let history_path = "/vms/{key}/histories";
+    assert_eq!(
+      checked_in["paths"][history_path], generated["paths"][history_path],
+      "checked-in VM history pagination contract differs"
+    );
     let vm = &generated["paths"]["/vms/{vm_key}/histories/{history_key}/revert"]
       ["patch"];
     assert!(

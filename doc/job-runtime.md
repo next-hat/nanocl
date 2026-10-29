@@ -95,7 +95,9 @@ and current run through the normal deletion lifecycle, then recreates the saved
 declaration and schedule without immediately executing it. Active work is stopped
 by deletion; prior revisions and execution records remain available. The restored
 Job has a new incarnation and revision. Its saved cron schedule can admit future
-runs. Deletion and creation are not atomic: a failure after deletion is reported
+runs. The per-name lifecycle lock reserves the name through deletion and recreation,
+so concurrent creation cannot displace the restored configuration. Deletion and
+creation are not atomic: a failure after deletion is reported
 explicitly, and callers should inspect the current Job before retrying.
 
 `job runs` lists retained executions and distinguishes multiple incarnations by
