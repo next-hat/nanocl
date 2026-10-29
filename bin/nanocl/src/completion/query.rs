@@ -149,18 +149,23 @@ pub(super) async fn candidates(
       let Some(name) = selected.filter(|name| !name.is_empty()) else {
         return Ok(Vec::new());
       };
-      client
-        .list_history_job(
-          name,
-          Some(&JobHistoryQuery {
-            limit: Some(PAGE_SIZE as i64),
-            offset: Some(0),
-          }),
+      job_history_candidates(current, |offset| async move {
+        Ok(
+          client
+            .list_history_job(
+              name,
+              Some(&JobHistoryQuery {
+                limit: Some(PAGE_SIZE as i64),
+                offset: Some(offset),
+              }),
+            )
+            .await?
+            .into_iter()
+            .map(|revision| revision.key.to_string())
+            .collect(),
         )
-        .await?
-        .into_iter()
-        .map(|revision| revision.key.to_string())
-        .collect()
+      })
+      .await?
     }
     CompletionKind::ResourceHistory => {
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
@@ -182,6 +187,34 @@ pub(super) async fn candidates(
     CompletionKind::Context => Vec::new(),
   };
   Ok(names)
+}
+
+/// A typed revision prefix can select older history. Keep empty-prefix
+/// suggestions to the newest page, and let the outer completion deadline bound
+/// the entire paginated lookup.
+async fn job_history_candidates<F, Fut>(
+  current: &str,
+  mut fetch_page: F,
+) -> IoResult<Vec<String>>
+where
+  F: FnMut(i64) -> Fut,
+  Fut: std::future::Future<Output = IoResult<Vec<String>>>,
+{
+  let mut candidates = Vec::new();
+  let mut offset = 0;
+  loop {
+    let keys = fetch_page(offset).await?;
+    let page_len = keys.len();
+    candidates.extend(keys.into_iter().filter(|key| key.starts_with(current)));
+    if current.is_empty()
+      || candidates.len() >= PAGE_SIZE
+      || page_len < PAGE_SIZE
+    {
+      candidates.truncate(PAGE_SIZE);
+      return Ok(candidates);
+    }
+    offset += page_len as i64;
+  }
 }
 
 /// UUID columns do not support LIKE in the existing API. Page deterministically
@@ -232,6 +265,63 @@ async fn uuid_candidates(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[ntex::test]
+  async fn job_history_completion_finds_older_prefix_and_caps_candidates() {
+    let history: Vec<_> = (0..450)
+      .map(|index| {
+        let prefix = if index < 125 { '0' } else { 'f' };
+        format!("{prefix}0000000-0000-0000-0000-{index:012x}")
+      })
+      .collect();
+    let mut offsets = Vec::new();
+    let candidates = job_history_candidates("f", |offset| {
+      offsets.push(offset);
+      std::future::ready(Ok(
+        history
+          .iter()
+          .skip(offset as usize)
+          .take(PAGE_SIZE)
+          .cloned()
+          .collect(),
+      ))
+    })
+    .await
+    .unwrap();
+    assert_eq!(candidates, history[125..225]);
+    assert_eq!(offsets, [0, 100, 200]);
+  }
+
+  #[ntex::test]
+  async fn job_history_completion_bounds_empty_prefix_and_exhausts_missing_prefix()
+   {
+    let history: Vec<_> = (0..245)
+      .map(|index| format!("00000000-0000-0000-0000-{index:012x}"))
+      .collect();
+    for (prefix, expected_offsets) in [("", vec![0]), ("f", vec![0, 100, 200])]
+    {
+      let mut offsets = Vec::new();
+      let candidates = job_history_candidates(prefix, |offset| {
+        offsets.push(offset);
+        std::future::ready(Ok(
+          history
+            .iter()
+            .skip(offset as usize)
+            .take(PAGE_SIZE)
+            .cloned()
+            .collect(),
+        ))
+      })
+      .await
+      .unwrap();
+      assert_eq!(offsets, expected_offsets);
+      if prefix.is_empty() {
+        assert_eq!(candidates, history[..PAGE_SIZE]);
+      } else {
+        assert!(candidates.is_empty());
+      }
+    }
+  }
 
   #[test]
   fn prefix_filter_escapes_sql_wildcards_and_orders_before_limiting() {

@@ -14,7 +14,7 @@ use crate::{
   path = "/vms/{vm_key}/histories/{history_key}/revert",
   params(
     ("vm_key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format"),
-    ("history_key" = String, Path, description = "Key of the VM history"),
+    ("history_key" = uuid::Uuid, Path, description = "Specification UUID of the VM history"),
   ),
   responses(
     (status = 200, description = "Virtual machine revert accepted", body = nanocl_stubs::vm::Vm, headers(

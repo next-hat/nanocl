@@ -2560,10 +2560,11 @@ paths:
           type: string
       - name: history_key
         in: path
-        description: Key of the VM history
+        description: Specification UUID of the VM history
         required: true
         schema:
           type: string
+          format: uuid
       responses:
         '200':
           description: Virtual machine revert accepted

@@ -316,6 +316,14 @@ mod tests {
     assert!(
       vm["responses"]["200"]["headers"]["X-Nanocl-Operation"].is_object()
     );
+    let revision = vm["parameters"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .find(|parameter| parameter["name"] == "history_key")
+      .unwrap();
+    assert_eq!(revision["schema"]["type"], "string");
+    assert_eq!(revision["schema"]["format"], "uuid");
     let job =
       &generated["paths"]["/jobs/{name}/histories/{id}/revert"]["patch"];
     assert!(
