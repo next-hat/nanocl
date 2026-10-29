@@ -125,18 +125,15 @@ async fn apply_matching_vm(
   match actual {
     ObjPsStatusKind::Start => Ok("Unchanged"),
     ObjPsStatusKind::Stop => {
-      let waiter = utils::process::wait_process_state(
+      utils::progress::set_state_message(pg, summary, "Starting", output)?;
+      utils::process::wait_process_operation(
         key,
         EventActorKind::Vm,
-        vec![NativeEventAction::Start],
+        NativeEventAction::Start,
         client,
+        client.start_process_operation("vm", key),
       )
       .await?;
-      utils::progress::set_state_message(pg, summary, "Starting", output)?;
-      client.start_process("vm", key).await?;
-      waiter.await.map_err(|err| {
-        IoError::interrupted("wait_process_state", &err.to_string())
-      })??;
       Ok("Running")
     }
     _ => Err(IoError::other(
@@ -288,23 +285,18 @@ async fn state_apply(
             utils::progress::set_state_message(
               &pg, summary, "Clearing", output,
             )?;
-            let waiter = utils::process::wait_job_deletion(
+            utils::process::wait_job_deletion(
               &job.name,
               previous.incarnation_key,
               previous.current_run_key,
               client,
-            )
-            .await?;
-            client
-              .delete_job_if_current(
+              client.delete_job_if_current(
                 &job.name,
                 previous.incarnation_key,
                 previous.current_run_key,
-              )
-              .await?;
-            waiter.await.map_err(|err| {
-              IoError::interrupted("wait_process_state", &err.to_string())
-            })??;
+              ),
+            )
+            .await?;
             utils::progress::set_state_message(
               &pg, summary, "Cleared", output,
             )?;
@@ -342,20 +334,13 @@ async fn state_apply(
                   &pg, summary, "Creating", output,
                 )?;
                 client.create_cargo(&cargo, Some(namespace)).await?;
-                let waiter = utils::process::wait_process_state(
-                  key,
-                  EventActorKind::Cargo,
-                  vec![NativeEventAction::Start],
-                  client,
-                )
-                .await?;
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("cargo", key).await?;
-                waiter.await.map_err(|err| {
-                  IoError::interrupted("wait_process_state", &err.to_string())
-                })??;
+                utils::process::wait_process_operation(
+                  key, EventActorKind::Cargo, NativeEventAction::Start, client,
+                  client.start_process_operation("cargo", key),
+                ).await?;
               }
               Ok(inspect) => {
                 let cmp = cargo_spec_from_revision(&inspect.spec);
@@ -363,22 +348,30 @@ async fn state_apply(
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
                   )?;
-                  let waiter = utils::process::wait_process_state(
-                    key,
-                    EventActorKind::Cargo,
-                    vec![NativeEventAction::Update],
-                    client,
-                  )
-                  .await?;
-                  client.put_cargo(key, &cargo).await?;
-                  waiter.await.map_err(|err| {
-                    IoError::interrupted("wait_process_state", &err.to_string())
-                  })??;
+                  utils::process::wait_process_operation(
+                    key, EventActorKind::Cargo, NativeEventAction::Update, client,
+                    client.put_cargo_operation(key, &cargo),
+                  ).await?;
                   utils::progress::set_state_message(
                     &pg, summary, "Updated", output,
                   )?;
-                } else if inspect.status.actual == ObjPsStatusKind::Start {
-                  return Ok("Unchanged");
+                } else {
+                  match inspect.status.actual {
+                    ObjPsStatusKind::Start => return Ok("Unchanged"),
+                    ObjPsStatusKind::Stop => {
+                      utils::progress::set_state_message(
+                        &pg, summary, "Starting", output,
+                      )?;
+                      utils::process::wait_process_operation(
+                        key, EventActorKind::Cargo, NativeEventAction::Start, client,
+                        client.start_process_operation("cargo", key),
+                      ).await?;
+                    }
+                    actual => return Err(IoError::other(
+                      "StateApply",
+                      &format!("Cargo {key} has observed status {actual:?}; expected Start or Stop"),
+                    )),
+                  }
                 }
               }
             }
@@ -416,20 +409,17 @@ async fn state_apply(
                   utils::path::resolve_full_path(&vm.image)?;
                 vm.image = image_full_path;
                 client.create_vm(&vm, Some(namespace)).await?;
-                let waiter = utils::process::wait_process_state(
-                  key,
-                  EventActorKind::Vm,
-                  vec![NativeEventAction::Start],
-                  client,
-                )
-                .await?;
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("vm", key).await?;
-                waiter.await.map_err(|err| {
-                  IoError::interrupted("wait_process_state", &err.to_string())
-                })??;
+                utils::process::wait_process_operation(
+                  key,
+                  EventActorKind::Vm,
+                  NativeEventAction::Start,
+                  client,
+                  client.start_process_operation("vm", key),
+                )
+                .await?;
               }
               Ok(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
@@ -438,17 +428,14 @@ async fn state_apply(
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
                   )?;
-                  let waiter = utils::process::wait_process_state(
+                  utils::process::wait_process_operation(
                     key,
                     EventActorKind::Vm,
-                    vec![NativeEventAction::Start],
+                    NativeEventAction::Update,
                     client,
+                    client.patch_vm_operation(key, &update),
                   )
                   .await?;
-                  client.patch_vm(key, &update).await?;
-                  waiter.await.map_err(|err| {
-                    IoError::interrupted("wait_process_state", &err.to_string())
-                  })??;
                   utils::progress::set_state_message(
                     &pg, summary, "Updated", output,
                   )?;
@@ -958,19 +945,21 @@ mod tests {
       "Reason": "VM start",
       "Note": if failed { "VM start failed" } else { "VM started" },
       "Actor": {"Key": actor_key, "Kind": actor_kind},
+      "Metadata": {"Operation": "a54feac1-3cdf-43bd-9f02-1ad2183f9e92"},
     });
     Bytes::from(format!("{event}\n"))
   }
 
   async fn watch_vm_start(
     req: web::HttpRequest,
-    body: web::types::Json<Value>,
+    body: Bytes,
   ) -> web::HttpResponse {
     let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
     let events = {
       let mut requests = requests.lock().unwrap();
       requests.paths.push(req.path().to_owned());
-      requests.conditions = Some(body.into_inner());
+      assert!(body.is_empty());
+      requests.conditions = Some(Value::Null);
       requests.events.take().unwrap()
     };
     web::HttpResponse::Ok().streaming(Box::pin(events))
@@ -985,7 +974,12 @@ mod tests {
       web::HttpResponse::Conflict()
         .json(&serde_json::json!({"msg": "VM start rejected"}))
     } else {
-      web::HttpResponse::Accepted().into()
+      web::HttpResponse::Accepted()
+        .set_header(
+          "X-Nanocl-Operation",
+          "a54feac1-3cdf-43bd-9f02-1ad2183f9e92",
+        )
+        .build()
     }
   }
 
@@ -1082,15 +1076,7 @@ mod tests {
         format!("/v{NANOCLD_DEFAULT_VERSION}/processes/vm/global.guest/start"),
       ]
     );
-    assert_eq!(
-      requests.conditions,
-      Some(serde_json::json!([{
-        "ActorKey": "global.guest",
-        "ActorKind": "Vm",
-        "Kind": ["normal", "error"],
-        "Action": ["start"],
-      }]))
-    );
+    assert_eq!(requests.conditions, Some(Value::Null));
     result
   }
 

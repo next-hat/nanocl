@@ -37,6 +37,40 @@ where
   P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedVmOperation>> + 'static,
 {
+  accept_task_with_receipt(key, action, state, prepare)
+    .await
+    .map(|(vm, _)| vm)
+}
+
+/// Surface the UUID captured at admission, never a later current-operation read.
+pub(crate) async fn start_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<uuid::Uuid> {
+  let prepare_key = key.to_owned();
+  let prepare_state = state.clone();
+  accept_task_with_receipt(
+    key,
+    NativeEventAction::Starting,
+    state,
+    move |owner, lease| async move {
+      VmDb::prepare_start(&prepare_key, owner, lease, &prepare_state).await
+    },
+  )
+  .await
+  .map(|(_, operation)| operation)
+}
+
+pub(crate) async fn accept_task_with_receipt<P, F>(
+  key: &str,
+  action: NativeEventAction,
+  state: &SystemState,
+  prepare: P,
+) -> HttpResult<(Vm, uuid::Uuid)>
+where
+  P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
+  F: Future<Output = HttpResult<AcceptedVmOperation>> + 'static,
+{
   let mutex_action = match action {
     NativeEventAction::Starting => "start",
     NativeEventAction::Updating => "update",
@@ -93,6 +127,7 @@ pub(crate) async fn accept_restart(
     Some(restart),
   )
   .await
+  .map(|(vm, _)| vm)
 }
 
 async fn accept_task_with_acquisition<P, F, A>(
@@ -102,7 +137,7 @@ async fn accept_task_with_acquisition<P, F, A>(
   prepare: P,
   acquire: A,
   restart: Option<VmRestartTask>,
-) -> HttpResult<Vm>
+) -> HttpResult<(Vm, uuid::Uuid)>
 where
   P: FnOnce(OperationOwner, VmOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedVmOperation>> + 'static,
@@ -194,6 +229,8 @@ where
     let task_state = state.clone();
     let task_action = action.clone();
     let task_vm = vm.clone();
+    let completion_actor: EventActor = vm.clone().into();
+    let completion = completion_action(&action);
     let error_state = state.clone();
     let error_action = action.clone();
     let error_actor: EventActor = vm.clone().into();
@@ -222,7 +259,7 @@ where
         Ok(())
       }
       .await;
-      let (result, settled) = match admission {
+      let (mut result, settled) = match admission {
         Ok(()) => {
           log::debug!(
             "Executing VM task: {key} {task_action} operation={operation} revision={revision}"
@@ -252,27 +289,30 @@ where
       };
       // Runtime helpers settle ordinary outcomes under this same owner. A
       // still-pending row is retained for evidence-based recovery after exit.
-      if settled
-        && let Err(error) = VmDb::complete_operation(
-            &accepted_operation,
-            if result.is_ok() {
-              "completed"
-            } else {
-              "failed"
-            },
-            result.as_ref().err().map(|_| serde_json::json!({
-              "Failure": "VM execution failed; inspect the corresponding VM error event",
-              "Operation": operation,
-              "Stage": "runtime-execution"
-            })),
-            lease.clone(),
-            &task_state.inner.pool,
-          )
-          .await
-      {
-        log::error!(
-          "VM operation completion persistence failed: {key} operation={operation}: {error}"
-        );
+      // Successful deletion already committed its exact operation together
+      // with removing the live row; it cannot be completed a second time.
+      let mut completed =
+        accepted_operation.action == "delete" && result.is_ok();
+      if settled && !completed {
+        match VmDb::complete_operation(
+          &accepted_operation,
+          if result.is_ok() { "completed" } else { "failed" },
+          result.as_ref().err().map(|_| serde_json::json!({
+            "Failure": "VM execution failed; inspect the corresponding VM error event",
+            "Operation": operation,
+            "Stage": "runtime-execution"
+          })),
+          lease.clone(),
+          &task_state.inner.pool,
+        ).await {
+          Ok(committed) => completed = committed,
+          Err(error) => log::error!(
+            "VM operation completion persistence failed: {key} operation={operation}: {error}"
+          ),
+        }
+      }
+      if completion.is_some() {
+        result = require_committed_result(result, completed);
       }
       if let Err(error) =
         utils::operation::cleanup_owner(&lease.1, &task_state.inner.pool).await
@@ -284,6 +324,24 @@ where
       // Preserve the synchronous restart endpoint without waking its caller
       // while the mutation/owner lease is still held.
       drop(lease);
+      if let Some(action) = completion {
+        let (kind, note) = match &result {
+          Ok(()) => (EventKind::Normal, format!("Vm {key}")),
+          Err(error) => (EventKind::Error, error.to_string()),
+        };
+        task_state
+          .emit_action_sync(
+            &completion_actor,
+            action,
+            kind,
+            "state_sync",
+            Some(note),
+            Some(
+              serde_json::json!({"Operation": operation, "SpecKey": revision}),
+            ),
+          )
+          .await;
+      }
       if let Some(restart) = restart {
         let _ = restart.completion.send(result.clone());
       }
@@ -293,7 +351,22 @@ where
       .inner
       .task_manager
       .add_task(&task_key, action.clone(), task, move |error| async move {
-        report_task_error(&error_actor, error_action, error, &error_state);
+        if let Some(action) = completion_action(&error_action) {
+          // Also report an execution owner that stopped before emitting its
+          // own result. Duplicate failure notifications retain the same UUID.
+          error_state.emit_action(
+            &error_actor,
+            action,
+            EventKind::Error,
+            "state_sync",
+            Some(error.to_string()),
+            Some(
+              serde_json::json!({"Operation": operation, "SpecKey": revision}),
+            ),
+          );
+        } else {
+          report_task_error(&error_actor, error_action, error, &error_state);
+        }
         Ok(())
       })
       .await;
@@ -316,7 +389,7 @@ where
       }
     }
     let _ = start.send(());
-    let _ = reply.send(Ok(vm));
+    let _ = reply.send(Ok((vm, operation)));
   });
   accepted.await.map_err(|_| {
     HttpError::internal_server_error(
@@ -339,6 +412,29 @@ fn owned_executor(
       IoError::interrupted("VM task", "Execution owner stopped unexpectedly")
     })?
   })
+}
+
+fn completion_action(action: &NativeEventAction) -> Option<NativeEventAction> {
+  match action {
+    NativeEventAction::Starting => Some(NativeEventAction::Start),
+    NativeEventAction::Updating => Some(NativeEventAction::Update),
+    NativeEventAction::Destroying => Some(NativeEventAction::Destroy),
+    _ => None,
+  }
+}
+
+fn require_committed_result(
+  result: IoResult<()>,
+  completed: bool,
+) -> IoResult<()> {
+  result?;
+  if !completed {
+    return Err(IoError::interrupted(
+      "VM operation",
+      "Runtime work finished but operation completion was not recorded",
+    ));
+  }
+  Ok(())
 }
 
 fn report_task_error(
@@ -455,6 +551,35 @@ impl ObjTaskUpdate for VmDb {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn vm_receipts_use_terminal_actions() {
+    for (acceptance, terminal) in [
+      (NativeEventAction::Starting, NativeEventAction::Start),
+      (NativeEventAction::Updating, NativeEventAction::Update),
+      (NativeEventAction::Destroying, NativeEventAction::Destroy),
+    ] {
+      assert_eq!(super::completion_action(&acceptance), Some(terminal));
+    }
+    assert_eq!(super::completion_action(&NativeEventAction::Restart), None);
+  }
+
+  #[test]
+  fn vm_completion_requires_durable_settlement_before_success() {
+    assert!(super::require_committed_result(Ok(()), true).is_ok());
+    let incomplete =
+      super::require_committed_result(Ok(()), false).unwrap_err();
+    assert_eq!(incomplete.inner.kind(), std::io::ErrorKind::Interrupted);
+    for completed in [false, true] {
+      let error = super::require_committed_result(
+        Err(nanocl_error::io::IoError::other("runtime", "start failed")),
+        completed,
+      )
+      .unwrap_err();
+      assert_eq!(error.context(), Some("runtime"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
+    }
+  }
+
   use nanocl_stubs::system::{
     ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial,
   };

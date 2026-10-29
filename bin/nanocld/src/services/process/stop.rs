@@ -45,7 +45,9 @@ pub(super) fn managed_cargo_runtime_key(
     ("key" = String, Path, description = "Canonical resource key in `{namespace}.{name}` format (jobs use their non-namespaced key)", example = "global.deploy-example"),
   ),
   responses(
-    (status = 202, description = "Process instances stopped"),
+    (status = 202, description = "Stop accepted", headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID for Cargo; omitted for other kinds. Match terminal event Metadata.Operation to confirm completion.")
+    )),
   ),
 ))]
 pub async fn stop_processes(
@@ -56,18 +58,25 @@ pub async fn stop_processes(
   let (_, kind, key) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
-  if kind == ProcessKind::Job {
+  let operation = if kind == ProcessKind::Job {
     crate::tasks::job::stop(&key, state).await?;
+    None
   } else if kind == ProcessKind::Vm {
     utils::container::vm::enqueue_lifecycle(&key, None, false, state)
       .await
       .map_err(crate::services::vm::lifecycle::lifecycle_error)?;
+    None
   } else if kind == ProcessKind::Cargo {
-    crate::tasks::cargo::stop(&key, state).await?;
+    Some(crate::tasks::cargo::stop_operation(&key, state).await?)
   } else {
     utils::container::generic::emit_stopping(&key, &kind, &state).await?;
+    None
+  };
+  let mut response = web::HttpResponse::Accepted();
+  if let Some(operation) = operation {
+    response.set_header("X-Nanocl-Operation", operation.to_string());
   }
-  Ok(web::HttpResponse::Accepted().build())
+  Ok(response.build())
 }
 
 /// Stop a single process by its name or id

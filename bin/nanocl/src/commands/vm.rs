@@ -79,21 +79,6 @@ impl GenericCommandInspect for VmArg {
   type ApiItem = VmInspect;
 }
 
-async fn wait_vm_state(
-  key: &str,
-  action: NativeEventAction,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let waiter = utils::process::wait_process_state(
-    key,
-    EventActorKind::Vm,
-    [action].to_vec(),
-    client,
-  )
-  .await?;
-  Ok(waiter)
-}
-
 fn read_cloud_init_user_data(reader: impl Read) -> IoResult<String> {
   const MAX_BYTES: usize = 64 * 1024;
   let mut data = Vec::new();
@@ -168,12 +153,14 @@ pub async fn exec_vm_run(
     load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
       .map(VmCloudInitUserData::Raw);
   let vm = client.create_vm(&vm, options.namespace.as_deref()).await?;
-  let waiter =
-    wait_vm_state(&vm.spec.vm_key, NativeEventAction::Start, client).await?;
-  client.start_process("vm", &vm.spec.vm_key).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_process_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &vm.spec.vm_key,
+    EventActorKind::Vm,
+    NativeEventAction::Start,
+    client,
+    client.start_process_operation("vm", &vm.spec.vm_key),
+  )
+  .await?;
   ntex::time::sleep(Duration::from_secs(10)).await;
   if options.attach {
     #[cfg(not(target_os = "windows"))]
@@ -203,12 +190,14 @@ pub async fn exec_vm_patch(
     load_cloud_init_user_data(options.cloud_init_user_data.as_deref())?
       .map(VmCloudInitUserData::Raw)
   };
-  let waiter =
-    wait_vm_state(&options.key, NativeEventAction::Start, client).await?;
-  client.patch_vm(&options.key, &vm).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_process_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &options.key,
+    EventActorKind::Vm,
+    NativeEventAction::Update,
+    client,
+    client.patch_vm_operation(&options.key, &vm),
+  )
+  .await?;
   Ok(())
 }
 

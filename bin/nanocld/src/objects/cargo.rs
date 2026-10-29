@@ -158,10 +158,30 @@ impl ObjDelByPk for CargoDb {
     opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
+    Self::delete_with_operation(pk, opts, state)
+      .await
+      .map(|(cargo, _)| cargo)
+  }
+
+  async fn fn_del_obj_by_pk(
+    pk: &str,
+    opts: &Self::ObjDelOpts,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjDelOut> {
+    Self::del_obj_by_pk(pk, opts, state).await
+  }
+}
+
+impl CargoDb {
+  pub(crate) async fn delete_with_operation(
+    pk: &str,
+    opts: &CargoDeleteQuery,
+    state: &SystemState,
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
     let key = pk.to_owned();
     let force = opts.force.unwrap_or(false);
     let prepare_state = state.clone();
-    crate::tasks::cargo::accept_task(
+    crate::tasks::cargo::accept_task_with_operation(
       pk,
       NativeEventAction::Destroying,
       state,
@@ -197,26 +217,84 @@ impl ObjDelByPk for CargoDb {
     .await
   }
 
-  async fn fn_del_obj_by_pk(
+  pub(crate) async fn put_with_operation(
     pk: &str,
-    opts: &Self::ObjDelOpts,
+    obj: &CargoObjPutIn,
     state: &SystemState,
-  ) -> HttpResult<Self::ObjDelOut> {
-    Self::del_obj_by_pk(pk, opts, state).await
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let spec = obj.spec.clone();
+    let version = obj.version.clone();
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        Self::prepare_replacement(
+          &cargo,
+          &spec,
+          &version,
+          &prepare_state,
+          owner,
+          lease,
+        )
+        .await
+      },
+    )
+    .await
   }
-}
 
-impl CargoDb {
-  pub(crate) async fn revert_to_history(
+  pub(crate) async fn patch_with_operation(
+    pk: &str,
+    obj: &CargoObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let patch = obj.spec.clone();
+    let version = obj.version.clone();
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let current =
+          SpecDb::read_by_pk(&cargo.spec.key, &prepare_state.inner.pool)
+            .await?
+            .try_to_cargo_spec()?;
+        let spec =
+          apply_cargo_spec_patch(current, &patch).map_err(|error| {
+            IoError::invalid_input("CargoSpec".to_owned(), error.to_string())
+          })?;
+        Self::prepare_replacement(
+          &cargo,
+          &spec,
+          &version,
+          &prepare_state,
+          owner,
+          lease,
+        )
+        .await
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn revert_to_history_with_operation(
     pk: &str,
     history_key: uuid::Uuid,
     version: &str,
     state: &SystemState,
-  ) -> HttpResult<Cargo> {
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
     let key = pk.to_owned();
     let version = version.to_owned();
     let prepare_state = state.clone();
-    crate::tasks::cargo::accept_task(
+    crate::tasks::cargo::accept_task_with_operation(
       pk,
       NativeEventAction::Updating,
       state,
@@ -311,29 +389,9 @@ impl ObjPutByPk for CargoDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    let key = pk.to_owned();
-    let spec = obj.spec.clone();
-    let version = obj.version.clone();
-    let prepare_state = state.clone();
-    crate::tasks::cargo::accept_task(
-      pk,
-      NativeEventAction::Updating,
-      state,
-      move |owner, lease| async move {
-        let cargo =
-          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
-        Self::prepare_replacement(
-          &cargo,
-          &spec,
-          &version,
-          &prepare_state,
-          owner,
-          lease,
-        )
-        .await
-      },
-    )
-    .await
+    Self::put_with_operation(pk, obj, state)
+      .await
+      .map(|(cargo, _)| cargo)
   }
 
   async fn fn_put_obj_by_pk(
@@ -354,37 +412,9 @@ impl ObjPatchByPk for CargoDb {
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let key = pk.to_owned();
-    let patch = obj.spec.clone();
-    let version = obj.version.clone();
-    let prepare_state = state.clone();
-    crate::tasks::cargo::accept_task(
-      pk,
-      NativeEventAction::Updating,
-      state,
-      move |owner, lease| async move {
-        let cargo =
-          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
-        let current =
-          SpecDb::read_by_pk(&cargo.spec.key, &prepare_state.inner.pool)
-            .await?
-            .try_to_cargo_spec()?;
-        let spec =
-          apply_cargo_spec_patch(current, &patch).map_err(|error| {
-            IoError::invalid_input("CargoSpec".to_owned(), error.to_string())
-          })?;
-        Self::prepare_replacement(
-          &cargo,
-          &spec,
-          &version,
-          &prepare_state,
-          owner,
-          lease,
-        )
-        .await
-      },
-    )
-    .await
+    Self::patch_with_operation(pk, obj, state)
+      .await
+      .map(|(cargo, _)| cargo)
   }
 
   async fn fn_patch_obj_by_pk(

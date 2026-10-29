@@ -156,6 +156,21 @@ where
   P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
 {
+  accept_task_with_operation(key, action, state, prepare)
+    .await
+    .map(|(cargo, _)| cargo)
+}
+
+pub(crate) async fn accept_task_with_operation<P, F>(
+  key: &str,
+  action: NativeEventAction,
+  state: &SystemState,
+  prepare: P,
+) -> HttpResult<(Cargo, uuid::Uuid)>
+where
+  P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
+  F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
+{
   let phase = action_name(&action)?;
   accept_owned(key, phase, action, state, prepare, None).await
 }
@@ -167,7 +182,7 @@ async fn accept_owned<P, F>(
   state: &SystemState,
   prepare: P,
   target: Option<(String, Option<String>)>,
-) -> HttpResult<Cargo>
+) -> HttpResult<(Cargo, uuid::Uuid)>
 where
   P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
@@ -247,6 +262,9 @@ where
     };
     let cargo = accepted.cargo.clone();
     let operation = accepted.operation.key;
+    let revision = accepted.operation.spec_key;
+    let error_state = state.clone();
+    let error_actor = cargo.clone().into();
     let context = CargoRuntimeContext {
       operation: accepted.operation.clone(),
       lease: (lease.0, Some(lease.1)),
@@ -267,7 +285,16 @@ where
         &format!("Cargo@{key}"),
         event.clone(),
         task,
-        |_error| async { Ok(()) },
+        move |error| async move {
+          if !is_targeted_action(phase) {
+            error_state.emit_action(
+              &error_actor, completion_action(phase), EventKind::Error,
+              "state_sync", Some(error.to_string()),
+              Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
+            );
+          }
+          Ok(())
+        },
       )
       .await;
     if event != NativeEventAction::Restart {
@@ -299,7 +326,7 @@ where
         }
       }
     }
-    let _ = reply.send(Ok(cargo));
+    let _ = reply.send(Ok((cargo, operation)));
   });
   response.await.map_err(|_| {
     HttpError::internal_server_error(
@@ -354,59 +381,80 @@ async fn accept_current(
   key: &str,
   event: NativeEventAction,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> HttpResult<uuid::Uuid> {
   let phase = action_name(&event)?;
   let prepare_key = key.to_owned();
   let prepare_state = state.clone();
-  accept_task(key, event, state, move |owner, lease| async move {
-    let cargo =
-      CargoDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
-        .await?;
-    // This runs with both the lifecycle and operation owner leases held, before
-    // an operation or desired status is accepted. Only start/delete dispatch
-    // work to other nodes; stop/restart operate on this node's Docker runtime.
-    if matches!(phase, "stop" | "restart") {
-      let replicas =
-        CargoReplicaDb::list_by_cargo(&prepare_key, &prepare_state.inner.pool)
+  accept_owned(
+    key,
+    phase,
+    event,
+    state,
+    move |owner, lease| async move {
+      let cargo =
+        CargoDb::transform_read_by_pk(&prepare_key, &prepare_state.inner.pool)
           .await?;
-      let processes = ProcessDb::read_by_kind_key(
-        &prepare_key,
+      // This runs with both the lifecycle and operation owner leases held, before
+      // an operation or desired status is accepted. Only start/delete dispatch
+      // work to other nodes; stop/restart operate on this node's Docker runtime.
+      if matches!(phase, "stop" | "restart") {
+        let replicas = CargoReplicaDb::list_by_cargo(
+          &prepare_key,
+          &prepare_state.inner.pool,
+        )
+        .await?;
+        let processes = ProcessDb::read_by_kind_key(
+          &prepare_key,
+          None,
+          &prepare_state.inner.pool,
+        )
+        .await?;
+        validate_local_action(
+          phase,
+          &prepare_state.inner.config.hostname,
+          replicas.iter().map(|replica| replica.node_name.as_deref()),
+          processes.iter().map(|process| process.node_name.as_str()),
+        )?;
+      }
+      let operation =
+        OperationDb::new(&owner, "Cargo", &prepare_key, cargo.spec.key, phase);
+      CargoDb::accept_operation(
+        &cargo,
         None,
+        operation,
+        lease,
         &prepare_state.inner.pool,
       )
-      .await?;
-      validate_local_action(
-        phase,
-        &prepare_state.inner.config.hostname,
-        replicas.iter().map(|replica| replica.node_name.as_deref()),
-        processes.iter().map(|process| process.node_name.as_str()),
-      )?;
-    }
-    let operation =
-      OperationDb::new(&owner, "Cargo", &prepare_key, cargo.spec.key, phase);
-    CargoDb::accept_operation(
-      &cargo,
-      None,
-      operation,
-      lease,
-      &prepare_state.inner.pool,
-    )
-    .await
-    .map_err(http_error)
-  })
+      .await
+      .map_err(http_error)
+    },
+    None,
+  )
   .await
-  .map(|_| ())
+  .map(|(_, operation)| operation)
 }
 
-pub(crate) async fn start(key: &str, state: &SystemState) -> HttpResult<()> {
-  accept_current(key, NativeEventAction::Starting, state).await
-}
-pub(crate) async fn stop(key: &str, state: &SystemState) -> HttpResult<()> {
-  accept_current(key, NativeEventAction::Stopping, state).await
-}
-pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
+pub(crate) async fn restart_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<uuid::Uuid> {
   accept_current(key, NativeEventAction::Restart, state).await
 }
+/// Return the exact accepted operation, even if a successor starts before reply.
+pub(crate) async fn start_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<uuid::Uuid> {
+  accept_current(key, NativeEventAction::Starting, state).await
+}
+
+pub(crate) async fn stop_operation(
+  key: &str,
+  state: &SystemState,
+) -> HttpResult<uuid::Uuid> {
+  accept_current(key, NativeEventAction::Stopping, state).await
+}
+
 pub(crate) async fn refresh(
   key: &str,
   expected_spec: uuid::Uuid,
@@ -699,18 +747,8 @@ async fn execute(
         )
         .await
       };
-      let settled = matches!(&finished, Ok(true));
       match finished {
-        Ok(true) => {
-          if action != "start" && !is_targeted_action(action) {
-            state
-              .emit_normal_native_action_sync(
-                &accepted.cargo,
-                completion_action(action),
-              )
-              .await;
-          }
-        }
+        Ok(true) => {}
         Ok(false) => {
           log::warn!(
             "Cargo operation {} lost completion ownership",
@@ -731,18 +769,6 @@ async fn execute(
             "Operation completion remains pending",
           ));
         }
-      }
-      if !settled
-        && !is_targeted_action(action)
-        && CargoDb::validate_operation(
-          &accepted.operation,
-          state.lease.clone(),
-          &state.inner.pool,
-        )
-        .await
-        .unwrap_or(false)
-      {
-        state.emit_error_native_action(&accepted.cargo, completion_action(action), Some(format!("Cargo operation {} ({action}) runtime work finished but completion could not be recorded; the operation remains pending", accepted.operation.key)));
       }
     }
     Err(error) => {
@@ -814,9 +840,6 @@ async fn execute(
         accepted.operation.key,
         error.context()
       );
-      if owns_failure && !is_targeted_action(action) {
-        state.emit_error_native_action(&accepted.cargo, completion_action(action), Some(format!("Cargo operation {} ({action}) could not complete; inspect its runtime and pending operation before retrying", accepted.operation.key)));
-      }
     }
   }
   if let Some(owner) = &state.lease.1
@@ -824,6 +847,34 @@ async fn execute(
       utils::operation::cleanup_owner(owner, &state.inner.pool).await
   {
     log::warn!("Cargo operation owner cleanup deferred: {error}");
+  }
+  let event_state = state.state.clone();
+  drop(state);
+  if !is_targeted_action(action) {
+    // Earlier readiness events still drive routing. Only this exact owner's
+    // committed completion can satisfy an operation-aware command waiter.
+    let (kind, note) = if reported.is_ok() {
+      (
+        EventKind::Normal,
+        format!("Cargo {}", accepted.operation.resource_key),
+      )
+    } else {
+      (
+        EventKind::Error,
+        format!(
+          "Cargo operation {} ({action}) could not complete; inspect its runtime and pending operation before retrying",
+          accepted.operation.key
+        ),
+      )
+    };
+    event_state.emit_action_sync(
+      &accepted.cargo.clone().into(),
+      completion_action(action),
+      kind,
+      "state_sync",
+      Some(note),
+      Some(serde_json::json!({"Operation": accepted.operation.key, "SpecKey": accepted.operation.spec_key})),
+    ).await;
   }
   reported
 }

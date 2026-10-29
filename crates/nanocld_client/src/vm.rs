@@ -265,6 +265,26 @@ impl NanocldClient {
       .await?;
     Ok(())
   }
+  /// Patch a VM and return its accepted operation ID.
+  pub async fn patch_vm_operation(
+    &self,
+    key: &str,
+    vm: &VmSpecUpdate,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}", Self::VM_PATH),
+        Some(vm),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
 }
 
 #[cfg(test)]

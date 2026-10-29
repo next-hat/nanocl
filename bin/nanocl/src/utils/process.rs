@@ -1,16 +1,18 @@
-use futures::StreamExt;
-use ntex::rt;
+use std::future::Future;
 
-use nanocl_error::io::{IoError, IoResult};
+use futures::StreamExt;
+
+use nanocl_error::{
+  http_client::HttpClientResult,
+  io::{IoError, IoResult},
+};
 
 use nanocld_client::{
   NanocldClient,
   stubs::system::{
-    EventActorKind, EventCondition, EventKind, NativeEventAction, ObjPsStatus,
+    Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
   },
 };
-
-use crate::models::GenericProcessStatus;
 
 pub fn resource_key(name: &str, namespace: &str) -> IoResult<String> {
   nanocld_client::stubs::resource_key::ResourceKey::new(name, namespace)
@@ -29,61 +31,73 @@ pub fn get_actor_kind(object_name: &str) -> EventActorKind {
   }
 }
 
-pub async fn get_process_status(
-  object_name: &str,
-  key: &str,
-  client: &NanocldClient,
-) -> IoResult<ObjPsStatus> {
-  let res = client
-    .send_get(&format!("/{object_name}/{key}/inspect"), None::<String>)
-    .await?;
-  Ok(
-    NanocldClient::res_json::<GenericProcessStatus>(res)
-      .await?
-      .status,
-  )
-}
-
-pub async fn wait_process_state(
+/// Subscribe before admission, then accept only the operation returned by it.
+/// Owning the stream in this future also closes it on rejection or cancellation.
+pub async fn wait_process_operation(
   key: &str,
   kind: EventActorKind,
-  action: Vec<NativeEventAction>,
+  action: NativeEventAction,
   client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let condition = EventCondition {
-    actor_key: Some(key.to_owned()),
-    actor_kind: Some(kind),
-    kind: vec![EventKind::Normal, EventKind::Error],
-    action,
-    ..Default::default()
-  };
-  let mut stream = client.watch_events(Some(vec![condition.clone()])).await?;
-  let key = key.to_owned();
-  let fut = rt::spawn(async move {
-    while let Some(event) = stream.next().await {
-      let event = event?;
-      // A failed transition can use a different action from its completion.
-      if event.kind == EventKind::Error
-        && event.actor.as_ref().is_some_and(|actor| {
-          actor.key.as_deref() == Some(key.as_str())
-            && Some(&actor.kind) == condition.actor_kind.as_ref()
-        })
-      {
-        return Err(IoError::interrupted(
-          "Error",
-          &event.note.unwrap_or_default(),
-        ));
-      }
-      if event.kind == EventKind::Normal && condition == event {
-        return Ok(());
-      }
+  request: impl Future<Output = HttpClientResult<uuid::Uuid>>,
+) -> HttpClientResult<()> {
+  // A name-only server condition can close the stream on a previous operation.
+  let stream = client.watch_events(None).await?;
+  let operation = request.await?;
+  wait_operation_events(stream, key, kind, action, operation).await
+}
+
+async fn wait_operation_events(
+  mut stream: impl futures::Stream<Item = nanocl_error::http::HttpResult<Event>>
+  + Unpin,
+  key: &str,
+  kind: EventActorKind,
+  action: NativeEventAction,
+  operation: uuid::Uuid,
+) -> HttpClientResult<()> {
+  while let Some(event) = stream.next().await {
+    if let Some(result) =
+      operation_event_result(&event?, key, &kind, &action, operation)
+    {
+      return result.map_err(Into::into);
     }
-    Err(IoError::interrupted(
-      "wait_process_state",
-      &format!("Event stream ended before the requested completion for {key}"),
-    ))
-  });
-  Ok(fut)
+  }
+  Err(IoError::interrupted(
+    "Process operation",
+    &format!(
+      "Event stream ended before the requested completion for {key} (operation {operation})"
+    ),
+  ).into())
+}
+
+fn operation_event_result(
+  event: &Event,
+  key: &str,
+  kind: &EventActorKind,
+  action: &NativeEventAction,
+  operation: uuid::Uuid,
+) -> Option<IoResult<()>> {
+  if !event.actor.as_ref().is_some_and(|actor| {
+    actor.key.as_deref() == Some(key) && &actor.kind == kind
+  }) || event
+    .metadata
+    .as_ref()
+    .and_then(|metadata| metadata.get("Operation"))
+    .and_then(serde_json::Value::as_str)
+    .and_then(|value| value.parse::<uuid::Uuid>().ok())
+    != Some(operation)
+  {
+    return None;
+  }
+  if event.kind == EventKind::Error {
+    return Some(Err(IoError::interrupted(
+      "Process operation",
+      event.note.as_deref().unwrap_or("Operation failed"),
+    )));
+  }
+  if event.kind == EventKind::Normal && event.action == action.to_string() {
+    return Some(Ok(()));
+  }
+  None
 }
 
 /// Statefile replacement waits for the removed incarnation, never an older
@@ -93,25 +107,40 @@ pub async fn wait_job_deletion(
   incarnation: uuid::Uuid,
   run: Option<uuid::Uuid>,
   client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
+  request: impl Future<Output = HttpClientResult<()>>,
+) -> HttpClientResult<()> {
+  // Server-side conditions close the stream on a matching name/action, before
+  // this waiter can reject an old incarnation or run with that same name.
+  let stream = client.watch_events(None).await?;
+  request.await?;
+  wait_job_deletion_events(stream, key.to_owned(), incarnation, run)
+    .await
+    .map_err(Into::into)
+}
+
+async fn wait_job_deletion_events(
+  mut stream: impl futures::Stream<
+    Item = nanocl_error::http::HttpResult<nanocld_client::stubs::system::Event>,
+  > + Unpin,
+  key: String,
+  incarnation: uuid::Uuid,
+  run: Option<uuid::Uuid>,
+) -> IoResult<()> {
   let condition = EventCondition {
-    actor_key: Some(key.to_owned()),
+    actor_key: Some(key.clone()),
     actor_kind: Some(EventActorKind::Job),
-    kind: vec![EventKind::Normal, EventKind::Error],
+    kind: vec![EventKind::Normal],
     action: vec![NativeEventAction::Destroy],
     ..Default::default()
   };
-  let mut stream = client.watch_events(Some(vec![condition.clone()])).await?;
   let incarnation = incarnation.to_string();
   let run = run.map(|key| key.to_string());
-  Ok(rt::spawn(async move {
-    while let Some(event) = stream.next().await {
-      let event = event?;
-      if !event
-        .actor
-        .as_ref()
-        .and_then(|actor| actor.attributes.as_ref())
-        .is_some_and(|attributes| {
+  while let Some(event) = stream.next().await {
+    let event = event?;
+    if !event.actor.as_ref().is_some_and(|actor| {
+      actor.key.as_deref() == Some(key.as_str())
+        && actor.kind == EventActorKind::Job
+        && actor.attributes.as_ref().is_some_and(|attributes| {
           attributes
             .get("IncarnationKey")
             .and_then(serde_json::Value::as_str)
@@ -119,24 +148,23 @@ pub async fn wait_job_deletion(
             && attributes.get("RunKey").and_then(serde_json::Value::as_str)
               == run.as_deref()
         })
-      {
-        continue;
-      }
-      if event.kind == EventKind::Error {
-        return Err(IoError::interrupted(
-          "Job deletion",
-          &event.note.unwrap_or_default(),
-        ));
-      }
-      if condition == event {
-        return Ok(());
-      }
+    }) {
+      continue;
     }
-    Err(IoError::interrupted(
-      "Job deletion",
-      "Event stream ended before incarnation deletion",
-    ))
-  }))
+    if event.kind == EventKind::Error {
+      return Err(IoError::interrupted(
+        "Job deletion",
+        &event.note.unwrap_or_default(),
+      ));
+    }
+    if condition == event {
+      return Ok(());
+    }
+  }
+  Err(IoError::interrupted(
+    "Job deletion",
+    "Event stream ended before incarnation deletion",
+  ))
 }
 
 #[cfg(test)]
@@ -154,6 +182,95 @@ mod tests {
       resource_key("website", "team.production").unwrap(),
       "team.production.website"
     );
+  }
+
+  #[test]
+  fn operation_wait_matches_only_the_accepted_identity() {
+    let operation = uuid::Uuid::from_u128(1);
+    let mut value = deletion_event(operation, None, "normal", "start");
+    value["Actor"]["Key"] = json!("global.api");
+    value["Actor"]["Kind"] = json!("Cargo");
+    value["Metadata"] = json!({"Operation": operation});
+    let result = |value: Value| {
+      operation_event_result(
+        &serde_json::from_value::<Event>(value).unwrap(),
+        "global.api",
+        &EventActorKind::Cargo,
+        &NativeEventAction::Start,
+        operation,
+      )
+    };
+    result(value.clone()).unwrap().unwrap();
+    for (pointer, other) in [
+      ("/Metadata/Operation", json!(uuid::Uuid::from_u128(2))),
+      ("/Metadata/Operation", json!("invalid")),
+      ("/Metadata", Value::Null),
+      ("/Actor/Key", json!("global.other")),
+      ("/Actor/Kind", json!("Vm")),
+      ("/Action", json!("starting")),
+      ("/Kind", json!("warning")),
+    ] {
+      let mut unrelated = value.clone();
+      *unrelated.pointer_mut(pointer).unwrap() = other;
+      assert!(result(unrelated).is_none(), "{pointer}");
+    }
+    value["Kind"] = json!("error");
+    value["Action"] = json!("updating");
+    let failure = result(value.clone()).unwrap().unwrap_err();
+    assert!(failure.to_string().contains("Exact Job deletion failed"));
+    value["Metadata"]["Operation"] = json!(uuid::Uuid::from_u128(2));
+    assert!(result(value).is_none());
+  }
+
+  #[ntex::test]
+  async fn operation_stream_ignores_predecessors_and_requires_completion() {
+    let operation = uuid::Uuid::from_u128(1);
+    let event = |id, kind, action| {
+      let mut value = deletion_event(operation, None, kind, action);
+      value["Actor"]["Key"] = json!("global.api");
+      value["Actor"]["Kind"] = json!("Cargo");
+      value["Metadata"] = json!({"Operation": id});
+      serde_json::from_value::<Event>(value).unwrap()
+    };
+    let stale = uuid::Uuid::from_u128(2);
+    wait_operation_events(
+      futures::stream::iter(vec![
+        Ok(event(stale, "normal", "start")),
+        Ok(event(stale, "error", "start")),
+        Ok(event(operation, "normal", "starting")),
+        Ok(event(operation, "normal", "start")),
+      ]),
+      "global.api",
+      EventActorKind::Cargo,
+      NativeEventAction::Start,
+      operation,
+    )
+    .await
+    .unwrap();
+    let error = wait_operation_events(
+      futures::stream::iter(vec![Ok(event(stale, "normal", "start"))]),
+      "global.api",
+      EventActorKind::Cargo,
+      NativeEventAction::Start,
+      operation,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("before the requested completion")
+    );
+    let error = wait_operation_events(
+      futures::stream::iter(vec![Ok(event(operation, "error", "starting"))]),
+      "global.api",
+      EventActorKind::Cargo,
+      NativeEventAction::Start,
+      operation,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("Exact Job deletion failed"));
   }
 
   fn deletion_event(
@@ -181,11 +298,12 @@ mod tests {
 
   async fn serve_deletion_events(
     request: web::HttpRequest,
-    conditions: web::types::Json<Value>,
+    body: ntex::util::Bytes,
   ) -> web::HttpResponse {
-    assert_eq!(conditions[0]["ActorKey"], "backup");
-    assert_eq!(conditions[0]["ActorKind"], "Job");
-    assert_eq!(conditions[0]["Action"], json!(["destroy"]));
+    assert!(
+      body.is_empty(),
+      "Job deletion must use an unconditioned stream"
+    );
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
       .body(request.app_state::<String>().unwrap().clone())
@@ -212,13 +330,19 @@ mod tests {
       ..Default::default()
     })
     .unwrap();
-    let waiter =
-      wait_job_deletion("backup", uuid::Uuid::from_u128(1), run, &client)
-        .await?;
-    tokio::time::timeout(std::time::Duration::from_secs(5), waiter)
-      .await
-      .expect("Job deletion did not settle after the event stream")
-      .expect("Job deletion waiter panicked")
+    tokio::time::timeout(
+      std::time::Duration::from_secs(5),
+      wait_job_deletion(
+        "backup",
+        uuid::Uuid::from_u128(1),
+        run,
+        &client,
+        async { Ok(()) },
+      ),
+    )
+    .await
+    .expect("Job deletion did not settle after the event stream")
+    .map_err(Into::into)
   }
 
   #[ntex::test]
@@ -289,5 +413,75 @@ mod tests {
     )
     .await
     .unwrap();
+  }
+  #[ntex::test]
+  async fn job_deletion_stream_requires_exact_actor_and_execution() {
+    let incarnation = uuid::Uuid::from_u128(1);
+    let run = Some(uuid::Uuid::from_u128(2));
+    let mut wrong_key = deletion_event(incarnation, run, "error", "destroy");
+    wrong_key["Actor"]["Key"] = json!("another-job");
+    let mut wrong_kind = deletion_event(incarnation, run, "error", "stop");
+    wrong_kind["Actor"]["Kind"] = json!("Cargo");
+    let events = vec![
+      wrong_key,
+      wrong_kind,
+      deletion_event(uuid::Uuid::from_u128(3), run, "normal", "destroy"),
+      deletion_event(
+        incarnation,
+        Some(uuid::Uuid::from_u128(4)),
+        "normal",
+        "destroy",
+      ),
+      deletion_event(incarnation, run, "normal", "stop"),
+      deletion_event(incarnation, run, "normal", "destroy"),
+    ];
+    let events = futures::stream::iter(events.into_iter().map(|event| {
+      Ok(
+        serde_json::from_value::<nanocld_client::stubs::system::Event>(event)
+          .unwrap(),
+      )
+    }));
+    wait_job_deletion_events(events, "backup".into(), incarnation, run)
+      .await
+      .unwrap();
+
+    let event =
+      serde_json::from_value(deletion_event(incarnation, run, "error", "stop"))
+        .unwrap();
+    let error = wait_job_deletion_events(
+      futures::stream::iter(vec![Ok(event)]),
+      "backup".into(),
+      incarnation,
+      run,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("Exact Job deletion failed"));
+
+    let event = serde_json::from_value(deletion_event(
+      incarnation,
+      None,
+      "normal",
+      "destroy",
+    ))
+    .unwrap();
+    wait_job_deletion_events(
+      futures::stream::iter(vec![Ok(event)]),
+      "backup".into(),
+      incarnation,
+      None,
+    )
+    .await
+    .unwrap();
+
+    let error = wait_job_deletion_events(
+      futures::stream::empty(),
+      "backup".into(),
+      incarnation,
+      run,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("before incarnation deletion"));
   }
 }

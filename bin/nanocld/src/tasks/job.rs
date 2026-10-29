@@ -131,16 +131,18 @@ pub(crate) async fn start_if_incarnation(
       &state.inner.pool,
     )
     .await;
-    drop(serialized);
     match completed {
       Ok(true) => {
-        let _ = reply.send(Ok(()));
         state
           .emit_normal_native_action_sync(
             &accepted.job,
             NativeEventAction::Starting,
           )
           .await;
+        // A stop/delete accepted after this reply must not publish its event
+        // before the delayed Starting event of the run it just cancelled.
+        drop(serialized);
+        let _ = reply.send(Ok(()));
         if let Err(error) =
           utils::container::job::execute(&accepted, &owner, &state).await
         {
@@ -223,9 +225,19 @@ async fn control(
       }
     };
     let _ = reply.send(Ok(accepted.job.clone()));
-    let result =
-      utils::container::job::control(&accepted, &owner, &state).await;
-    if let Err(error) = result {
+    let result = utils::container::job::control(&accepted, &owner, &state)
+      .await
+      .and_then(|completed| {
+        if completed {
+          Ok(())
+        } else {
+          Err(IoError::interrupted(
+            "Job control",
+            "Operation completion was not recorded",
+          ))
+        }
+      });
+    if let Err(error) = &result {
       log::warn!("Job {} {} failed: {error}", accepted.job.spec.name, action);
       if let Some(run) = &accepted.run {
         let _ = JobRunDb::mark_unknown(
@@ -244,17 +256,29 @@ async fn control(
         &state.inner.pool,
       )
       .await;
-      state.emit_error_native_action(
-        &accepted.job,
-        if action == "delete" {
-          NativeEventAction::Destroy
-        } else {
-          NativeEventAction::Stop
-        },
-        Some(error.to_string()),
-      );
     }
+    // A terminal event permits an immediate successor (including recreation).
+    // Publish it only after the lifecycle lease is available to that request.
     drop(serialized);
+    let action = if action == "delete" {
+      NativeEventAction::Destroy
+    } else {
+      NativeEventAction::Stop
+    };
+    match result {
+      Ok(()) => {
+        state
+          .emit_normal_native_action_sync(&accepted.job, action)
+          .await;
+      }
+      Err(error) => {
+        state.emit_error_native_action(
+          &accepted.job,
+          action,
+          Some(error.to_string()),
+        );
+      }
+    }
     cleanup(&owner, &state).await;
   });
   response.await.map_err(|_| {

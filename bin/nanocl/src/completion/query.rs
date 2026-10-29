@@ -120,8 +120,8 @@ pub(super) async fn candidates(
         .map(|container| container.name)
         .collect()
     }
-    // History endpoints currently expose the latest 100 revisions and do not
-    // accept pagination or prefix filters. Match within that existing window.
+    // History endpoints return revisions without prefix filters. Match the
+    // requested prefix locally; completion still caps the emitted candidates.
     CompletionKind::CargoHistory => {
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
         return Ok(Vec::new());
@@ -133,7 +133,6 @@ pub(super) async fn candidates(
         .map(|revision| revision.key.to_string())
         .collect()
     }
-    // The same latest-100 endpoint limit applies to resource revisions.
     CompletionKind::ResourceHistory => {
       let Some(key) = selected.filter(|key| !key.is_empty()) else {
         return Ok(Vec::new());

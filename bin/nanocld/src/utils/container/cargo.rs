@@ -70,8 +70,8 @@ pub use readiness::has_container_healthcheck;
 pub(crate) use readiness::{all_desired_replicas_ready, promotion_actions};
 use readiness::{
   healthcheck_enabled, observed_container_ready, observed_container_running,
-  required_candidate_topology_complete, requires_steady_state_readiness,
-  restart_required_slots_ready,
+  required_candidate_topology_complete, required_slots_ready,
+  requires_steady_state_readiness,
 };
 #[cfg(test)]
 pub(crate) use replacement::stop_fault::forget_next_init_stop;
@@ -1082,7 +1082,7 @@ pub(crate) async fn restart(
   }
   let any_healthcheck = wait_until_ready(&plan.slots, state).await?;
   refresh_slot_observations(&mut plan.slots, state).await?;
-  if !restart_required_slots_ready(&plan.slots) {
+  if !required_slots_ready(&plan.slots) {
     return Err(IoError::interrupted(
       "CargoReadiness",
       &format!(
@@ -1134,10 +1134,12 @@ pub async fn start(
       .await?;
   validate_observed_identities(
     &cargo.spec.cargo_key,
+    cargo.spec.key,
     &replicas,
     &processes,
     &state.inner.config.hostname,
   )?;
+  let mut slots = Vec::new();
   for replica in &replicas {
     let persisted = CargoReplicaDb::get(replica.key, &state.inner.pool).await?;
     if persisted.cargo_key != cargo.spec.cargo_key
@@ -1152,7 +1154,16 @@ pub async fn start(
         ),
       ));
     }
-    reconcile_replica(cargo, replica, state).await?;
+    slots.extend(reconcile_replica(cargo, replica, state).await?.slots);
+  }
+  // Earlier replicas can stop while later replicas wait for readiness.
+  // Reobserve the complete local set before acknowledging this node's start.
+  refresh_slot_observations(&mut slots, state).await?;
+  if !required_slots_ready(&slots) {
+    return Err(IoError::interrupted(
+      "CargoReadiness",
+      "Cargo changed readiness while its replicas were starting",
+    ));
   }
   Ok(())
 }

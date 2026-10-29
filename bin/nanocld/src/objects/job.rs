@@ -1,4 +1,4 @@
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   job::{Job, JobInspect},
   system::NativeEventAction,
@@ -20,13 +20,35 @@ impl ObjCreate for JobDb {
     obj: &Self::ObjCreateIn,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    let job =
-      JobDb::create_with_spec(&obj.spec, &obj.version, &state.inner.pool)
-        .await?;
-    if let Some(schedule) = &job.spec.schedule {
-      utils::cron::add_cron_rule(&job, schedule, state).await?;
-    }
-    Ok(job)
+    let serialized = utils::container::job::lifecycle_lock(&obj.spec.name)
+      .try_lock_owned()
+      .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+    let spec = obj.spec.clone();
+    let version = obj.version.clone();
+    let state = state.clone();
+    let (reply, response) = tokio::sync::oneshot::channel();
+    // Once creation begins, its owner keeps registration ordered with
+    // start/delete even if the request stops waiting for the response.
+    ntex::rt::spawn(async move {
+      let _serialized = serialized;
+      let result = async {
+        let job =
+          JobDb::create_with_spec(&spec, &version, &state.inner.pool).await?;
+        if let Some(schedule) = &job.spec.schedule {
+          utils::cron::add_cron_rule(&job, schedule, &state).await?;
+        }
+        Ok::<_, HttpError>(job)
+      }
+      .await;
+      // Release admission before the caller can immediately start this Job.
+      drop(_serialized);
+      let _ = reply.send(result);
+    });
+    response.await.map_err(|_| {
+      HttpError::internal_server_error(
+        "Job creation owner stopped before replying",
+      )
+    })?
   }
 }
 

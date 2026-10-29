@@ -4,7 +4,9 @@ use ntex::{channel::mpsc::Receiver, io, ws};
 use ntex::rt;
 
 use nanocl_error::{
-  http::HttpResult, http_client::HttpClientResult, io::FromIo,
+  http::HttpResult,
+  http_client::HttpClientResult,
+  io::{FromIo, IoError},
 };
 
 use nanocl_stubs::{
@@ -229,6 +231,39 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Start a Cargo or VM and return the accepted operation ID.
+  ///
+  /// An older daemon may accept the request without returning a receipt. In
+  /// that case this returns an error instead of guessing which operation ran.
+  pub async fn start_process_operation(
+    &self,
+    kind: &str,
+    key: &str,
+  ) -> HttpClientResult<uuid::Uuid> {
+    if !matches!(kind, "cargo" | "vm") {
+      return Err(
+        IoError::invalid_input(
+          "Process operation",
+          "Start operation receipts are only supported for cargo and vm",
+        )
+        .into(),
+      );
+    }
+    let response = self
+      .send_post(
+        &format!("{}/{kind}/{key}/start", Self::PROCESS_PATH),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
   /// Restart all processes for a kind and canonical resource key.
   ///
   /// ## Example
@@ -260,6 +295,36 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Restart a Cargo and return the accepted operation ID.
+  pub async fn restart_process_operation(
+    &self,
+    kind: &str,
+    key: &str,
+  ) -> HttpClientResult<uuid::Uuid> {
+    if kind != "cargo" {
+      return Err(
+        IoError::invalid_input(
+          "Process operation",
+          "Restart operation receipts are only supported for cargo",
+        )
+        .into(),
+      );
+    }
+    let response = self
+      .send_post(
+        &format!("{}/{kind}/{key}/restart", Self::PROCESS_PATH),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
   /// Stop all processes for a kind and canonical resource key.
   ///
   /// ## Example
@@ -289,6 +354,86 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+
+  /// Stop a Cargo and return the accepted operation ID.
+  ///
+  /// VM shutdown uses the synchronous stop_vm lifecycle endpoint instead.
+  /// Missing receipts fail after admission; callers must not retry blindly.
+  pub async fn stop_process_operation(
+    &self,
+    kind: &str,
+    key: &str,
+  ) -> HttpClientResult<uuid::Uuid> {
+    if kind != "cargo" {
+      return Err(
+        IoError::invalid_input(
+          "Process operation",
+          "Stop operation receipts are only supported for cargo",
+        )
+        .into(),
+      );
+    }
+    let response = self
+      .send_post(
+        &format!("{}/{kind}/{key}/stop", Self::PROCESS_PATH),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
+  /// Delete a Cargo or VM and return the accepted operation ID.
+  /// The existing query is forwarded unchanged, including Cargo force.
+  pub async fn delete_process_operation<Q: serde::Serialize>(
+    &self,
+    kind: &str,
+    key: &str,
+    query: Option<Q>,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let collection = match kind {
+      "cargo" => "cargoes",
+      "vm" => "vms",
+      _ => {
+        return Err(
+          IoError::invalid_input(
+            "Process operation",
+            "Delete operation receipts are only supported for cargo and vm",
+          )
+          .into(),
+        );
+      }
+    };
+    let response = self
+      .send_delete(&format!("/{collection}/{key}"), query)
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
+  pub(crate) fn process_operation_header(
+    value: Option<&[u8]>,
+  ) -> HttpClientResult<uuid::Uuid> {
+    value
+      .and_then(|value| std::str::from_utf8(value).ok())
+      .and_then(|value| uuid::Uuid::parse_str(value).ok())
+      .ok_or_else(|| {
+        IoError::invalid_data(
+          "Process operation",
+          "Request was accepted, but completion cannot be correlated: missing or invalid X-Nanocl-Operation response header",
+        )
+        .into()
+      })
   }
 
   /// A stream is returned, data are sent when processes reach status
@@ -380,6 +525,30 @@ mod tests {
   use super::*;
 
   use futures::StreamExt;
+
+  #[test]
+  fn process_operation_header_requires_valid_receipt() {
+    let operation = uuid::Uuid::from_u128(1);
+    let encoded = operation.to_string();
+    assert_eq!(
+      NanocldClient::process_operation_header(Some(encoded.as_bytes()))
+        .unwrap(),
+      operation
+    );
+    for value in [
+      None,
+      Some(&b""[..]),
+      Some(&b"not-a-uuid"[..]),
+      Some(&[0xff][..]),
+    ] {
+      let error = NanocldClient::process_operation_header(value)
+        .unwrap_err()
+        .to_string();
+      assert!(error.contains("Request was accepted"), "{error}");
+      assert!(error.contains("completion cannot be correlated"), "{error}");
+      assert!(error.contains("X-Nanocl-Operation"), "{error}");
+    }
+  }
 
   #[test]
   fn process_attach_url_uses_process_route() {

@@ -8,7 +8,6 @@ use nanocl_stubs::cargo_spec::CargoSpec;
 
 use crate::{
   models::{CargoDb, CargoObjPutIn, SystemState},
-  objects::generic::*,
   utils,
 };
 
@@ -22,7 +21,9 @@ use crate::{
     ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
-    (status = 200, description = "Cargo updated", body = nanocl_stubs::cargo::Cargo),
+    (status = 200, description = "Cargo update accepted", body = nanocl_stubs::cargo::Cargo, headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID. Match terminal event Metadata.Operation to confirm completion.")
+    )),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -46,6 +47,11 @@ pub async fn put_cargo(
     spec,
     version: path.0.clone(),
   };
-  let cargo = CargoDb::put_obj_by_pk(key.as_str(), obj, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&cargo))
+  let (cargo, operation) =
+    CargoDb::put_with_operation(key.as_str(), obj, &state).await?;
+  Ok(
+    web::HttpResponse::Ok()
+      .set_header("X-Nanocl-Operation", operation.to_string())
+      .json(&cargo),
+  )
 }

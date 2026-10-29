@@ -571,8 +571,6 @@ mod tests {
       "5",
       "--offset",
       "2",
-      "--filters",
-      "name=app",
     ])
     .expect("wide ps command must parse with existing options");
     let Command::Ps(options) = cli.command else {
@@ -582,7 +580,7 @@ mod tests {
     assert!(options.wide);
     assert_eq!(options.limit, Some(5));
     assert_eq!(options.offset, Some(2));
-    assert_eq!(options.filters, Some(vec!["name=app".to_owned()]));
+    assert!(options.filters.is_none());
     let filter = options.others.unwrap();
     assert!(filter.all);
     assert_eq!(filter.namespace.as_deref(), Some("global"));

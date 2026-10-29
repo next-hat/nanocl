@@ -464,7 +464,16 @@ impl NanocldClient {
     let (tx, rx) = ntex::channel::mpsc::channel();
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
-      'stream: while let Some(item) = stream.next().await {
+      'stream: while let Some(item) = std::future::poll_fn(|cx| {
+        // A quiet HTTP stream may never yield another event. Register receiver
+        // cancellation independently so dropping a waiter releases its reader.
+        if tx.poll_closed(cx).is_ready() {
+          return std::task::Poll::Ready(None);
+        }
+        stream.poll_next_unpin(cx)
+      })
+      .await
+      {
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {
@@ -729,6 +738,50 @@ mod tests {
     let res = TestResponse::builder().build();
     res.set_payload(Payload::from_stream(futures::stream::iter(chunks)));
     res
+  }
+
+  #[ntex::test]
+  async fn res_stream_receiver_drop_releases_quiet_payload() {
+    struct DropSignal(Option<futures::channel::oneshot::Sender<()>>);
+    impl Drop for DropSignal {
+      fn drop(&mut self) {
+        if let Some(sender) = self.0.take() {
+          let _ = sender.send(());
+        }
+      }
+    }
+
+    for initial in [&b""[..], &b"{\"value\":"[..], &b"{\"value\":1}\n"[..]] {
+      let (polled_tx, polled_rx) = futures::channel::oneshot::channel();
+      let (dropped_tx, dropped_rx) = futures::channel::oneshot::channel();
+      let guard = DropSignal(Some(dropped_tx));
+      let mut polled_tx = Some(polled_tx);
+      let mut initial = Some(Bytes::copy_from_slice(initial));
+      let payload = futures::stream::poll_fn(move |_| {
+        let _keep_alive = &guard;
+        if let Some(bytes) = initial.take() {
+          return std::task::Poll::Ready(Some(Ok(bytes)));
+        }
+        if let Some(sender) = polled_tx.take() {
+          let _ = sender.send(());
+        }
+        std::task::Poll::Pending
+      });
+      let response = TestResponse::builder().build();
+      response.set_payload(Payload::from_stream(payload));
+      let receiver = NanocldClient::res_stream::<Value>(response).await;
+      ntex::time::timeout(Millis(1000), polled_rx)
+        .await
+        .expect("reader must reach the quiet payload")
+        .unwrap();
+      drop(receiver);
+      ntex::time::timeout(Millis(1000), dropped_rx)
+        .await
+        .expect(
+          "receiver drop must release a quiet payload without another event",
+        )
+        .unwrap();
+    }
   }
 
   #[ntex::test]

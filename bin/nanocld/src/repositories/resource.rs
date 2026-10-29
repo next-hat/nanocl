@@ -5,12 +5,12 @@ use diesel::prelude::*;
 use jsonschema::{Draft, Validator};
 use nanocl_error::{
   http::{HttpError, HttpResult},
-  io::IoResult,
+  io::{IoError, IoResult},
 };
 
 use nanocl_stubs::{
   generic::GenericFilter,
-  resource::{Resource, ResourcePartial},
+  resource::{Resource, ResourcePartial, ResourceSpec},
   resource_kind::ResourceKind,
 };
 
@@ -19,7 +19,7 @@ use crate::{
   models::{
     ColumnType, Pool, ResourceDb, ResourceKindDb, ResourceUpdateDb, SpecDb,
   },
-  schema::resources,
+  schema::{resources, specs},
   utils,
 };
 
@@ -117,6 +117,54 @@ impl WithSpec for ResourceDb {
 }
 
 impl ResourceDb {
+  fn history_query(key: &str) -> specs::BoxedQuery<'_, diesel::pg::Pg> {
+    specs::table
+      .filter(specs::kind_name.eq("Resource"))
+      .filter(specs::kind_key.eq(key))
+      .order((specs::created_at.desc(), specs::key.desc()))
+      .into_boxed()
+  }
+
+  pub(crate) async fn history(
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<ResourceSpec>> {
+    let key = key.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      Ok(
+        Self::history_query(&key)
+          .load::<SpecDb>(conn)
+          .map_err(Self::map_err)?
+          .into_iter()
+          .map(ResourceSpec::from)
+          .collect(),
+      )
+    })
+    .await
+  }
+
+  pub(crate) async fn history_spec(
+    key: &str,
+    revision: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<SpecDb> {
+    let key = key.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      Self::history_query(&key)
+        .filter(specs::key.eq(revision))
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(Self::map_err)?
+        .ok_or_else(|| {
+          IoError::not_found(
+            "Resource history",
+            "Revision does not belong to the selected resource",
+          )
+        })
+    })
+    .await
+  }
+
   pub async fn parse_kind(
     kind: &str,
     pool: &Pool,
@@ -244,5 +292,35 @@ impl ResourceDb {
         .await?;
     }
     Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn resource_history_query_scopes_kind_and_name_without_truncation() {
+    let query = ResourceDb::history_query("shared-name");
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(sql.contains("\"specs\".\"kind_name\" = $1"), "{sql}");
+    assert!(sql.contains("\"specs\".\"kind_key\" = $2"), "{sql}");
+    assert!(
+      sql.contains(
+        "ORDER BY \"specs\".\"created_at\" DESC, \"specs\".\"key\" DESC"
+      ),
+      "{sql}"
+    );
+    assert!(sql.contains("[\"Resource\", \"shared-name\"]"), "{sql}");
+    assert!(!sql.contains("LIMIT"), "{sql}");
+
+    let revision = uuid::Uuid::from_u128(1);
+    let query =
+      ResourceDb::history_query("shared-name").filter(specs::key.eq(revision));
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(sql.contains("\"specs\".\"kind_name\" = $1"), "{sql}");
+    assert!(sql.contains("\"specs\".\"kind_key\" = $2"), "{sql}");
+    assert!(sql.contains("\"specs\".\"key\" = $3"), "{sql}");
+    assert!(sql.contains(&revision.to_string()), "{sql}");
   }
 }

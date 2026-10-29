@@ -1,15 +1,7 @@
 use ntex::web;
 
+use crate::models::{ResourceDb, SystemState};
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::{
-  generic::{GenericClause, GenericFilter},
-  resource::ResourceSpec,
-};
-
-use crate::{
-  models::{SpecDb, SystemState},
-  repositories::generic::*,
-};
 
 /// List resource history
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -20,7 +12,7 @@ use crate::{
     ("name" = String, Path, description = "The resource name to list history")
   ),
   responses(
-    (status = 200, description = "The resource history", body = [ResourceSpec]),
+    (status = 200, description = "The resource history", body = [nanocl_stubs::resource::ResourceSpec]),
     (status = 404, description = "Resource is not existing", body = crate::services::openapi::ApiError),
   ),
 ))]
@@ -29,12 +21,6 @@ pub async fn list_resource_history(
   _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter =
-    GenericFilter::new().r#where("kind_key", GenericClause::Eq(path.1.clone()));
-  let items = SpecDb::read_by(&filter, &state.inner.pool)
-    .await?
-    .into_iter()
-    .map(ResourceSpec::from)
-    .collect::<Vec<_>>();
+  let items = ResourceDb::history(&path.1, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }

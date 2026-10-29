@@ -525,6 +525,7 @@ pub(crate) async fn execute(
     .await
     .is_err()
   {
+    let _serialized = lifecycle_lock(&run.job_name).lock_owned().await;
     return fail_execution(
       run,
       None,
@@ -835,7 +836,7 @@ pub(crate) async fn control(
   accepted: &AcceptedJobControl,
   owner: &OperationGuard,
   state: &SystemState,
-) -> IoResult<()> {
+) -> IoResult<bool> {
   if let Some(run) = &accepted.run {
     let runtimes = inventory(run, state).await?;
     for (index, id, runtime) in runtimes {
@@ -921,35 +922,23 @@ pub(crate) async fn control(
     if accepted.job.spec.schedule.is_some() {
       utils::cron::remove_cron_rule(&accepted.job, state).await?;
     }
-    if JobDb::delete_operation(
+    JobDb::delete_operation(
       &accepted.operation,
       accepted.job.current_run_key,
       owner.clone(),
       &state.inner.pool,
     )
-    .await?
-    {
-      state
-        .emit_normal_native_action_sync(
-          &accepted.job,
-          NativeEventAction::Destroy,
-        )
-        .await;
-    }
-  } else if JobDb::complete_control(
-    &accepted.operation,
-    "completed",
-    None,
-    owner.clone(),
-    &state.inner.pool,
-  )
-  .await?
-  {
-    state
-      .emit_normal_native_action_sync(&accepted.job, NativeEventAction::Stop)
-      .await;
+    .await
+  } else {
+    JobDb::complete_control(
+      &accepted.operation,
+      "completed",
+      None,
+      owner.clone(),
+      &state.inner.pool,
+    )
+    .await
   }
-  Ok(())
 }
 
 #[cfg(test)]

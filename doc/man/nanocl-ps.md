@@ -34,7 +34,7 @@ Limit the number of results default to 100
 Offset the results to navigate through the results
 
 **--filters** *\<FILTERS\>*  
-Filters
+Unsupported; use dedicated options such as **--namespace**, **--kind**, and **--all**.
 
 **-n**, **--namespace** *\<NAMESPACE\>*  
 Show all processes for the given namespace
