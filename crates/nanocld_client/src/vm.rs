@@ -27,7 +27,7 @@ impl NanocldClient {
     key: &str,
     action: &str,
     options: &VmLifecycleOptions,
-  ) -> HttpClientResult<()> {
+  ) -> HttpClientResult<bool> {
     options
       .validate()
       .map_err(|err| IoError::invalid_input("VM lifecycle", &err))?;
@@ -43,7 +43,20 @@ impl NanocldClient {
       .map_err(|err| self.send_error(err))?;
     let status = response.status();
     crate::error::is_api_error(&mut response, &status).await?;
-    Ok(())
+    Ok(Self::vm_lifecycle_unchanged(
+      status,
+      response
+        .headers()
+        .get("x-nanocl-unchanged")
+        .map(|value| value.as_bytes()),
+    ))
+  }
+
+  fn vm_lifecycle_unchanged(
+    status: ntex::http::StatusCode,
+    value: Option<&[u8]>,
+  ) -> bool {
+    status == ntex::http::StatusCode::OK && value == Some(&b"true"[..])
   }
 
   /// Stop a VM, waiting for guest shutdown unless force is explicitly requested.
@@ -53,6 +66,15 @@ impl NanocldClient {
     key: &str,
     options: &VmLifecycleOptions,
   ) -> HttpClientResult<()> {
+    self.stop_vm_with_outcome(key, options).await.map(|_| ())
+  }
+
+  /// Stop a VM and report whether the daemon confirmed it was already stopped.
+  pub async fn stop_vm_with_outcome(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<bool> {
     self.send_vm_lifecycle(key, "stop", options).await
   }
 
@@ -62,7 +84,10 @@ impl NanocldClient {
     key: &str,
     options: &VmLifecycleOptions,
   ) -> HttpClientResult<()> {
-    self.send_vm_lifecycle(key, "restart", options).await
+    self
+      .send_vm_lifecycle(key, "restart", options)
+      .await
+      .map(|_| ())
   }
 
   /// Query actual QEMU execution state through the configured daemon transport.
@@ -290,6 +315,36 @@ impl NanocldClient {
 #[cfg(test)]
 mod console_tests {
   use super::*;
+
+  #[test]
+  fn vm_lifecycle_unchanged_requires_explicit_success_header() {
+    use ntex::http::StatusCode;
+    assert!(NanocldClient::vm_lifecycle_unchanged(
+      StatusCode::OK,
+      Some(b"true"),
+    ));
+    for value in [
+      None,
+      Some(&b"false"[..]),
+      Some(&b""[..]),
+      Some(&b"invalid"[..]),
+    ] {
+      assert!(!NanocldClient::vm_lifecycle_unchanged(
+        StatusCode::OK,
+        value
+      ));
+    }
+    for status in [
+      StatusCode::ACCEPTED,
+      StatusCode::NO_CONTENT,
+      StatusCode::CONFLICT,
+    ] {
+      assert!(!NanocldClient::vm_lifecycle_unchanged(
+        status,
+        Some(b"true")
+      ));
+    }
+  }
 
   #[test]
   fn vm_lifecycle_paths_require_canonical_keys() {

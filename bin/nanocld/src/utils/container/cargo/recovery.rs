@@ -283,7 +283,7 @@ fn deletion_observation_settles(
   inventory_empty && processes_empty && attachments_empty
 }
 
-fn observed_identity_matches(
+pub(super) fn observed_identity_matches(
   labels: Option<&HashMap<String, String>>,
   persisted_labels: Option<&HashMap<String, String>>,
 ) -> bool {
@@ -320,7 +320,7 @@ fn observed_identity_matches(
   .all(|label| labels.get(*label) == persisted.get(*label))
 }
 
-fn accepted_creation_identity(
+pub(super) fn accepted_creation_identity(
   labels: Option<&HashMap<String, String>>,
   persisted_labels: Option<&HashMap<String, String>>,
   incarnation: uuid::Uuid,

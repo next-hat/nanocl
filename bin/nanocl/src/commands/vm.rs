@@ -21,7 +21,7 @@ use nanocld_client::{
     generic::{GenericFilter, GenericListQueryNsp},
     process::{OutputKind, OutputLog},
     resource_key::ResourceKey,
-    system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
+    system::{EventActorKind, NativeEventAction},
     vm::VmInspect,
     vm_spec::{VmCloudInitUserData, VmSpecPartial, VmSpecUpdate},
   },
@@ -39,7 +39,6 @@ use crate::{
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
-  generic::inspect_lifecycle_unchanged,
   history::{print_revision_history, validate_options},
 };
 
@@ -236,18 +235,11 @@ async fn exec_vm_lifecycle(
   let request = options.into();
   let request = &request;
   run_vm_lifecycle(&options.keys, |key| async move {
-    if !restart
-      && inspect_lifecycle_unchanged(client, "vms", key, &ObjPsStatusKind::Stop)
-        .await?
-    {
-      return Ok(true);
-    }
     if restart {
-      client.restart_vm(key, request).await
+      client.restart_vm(key, request).await.map(|_| false)
     } else {
-      client.stop_vm(key, request).await
+      client.stop_vm_with_outcome(key, request).await
     }
-    .map(|_| false)
     .map_err(IoError::from)
   })
   .await

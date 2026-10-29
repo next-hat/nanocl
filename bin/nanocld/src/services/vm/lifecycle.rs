@@ -25,7 +25,9 @@ pub(crate) fn lifecycle_error(error: IoError) -> HttpError {
   request_body = VmLifecycleOptions,
   params(("key" = String, Path, description = "Canonical VM key in `{namespace}.{name}` format")),
   responses(
-    (status = 200, description = "VM runtime has stopped"),
+    (status = 200, description = "VM runtime has stopped", headers(
+      ("X-Nanocl-Unchanged" = String, description = "true only when the daemon verified under lifecycle admission that the runtime was already stopped")
+    )),
     (status = 400, description = "Invalid canonical key or shutdown timeout", body = crate::services::openapi::ApiError),
     (status = 404, description = "VM does not exist", body = crate::services::openapi::ApiError),
     (status = 409, description = "Runtime is stale or a lifecycle operation is already active", body = crate::services::openapi::ApiError),
@@ -41,10 +43,15 @@ pub async fn stop_vm(
   let key = utils::key::parse_resource_key(&path.1)?;
   let options = payload.into_inner();
   options.validate().map_err(HttpError::bad_request)?;
-  utils::container::vm::stop_with_options(key.as_str(), &options, state)
-    .await
-    .map_err(lifecycle_error)?;
-  Ok(web::HttpResponse::Ok().build())
+  let unchanged =
+    utils::container::vm::stop_with_outcome(key.as_str(), &options, state)
+      .await
+      .map_err(lifecycle_error)?;
+  let mut response = web::HttpResponse::Ok();
+  if unchanged {
+    response.set_header("X-Nanocl-Unchanged", "true");
+  }
+  Ok(response.build())
 }
 
 /// Shut down a VM, then start the same runtime after confirmed exit.

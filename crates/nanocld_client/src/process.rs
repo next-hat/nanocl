@@ -231,15 +231,13 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// Start a Cargo or VM and return the accepted operation ID.
-  ///
-  /// An older daemon may accept the request without returning a receipt. In
-  /// that case this returns an error instead of guessing which operation ran.
+  /// Start a Cargo or VM and return the accepted operation ID, or None when
+  /// the daemon confirms the requested state is already established.
   pub async fn start_process_operation(
     &self,
     kind: &str,
     key: &str,
-  ) -> HttpClientResult<uuid::Uuid> {
+  ) -> HttpClientResult<Option<uuid::Uuid>> {
     if !matches!(kind, "cargo" | "vm") {
       return Err(
         IoError::invalid_input(
@@ -256,7 +254,8 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-    Self::process_operation_header(
+    Self::process_operation_outcome(
+      response.status(),
       response
         .headers()
         .get("x-nanocl-operation")
@@ -356,7 +355,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// Stop a Cargo and return the accepted operation ID.
+  /// Stop a Cargo and return the accepted operation ID, or None when
+  /// the daemon confirms it is already stopped.
   ///
   /// VM shutdown uses the synchronous stop_vm lifecycle endpoint instead.
   /// Missing receipts fail after admission; callers must not retry blindly.
@@ -364,7 +364,7 @@ impl NanocldClient {
     &self,
     kind: &str,
     key: &str,
-  ) -> HttpClientResult<uuid::Uuid> {
+  ) -> HttpClientResult<Option<uuid::Uuid>> {
     if kind != "cargo" {
       return Err(
         IoError::invalid_input(
@@ -381,7 +381,8 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-    Self::process_operation_header(
+    Self::process_operation_outcome(
+      response.status(),
       response
         .headers()
         .get("x-nanocl-operation")
@@ -419,6 +420,25 @@ impl NanocldClient {
         .get("x-nanocl-operation")
         .map(|value| value.as_bytes()),
     )
+  }
+
+  fn process_operation_outcome(
+    status: ntex::http::StatusCode,
+    value: Option<&[u8]>,
+  ) -> HttpClientResult<Option<uuid::Uuid>> {
+    match status {
+      ntex::http::StatusCode::OK => Ok(None),
+      ntex::http::StatusCode::ACCEPTED => {
+        Self::process_operation_header(value).map(Some)
+      }
+      _ => Err(
+        IoError::invalid_data(
+          "Process operation",
+          &format!("Unexpected lifecycle response status: {status}"),
+        )
+        .into(),
+      ),
+    }
   }
 
   pub(crate) fn process_operation_header(
@@ -525,6 +545,46 @@ mod tests {
   use super::*;
 
   use futures::StreamExt;
+
+  #[test]
+  fn process_operation_outcome_requires_explicit_unchanged_or_receipt() {
+    use ntex::http::StatusCode;
+    let operation = uuid::Uuid::from_u128(1);
+    let encoded = operation.to_string();
+    assert_eq!(
+      NanocldClient::process_operation_outcome(StatusCode::OK, None).unwrap(),
+      None
+    );
+    assert_eq!(
+      NanocldClient::process_operation_outcome(
+        StatusCode::ACCEPTED,
+        Some(encoded.as_bytes()),
+      )
+      .unwrap(),
+      Some(operation)
+    );
+    for value in [
+      None,
+      Some(&b""[..]),
+      Some(&b"invalid"[..]),
+      Some(&[0xff][..]),
+    ] {
+      assert!(
+        NanocldClient::process_operation_outcome(StatusCode::ACCEPTED, value,)
+          .is_err()
+      );
+    }
+    for status in [StatusCode::CREATED, StatusCode::NO_CONTENT] {
+      assert!(NanocldClient::process_operation_outcome(status, None).is_err());
+      assert!(
+        NanocldClient::process_operation_outcome(
+          status,
+          Some(encoded.as_bytes()),
+        )
+        .is_err()
+      );
+    }
+  }
 
   #[test]
   fn process_operation_header_requires_valid_receipt() {

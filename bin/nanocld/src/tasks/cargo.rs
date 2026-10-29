@@ -172,7 +172,12 @@ where
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
 {
   let phase = action_name(&action)?;
-  accept_owned(key, phase, action, state, prepare, None).await
+  let (cargo, operation) =
+    accept_owned(key, phase, action, state, prepare, None, false).await?;
+  let operation = operation.ok_or_else(|| {
+    HttpError::internal_server_error("Cargo mutation returned no operation")
+  })?;
+  Ok((cargo, operation))
 }
 
 async fn accept_owned<P, F>(
@@ -182,7 +187,8 @@ async fn accept_owned<P, F>(
   state: &SystemState,
   prepare: P,
   target: Option<(String, Option<String>)>,
-) -> HttpResult<(Cargo, uuid::Uuid)>
+  allow_unchanged: bool,
+) -> HttpResult<(Cargo, Option<uuid::Uuid>)>
 where
   P: FnOnce(OperationOwner, CargoOperationLease) -> F + 'static,
   F: Future<Output = HttpResult<AcceptedCargoOperation>> + 'static,
@@ -235,7 +241,18 @@ where
       }
     };
     let lease = (std::sync::Arc::new(guard), owner_guard);
-    let accepted = match prepare(owner, lease.clone()).await {
+    let prepared: HttpResult<(Cargo, Option<OperationDb>)> = async {
+      if allow_unchanged
+        && let Some(cargo) =
+          unchanged_current(&key, phase, incarnation, &state).await?
+      {
+        return Ok((cargo, None));
+      }
+      let accepted = prepare(owner, lease.clone()).await?;
+      Ok((accepted.cargo, Some(accepted.operation)))
+    }
+    .await;
+    let (cargo, operation) = match prepared {
       Ok(value) => value,
       Err(error) => {
         match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
@@ -260,7 +277,26 @@ where
         return;
       }
     };
-    let cargo = accepted.cargo.clone();
+    let Some(operation) = operation else {
+      let released = async {
+        if !utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await?
+        {
+          return Err(IoError::interrupted(
+            "Cargo unchanged",
+            "No-op ownership could not be released",
+          ));
+        }
+        CargoDb::delete_mutex(&mutex.key, &state).await
+      }
+      .await;
+      drop(lease);
+      let _ = reply.send(released.map(|()| (cargo, None)).map_err(http_error));
+      return;
+    };
+    let accepted = AcceptedCargoOperation {
+      cargo: cargo.clone(),
+      operation,
+    };
     let operation = accepted.operation.key;
     let revision = accepted.operation.spec_key;
     let error_state = state.clone();
@@ -331,7 +367,7 @@ where
         }
       }
     }
-    let _ = reply.send(Ok((cargo, operation)));
+    let _ = reply.send(Ok((cargo, Some(operation))));
   });
   response.await.map_err(|_| {
     HttpError::internal_server_error(
@@ -382,11 +418,77 @@ async fn publish_acceptance(
   state.inner.event_emitter_raw.emit(&event)
 }
 
+fn unchanged_status_matches(cargo: &Cargo, action: &str) -> bool {
+  let requested = match action {
+    "start" => ObjPsStatusKind::Start,
+    "stop" => ObjPsStatusKind::Stop,
+    _ => return false,
+  };
+  cargo.status.wanted == requested && cargo.status.actual == requested
+}
+
+async fn unchanged_current(
+  key: &str,
+  action: &str,
+  incarnation: uuid::Uuid,
+  state: &SystemState,
+) -> HttpResult<Option<Cargo>> {
+  let cargo = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation {
+    return Err(HttpError::conflict(
+      "Cargo incarnation changed during admission",
+    ));
+  }
+  let operation = OperationDb::current("Cargo", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Err(HttpError::conflict(
+      "Cargo has an unresolved pending operation",
+    ));
+  }
+  if !unchanged_status_matches(&cargo, action)
+    || operation.as_ref().is_some_and(|operation| {
+      operation.incarnation_key != incarnation
+        || operation.spec_key != cargo.spec.key
+    })
+  {
+    return Ok(None);
+  }
+  let observed = tokio::time::timeout(
+    std::time::Duration::from_secs(5),
+    utils::container::cargo::runtime_is_unchanged(
+      &cargo,
+      incarnation,
+      &cargo.status.actual,
+      state,
+    ),
+  )
+  .await;
+  if !matches!(observed, Ok(Ok(true))) {
+    return Ok(None);
+  }
+  // Keep the same owner while checking that observation still belongs to the
+  // same settled definition. A no-op never creates or settles an operation.
+  let current = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
+  if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation
+    || current.spec.key != cargo.spec.key
+    || !unchanged_status_matches(&current, action)
+    || OperationDb::current("Cargo", key, &state.inner.pool).await? != operation
+  {
+    return Err(HttpError::conflict(
+      "Cargo changed during no-op observation",
+    ));
+  }
+  Ok(Some(current))
+}
+
 async fn accept_current(
   key: &str,
   event: NativeEventAction,
   state: &SystemState,
-) -> HttpResult<uuid::Uuid> {
+) -> HttpResult<Option<uuid::Uuid>> {
   let phase = action_name(&event)?;
   let prepare_key = key.to_owned();
   let prepare_state = state.clone();
@@ -434,6 +536,7 @@ async fn accept_current(
       .map_err(http_error)
     },
     None,
+    matches!(phase, "start" | "stop"),
   )
   .await
   .map(|(_, operation)| operation)
@@ -443,20 +546,24 @@ pub(crate) async fn restart_operation(
   key: &str,
   state: &SystemState,
 ) -> HttpResult<uuid::Uuid> {
-  accept_current(key, NativeEventAction::Restart, state).await
+  accept_current(key, NativeEventAction::Restart, state)
+    .await?
+    .ok_or_else(|| {
+      HttpError::internal_server_error("Cargo restart returned no operation")
+    })
 }
 /// Return the exact accepted operation, even if a successor starts before reply.
 pub(crate) async fn start_operation(
   key: &str,
   state: &SystemState,
-) -> HttpResult<uuid::Uuid> {
+) -> HttpResult<Option<uuid::Uuid>> {
   accept_current(key, NativeEventAction::Starting, state).await
 }
 
 pub(crate) async fn stop_operation(
   key: &str,
   state: &SystemState,
-) -> HttpResult<uuid::Uuid> {
+) -> HttpResult<Option<uuid::Uuid>> {
   accept_current(key, NativeEventAction::Stopping, state).await
 }
 
@@ -549,6 +656,7 @@ pub(crate) async fn process_action(
       .map_err(http_error)
     },
     Some((id.to_owned(), signal.map(str::to_owned))),
+    false,
   )
   .await
   .map(|_| ())
@@ -1057,6 +1165,37 @@ mod tests {
   use crate::vars;
 
   use super::*;
+
+  #[test]
+  fn cargo_noop_status_requires_matching_desired_and_observed_state() {
+    for (action, requested) in [
+      ("start", ObjPsStatusKind::Start),
+      ("stop", ObjPsStatusKind::Stop),
+    ] {
+      let mut cargo = Cargo::default();
+      cargo.status.wanted = requested.clone();
+      cargo.status.actual = requested.clone();
+      assert!(unchanged_status_matches(&cargo, action));
+      for other in [
+        ObjPsStatusKind::Create,
+        ObjPsStatusKind::Starting,
+        ObjPsStatusKind::Updating,
+        ObjPsStatusKind::Stopping,
+        ObjPsStatusKind::Fail,
+        ObjPsStatusKind::Finish,
+        ObjPsStatusKind::Unknown,
+      ] {
+        cargo.status.actual = other.clone();
+        assert!(!unchanged_status_matches(&cargo, action));
+        cargo.status.actual = requested.clone();
+        cargo.status.wanted = other;
+        assert!(!unchanged_status_matches(&cargo, action));
+        cargo.status.wanted = requested.clone();
+      }
+      assert!(!unchanged_status_matches(&cargo, "restart"));
+      assert!(!unchanged_status_matches(&cargo, "delete"));
+    }
+  }
 
   #[test]
   fn cargo_receipts_require_durable_settlement_for_terminal_events() {

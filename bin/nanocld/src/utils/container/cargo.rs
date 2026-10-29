@@ -49,8 +49,8 @@ mod replacement;
 mod restart;
 
 pub(crate) use lifecycle::{
-  ensure_current, lifecycle_lock, observe, process_action, stop,
-  validate_target,
+  ensure_current, lifecycle_lock, observe, process_action,
+  runtime_is_unchanged, stop, validate_target,
 };
 pub(crate) const LABEL_INCARNATION: &str = "io.nanocl.cargo.incarnation";
 pub(crate) const LABEL_SPEC: &str = "io.nanocl.cargo.spec";

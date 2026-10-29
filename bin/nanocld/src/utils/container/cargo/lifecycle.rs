@@ -5,13 +5,13 @@ use super::{
 use crate::{
   models::{
     CargoDb, CargoLifecycleLock, CargoLifecycleLocks, CargoReplicaDb,
-    CargoReplicaProcessDb, CargoRuntimeContext, ObjPsStatusDb,
-    ObjPsStatusUpdate, OperationDb, ProcessDb, SystemState,
+    CargoReplicaProcessDb, CargoReplicaProcessRole, CargoRuntimeContext,
+    ObjPsStatusDb, ObjPsStatusUpdate, OperationDb, ProcessDb, SystemState,
   },
   repositories::generic::*,
 };
 use bollard_next::query_parameters::{
-  KillContainerOptions, RemoveContainerOptions,
+  KillContainerOptions, ListContainersOptions, RemoveContainerOptions,
 };
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
@@ -20,7 +20,7 @@ use nanocl_stubs::{
   system::{ObjPsHealthStatusKind, ObjPsStatusKind},
 };
 use std::{
-  collections::HashMap,
+  collections::{HashMap, HashSet},
   sync::{Arc, LazyLock, Mutex},
 };
 
@@ -351,6 +351,181 @@ pub(super) fn runtime_docker_error(
   }
 }
 
+/// Verify a no-op from complete local inventory without mutating runtime.
+/// The caller holds lifecycle and distributed ownership until replying.
+pub(crate) async fn runtime_is_unchanged(
+  cargo: &Cargo,
+  incarnation: uuid::Uuid,
+  requested: &ObjPsStatusKind,
+  state: &SystemState,
+) -> IoResult<bool> {
+  let key = &cargo.spec.cargo_key;
+  let replicas = CargoReplicaDb::list_by_cargo(key, &state.inner.pool).await?;
+  // Remote starts retain their existing coordinated operation. Cached remote
+  // observations cannot justify skipping that operation.
+  if replicas.iter().any(|replica| {
+    replica.node_name.as_deref() != Some(state.inner.config.hostname.as_str())
+  }) {
+    return Ok(false);
+  }
+  let processes =
+    ProcessDb::read_by_kind_key(key, None, &state.inner.pool).await?;
+  if processes.iter().any(|process| {
+    process.node_name != state.inner.config.hostname
+      || is_rollout_process_name(&process.name)
+  }) {
+    return Ok(false);
+  }
+  let ids = processes
+    .iter()
+    .map(|process| process.key.as_str())
+    .collect::<HashSet<_>>();
+  let mut mapped_ids = HashSet::new();
+  for replica in &replicas {
+    for mapping in
+      CargoReplicaProcessDb::list_by_replica(replica.key, &state.inner.pool)
+        .await?
+    {
+      if let Some(id) = mapping.process_key
+        && !mapped_ids.insert(id)
+      {
+        return Ok(false);
+      }
+    }
+  }
+  if ids.len() != mapped_ids.len()
+    || ids.iter().any(|id| !mapped_ids.contains(*id))
+  {
+    return Ok(false);
+  }
+  let inventory = state
+    .inner
+    .docker_api
+    .list_containers(Some(ListContainersOptions {
+      all: true,
+      filters: Some(HashMap::from([(
+        "label".to_owned(),
+        vec![format!("io.nanocl.c={key}")],
+      )])),
+      ..Default::default()
+    }))
+    .await
+    .map_err(|_| {
+      IoError::interrupted("Cargo observation", "Docker inventory unavailable")
+    })?;
+  let inventory_ids = inventory
+    .iter()
+    .filter_map(|container| container.id.as_deref())
+    .collect::<HashSet<_>>();
+  if inventory_ids.len() != inventory.len() || inventory_ids != ids {
+    return Ok(false);
+  }
+  let mut observed = Vec::with_capacity(processes.len());
+  for container in inventory {
+    let id = container.id.as_deref().expect("inventory IDs were checked");
+    let mut process = validate_target(cargo, incarnation, id, state).await?;
+    let runtime = state
+      .inner
+      .docker_api
+      .inspect_container(id, None)
+      .await
+      .map_err(|_| {
+        IoError::interrupted(
+          "Cargo observation",
+          "Docker runtime observation unavailable",
+        )
+      })?;
+    let labels = runtime
+      .config
+      .as_ref()
+      .and_then(|config| config.labels.as_ref());
+    let persisted_labels = process
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.labels.as_ref());
+    if runtime.id.as_deref() != Some(id)
+      || runtime.name.as_deref().is_some_and(is_rollout_process_name)
+      || !super::recovery::observed_identity_matches(labels, persisted_labels)
+      || !super::recovery::accepted_creation_identity(
+        labels,
+        persisted_labels,
+        incarnation,
+        cargo.spec.key,
+      )
+    {
+      return Ok(false);
+    }
+    process.data = runtime;
+    observed.push(process);
+  }
+  let replica_keys = replicas.iter().map(|replica| replica.key).collect();
+  Ok(observed_state_matches(
+    cargo,
+    &replica_keys,
+    &observed,
+    requested,
+  ))
+}
+
+fn observed_state_matches(
+  cargo: &Cargo,
+  replicas: &HashSet<uuid::Uuid>,
+  processes: &[Process],
+  requested: &ObjPsStatusKind,
+) -> bool {
+  match requested {
+    ObjPsStatusKind::Start => {
+      all_desired_replicas_ready(cargo, replicas, processes)
+        && processes.iter().all(|process| {
+          let Ok(identity) = process_identity(process) else {
+            return false;
+          };
+          if identity.role != CargoReplicaProcessRole::Init {
+            return process.data.state.as_ref().is_some_and(|state| {
+              state.running == Some(true) && state.restarting != Some(true)
+            });
+          }
+          process.data.state.as_ref().is_some_and(|state| {
+            state.running == Some(false)
+              && state.status
+                == Some(bollard_next::models::ContainerStateStatusEnum::EXITED)
+              && state.exit_code == Some(0)
+          })
+        })
+        && replicas.iter().all(|replica| {
+          cargo.spec.containers.iter().all(|declared| {
+            processes
+              .iter()
+              .filter(|process| {
+                process_identity(process).is_ok_and(|identity| {
+                  identity.replica_key == *replica
+                    && identity.role == CargoReplicaProcessRole::App
+                    && identity.container_name == declared.name
+                })
+              })
+              .count()
+              == 1
+          }) && cargo.spec.init_containers.iter().all(|declared| {
+            processes.iter().any(|process| {
+              process_identity(process).is_ok_and(|identity| {
+                identity.replica_key == *replica
+                  && identity.role == CargoReplicaProcessRole::Init
+                  && identity.container_name == declared.name
+              })
+            })
+          })
+        })
+    }
+    ObjPsStatusKind::Stop => processes.iter().all(|process| {
+      process.data.state.as_ref().is_some_and(|state| {
+        state.running == Some(false) && state.restarting != Some(true)
+      })
+    }),
+    _ => false,
+  }
+}
+
 /// Observe exact mappings without replaying or cleaning any runtime work.
 /// This node's Docker API cannot settle remote execution.
 pub(crate) async fn observe(
@@ -451,7 +626,220 @@ pub(crate) async fn observe(
 
 #[cfg(test)]
 mod tests {
+  use super::super::tests::{
+    declared_container, readiness_cargo, readiness_process,
+    ready_replica_processes,
+  };
   use super::*;
+
+  #[test]
+  fn cargo_noop_requires_complete_ready_runtime_and_finished_init() {
+    let replica = uuid::Uuid::new_v4();
+    let replicas = HashSet::from([replica]);
+    let mut cargo = readiness_cargo(1);
+    let mut processes = ready_replica_processes(replica);
+    let app = processes
+      .iter_mut()
+      .find(|process| {
+        process_identity(process).unwrap().role == CargoReplicaProcessRole::App
+      })
+      .unwrap();
+    *app = readiness_process(
+      replica,
+      "api.c",
+      "app",
+      "api",
+      true,
+      true,
+      Some(bollard_next::models::HealthStatusEnum::HEALTHY),
+    );
+    // Readiness alone permits a missing optional app. An explicit start would
+    // create it, so skipping that start requires every declared app.
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    let optional = readiness_process(
+      replica,
+      "metrics.c",
+      "app",
+      "metrics",
+      false,
+      true,
+      Some(bollard_next::models::HealthStatusEnum::UNHEALTHY),
+    );
+    processes.push(optional.clone());
+    // Optional health does not become an essential readiness requirement.
+    assert!(observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes[..1],
+      &ObjPsStatusKind::Start
+    ));
+    for running in [Some(false), None] {
+      processes
+        .last_mut()
+        .unwrap()
+        .data
+        .state
+        .as_mut()
+        .unwrap()
+        .running = running;
+      assert!(!observed_state_matches(
+        &cargo,
+        &replicas,
+        &processes,
+        &ObjPsStatusKind::Start
+      ));
+    }
+    *processes.last_mut().unwrap() = optional.clone();
+    processes
+      .last_mut()
+      .unwrap()
+      .data
+      .state
+      .as_mut()
+      .unwrap()
+      .restarting = Some(true);
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    *processes.last_mut().unwrap() = optional.clone();
+    processes.push(optional);
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    processes.pop();
+    cargo
+      .spec
+      .init_containers
+      .push(declared_container("migrate", true));
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    let mut init = readiness_process(
+      replica,
+      "migrate.c",
+      "init",
+      "migrate",
+      true,
+      false,
+      None,
+    );
+    init.data.state.as_mut().unwrap().exit_code = Some(0);
+    init.data.state.as_mut().unwrap().status =
+      Some(bollard_next::models::ContainerStateStatusEnum::EXITED);
+    processes.push(init);
+    assert!(observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    processes
+      .last_mut()
+      .unwrap()
+      .data
+      .state
+      .as_mut()
+      .unwrap()
+      .running = Some(true);
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    processes
+      .last_mut()
+      .unwrap()
+      .data
+      .state
+      .as_mut()
+      .unwrap()
+      .running = Some(false);
+    processes
+      .last_mut()
+      .unwrap()
+      .data
+      .state
+      .as_mut()
+      .unwrap()
+      .exit_code = Some(1);
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    processes.pop();
+    cargo.spec.init_containers.clear();
+    for process in &mut processes {
+      if let Some(health) = process.data.state.as_mut().unwrap().health.as_mut()
+      {
+        health.status = Some(bollard_next::models::HealthStatusEnum::UNHEALTHY);
+      }
+    }
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+  }
+
+  #[test]
+  fn cargo_stop_noop_requires_every_runtime_confirmed_stopped() {
+    let replica = uuid::Uuid::new_v4();
+    let replicas = HashSet::from([replica]);
+    let cargo = readiness_cargo(1);
+    let mut processes = ready_replica_processes(replica);
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Stop
+    ));
+    for process in &mut processes {
+      process.data.state.as_mut().unwrap().running = Some(false);
+    }
+    assert!(observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Stop
+    ));
+    processes[0].data.state.as_mut().unwrap().running = None;
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Stop
+    ));
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Unknown
+    ));
+  }
 
   #[test]
   fn targeted_docker_rejections_preserve_certainty_without_daemon_payloads() {

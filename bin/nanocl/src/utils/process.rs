@@ -33,17 +33,44 @@ pub fn get_actor_kind(object_name: &str) -> EventActorKind {
 
 /// Subscribe before admission, then accept only the operation returned by it.
 /// Owning the stream in this future also closes it on rejection or cancellation.
-pub async fn wait_process_operation(
+pub async fn wait_process_operation<T: Into<Option<uuid::Uuid>>>(
   key: &str,
   kind: EventActorKind,
   action: NativeEventAction,
   client: &NanocldClient,
-  request: impl Future<Output = HttpClientResult<uuid::Uuid>>,
+  request: impl Future<Output = HttpClientResult<T>>,
 ) -> HttpClientResult<()> {
+  wait_process_operation_outcome(key, kind, action, client, request)
+    .await
+    .map(|_| ())
+}
+
+/// Return true only when the daemon authoritatively confirms no change.
+pub async fn wait_process_operation_outcome<T: Into<Option<uuid::Uuid>>>(
+  key: &str,
+  kind: EventActorKind,
+  action: NativeEventAction,
+  client: &NanocldClient,
+  request: impl Future<Output = HttpClientResult<T>>,
+) -> HttpClientResult<bool> {
   // A name-only server condition can close the stream on a previous operation.
   let stream = client.watch_events(None).await?;
-  let operation = request.await?;
-  wait_operation_events(stream, key, kind, action, operation).await
+  wait_operation_outcome(stream, key, kind, action, request).await
+}
+
+async fn wait_operation_outcome<T: Into<Option<uuid::Uuid>>>(
+  stream: impl futures::Stream<Item = nanocl_error::http::HttpResult<Event>> + Unpin,
+  key: &str,
+  kind: EventActorKind,
+  action: NativeEventAction,
+  request: impl Future<Output = HttpClientResult<T>>,
+) -> HttpClientResult<bool> {
+  let Some(operation) = request.await?.into() else {
+    // An authoritative no-op has no operation event; release the subscription.
+    return Ok(true);
+  };
+  wait_operation_events(stream, key, kind, action, operation).await?;
+  Ok(false)
 }
 
 async fn wait_operation_events(
@@ -240,6 +267,76 @@ mod tests {
     assert!(pending.to_string().contains(&operation.to_string()));
     value["Metadata"]["Operation"] = json!(uuid::Uuid::from_u128(2));
     assert!(result(value).is_none());
+  }
+
+  #[test]
+  fn operation_outcome_unchanged_drops_stream_without_polling() {
+    struct DropSignal(std::rc::Rc<std::cell::Cell<bool>>);
+    impl Drop for DropSignal {
+      fn drop(&mut self) {
+        self.0.set(true);
+      }
+    }
+    let dropped = std::rc::Rc::new(std::cell::Cell::new(false));
+    let signal = DropSignal(dropped.clone());
+    let stream = futures::stream::poll_fn(
+      move |_| -> std::task::Poll<
+        Option<nanocl_error::http::HttpResult<Event>>,
+      > {
+        let _ = &signal;
+        panic!("An unchanged request must not poll for an operation event");
+      },
+    );
+    let unchanged = futures::executor::block_on(wait_operation_outcome(
+      stream,
+      "global.api",
+      EventActorKind::Cargo,
+      NativeEventAction::Start,
+      async {
+        assert!(
+          !dropped.get(),
+          "the stream must remain owned until the response"
+        );
+        Ok(None::<uuid::Uuid>)
+      },
+    ))
+    .unwrap();
+    assert!(unchanged);
+    assert!(
+      dropped.get(),
+      "the no-op must release the event subscription"
+    );
+  }
+
+  #[ntex::test]
+  async fn operation_outcome_accepted_requires_matching_completion() {
+    let operation = uuid::Uuid::from_u128(1);
+    let mut value = deletion_event(operation, None, "normal", "start");
+    value["Actor"]["Key"] = json!("global.api");
+    value["Actor"]["Kind"] = json!("Cargo");
+    value["Metadata"] = json!({"Operation": operation});
+    let event = serde_json::from_value::<Event>(value).unwrap();
+    let unchanged = wait_operation_outcome(
+      futures::stream::iter(vec![Ok(event)]),
+      "global.api",
+      EventActorKind::Cargo,
+      NativeEventAction::Start,
+      async { Ok(Some(operation)) },
+    )
+    .await
+    .unwrap();
+    assert!(!unchanged);
+    assert!(
+      wait_operation_outcome(
+        futures::stream::empty(),
+        "global.api",
+        EventActorKind::Cargo,
+        NativeEventAction::Start,
+        async { Ok(operation) },
+      )
+      .await
+      .is_err()
+    );
   }
 
   #[ntex::test]
