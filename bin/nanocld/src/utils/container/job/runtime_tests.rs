@@ -1409,6 +1409,14 @@ async fn job_runtime_expected_delete_rejects_successor_and_pre_run_identity() {
 #[ntex::test]
 async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   let fixture = Fixture::new(Mode::BlockStop).await;
+  // Compare retained revisions at the database timestamp precision.
+  let expected_spec = JobDb::history_spec(
+    &fixture.job.spec.name,
+    fixture.job.spec_key,
+    &fixture.state.inner.pool,
+  )
+  .await
+  .unwrap();
   crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
     .await
     .unwrap();
@@ -1466,7 +1474,7 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   assert_ne!(restored.spec_key, fixture.job.spec_key);
   assert_eq!(
     JobPartial::from(restored.spec),
-    JobPartial::from(fixture.job.spec.clone())
+    JobPartial::from(expected_spec.clone())
   );
   assert!(restored.current_run_key.is_none());
   let detail = JobDb::inspect_run(
@@ -1478,7 +1486,7 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   .unwrap();
   assert_eq!(detail.run.state, JobRunState::Interrupted);
   assert!(detail.run.finished_at.is_some());
-  assert_eq!(detail.spec, fixture.job.spec);
+  assert_eq!(detail.spec, expected_spec);
   assert_eq!(detail.run.spec_key, fixture.job.spec_key);
   assert!(fixture.docker.runtimes.lock().unwrap().is_empty());
   assert_eq!(
