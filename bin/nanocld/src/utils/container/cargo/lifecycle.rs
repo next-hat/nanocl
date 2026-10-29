@@ -678,6 +678,52 @@ mod tests {
       &processes,
       &ObjPsStatusKind::Start
     ));
+    // A fully ready subset cannot stand in for every desired replica.
+    cargo.spec.replicas = 2;
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    let second_replica = uuid::Uuid::new_v4();
+    let both_replicas = HashSet::from([replica, second_replica]);
+    assert!(!observed_state_matches(
+      &cargo,
+      &both_replicas,
+      &processes,
+      &ObjPsStatusKind::Start
+    ));
+    let mut both_processes = processes.clone();
+    both_processes.extend(ready_replica_processes(second_replica));
+    both_processes.push(readiness_process(
+      second_replica,
+      "metrics-2.c",
+      "app",
+      "metrics",
+      false,
+      true,
+      None,
+    ));
+    assert!(observed_state_matches(
+      &cargo,
+      &both_replicas,
+      &both_processes,
+      &ObjPsStatusKind::Start
+    ));
+    cargo.spec.replicas = 1;
+    assert!(!observed_state_matches(
+      &cargo,
+      &both_replicas,
+      &both_processes,
+      &ObjPsStatusKind::Start
+    ));
+    assert!(!observed_state_matches(
+      &cargo,
+      &replicas,
+      &both_processes,
+      &ObjPsStatusKind::Start
+    ));
     assert!(!observed_state_matches(
       &cargo,
       &replicas,

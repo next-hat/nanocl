@@ -4,7 +4,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   job::Job,
-  system::{EventActorKind, NativeEventAction},
+  system::{EventActorKind, EventKind, NativeEventAction},
 };
 
 use super::generic::ObjTask;
@@ -87,9 +87,9 @@ pub(crate) async fn start_if_incarnation(
   state: &SystemState,
 ) -> HttpResult<()> {
   let lock = utils::container::job::lifecycle_lock(key);
-  let serialized = lock
-    .try_lock_owned()
-    .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+  // Serialize admission through the preceding action's event publication.
+  // Durable acceptance still rejects an unfinished run or pending operation.
+  let serialized = lock.lock_owned().await;
   let key = key.to_owned();
   let state = state.clone();
   let (reply, response) = tokio::sync::oneshot::channel();
@@ -184,9 +184,7 @@ async fn control(
   state: &SystemState,
 ) -> HttpResult<Job> {
   let lock = utils::container::job::lifecycle_lock(key);
-  let serialized = lock
-    .try_lock_owned()
-    .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+  let serialized = lock.lock_owned().await;
   let key = key.to_owned();
   let state = state.clone();
   let (reply, response) = tokio::sync::oneshot::channel();
@@ -257,9 +255,6 @@ async fn control(
       )
       .await;
     }
-    // A terminal event permits an immediate successor (including recreation).
-    // Publish it only after the lifecycle lease is available to that request.
-    drop(serialized);
     let action = if action == "delete" {
       NativeEventAction::Destroy
     } else {
@@ -272,13 +267,21 @@ async fn control(
           .await;
       }
       Err(error) => {
-        state.emit_error_native_action(
-          &accepted.job,
-          action,
-          Some(error.to_string()),
-        );
+        state
+          .emit_action_sync(
+            &accepted.job.clone().into(),
+            action,
+            EventKind::Error,
+            "state_sync",
+            Some(error.to_string()),
+            None,
+          )
+          .await;
       }
     }
+    // Publish the predecessor's terminal event before a successor can publish
+    // Starting. Event-driven follow-ups wait for this short admission boundary.
+    drop(serialized);
     cleanup(&owner, &state).await;
   });
   response.await.map_err(|_| {

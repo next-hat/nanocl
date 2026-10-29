@@ -133,6 +133,7 @@ fn operation_event_result(
       event.note.as_deref().unwrap_or("Operation failed"),
     )));
   }
+  // Admission and completion both use state_sync; their actions are distinct.
   if event.kind == EventKind::Normal && event.action == action.to_string() {
     return Some(Ok(()));
   }
@@ -388,6 +389,100 @@ mod tests {
     .await
     .unwrap_err();
     assert!(error.to_string().contains("Exact Job deletion failed"));
+  }
+
+  #[ntex::test]
+  async fn operation_stream_state_sync_admission_is_not_completion() {
+    let operation = uuid::Uuid::from_u128(1);
+    for (kind, admission, completion) in [
+      (
+        EventActorKind::Cargo,
+        NativeEventAction::Starting,
+        NativeEventAction::Start,
+      ),
+      (
+        EventActorKind::Cargo,
+        NativeEventAction::Stopping,
+        NativeEventAction::Stop,
+      ),
+      (
+        EventActorKind::Cargo,
+        NativeEventAction::Updating,
+        NativeEventAction::Update,
+      ),
+      (
+        EventActorKind::Cargo,
+        NativeEventAction::Destroying,
+        NativeEventAction::Destroy,
+      ),
+      (
+        EventActorKind::Vm,
+        NativeEventAction::Starting,
+        NativeEventAction::Start,
+      ),
+      (
+        EventActorKind::Vm,
+        NativeEventAction::Updating,
+        NativeEventAction::Update,
+      ),
+      (
+        EventActorKind::Vm,
+        NativeEventAction::Destroying,
+        NativeEventAction::Destroy,
+      ),
+    ] {
+      let event = |event_kind: &str, action: &NativeEventAction| {
+        let mut value =
+          deletion_event(operation, None, event_kind, &action.to_string());
+        value["Actor"]["Key"] = json!("global.api");
+        value["Actor"]["Kind"] = json!(kind);
+        value["Metadata"] = json!({"Operation": operation});
+        value["Reason"] = json!("state_sync");
+        value["Note"] = json!("The admitted operation failed");
+        serde_json::from_value::<Event>(value).unwrap()
+      };
+      let error = wait_operation_events(
+        futures::stream::iter(vec![Ok(event("normal", &admission))]),
+        "global.api",
+        kind.clone(),
+        completion.clone(),
+        operation,
+      )
+      .await
+      .unwrap_err();
+      assert!(
+        error
+          .to_string()
+          .contains("before the requested completion")
+      );
+
+      let error = wait_operation_events(
+        futures::stream::iter(vec![
+          Ok(event("normal", &admission)),
+          Ok(event("error", &completion)),
+        ]),
+        "global.api",
+        kind.clone(),
+        completion.clone(),
+        operation,
+      )
+      .await
+      .unwrap_err();
+      assert!(error.to_string().contains("The admitted operation failed"));
+
+      wait_operation_events(
+        futures::stream::iter(vec![
+          Ok(event("normal", &admission)),
+          Ok(event("normal", &completion)),
+        ]),
+        "global.api",
+        kind.clone(),
+        completion,
+        operation,
+      )
+      .await
+      .unwrap();
+    }
   }
 
   #[ntex::test]
