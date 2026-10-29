@@ -153,7 +153,6 @@ impl JobDb {
     version: &str,
     state: &SystemState,
   ) -> HttpResult<Job> {
-    let current = Self::transform_read_by_pk(name, &state.inner.pool).await?;
     let stored =
       Self::history_spec(name, history_key, &state.inner.pool).await?;
     if stored.name != name {
@@ -173,6 +172,8 @@ impl JobDb {
         .lock_owned()
         .await,
     );
+    // Snapshot the live incarnation and run only after preceding actions settle.
+    let current = Self::transform_read_by_pk(name, &state.inner.pool).await?;
     let state = state.clone();
     let (reply, response) = tokio::sync::oneshot::channel();
     // Retain ownership of the whole replacement if the HTTP caller disconnects.
