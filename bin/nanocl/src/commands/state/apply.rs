@@ -358,7 +358,10 @@ async fn state_apply(
                 } else {
                   match inspect.status.actual {
                     ObjPsStatusKind::Start => return Ok("Unchanged"),
-                    ObjPsStatusKind::Stop => {
+                    ObjPsStatusKind::Create
+                    | ObjPsStatusKind::Stop
+                    | ObjPsStatusKind::Fail
+                    | ObjPsStatusKind::Finish => {
                       utils::progress::set_state_message(
                         &pg, summary, "Starting", output,
                       )?;
@@ -369,7 +372,7 @@ async fn state_apply(
                     }
                     actual => return Err(IoError::other(
                       "StateApply",
-                      &format!("Cargo {key} has observed status {actual:?}; expected Start or Stop"),
+                      &format!("Cargo {key} has observed status {actual:?}; expected a settled Start, Create, Stop, Fail, or Finish status"),
                     )),
                   }
                 }

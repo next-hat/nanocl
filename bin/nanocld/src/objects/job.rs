@@ -20,9 +20,11 @@ impl ObjCreate for JobDb {
     obj: &Self::ObjCreateIn,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
+    // A cancelled run can briefly reacquire this lock after deletion completes.
+    // Wait for its final observation before admitting the replacement.
     let serialized = utils::container::job::lifecycle_lock(&obj.spec.name)
-      .try_lock_owned()
-      .map_err(|_| HttpError::conflict("A Job lifecycle action is active"))?;
+      .lock_owned()
+      .await;
     let spec = obj.spec.clone();
     let version = obj.version.clone();
     let state = state.clone();
