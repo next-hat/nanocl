@@ -404,7 +404,10 @@ pub trait GenericCommandStop: GenericCommand {
           }
           Ok(())
         };
-      let result = if object_name == "jobs" || object_name == "vms" {
+      let result = if object_name == "vms" {
+        // This endpoint returns only after confirmed shutdown, unlike Job admission.
+        client.stop_vm(key, &Default::default()).await
+      } else if object_name == "jobs" {
         client.stop_process(&kind, key).await
       } else {
         utils::process::wait_process_operation(

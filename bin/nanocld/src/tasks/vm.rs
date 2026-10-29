@@ -341,6 +341,9 @@ where
             ),
           )
           .await;
+        // The terminal event owns this operation result. Returning its error
+        // would make TaskManager publish the same failure a second time.
+        return Ok(());
       }
       if let Some(restart) = restart {
         let _ = restart.completion.send(result.clone());
@@ -352,8 +355,7 @@ where
       .task_manager
       .add_task(&task_key, action.clone(), task, move |error| async move {
         if let Some(action) = completion_action(&error_action) {
-          // Also report an execution owner that stopped before emitting its
-          // own result. Duplicate failure notifications retain the same UUID.
+          // Report an execution owner that stopped before emitting its result.
           error_state.emit_action(
             &error_actor,
             action,
@@ -589,6 +591,44 @@ mod tests {
   };
 
   use super::*;
+
+  #[ntex::test]
+  async fn vm_owner_exit_invokes_task_fallback_once() {
+    let manager = crate::models::TaskManager::default();
+    let failures = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let reported = failures.clone();
+    let (release, blocked) = tokio::sync::oneshot::channel();
+    let task = owned_executor(async move {
+      blocked.await.unwrap();
+      // The detached owner exits without sending an operation result.
+      panic!("injected VM execution owner exit");
+    });
+    manager
+      .add_task(
+        "Vm@owner-exit-test",
+        NativeEventAction::Starting,
+        task,
+        move |error| async move {
+          reported.borrow_mut().push(error);
+          Ok(())
+        },
+      )
+      .await;
+    let registered = manager.get_task("Vm@owner-exit-test").await.unwrap();
+    release.send(()).unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(2), registered.wait())
+      .await
+      .expect("VM owner exit did not reach the task fallback");
+    assert!(manager.get_task("Vm@owner-exit-test").await.is_none());
+    let failures = failures.borrow();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].context(), Some("VM task"));
+    assert_eq!(failures[0].inner.kind(), std::io::ErrorKind::Interrupted);
+    assert_eq!(
+      failures[0].inner.to_string(),
+      "Execution owner stopped unexpectedly"
+    );
+  }
 
   #[ntex::test]
   async fn cancelled_vm_waiter_retains_executor_ownership_until_completion() {
