@@ -1540,7 +1540,20 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
       .await
       .expect("Competing creation remained blocked after replacement")
       .unwrap_err();
-  assert_eq!(conflict.status, ntex::http::StatusCode::CONFLICT);
+  // The existing operation transaction adapter preserves the duplicate-index
+  // diagnostic but maps database errors to HTTP 500. Verify that exact rejection
+  // instead of accepting an unrelated creation failure or changing that API here.
+  assert_eq!(
+    conflict.status,
+    ntex::http::StatusCode::INTERNAL_SERVER_ERROR,
+    "{conflict}"
+  );
+  assert!(
+    conflict.msg.contains("Operation transaction")
+      && conflict.msg.contains("duplicate key value")
+      && conflict.msg.contains("resource_incarnations_live_idx"),
+    "Expected duplicate live Job rejection, got {conflict}"
+  );
   let restored = tokio::time::timeout(Duration::from_secs(30), async {
     loop {
       if let Ok(job) = JobDb::transform_read_by_pk(
