@@ -1550,7 +1550,10 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   );
   assert!(
     conflict.msg.contains("Operation transaction")
-      && conflict.msg.contains("duplicate key value")
+      && conflict
+        .msg
+        .to_ascii_lowercase()
+        .contains("duplicate key value")
       && conflict.msg.contains("resource_incarnations_live_idx"),
     "Expected duplicate live Job rejection, got {conflict}"
   );
