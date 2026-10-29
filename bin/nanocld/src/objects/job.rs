@@ -189,6 +189,7 @@ impl JobDb {
             "Job {} was removed, but its restored configuration could not be created: {}; retained configurations and runs remain available",
             current.spec.name, error.msg,
           );
+          log::warn!("Job {} revert failed after deletion: {error}", current.spec.name);
           error
         })?;
         state.emit_normal_native_action_sync(&job, NativeEventAction::Create).await;
