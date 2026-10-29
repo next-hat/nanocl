@@ -73,6 +73,76 @@ fn read_crontab_stderr(mut stderr: impl Read) -> std::io::Result<String> {
   Ok(diagnostic)
 }
 
+/// Install one complete crontab while retaining the child and its pipe reader.
+fn install_crontab(
+  content: &str,
+  command: &mut std::process::Command,
+) -> IoResult<()> {
+  let mut child = command
+    .stdin(Stdio::piped())
+    .stdout(Stdio::null())
+    .stderr(Stdio::piped())
+    .spawn()
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  let Some(stderr) = child.stderr.take() else {
+    let _ = child.kill();
+    let _ = child.wait();
+    return Err(IoError::other("Cron job", "crontab stderr is unavailable"));
+  };
+  // Drain stderr before writing stdin: either pipe can otherwise fill while
+  // the other side is blocked. This thread belongs to the serialized owner.
+  let diagnostic = match std::thread::Builder::new()
+    .name("nanocl-crontab-stderr".to_owned())
+    .spawn(move || read_crontab_stderr(stderr))
+  {
+    Ok(reader) => reader,
+    Err(error) => {
+      let _ = child.kill();
+      let _ = child.wait();
+      return Err(*error.map_err_context(|| "Cron job"));
+    }
+  };
+  // Close stdin before waiting, and retain ownership on write failure too.
+  let written = child
+    .stdin
+    .take()
+    .ok_or_else(|| std::io::Error::other("crontab stdin is unavailable"))
+    .and_then(|mut stdin| stdin.write_all(content.as_bytes()));
+  if written.is_err() {
+    let _ = child.kill();
+  }
+  let status = child.wait();
+  if status.is_err() {
+    let _ = child.kill();
+    let _ = child.wait();
+  }
+  let diagnostic = match diagnostic.join() {
+    Ok(Ok(diagnostic)) if diagnostic.is_empty() => String::new(),
+    Ok(Ok(diagnostic)) => format!(": {diagnostic}"),
+    Ok(Err(error)) => format!("; crontab stderr unavailable: {error}"),
+    Err(_) => "; crontab stderr reader stopped unexpectedly".to_owned(),
+  };
+  written.map_err(|error| {
+    IoError::with_context(
+      "Cron job",
+      std::io::Error::new(error.kind(), format!("{error}{diagnostic}")),
+    )
+  })?;
+  let status = status.map_err(|error| {
+    IoError::with_context(
+      "Cron job",
+      std::io::Error::new(error.kind(), format!("{error}{diagnostic}")),
+    )
+  })?;
+  if !status.success() {
+    return Err(IoError::interrupted(
+      "Cron job",
+      &format!("crontab exited with status {status}{diagnostic}"),
+    ));
+  }
+  Ok(())
+}
+
 /// Read, modify, and install under one lock shared by all scheduled Jobs.
 async fn update_crontab(
   update: impl FnOnce(String) -> String + Send + Sync + 'static,
@@ -81,70 +151,7 @@ async fn update_crontab(
     let content = std::fs::read_to_string("/var/spool/cron/crontabs/root")
       .map_err(|err| err.map_err_context(|| "Cron job"))?;
     let content = update(content);
-    let mut child = std::process::Command::new("crontab")
-      .arg("-")
-      .stdin(Stdio::piped())
-      .stdout(Stdio::null())
-      .stderr(Stdio::piped())
-      .spawn()
-      .map_err(|err| err.map_err_context(|| "Cron job"))?;
-    let Some(stderr) = child.stderr.take() else {
-      let _ = child.kill();
-      let _ = child.wait();
-      return Err(IoError::other("Cron job", "crontab stderr is unavailable"));
-    };
-    // Drain stderr before writing stdin: either pipe can otherwise fill while
-    // the other side is blocked. This thread belongs to the serialized owner.
-    let diagnostic = match std::thread::Builder::new()
-      .name("nanocl-crontab-stderr".to_owned())
-      .spawn(move || read_crontab_stderr(stderr))
-    {
-      Ok(reader) => reader,
-      Err(error) => {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(*error.map_err_context(|| "Cron job"));
-      }
-    };
-    // Close stdin before waiting, and retain ownership on write failure too.
-    let written = child
-      .stdin
-      .take()
-      .ok_or_else(|| std::io::Error::other("crontab stdin is unavailable"))
-      .and_then(|mut stdin| stdin.write_all(content.as_bytes()));
-    if written.is_err() {
-      let _ = child.kill();
-    }
-    let status = child.wait();
-    if status.is_err() {
-      let _ = child.kill();
-      let _ = child.wait();
-    }
-    let diagnostic = match diagnostic.join() {
-      Ok(Ok(diagnostic)) if diagnostic.is_empty() => String::new(),
-      Ok(Ok(diagnostic)) => format!(": {diagnostic}"),
-      Ok(Err(error)) => format!("; crontab stderr unavailable: {error}"),
-      Err(_) => "; crontab stderr reader stopped unexpectedly".to_owned(),
-    };
-    written.map_err(|error| {
-      IoError::with_context(
-        "Cron job",
-        std::io::Error::new(error.kind(), format!("{error}{diagnostic}")),
-      )
-    })?;
-    let status = status.map_err(|error| {
-      IoError::with_context(
-        "Cron job",
-        std::io::Error::new(error.kind(), format!("{error}{diagnostic}")),
-      )
-    })?;
-    if !status.success() {
-      return Err(IoError::interrupted(
-        "Cron job",
-        &format!("crontab exited with status {status}{diagnostic}"),
-      ));
-    }
-    Ok(())
+    install_crontab(&content, std::process::Command::new("crontab").arg("-"))
   })
   .await
 }
@@ -189,6 +196,115 @@ pub async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  // These subprocess regressions are for the existing CI suite. They never run
+  // the real crontab command or modify the host environment or spool.
+  fn crontab_fixture(script: &str) -> std::process::Command {
+    let mut command = std::process::Command::new("timeout");
+    command.args(["-k", "2", "10", "sh", "-c", script]);
+    command
+  }
+
+  #[test]
+  fn crontab_install_drains_stderr_while_writing_full_input() {
+    let content = "x".repeat(4 * 1024 * 1024);
+    let mut command = crontab_fixture(
+      r#"
+        set -e
+        i=0
+        while [ "$i" -lt 1024 ]; do
+          printf '%4096s' '' >&2
+          i=$((i + 1))
+        done
+        received=$(wc -c)
+        test "$received" -eq 4194304
+      "#,
+    );
+    // Both pipes exceed their capacities. Without concurrent drainage this
+    // fails through the fixture's deadline instead of hanging the CI worker.
+    install_crontab(&content, &mut command).unwrap();
+  }
+
+  #[test]
+  fn crontab_install_reports_failed_status_and_bounded_plain_text() {
+    let mut command = crontab_fixture(
+      r#"
+        printf '\033[31minvalid schedule\000\007\n' >&2
+        i=0
+        while [ "$i" -lt 1024 ]; do
+          printf '%4096s' x >&2
+          i=$((i + 1))
+        done
+        cat >/dev/null
+        exit 7
+      "#,
+    );
+    let error =
+      install_crontab("* * * * * fixture\n", &mut command).unwrap_err();
+    assert_eq!(error.context(), Some("Cron job"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    let message = error.to_string();
+    assert!(message.contains("exit status: 7"), "{message}");
+    assert!(message.contains("[31minvalid schedule"), "{message}");
+    assert!(message.contains("[stderr truncated]"), "{message}");
+    assert!(message.len() < 9 * 1024);
+    assert!(!message.chars().any(|character| {
+      character.is_control() && !matches!(character, '\n' | '\t')
+    }));
+  }
+
+  #[test]
+  fn crontab_install_retains_diagnostic_when_child_closes_input() {
+    let mut command = crontab_fixture(
+      r#"
+        printf 'crontab refused input\n' >&2
+        exec 0<&-
+        exit 0
+      "#,
+    );
+    // The diagnostic precedes closing stdin, so the parent's write-error kill
+    // cannot race ahead of its production.
+    let error =
+      install_crontab(&"x".repeat(4 * 1024 * 1024), &mut command).unwrap_err();
+    assert_eq!(error.context(), Some("Cron job"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::BrokenPipe);
+    assert!(error.to_string().contains("crontab refused input"));
+  }
+
+  #[test]
+  fn crontab_install_reports_missing_executable() {
+    let missing = std::env::temp_dir()
+      .join(format!("nanocl-crontab-missing-{}", uuid::Uuid::new_v4(),));
+    let error = install_crontab("", &mut std::process::Command::new(missing))
+      .unwrap_err();
+    assert_eq!(error.context(), Some("Cron job"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::NotFound);
+  }
+
+  #[ntex::test]
+  async fn cron_install_failure_releases_serialized_owner() {
+    let error =
+      serialized_update(|| install_crontab("", &mut crontab_fixture("exit 7")))
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("exit status: 7"));
+    // A failed installation must release the owner so the next update can
+    // install successfully. The existing cancellation test covers the inverse.
+    ntex::time::timeout(
+      std::time::Duration::from_secs(15),
+      serialized_update(|| {
+        install_crontab(
+          "replacement\n",
+          &mut crontab_fixture(
+            "IFS= read -r value; test \"$value\" = replacement",
+          ),
+        )
+      }),
+    )
+    .await
+    .expect("failed installer retained the serialization lock")
+    .unwrap();
+  }
 
   #[test]
   fn crontab_stderr_is_bounded_drained_and_plain_text() {

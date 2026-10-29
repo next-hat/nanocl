@@ -326,6 +326,160 @@ impl NanocldClient {
 mod console_tests {
   use super::*;
 
+  #[ntex::test]
+  async fn vm_receipt_methods_preserve_delete_and_patch_wire_contracts() {
+    use ntex::http::StatusCode;
+    let operation = uuid::Uuid::from_u128(23);
+    let encoded = operation.to_string();
+    let (client, requests, _server) = crate::process::receipt_test::client(
+      StatusCode::OK,
+      Some(&encoded),
+      None,
+    );
+    let patch = VmSpecUpdate {
+      hostname: Some("database-node".to_owned()),
+      console: Some(true),
+      ..Default::default()
+    };
+    assert_eq!(
+      client
+        .patch_vm_operation("team.database", &patch)
+        .await
+        .unwrap(),
+      operation,
+    );
+    assert_eq!(
+      client.delete_vm_operation("team.database").await.unwrap(),
+      operation,
+    );
+    client.delete_vm("team.database").await.unwrap();
+    for key in [
+      "database",
+      "../vm",
+      "global.vm?force=true",
+      "global.vm/status",
+    ] {
+      assert!(client.delete_vm_operation(key).await.is_err());
+    }
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 3);
+    assert_eq!(recorded[0].method, "PATCH");
+    assert_eq!(
+      serde_json::from_str::<serde_json::Value>(&recorded[0].body).unwrap(),
+      serde_json::to_value(&patch).unwrap(),
+    );
+    for request in &recorded[1..] {
+      assert_eq!(request.method, "DELETE");
+      assert!(request.body.is_empty());
+    }
+    for request in recorded.iter() {
+      assert_eq!(
+        request.path,
+        format!("/v{}/vms/team.database", crate::NANOCLD_DEFAULT_VERSION),
+      );
+      assert!(request.query.is_empty());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_receipt_methods_reject_missing_or_invalid_completion_ids() {
+    use ntex::http::StatusCode;
+    for receipt in [None, Some("not-a-uuid")] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(StatusCode::OK, receipt, None);
+      let errors = [
+        client
+          .patch_vm_operation("team.database", &VmSpecUpdate::default())
+          .await
+          .unwrap_err(),
+        client
+          .delete_vm_operation("team.database")
+          .await
+          .unwrap_err(),
+        client.delete_vm("team.database").await.unwrap_err(),
+      ];
+      for error in errors {
+        assert!(
+          error
+            .to_string()
+            .contains("completion cannot be correlated")
+        );
+      }
+      assert_eq!(requests.lock().unwrap().len(), 3);
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_stop_outcome_uses_explicit_header_and_preserves_shutdown_options()
+  {
+    use ntex::http::StatusCode;
+    let options = VmLifecycleOptions {
+      timeout: 17,
+      force: true,
+    };
+    for (status, unchanged, expected) in [
+      (StatusCode::OK, Some("true"), true),
+      (StatusCode::OK, None, false),
+      (StatusCode::ACCEPTED, Some("true"), false),
+    ] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(status, None, unchanged);
+      assert_eq!(
+        client
+          .stop_vm_with_outcome("team.database", &options)
+          .await
+          .unwrap(),
+        expected,
+      );
+      client.stop_vm("team.database", &options).await.unwrap();
+      client.restart_vm("team.database", &options).await.unwrap();
+      assert!(
+        client
+          .stop_vm_with_outcome(
+            "team.database",
+            &VmLifecycleOptions {
+              timeout: 0,
+              force: false,
+            }
+          )
+          .await
+          .is_err()
+      );
+      let recorded = requests.lock().unwrap();
+      assert_eq!(recorded.len(), 3);
+      for (request, action) in recorded.iter().zip(["stop", "stop", "restart"])
+      {
+        assert_eq!(request.method, "POST");
+        assert_eq!(
+          request.path,
+          format!(
+            "/v{}/vms/team.database/{action}",
+            crate::NANOCLD_DEFAULT_VERSION,
+          )
+        );
+        assert!(request.query.is_empty());
+        assert_eq!(
+          serde_json::from_str::<serde_json::Value>(&request.body).unwrap(),
+          serde_json::to_value(&options).unwrap(),
+        );
+      }
+    }
+    let (client, _, _server) = crate::process::receipt_test::client(
+      StatusCode::CONFLICT,
+      None,
+      Some("true"),
+    );
+    let error = client
+      .stop_vm_with_outcome("team.database", &options)
+      .await
+      .unwrap_err();
+    assert!(matches!(
+      error,
+      nanocl_error::http_client::HttpClientError::HttpError(error)
+        if error.status == StatusCode::CONFLICT
+    ));
+  }
+
   #[test]
   fn vm_lifecycle_unchanged_requires_explicit_success_header() {
     use ntex::http::StatusCode;
