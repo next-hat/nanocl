@@ -2601,6 +2601,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Another VM lifecycle operation is active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     Any:

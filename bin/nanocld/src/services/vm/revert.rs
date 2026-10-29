@@ -22,6 +22,7 @@ use crate::{
     )),
     (status = 400, description = "Invalid key or history from another resource", body = crate::services::openapi::ApiError),
     (status = 404, description = "Virtual machine or history does not exist in the current incarnation", body = crate::services::openapi::ApiError),
+    (status = 409, description = "Another VM lifecycle operation is active", body = crate::services::openapi::ApiError),
   ),
 ))]
 pub async fn revert_vm(

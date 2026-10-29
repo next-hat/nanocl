@@ -321,6 +321,14 @@ mod tests {
     assert!(
       vm["responses"]["200"]["headers"]["X-Nanocl-Operation"].is_object()
     );
+    assert_eq!(
+      vm["responses"]["409"]["description"],
+      "Another VM lifecycle operation is active"
+    );
+    assert_eq!(
+      vm["responses"]["409"]["content"]["application/json"]["schema"]["$ref"],
+      "#/components/schemas/ApiError"
+    );
     let revision = vm["parameters"]
       .as_array()
       .unwrap()
