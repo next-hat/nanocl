@@ -638,9 +638,13 @@ async fn execute_start(
     &state.inner.pool,
   )
   .await?;
+  // Start is emitted once by execute, after durable completion and lease release.
   for action in utils::container::cargo::promotion_actions(
     utils::container::cargo::has_container_healthcheck(cargo, &processes),
-  ) {
+  )
+  .into_iter()
+  .filter(|action| *action != NativeEventAction::Start)
+  {
     state.emit_normal_native_action_sync(cargo, action).await;
   }
   Ok(())

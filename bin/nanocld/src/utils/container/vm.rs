@@ -1439,10 +1439,12 @@ async fn delete_unlocked<G: Clone + Send + 'static>(
   } else {
     VmDb::clear_by_pk_owned(&vm.spec.vm_key, keepalive, &state.inner.pool)
       .await?;
+    state
+      .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
+      .await;
   }
-  state
-    .emit_normal_native_action_sync(&vm, NativeEventAction::Destroy)
-    .await;
+  // Accepted operations publish their correlated completion from the owning
+  // task after releasing its lease.
   Ok(())
 }
 
