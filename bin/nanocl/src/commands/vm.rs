@@ -31,7 +31,8 @@ use crate::{
   config::CliConfig,
   models::{
     GenericDefaultOpts, GenericHistoryOpts, SpecHistoryRow, VmArg, VmCommand,
-    VmCompactRow, VmCreateOpts, VmLifecycleOpts, VmPatchOpts, VmRow, VmRunOpts,
+    VmCompactRow, VmCreateOpts, VmLifecycleOpts, VmPatchOpts, VmRevertOpts,
+    VmRow, VmRunOpts,
   },
   utils,
 };
@@ -220,6 +221,34 @@ async fn exec_vm_history(
   )
 }
 
+/// Restore a saved specification and wait for its accepted update operation.
+async fn exec_vm_revert(
+  cli_conf: &CliConfig,
+  opts: &VmRevertOpts,
+) -> IoResult<()> {
+  let client = &cli_conf.client;
+  let mut vm = None;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Vm,
+    NativeEventAction::Update,
+    client,
+    async {
+      let (response, operation) = client
+        .revert_vm_operation(&opts.key, &opts.history_id.to_string())
+        .await?;
+      vm = Some(response);
+      Ok(operation)
+    },
+  )
+  .await?;
+  let vm = vm.ok_or_else(|| {
+    IoError::invalid_data("VM revert", "Accepted response is unavailable")
+  })?;
+  utils::print::print_yml(vm)?;
+  Ok(())
+}
+
 fn vm_process_name(key: &str) -> IoResult<String> {
   let key = key
     .parse::<ResourceKey>()
@@ -379,6 +408,7 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Remove(opts) => VmArg::exec_rm(&cli_conf.client, opts).await,
     VmCommand::Inspect(opts) => VmArg::exec_inspect(cli_conf, opts).await,
     VmCommand::History(opts) => exec_vm_history(cli_conf, opts).await,
+    VmCommand::Revert(opts) => exec_vm_revert(cli_conf, opts).await,
     VmCommand::Start(opts) => VmArg::exec_start(client, opts).await,
     VmCommand::Stop(opts) => exec_vm_lifecycle(client, opts, false).await,
     VmCommand::Restart(opts) => exec_vm_lifecycle(client, opts, true).await,

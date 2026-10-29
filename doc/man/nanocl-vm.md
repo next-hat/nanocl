@@ -44,6 +44,9 @@ Inspect a VM by canonical key
 vm-history(1)
 List specification revisions or inspect one revision by canonical key
 
+vm-revert(1)
+Restore a specification revision by canonical key
+
 vm-start(1)
 Start VMs by canonical keys
 

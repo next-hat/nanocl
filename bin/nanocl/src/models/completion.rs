@@ -11,6 +11,8 @@ pub enum CompletionKind {
   Process,
   CargoContainer,
   CargoHistory,
+  VmHistory,
+  JobHistory,
   ResourceHistory,
   Event,
   Metric,

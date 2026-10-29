@@ -237,7 +237,10 @@ impl NanocldClient {
     )
   }
 
-  async fn patch(&self, url: &str) -> IoResult<ntex::client::ClientRequest> {
+  pub(crate) async fn patch(
+    &self,
+    url: &str,
+  ) -> IoResult<ntex::client::ClientRequest> {
     Ok(
       self
         .gen_client()

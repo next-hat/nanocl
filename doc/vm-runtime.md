@@ -116,6 +116,25 @@ The automatic-recovery correction passed formatting, Clippy, the development-bin
 
 The recovery fixture terminates only its newly created child controller, then invokes the production recovery scan. Previous-boot coverage uses simulated boot-identity fixtures, including changed filesystem identity and exact cleanup. No host reboot was performed, no host boot identity was changed, and the installed cluster was untouched. Broader suite validation runs in PR CI rather than repeating the full suite locally.
 
+## Reverting a configuration
+
+```sh
+nanocl vm history global.desktop
+nanocl vm revert global.desktop SPEC_UUID
+```
+
+Revert restores the complete saved declaration as a new desired revision using
+the existing VM update lifecycle. The selected specification must belong to the
+live VM and its current incarnation. Revisions remain immutable. Running guests
+use the usual graceful shutdown and runtime replacement; the CLI waits for the
+matching update operation and reports its failure if replacement cannot complete.
+Guest disk contents are not rolled back.
+
+The API is `PATCH /v0.19.0/vms/{vm_key}/histories/{history_key}/revert` with no
+request body. HTTP 200 returns the accepted VM and `X-Nanocl-Operation`; clients
+use that operation UUID to match terminal events. The SDK exposes `revert_vm`
+and `revert_vm_operation` for callers that need the receipt.
+
 ## Live resource growth
 
 Reserve CPU and memory ceilings when creating the VM. `HostConfig.MaxCpu` and `HostConfig.MaxMemory` are optional; omitted values use the initial `Cpu` and `Memory`, leaving no capacity for live growth of that resource. Memory values are MiB. The ceilings cannot be changed by a live resize: changing them through PATCH replaces the runtime and requires guest shutdown. `HostConfig` PATCH merges only supplied fields under the VM lifecycle lock; omitted fields retain their current values and explicit null clears nullable settings.

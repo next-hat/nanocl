@@ -122,7 +122,7 @@ fn object_kind(path: &[&str], id: &str) -> Option<CompletionKind> {
       [
         "vm",
         "remove" | "inspect" | "start" | "stop" | "restart" | "attach"
-        | "patch" | "history" | "status" | "resize" | "resources",
+        | "patch" | "history" | "revert" | "status" | "resize" | "resources",
       ],
       "key" | "keys",
     ) => Some(Vm),
@@ -130,10 +130,16 @@ fn object_kind(path: &[&str], id: &str) -> Option<CompletionKind> {
       [
         "job",
         "remove" | "inspect" | "logs" | "wait" | "start" | "stop" | "history"
-        | "runs",
+        | "runs" | "revert",
       ],
       "key" | "keys" | "name",
     ) => Some(Job),
+    (["vm", "revert"], "history_id") | (["vm", "history"], "id") => {
+      Some(VmHistory)
+    }
+    (["job", "revert"], "history_id") | (["job", "history"], "id") => {
+      Some(JobHistory)
+    }
     (["resource", "remove" | "inspect" | "history"], "key" | "keys")
     | (["resource", "revert"], "name") => Some(Resource),
     (["resource", "revert"], "key") | (["resource", "history"], "id") => {
@@ -214,12 +220,18 @@ mod tests {
       (&["cargo", "history"], "id"),
       (&["vm", "attach"], "key"),
       (&["vm", "history"], "key"),
+      (&["vm", "history"], "id"),
+      (&["vm", "revert"], "key"),
+      (&["vm", "revert"], "history_id"),
       (&["vm", "restart"], "keys"),
       (&["vm", "status"], "key"),
       (&["vm", "resize"], "key"),
       (&["vm", "resources"], "key"),
       (&["job", "wait"], "name"),
       (&["job", "history"], "key"),
+      (&["job", "history"], "id"),
+      (&["job", "revert"], "name"),
+      (&["job", "revert"], "history_id"),
       (&["job", "runs"], "key"),
       (&["job", "stop"], "keys"),
       (&["resource", "history"], "key"),

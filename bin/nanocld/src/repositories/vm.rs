@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use diesel::prelude::*;
 
-use nanocl_error::{http::HttpResult, io::IoResult};
+use nanocl_error::{
+  http::HttpResult,
+  io::{IoError, IoResult},
+};
 
 use nanocl_stubs::{
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
@@ -24,6 +27,22 @@ use crate::{
 };
 
 use super::generic::*;
+
+fn validate_history_owner(vm: &VmDb, stored: &SpecDb) -> IoResult<()> {
+  if stored.kind_name != "Vm" || stored.kind_key != vm.key {
+    return Err(IoError::invalid_input(
+      "VM history",
+      "Cannot revert a VM using a history from another resource",
+    ));
+  }
+  if stored.incarnation_key != Some(vm.incarnation_key) {
+    return Err(IoError::not_found(
+      "VM history",
+      "Revision does not belong to the current VM incarnation",
+    ));
+  }
+  Ok(())
+}
 
 impl RepositoryBase for VmDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
@@ -202,6 +221,27 @@ impl VmDb {
     .await
   }
 
+  pub(crate) async fn history_spec(
+    key: &str,
+    revision: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<SpecDb> {
+    let vm = Self::read_by_pk(key, pool).await?.0;
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let stored = specs::table
+        .find(revision)
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(crate::models::OperationTransactionError::from)?
+        .ok_or_else(|| {
+          IoError::not_found("VM history", "Revision does not exist")
+        })?;
+      validate_history_owner(&vm, &stored)?;
+      Ok(stored)
+    })
+    .await
+  }
+
   pub async fn update_from_spec(
     key: &str,
     item: &VmSpecPartial,
@@ -360,5 +400,66 @@ impl VmDb {
       })
     })
     .await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn vm_history_owner_rejects_foreign_and_previous_incarnations() {
+    let vm = VmDb {
+      key: "global.guest".into(),
+      name: "guest".into(),
+      created_at: chrono::Utc::now().naive_utc(),
+      namespace_name: "global".into(),
+      status_key: "global.guest".into(),
+      spec_key: uuid::Uuid::new_v4(),
+      incarnation_key: uuid::Uuid::new_v4(),
+    };
+    let mut revision = SpecDb::try_from_vm_partial(
+      &vm.key,
+      "v0.17",
+      &VmSpecPartial {
+        name: vm.name.clone(),
+        image: "/guest.qcow2".into(),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    revision.incarnation_key = Some(vm.incarnation_key);
+    validate_history_owner(&vm, &revision).unwrap();
+
+    for foreign_key in ["global.other", "other.guest"] {
+      revision.kind_key = foreign_key.into();
+      assert_eq!(
+        validate_history_owner(&vm, &revision)
+          .unwrap_err()
+          .inner
+          .kind(),
+        std::io::ErrorKind::InvalidInput
+      );
+    }
+    revision.kind_key = vm.key.clone();
+    revision.kind_name = "Cargo".into();
+    assert_eq!(
+      validate_history_owner(&vm, &revision)
+        .unwrap_err()
+        .inner
+        .kind(),
+      std::io::ErrorKind::InvalidInput
+    );
+    revision.kind_name = "Vm".into();
+    for incarnation in [None, Some(uuid::Uuid::new_v4())] {
+      revision.incarnation_key = incarnation;
+      assert_eq!(
+        validate_history_owner(&vm, &revision)
+          .unwrap_err()
+          .inner
+          .kind(),
+        std::io::ErrorKind::NotFound
+      );
+    }
   }
 }

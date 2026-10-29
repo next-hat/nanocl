@@ -71,6 +71,7 @@ nanocl job history backup
 nanocl job history backup --limit 20 --offset 20
 nanocl job history backup --id SPEC_UUID
 nanocl job history backup --id SPEC_UUID --display json
+nanocl job revert backup SPEC_UUID
 nanocl job start backup
 nanocl job wait backup
 nanocl job runs backup
@@ -87,6 +88,15 @@ apply replaces Jobs, so earlier configurations remain available. A Job does not
 need to have executed for its specification to appear in history.
 `job history --id SPEC_UUID` returns the authored configuration and its revision
 metadata; the UUID is the specification's `Key`.
+
+`job revert NAME SPEC_UUID` restores a retained configuration belonging to the
+same Job name. A live Job must exist. Revert deletes that exact live incarnation
+and current run through the normal deletion lifecycle, then recreates the saved
+declaration and schedule without immediately executing it. Active work is stopped
+by deletion; prior revisions and execution records remain available. The restored
+Job has a new incarnation and revision. Its saved cron schedule can admit future
+runs. Deletion and creation are not atomic: a failure after deletion is reported
+explicitly, and callers should inspect the current Job before retrying.
 
 `job runs` lists retained executions and distinguishes multiple incarnations by
 UUID. `job runs --id RUN_UUID` includes the pinned specification, linked start
@@ -112,6 +122,8 @@ The API exposes:
 - `GET /jobs/{name}/histories`: configuration revisions, ordered by creation
   time descending, then specification UUID descending.
 - `GET /jobs/{name}/histories/{id}`: one configuration by specification UUID.
+- `PATCH /jobs/{name}/histories/{id}/revert`: restore a configuration
+  without immediately starting a run; returns the replacement Job.
 - `GET /jobs/{name}/runs`: executions, ordered by acceptance time descending,
   then run UUID descending.
 - `GET /jobs/{name}/runs/{run}`: one execution by run UUID, including its pinned
@@ -119,7 +131,7 @@ The API exposes:
 
 Both list endpoints accept `limit` (default 50, maximum 100) and nonnegative
 `offset`. The client exposes `list_history_job` and `inspect_history_job` for
-configurations, and `list_runs_job` and `inspect_run_job` for executions.
+configurations, `revert_job` to restore a configuration, and `list_runs_job` and `inspect_run_job` for executions.
 
 Execution history previously exposed by `nanocl job history` and the
 `/histories` API now lives under `nanocl job runs` and `/runs`. Update scripts

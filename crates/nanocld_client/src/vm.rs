@@ -240,6 +240,41 @@ impl NanocldClient {
     Self::res_json(response).await
   }
 
+  /// Revert a VM to a revision of its current incarnation.
+  pub async fn revert_vm(&self, key: &str, id: &str) -> HttpClientResult<Vm> {
+    let path = Self::vm_revert_path(key, id)?;
+    let response = self
+      .send_patch(&path, None::<String>, None::<String>)
+      .await?;
+    Self::res_json(response).await
+  }
+
+  /// Revert a VM and return its response plus the accepted operation ID.
+  pub async fn revert_vm_operation(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<(Vm, uuid::Uuid)> {
+    let path = Self::vm_revert_path(key, id)?;
+    let response = self
+      .send_patch(&path, None::<String>, None::<String>)
+      .await?;
+    let operation = Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )?;
+    Ok((Self::res_json(response).await?, operation))
+  }
+
+  fn vm_revert_path(key: &str, id: &str) -> HttpClientResult<String> {
+    let id = id.parse::<uuid::Uuid>().map_err(|err| {
+      IoError::invalid_input("VM history ID", &err.to_string())
+    })?;
+    Self::vm_lifecycle_path(key, &format!("histories/{id}/revert"))
+  }
+
   /// Delete a VM by its canonical key.
   ///
   /// ## Example
@@ -325,6 +360,111 @@ impl NanocldClient {
 #[cfg(test)]
 mod console_tests {
   use super::*;
+
+  #[test]
+  fn vm_revert_path_validates_key_and_revision() {
+    let id = uuid::Uuid::from_u128(42);
+    assert_eq!(
+      NanocldClient::vm_revert_path("team.guest", &id.to_string()).unwrap(),
+      format!("/vms/team.guest/histories/{id}/revert"),
+    );
+    for key in ["guest", "../vm", "global.vm?force=true", "global.vm/status"] {
+      assert!(NanocldClient::vm_revert_path(key, &id.to_string()).is_err());
+    }
+    for id in [
+      "",
+      "invalid",
+      "../other",
+      "00000000-0000-0000-0000-000000000042?x=y",
+    ] {
+      assert!(NanocldClient::vm_revert_path("team.guest", id).is_err());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_revert_preserves_wire_contract_and_operation_receipt() {
+    use ntex::http::StatusCode;
+    let operation = uuid::Uuid::from_u128(23);
+    let revision = uuid::Uuid::from_u128(42);
+    let vm = Vm {
+      namespace_name: "team".to_owned(),
+      created_at: "1970-01-01T00:00:00".parse().unwrap(),
+      status: Default::default(),
+      spec: VmSpec {
+        key: uuid::Uuid::from_u128(43),
+        vm_key: "team.guest".to_owned(),
+        name: "guest".to_owned(),
+        ..Default::default()
+      },
+    };
+    let (client, requests, _server) =
+      crate::process::receipt_test::client_with_body(
+        StatusCode::OK,
+        Some(&operation.to_string()),
+        None,
+        Some(serde_json::to_value(&vm).unwrap()),
+      );
+    let (restored, receipt) = client
+      .revert_vm_operation("team.guest", &revision.to_string())
+      .await
+      .unwrap();
+    assert_eq!(receipt, operation);
+    assert_eq!(restored.spec.key, vm.spec.key);
+    assert_eq!(restored.spec.vm_key, "team.guest");
+    let restored = client
+      .revert_vm("team.guest", &revision.to_string())
+      .await
+      .unwrap();
+    assert_eq!(restored.spec.key, vm.spec.key);
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 2);
+    for request in recorded.iter() {
+      assert_eq!(request.method, "PATCH");
+      assert_eq!(
+        request.path,
+        format!(
+          "/v{}/vms/team.guest/histories/{revision}/revert",
+          crate::NANOCLD_DEFAULT_VERSION,
+        ),
+      );
+      assert!(request.query.is_empty());
+      assert!(request.body.is_empty());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_revert_rejects_missing_receipts_and_propagates_conflicts() {
+    use ntex::http::StatusCode;
+    let revision = uuid::Uuid::from_u128(42).to_string();
+    for receipt in [None, Some("invalid-receipt")] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(StatusCode::OK, receipt, None);
+      let error = client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err();
+      assert!(
+        error
+          .to_string()
+          .contains("completion cannot be correlated")
+      );
+      assert_eq!(requests.lock().unwrap().len(), 1);
+    }
+    let (client, requests, _server) =
+      crate::process::receipt_test::client(StatusCode::CONFLICT, None, None);
+    for error in [
+      client.revert_vm("team.guest", &revision).await.unwrap_err(),
+      client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err(),
+    ] {
+      assert!(matches!(error,
+        nanocl_error::http_client::HttpClientError::HttpError(error)
+          if error.status == StatusCode::CONFLICT));
+    }
+    assert_eq!(requests.lock().unwrap().len(), 2);
+  }
 
   #[ntex::test]
   async fn vm_receipt_methods_preserve_delete_and_patch_wire_contracts() {

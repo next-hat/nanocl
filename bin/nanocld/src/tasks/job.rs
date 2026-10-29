@@ -181,6 +181,7 @@ async fn control(
   key: &str,
   action: &'static str,
   expected: Option<(uuid::Uuid, Option<uuid::Uuid>)>,
+  wait_for_completion: bool,
   state: &SystemState,
 ) -> HttpResult<Job> {
   let lock = utils::container::job::lifecycle_lock(key);
@@ -222,7 +223,12 @@ async fn control(
         return;
       }
     };
-    let _ = reply.send(Ok(accepted.job.clone()));
+    let completion = if wait_for_completion {
+      Some(reply)
+    } else {
+      let _ = reply.send(Ok(accepted.job.clone()));
+      None
+    };
     let result = utils::container::job::control(&accepted, &owner, &state)
       .await
       .and_then(|completed| {
@@ -260,7 +266,7 @@ async fn control(
     } else {
       NativeEventAction::Stop
     };
-    match result {
+    match &result {
       Ok(()) => {
         state
           .emit_normal_native_action_sync(&accepted.job, action)
@@ -283,6 +289,9 @@ async fn control(
     // Starting. Event-driven follow-ups wait for this short admission boundary.
     drop(serialized);
     cleanup(&owner, &state).await;
+    if let Some(reply) = completion {
+      let _ = reply.send(result.map(|()| accepted.job).map_err(http_error));
+    }
   });
   response.await.map_err(|_| {
     HttpError::internal_server_error(
@@ -292,11 +301,11 @@ async fn control(
 }
 
 pub(crate) async fn stop(key: &str, state: &SystemState) -> HttpResult<()> {
-  control(key, "stop", None, state).await.map(|_| ())
+  control(key, "stop", None, false, state).await.map(|_| ())
 }
 
 pub(crate) async fn delete(key: &str, state: &SystemState) -> HttpResult<Job> {
-  control(key, "delete", None, state).await
+  control(key, "delete", None, false, state).await
 }
 
 pub(crate) async fn delete_if_current(
@@ -315,5 +324,21 @@ pub(crate) async fn delete_if_identity(
   run: Option<uuid::Uuid>,
   state: &SystemState,
 ) -> HttpResult<Job> {
-  control(key, "delete", Some((incarnation, run)), state).await
+  control(key, "delete", Some((incarnation, run)), false, state).await
+}
+
+/// Replace only after the inspected incarnation's runtime and cron are removed.
+pub(crate) async fn delete_for_replacement(
+  expected: &Job,
+  state: &SystemState,
+) -> HttpResult<()> {
+  control(
+    &expected.spec.name,
+    "delete",
+    Some((expected.incarnation_key, expected.current_run_key)),
+    true,
+    state,
+  )
+  .await
+  .map(|_| ())
 }

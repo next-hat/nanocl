@@ -10,7 +10,7 @@ use crate::{
   config::CliConfig,
   models::{
     GenericDefaultOpts, GenericHistoryOpts, JobArg, JobCommand, JobCompactRow,
-    JobLogsOpts, JobRow, JobRunRow, JobWaitOpts, SpecHistoryRow,
+    JobLogsOpts, JobRevertOpts, JobRow, JobRunRow, JobWaitOpts, SpecHistoryRow,
   },
   utils,
 };
@@ -75,6 +75,19 @@ async fn exec_job_history(
     )
     .await?;
   super::history::print_list(opts, revisions, SpecHistoryRow::from)
+}
+
+/// Restore a saved configuration without accepting a new Job execution.
+async fn exec_job_revert(
+  cli_conf: &CliConfig,
+  opts: &JobRevertOpts,
+) -> IoResult<()> {
+  let job = cli_conf
+    .client
+    .revert_job(&opts.name, &opts.history_id.to_string())
+    .await?;
+  utils::print::print_yml(job)?;
+  Ok(())
 }
 
 /// Show durable executions independently of live Jobs and Docker log retention.
@@ -173,6 +186,7 @@ pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
     JobCommand::Remove(opts) => JobArg::exec_rm(&cli_conf.client, opts).await,
     JobCommand::Inspect(opts) => JobArg::exec_inspect(cli_conf, opts).await,
     JobCommand::History(opts) => exec_job_history(cli_conf, opts).await,
+    JobCommand::Revert(opts) => exec_job_revert(cli_conf, opts).await,
     JobCommand::Runs(opts) => exec_job_runs(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,
     JobCommand::Wait(opts) => exec_job_wait(cli_conf, opts).await,

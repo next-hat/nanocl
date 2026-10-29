@@ -5,6 +5,7 @@ use nanocld_client::{
   NanocldClient,
   stubs::{
     generic::{GenericClause, GenericFilter, GenericFilterNsp},
+    job::JobHistoryQuery,
     system::Event,
   },
 };
@@ -128,6 +129,34 @@ pub(super) async fn candidates(
       };
       client
         .list_history_cargo(key)
+        .await?
+        .into_iter()
+        .map(|revision| revision.key.to_string())
+        .collect()
+    }
+    CompletionKind::VmHistory => {
+      let Some(key) = selected.filter(|key| !key.is_empty()) else {
+        return Ok(Vec::new());
+      };
+      client
+        .list_history_vm(key)
+        .await?
+        .into_iter()
+        .map(|revision| revision.key.to_string())
+        .collect()
+    }
+    CompletionKind::JobHistory => {
+      let Some(name) = selected.filter(|name| !name.is_empty()) else {
+        return Ok(Vec::new());
+      };
+      client
+        .list_history_job(
+          name,
+          Some(&JobHistoryQuery {
+            limit: Some(PAGE_SIZE as i64),
+            offset: Some(0),
+          }),
+        )
         .await?
         .into_iter()
         .map(|revision| revision.key.to_string())

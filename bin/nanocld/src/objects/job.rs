@@ -1,11 +1,11 @@
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
-  job::{Job, JobInspect},
+  job::{Job, JobInspect, JobPartial},
   system::NativeEventAction,
 };
 
 use crate::{
-  models::{JobDb, JobObjCreateIn},
+  models::{JobDb, JobObjCreateIn, SystemState},
   repositories::generic::*,
   utils,
 };
@@ -130,5 +130,53 @@ impl ObjInspectByPk for JobDb {
       instances,
     };
     Ok(job_inspect)
+  }
+}
+
+impl JobDb {
+  /// Restore a declaration through the existing delete/create lifecycle.
+  /// This deliberately does not execute the restored Job.
+  pub(crate) async fn revert_to_history(
+    name: &str,
+    history_key: uuid::Uuid,
+    version: &str,
+    state: &SystemState,
+  ) -> HttpResult<Job> {
+    let current = Self::transform_read_by_pk(name, &state.inner.pool).await?;
+    let stored =
+      Self::history_spec(name, history_key, &state.inner.pool).await?;
+    if stored.name != name {
+      return Err(HttpError::bad_request(
+        "Cannot revert a Job to a history with another resource name",
+      ));
+    }
+    let spec = JobPartial::from(stored);
+    Self::validate_partial(&spec)?;
+    let obj = JobObjCreateIn {
+      spec,
+      version: version.to_owned(),
+    };
+    let state = state.clone();
+    let (reply, response) = tokio::sync::oneshot::channel();
+    // Retain ownership of the whole replacement if the HTTP caller disconnects.
+    ntex::rt::spawn(async move {
+      let result = async {
+        crate::tasks::job::delete_for_replacement(&current, &state).await?;
+        Self::create_obj(&obj, &state).await.map_err(|mut error| {
+          error.msg = format!(
+            "Job {} was removed, but its restored configuration could not be created: {}; retained configurations and runs remain available",
+            current.spec.name, error.msg,
+          );
+          error
+        })
+      }
+      .await;
+      let _ = reply.send(result);
+    });
+    response.await.map_err(|_| {
+      HttpError::internal_server_error(
+        "Job revert owner stopped before replying; inspect the Job before retrying",
+      )
+    })?
   }
 }

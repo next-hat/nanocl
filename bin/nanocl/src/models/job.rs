@@ -94,6 +94,8 @@ pub enum JobCommand {
   Inspect(GenericInspectOpts),
   /// List saved configuration revisions or inspect one by its ID
   History(GenericHistoryOpts),
+  /// Restore a saved Job configuration without starting an execution
+  Revert(JobRevertOpts),
   /// List retained executions or inspect a run; Docker logs are not archived
   Runs(GenericHistoryOpts),
   /// Show logs of a job
@@ -104,6 +106,15 @@ pub enum JobCommand {
   Start(GenericStartOpts),
   /// Stop the current Job execution
   Stop(GenericStopOpts),
+}
+
+/// `nanocl job revert` available options.
+#[derive(Clone, Parser)]
+pub struct JobRevertOpts {
+  /// Name of the Job to revert
+  pub name: String,
+  /// ID of the saved configuration revision
+  pub history_id: uuid::Uuid,
 }
 
 /// `nanocl job` available subcommands
@@ -203,6 +214,26 @@ mod tests {
   use nanocld_client::stubs::{job::JobSpec, system::ObjPsStatus};
 
   use super::*;
+
+  #[test]
+  fn job_cli_revert_requires_target_and_revision() {
+    let id = uuid::Uuid::from_u128(42);
+    let args =
+      JobArg::try_parse_from(["job", "revert", "backup", &id.to_string()])
+        .unwrap();
+    let JobCommand::Revert(opts) = args.command else {
+      panic!("revert");
+    };
+    assert_eq!(opts.name, "backup");
+    assert_eq!(opts.history_id, id);
+    for words in [
+      vec!["job", "revert"],
+      vec!["job", "revert", "backup"],
+      vec!["job", "revert", "backup", "invalid-revision"],
+    ] {
+      assert!(JobArg::try_parse_from(words).is_err());
+    }
+  }
 
   #[test]
   fn compact_job_row_preserves_outcome_counts_and_age() {

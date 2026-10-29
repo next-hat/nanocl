@@ -10,6 +10,7 @@ pub mod list;
 pub mod list_history;
 pub mod patch;
 pub mod resize;
+pub mod revert;
 
 pub use console::*;
 pub use count::*;
@@ -21,6 +22,7 @@ pub use list::*;
 pub use list_history::*;
 pub use patch::*;
 pub use resize::*;
+pub use revert::*;
 
 pub fn ntex_config(
   config: &mut web::ServiceConfig<crate::models::SystemState>,
@@ -85,6 +87,12 @@ pub fn ntex_config(
       .to_with_state(list_vm_history),
   );
   config.service(
+    web::resource("/vms/{vm_key}/histories/{history_key}/revert")
+      .name("revert_vm")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_vm),
+  );
+  config.service(
     web::resource("/vms/{key}")
       .name("patch_vm")
       .guard(web::guard::Patch())
@@ -104,8 +112,8 @@ mod tests {
     system::{
       Event, EventActorKind, EventCondition, EventKind, NativeEventAction,
     },
-    vm::{VmInspect, VmSummary},
-    vm_spec::{VmSpecPartial, VmSpecUpdate},
+    vm::{Vm, VmInspect, VmSummary},
+    vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate},
   };
   use ntex::http;
 
@@ -326,6 +334,7 @@ mod tests {
         &format!("/vms/{OTHER_KEY}"),
         Some(VmSpecUpdate {
           hostname: Some("updated".to_owned()),
+          metadata: Some(serde_json::json!({"history-test": "updated"})),
           ..Default::default()
         }),
         None::<String>,
@@ -336,6 +345,7 @@ mod tests {
       http::StatusCode::OK,
       "patch VM by canonical key"
     );
+    let patched = response.json::<Vm>().await.unwrap();
     wait_vm_task(
       update,
       &system.state,
@@ -343,6 +353,76 @@ mod tests {
       NativeEventAction::Updating,
     )
     .await;
+
+    // A revision from the same VM name in another namespace is not eligible.
+    let response = client
+      .send_get(&format!("/vms/{GLOBAL_KEY}/histories"), None::<String>)
+      .await;
+    let foreign = response.json::<Vec<VmSpec>>().await.unwrap()[0].key;
+    for (revision, status) in [
+      (foreign, http::StatusCode::BAD_REQUEST),
+      (uuid::Uuid::new_v4(), http::StatusCode::NOT_FOUND),
+    ] {
+      let response = client
+        .send_patch(
+          &format!("/vms/{OTHER_KEY}/histories/{revision}/revert"),
+          None::<String>,
+          None::<String>,
+        )
+        .await;
+      test_status_code!(response.status(), status, "reject invalid history");
+      let response = client
+        .send_get(&format!("/vms/{OTHER_KEY}/inspect"), None::<String>)
+        .await;
+      let unchanged = response.json::<VmInspect>().await.unwrap();
+      assert_eq!(unchanged.spec.key, patched.spec.key);
+    }
+
+    let update = vm_task_registration(
+      &system.state,
+      OTHER_KEY,
+      NativeEventAction::Updating,
+    )
+    .await;
+    let response = client
+      .send_patch(
+        &format!("/vms/{OTHER_KEY}/histories/{}/revert", vm.spec.key),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(response.status(), http::StatusCode::OK, "revert VM");
+    let operation = response
+      .headers()
+      .get("X-Nanocl-Operation")
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .parse::<uuid::Uuid>()
+      .unwrap();
+    assert!(!operation.is_nil());
+    let reverted = response.json::<Vm>().await.unwrap();
+    assert_ne!(reverted.spec.key, vm.spec.key);
+    assert_ne!(reverted.spec.key, patched.spec.key);
+    assert_eq!(
+      serde_json::to_value(VmSpecPartial::from(reverted.spec.clone())).unwrap(),
+      serde_json::to_value(VmSpecPartial::from(vm.spec.clone())).unwrap(),
+      "revert restores the full configuration, including absent fields"
+    );
+    wait_vm_task(
+      update,
+      &system.state,
+      OTHER_KEY,
+      NativeEventAction::Updating,
+    )
+    .await;
+    let response = client
+      .send_get(&format!("/vms/{OTHER_KEY}/histories"), None::<String>)
+      .await;
+    let history = response.json::<Vec<VmSpec>>().await.unwrap();
+    for revision in [vm.spec.key, patched.spec.key, reverted.spec.key] {
+      assert!(history.iter().any(|spec| spec.key == revision));
+    }
 
     for key in [GLOBAL_KEY, OTHER_KEY] {
       let deletion =

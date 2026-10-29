@@ -56,6 +56,12 @@ pub fn ntex_config(
       .to_with_state(inspect_job_history),
   );
   config.service(
+    web::resource("/jobs/{name}/histories/{id}/revert")
+      .name("revert_job")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_job),
+  );
+  config.service(
     web::resource("/jobs/{name}/runs")
       .name("list_job_runs")
       .guard(web::guard::Get())
