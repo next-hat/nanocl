@@ -1409,6 +1409,41 @@ async fn job_runtime_expected_delete_rejects_successor_and_pre_run_identity() {
 
 #[ntex::test]
 async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
+  use nanocl_stubs::system::{
+    Event, EventActorKind, EventCondition, EventKind,
+  };
+
+  async fn next_lifecycle_event(
+    events: &mut crate::models::RawEventReceiver,
+    name: &str,
+  ) -> Event {
+    tokio::time::timeout(Duration::from_secs(30), async {
+      while let Some(bytes) = events.0.recv().await {
+        if bytes.is_empty() {
+          continue;
+        }
+        let event: Event = serde_json::from_slice(&bytes).unwrap();
+        if event.actor.as_ref().is_some_and(|actor| {
+          actor.kind == EventActorKind::Job
+            && actor.key.as_deref() == Some(name)
+        }) && [
+          NativeEventAction::Destroying,
+          NativeEventAction::Destroy,
+          NativeEventAction::Create,
+        ]
+        .iter()
+        .any(|action| event.action == action.to_string())
+        {
+          assert_eq!(event.kind, EventKind::Normal);
+          return event;
+        }
+      }
+      panic!("Job lifecycle event stream ended before the next event");
+    })
+    .await
+    .expect("Job lifecycle event was not delivered")
+  }
+
   let fixture = Fixture::new(Mode::BlockStop).await;
   // Compare retained revisions at the database timestamp precision.
   let expected_spec = JobDb::history_spec(
@@ -1423,6 +1458,28 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
     .unwrap();
   fixture.wait_blocked().await;
   let run = fixture.current().await;
+  let mut events = fixture
+    .system
+    .state
+    .subscribe_raw(Some(vec![EventCondition {
+      actor_key: Some(fixture.job.spec.name.clone()),
+      actor_kind: Some(EventActorKind::Job),
+      kind: vec![EventKind::Normal],
+      action: vec![NativeEventAction::Create],
+      ..Default::default()
+    }]))
+    .await
+    .unwrap();
+  // Rejected history selection must not publish an accepted lifecycle event.
+  let rejected = JobDb::revert_to_history(
+    &fixture.job.spec.name,
+    uuid::Uuid::nil(),
+    "v0.19",
+    &fixture.state,
+  )
+  .await
+  .unwrap_err();
+  assert_eq!(rejected.status, ntex::http::StatusCode::NOT_FOUND);
   let mut revert = Box::pin(JobDb::revert_to_history(
     &fixture.job.spec.name,
     fixture.job.spec_key,
@@ -1453,6 +1510,17 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   })
   .await
   .unwrap();
+  // Acceptance is observable while runtime teardown is still blocked.
+  let destroying =
+    next_lifecycle_event(&mut events, &fixture.job.spec.name).await;
+  assert_eq!(destroying.action, NativeEventAction::Destroying.to_string());
+  let attributes = destroying.actor.unwrap().attributes.unwrap();
+  assert_eq!(
+    attributes["IncarnationKey"],
+    json!(fixture.job.incarnation_key)
+  );
+  assert_eq!(attributes["SpecKey"], json!(fixture.job.spec_key));
+  assert_eq!(attributes["RunKey"], json!(run.key));
   // A competing creator queues behind the deletion before its name is free.
   // Revert must retain admission through recreation instead of yielding to it.
   let mut competing_spec = JobPartial::from(expected_spec.clone());
@@ -1506,6 +1574,33 @@ async fn job_runtime_revert_survives_caller_cancellation_without_starting() {
   assert!(detail.run.finished_at.is_some());
   assert_eq!(detail.spec, expected_spec);
   assert_eq!(detail.run.spec_key, fixture.job.spec_key);
+  let destroyed =
+    next_lifecycle_event(&mut events, &fixture.job.spec.name).await;
+  let created = next_lifecycle_event(&mut events, &fixture.job.spec.name).await;
+  assert_eq!(destroyed.action, NativeEventAction::Destroy.to_string());
+  assert_eq!(created.action, NativeEventAction::Create.to_string());
+  let attributes = destroyed.actor.unwrap().attributes.unwrap();
+  assert_eq!(
+    attributes["IncarnationKey"],
+    json!(fixture.job.incarnation_key)
+  );
+  assert_eq!(attributes["SpecKey"], json!(fixture.job.spec_key));
+  assert_eq!(attributes["RunKey"], json!(run.key));
+  let attributes = created.actor.unwrap().attributes.unwrap();
+  assert_eq!(
+    attributes["IncarnationKey"],
+    json!(restored.incarnation_key)
+  );
+  assert_eq!(attributes["SpecKey"], json!(restored.spec_key));
+  assert!(attributes["RunKey"].is_null());
+  // The Create condition closes the stream: these are exactly the three
+  // replacement lifecycle events, without an extra event for the rejected request.
+  assert!(
+    tokio::time::timeout(Duration::from_secs(30), events.0.recv())
+      .await
+      .expect("Job event stream did not close after replacement creation")
+      .is_none()
+  );
   assert!(fixture.docker.runtimes.lock().unwrap().is_empty());
   assert_eq!(
     fixture

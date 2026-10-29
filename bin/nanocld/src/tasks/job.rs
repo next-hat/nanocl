@@ -245,6 +245,16 @@ async fn control_with_lifecycle_lock(
         return;
       }
     };
+    // Replacement bypasses the generic deletion wrapper. Publish acceptance
+    // only after its exact identity is admitted, before touching the runtime.
+    if wait_for_completion && action == "delete" {
+      state
+        .emit_normal_native_action_sync(
+          &accepted.job,
+          NativeEventAction::Destroying,
+        )
+        .await;
+    }
     let completion = if wait_for_completion {
       Some(reply)
     } else {
