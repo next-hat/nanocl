@@ -1,4 +1,4 @@
-use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::http_client::{HttpClientError, HttpClientResult};
 use nanocl_error::io::{FromIo, IoError};
 use ntex::{io, ws};
 
@@ -256,31 +256,70 @@ impl NanocldClient {
   }
 
   /// Revert a VM to a revision of its current incarnation.
+  /// Waits for admission without a response-header deadline. If cancelled or
+  /// the response is lost, inspect the VM before retrying: the daemon retains
+  /// ownership of the operation after disconnection.
   pub async fn revert_vm(&self, key: &str, id: &str) -> HttpClientResult<Vm> {
-    let path = Self::vm_revert_path(key, id)?;
-    let response = self
-      .send_patch(&path, None::<String>, None::<String>)
-      .await?;
-    Self::res_json(response).await
+    let response = self.send_vm_revert(key, id).await?;
+    Self::res_json(response)
+      .await
+      .map_err(Self::vm_revert_outcome_error)
   }
 
   /// Revert a VM and return its response plus the accepted operation ID.
+  /// Admission has no response-header deadline. On cancellation or a lost or
+  /// invalid receipt, inspect the VM before retrying the operation.
   pub async fn revert_vm_operation(
     &self,
     key: &str,
     id: &str,
   ) -> HttpClientResult<(Vm, uuid::Uuid)> {
-    let path = Self::vm_revert_path(key, id)?;
-    let response = self
-      .send_patch(&path, None::<String>, None::<String>)
-      .await?;
+    let response = self.send_vm_revert(key, id).await?;
     let operation = Self::process_operation_header(
       response
         .headers()
         .get("x-nanocl-operation")
         .map(|value| value.as_bytes()),
-    )?;
-    Ok((Self::res_json(response).await?, operation))
+    )
+    .map_err(Self::vm_revert_outcome_error)?;
+    let vm = Self::res_json(response)
+      .await
+      .map_err(Self::vm_revert_outcome_error)?;
+    Ok((vm, operation))
+  }
+
+  async fn send_vm_revert(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<ntex::client::ClientResponse> {
+    let path = Self::vm_revert_path(key, id)?;
+    // Admission can wait for lifecycle observation, preceding bookkeeping,
+    // and MAC allocation. Keep connect/payload deadlines, but do not abandon
+    // its receipt at the general response-header deadline. Never retry it.
+    let mut response = self
+      .patch(&path)
+      .await?
+      .timeout(ntex::time::Millis::ZERO)
+      .send()
+      .await
+      .map_err(|error| Self::vm_revert_outcome_error(self.send_error(error)))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status)
+      .await
+      .map_err(Self::vm_revert_outcome_error)?;
+    Ok(response)
+  }
+
+  fn vm_revert_outcome_error(error: HttpClientError) -> HttpClientError {
+    match error {
+      HttpClientError::IoError(error) => {
+        HttpClientError::IoError(error.map_err_context(
+          || "VM revert outcome is unknown; inspect the VM before retrying",
+        ))
+      }
+      error => error,
+    }
   }
 
   fn vm_revert_path(key: &str, id: &str) -> HttpClientResult<String> {
@@ -375,6 +414,58 @@ impl NanocldClient {
 #[cfg(test)]
 mod console_tests {
   use super::*;
+
+  #[test]
+  fn vm_revert_unknown_outcome_preserves_transport_and_api_errors() {
+    for kind in [
+      std::io::ErrorKind::TimedOut,
+      std::io::ErrorKind::ConnectionReset,
+      std::io::ErrorKind::InvalidData,
+    ] {
+      let error = NanocldClient::vm_revert_outcome_error(
+        IoError::without_context(std::io::Error::new(
+          kind,
+          "response was lost",
+        ))
+        .into(),
+      );
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+      assert!(matches!(error, HttpClientError::IoError(error)
+        if error.inner.kind() == kind
+          && error.inner.to_string() == "response was lost"));
+    }
+    for status in [
+      ntex::http::StatusCode::BAD_REQUEST,
+      ntex::http::StatusCode::NOT_FOUND,
+      ntex::http::StatusCode::CONFLICT,
+    ] {
+      let error = NanocldClient::vm_revert_outcome_error(
+        nanocl_error::http::HttpError::new(status, "rejected").into(),
+      );
+      assert!(!error.to_string().contains("outcome is unknown"));
+      assert!(matches!(error, HttpClientError::HttpError(error)
+        if error.status == status && error.msg == "rejected"));
+    }
+  }
+
+  #[test]
+  fn vm_revert_missing_or_invalid_receipt_reports_unknown_outcome() {
+    for value in [None, Some(&b"invalid-receipt"[..]), Some(&b"\xff"[..])] {
+      let error = NanocldClient::process_operation_header(value)
+        .map_err(NanocldClient::vm_revert_outcome_error)
+        .unwrap_err();
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+      assert!(
+        error
+          .to_string()
+          .contains("completion cannot be correlated")
+      );
+      assert!(matches!(error, HttpClientError::IoError(error)
+        if error.inner.kind() == std::io::ErrorKind::InvalidData));
+    }
+  }
 
   #[ntex::test]
   async fn vm_history_pagination_preserves_optional_query_contract() {
@@ -514,6 +605,8 @@ mod console_tests {
           .to_string()
           .contains("completion cannot be correlated")
       );
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
       assert_eq!(requests.lock().unwrap().len(), 1);
     }
     let (client, requests, _server) =
@@ -528,6 +621,29 @@ mod console_tests {
       assert!(matches!(error,
         nanocl_error::http_client::HttpClientError::HttpError(error)
           if error.status == StatusCode::CONFLICT));
+    }
+    assert_eq!(requests.lock().unwrap().len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_revert_lost_response_body_reports_unknown_outcome_without_retry()
+  {
+    let operation = uuid::Uuid::from_u128(23).to_string();
+    let revision = uuid::Uuid::from_u128(42).to_string();
+    let (client, requests, _server) = crate::process::receipt_test::client(
+      ntex::http::StatusCode::OK,
+      Some(&operation),
+      None,
+    );
+    for error in [
+      client.revert_vm("team.guest", &revision).await.unwrap_err(),
+      client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err(),
+    ] {
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
     }
     assert_eq!(requests.lock().unwrap().len(), 2);
   }
