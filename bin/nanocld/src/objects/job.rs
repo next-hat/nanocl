@@ -22,9 +22,11 @@ impl ObjCreate for JobDb {
   ) -> HttpResult<Self::ObjCreateOut> {
     // A cancelled run can briefly reacquire this lock after deletion completes.
     // Wait for its final observation before admitting the replacement.
-    let serialized = utils::container::job::lifecycle_lock(&obj.spec.name)
-      .lock_owned()
-      .await;
+    let serialized = std::sync::Arc::new(
+      utils::container::job::lifecycle_lock(&obj.spec.name)
+        .lock_owned()
+        .await,
+    );
     let spec = obj.spec.clone();
     let version = obj.version.clone();
     let state = state.clone();
@@ -36,8 +38,39 @@ impl ObjCreate for JobDb {
       let result = async {
         let job =
           JobDb::create_with_spec(&spec, &version, &state.inner.pool).await?;
-        if let Some(schedule) = &job.spec.schedule {
-          utils::cron::add_cron_rule(&job, schedule, &state).await?;
+        if let Some(schedule) = &job.spec.schedule
+          && let Err(error) =
+            utils::cron::add_cron_rule(&job, schedule, &state).await
+        {
+          // Installation may have succeeded before its result was lost. Try
+          // to remove its exact incarnation-scoped rule before undoing the
+          // unpublished database creation, retaining admission throughout.
+          let cron_cleanup = utils::cron::remove_cron_rule(&job, &state).await;
+          let rollback = JobDb::rollback_creation(
+            &job,
+            _serialized.clone(),
+            &state.inner.pool,
+          )
+          .await;
+          let mut error: HttpError = error.into();
+          match rollback {
+            Ok(()) => {
+              error.msg.push_str("; failed Job creation was rolled back");
+            }
+            Err(rollback) => {
+              error.msg.push_str(&format!(
+                "; Job creation rollback could not be confirmed: {rollback}; inspect the Job before retrying"
+              ));
+            }
+          }
+          if let Err(cleanup) = cron_cleanup {
+            // Every cron request carries the original incarnation, so a
+            // residual rule cannot start a replacement with the same name.
+            error.msg.push_str(&format!(
+              "; cron rule cleanup could not be confirmed: {cleanup}; any residual rule remains bound to the original Job incarnation"
+            ));
+          }
+          return Err(error);
         }
         Ok::<_, HttpError>(job)
       }
