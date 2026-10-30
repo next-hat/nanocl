@@ -168,7 +168,7 @@ impl ObjDelByPk for ResourceDb {
       ResourceDb::transform_read_by_pk(key, &state.inner.pool).await?;
     // Retain the declaration and history if the controller is unavailable, so
     // the normal DELETE can be retried after it returns.
-    ResourceDb::hook_delete(&resource, &state.inner.pool).await?;
+    ResourceDb::hook_delete_existing(&resource, &state.inner.pool).await?;
     ResourceDb::delete_with_history(
       &resource.spec.resource_key,
       &state.inner.pool,

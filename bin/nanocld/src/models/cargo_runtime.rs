@@ -29,6 +29,15 @@ impl From<IoError> for CargoCandidateFailure {
   }
 }
 
+/// Operation-local evidence captured before a replica rollout mutates runtime.
+#[derive(Clone, Debug)]
+pub(crate) enum CargoPreviousRuntime {
+  /// No attachment, persisted process, or Docker runtime belongs to this replica.
+  Absent,
+  /// Immutable process IDs and their positively observed running state.
+  Observed(HashMap<String, bool>),
+}
+
 pub(crate) type ProcessesByKey<'a> = HashMap<&'a str, &'a Process>;
 pub(crate) type CargoStableProcesses<'a> =
   HashMap<(uuid::Uuid, CargoReplicaProcessRole, String), Vec<&'a Process>>;

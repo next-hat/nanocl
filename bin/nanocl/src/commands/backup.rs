@@ -425,7 +425,7 @@ mod tests {
 
 #[cfg(test)]
 mod export_tests {
-  use std::sync::Arc;
+  use std::sync::{Arc, Mutex};
 
   use nanocld_client::{
     ConnectOpts, NanocldClient,
@@ -443,6 +443,11 @@ mod export_tests {
 
   use super::*;
   use crate::{config::UserConfig, models::Context};
+
+  struct ExportFixture {
+    failing_collection: Option<String>,
+    requests: Mutex<Vec<(String, usize)>>,
+  }
 
   fn namespace_names() -> Vec<String> {
     let mut names = vec![
@@ -477,16 +482,18 @@ mod export_tests {
       )])
     );
     let offset = filter.offset.unwrap();
-    if request
-      .app_state::<Arc<Option<String>>>()
+    let fixture = request.app_state::<Arc<ExportFixture>>().unwrap();
+    fixture
+      .requests
+      .lock()
       .unwrap()
-      .as_ref()
-      .as_deref()
-      == Some(collection)
+      .push((collection.to_owned(), offset));
+    if fixture.failing_collection.as_deref() == Some(collection)
       && offset == 100
     {
-      return web::HttpResponse::InternalServerError()
-        .json(&serde_json::json!({"msg": "later page failed"}));
+      return web::HttpResponse::InternalServerError().json(&serde_json::json!({
+        "msg": format!("later page failed for {collection} at offset {offset}"),
+      }));
     }
     let time = chrono::DateTime::UNIX_EPOCH.naive_utc();
     if collection == "namespaces" {
@@ -598,17 +605,21 @@ mod export_tests {
 
   fn fixture(
     failing_collection: Option<&str>,
-  ) -> (CliConfig, web::test::TestServer) {
-    let failure = Arc::new(failing_collection.map(str::to_owned));
+  ) -> (CliConfig, web::test::TestServer, Arc<ExportFixture>) {
+    let fixture = Arc::new(ExportFixture {
+      failing_collection: failing_collection.map(str::to_owned),
+      requests: Mutex::new(Vec::new()),
+    });
+    let server_fixture = fixture.clone();
     let server = web::test::server(async move |_| {
       web::App::new()
-        .with_config(web::WebAppConfig::new().set_state(failure.clone()))
+        .with_config(web::WebAppConfig::new().set_state(server_fixture.clone()))
         .service(
           web::resource("/{version}/{collection}")
             .route(web::get().to(serve_collection)),
         )
     });
-    let host = server.url("");
+    let host = server.url("").trim_end_matches('/').to_owned();
     let config = CliConfig {
       client: NanocldClient::connect_to(&ConnectOpts {
         url: host.clone(),
@@ -619,12 +630,12 @@ mod export_tests {
       context: Context::default(),
       user_config: UserConfig::default(),
     };
-    (config, server)
+    (config, server, fixture)
   }
 
   #[ntex::test]
   async fn backup_http_exports_all_collections_and_colliding_namespace_names() {
-    let (config, _server) = fixture(None);
+    let (config, _server, _fixture) = fixture(None);
     for skip_confirm in [false, true] {
       let dir = std::env::temp_dir()
         .join(format!("nanocl-backup-{}", uuid::Uuid::new_v4()));
@@ -675,7 +686,7 @@ mod export_tests {
       "secrets",
       "resources",
     ] {
-      let (config, _server) = fixture(Some(collection));
+      let (config, _server, fixture) = fixture(Some(collection));
       let dir = std::env::temp_dir()
         .join(format!("nanocl-backup-failure-{}", uuid::Uuid::new_v4()));
       let result = exec_backup(
@@ -686,9 +697,27 @@ mod export_tests {
         },
       )
       .await;
+      let error = result
+        .expect_err("later-page failure must prevent backup success")
+        .to_string();
       assert!(
-        result.is_err(),
-        "{collection} must not report a complete backup"
+        error.contains(&format!(
+          "later page failed for {collection} at offset 100"
+        )),
+        "wrong failure for {collection}: {error}",
+      );
+      let offsets: Vec<_> = fixture
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(name, _)| name == collection)
+        .map(|(_, offset)| *offset)
+        .collect();
+      assert_eq!(
+        offsets,
+        vec![0, 100],
+        "{collection} must reach the injected second page"
       );
       std::fs::remove_dir_all(dir).unwrap();
     }

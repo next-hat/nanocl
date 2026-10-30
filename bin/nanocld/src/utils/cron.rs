@@ -227,6 +227,23 @@ fn scheduled_cron_rule(
   )))
 }
 
+/// Invalid saved schedules must not prevent repair through the normal API.
+fn restored_cron_rules(jobs: &[Job], hosts: &[String]) -> Vec<String> {
+  jobs.iter().filter_map(|job| {
+    match scheduled_cron_rule(job, hosts) {
+      Ok(rule) => rule,
+      Err(error) => {
+        log::warn!(
+          "Skipping saved schedule for Job {:?} incarnation {}: {error}; repair the Job through the API",
+          job.spec.name,
+          job.incarnation_key,
+        );
+        None
+      }
+    }
+  }).collect()
+}
+
 async fn persisted_cron_rules(state: &SystemState) -> IoResult<Vec<String>> {
   const PAGE_SIZE: usize = 100;
   let mut offset = 0;
@@ -240,12 +257,7 @@ async fn persisted_cron_rules(state: &SystemState) -> IoResult<Vec<String>> {
     };
     let jobs = JobDb::transform_read_by(&filter, &state.inner.pool).await?;
     let count = jobs.len();
-    for job in jobs {
-      if let Some(rule) = scheduled_cron_rule(&job, &state.inner.config.hosts)?
-      {
-        rules.push(rule);
-      }
-    }
+    rules.extend(restored_cron_rules(&jobs, &state.inner.config.hosts));
     if count < PAGE_SIZE {
       return Ok(rules);
     }
@@ -369,6 +381,38 @@ mod tests {
     assert!(is_managed_cron_rule(&rule));
     assert!(!is_managed_cron_rule(&format!("# {rule}")));
     assert!(!is_managed_cron_rule(&format!("{rule} && echo unrelated")));
+  }
+
+  #[test]
+  fn startup_restoration_skips_invalid_jobs_and_keeps_valid_incarnations() {
+    let jobs = [
+      scheduled_job("valid-before", 1, Some("@daily")),
+      scheduled_job("invalid", 2, Some("invalid schedule")),
+      scheduled_job("unscheduled", 3, None),
+      scheduled_job("valid-after", 4, Some("*/5 * * * *")),
+    ];
+    let hosts = ["unix:///custom/nanocl.sock".to_owned()];
+    let rules = restored_cron_rules(&jobs, &hosts);
+    assert_eq!(
+      rules,
+      vec![
+        scheduled_cron_rule(&jobs[0], &hosts).unwrap().unwrap(),
+        scheduled_cron_rule(&jobs[3], &hosts).unwrap().unwrap(),
+      ]
+    );
+    let stale =
+      scheduled_cron_rule(&scheduled_job("invalid", 2, Some("@daily")), &hosts)
+        .unwrap()
+        .unwrap();
+    let rebuilt = rebuild_crontab(&stale, &rules);
+    assert!(!rebuilt.contains("/invalid/start"));
+    assert!(rebuilt.contains(
+      "/valid-before/start?incarnation=00000000-0000-0000-0000-000000000001"
+    ));
+    assert!(rebuilt.contains(
+      "/valid-after/start?incarnation=00000000-0000-0000-0000-000000000004"
+    ));
+    assert!(restored_cron_rules(&jobs[1..3], &hosts).is_empty());
   }
 
   // Database-backed CI regression: reads declarations without installing cron

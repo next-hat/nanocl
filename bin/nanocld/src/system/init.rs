@@ -219,6 +219,16 @@ pub fn docker_healthcheck(state: &SystemState) {
   });
 }
 
+/// A failed reconstruction must not activate stale schedules or block API repair.
+fn start_crond_if_restored(restored: IoResult<()>, start: impl FnOnce()) {
+  match restored {
+    Ok(()) => start(),
+    Err(error) => log::error!(
+      "boot::init: Job scheduler disabled because schedules could not be restored: {error}; continuing daemon startup so Jobs can be repaired through the API"
+    ),
+  }
+}
+
 /// Init function called before http server start.
 /// To boot and initialize our state and database.
 ///
@@ -226,8 +236,10 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   set_uds_perm();
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
-  utils::cron::restore_cron_rules(&system_state).await?;
-  spawn_crond();
+  start_crond_if_restored(
+    utils::cron::restore_cron_rules(&system_state).await,
+    spawn_crond,
+  );
   docker_healthcheck(&system_state);
   spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;
@@ -265,6 +277,31 @@ mod tests {
   use super::*;
 
   use crate::{cli, config, utils::tests::*};
+
+  #[test]
+  fn cron_restore_failure_keeps_startup_available_without_starting_crond() {
+    for kind in [
+      std::io::ErrorKind::NotFound,
+      std::io::ErrorKind::PermissionDenied,
+      std::io::ErrorKind::Interrupted,
+    ] {
+      let mut started = false;
+      start_crond_if_restored(
+        Err(IoError::with_context(
+          "Cron job",
+          std::io::Error::new(kind, "restoration failed"),
+        )),
+        || started = true,
+      );
+      assert!(
+        !started,
+        "crond must not consume stale rules after {kind:?}"
+      );
+    }
+    let mut started = false;
+    start_crond_if_restored(Ok(()), || started = true);
+    assert!(started);
+  }
 
   /// Test init
   #[ntex::test]

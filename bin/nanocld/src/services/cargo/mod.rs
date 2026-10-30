@@ -574,16 +574,33 @@ mod tests {
     system.state.wait_event_loop().await;
   }
 
-  async fn confirmed_update_rollback_fixture(phase: u8) {
+  #[derive(Clone, Copy, PartialEq)]
+  enum PreviousRollbackFixture {
+    Running,
+    Stopped,
+    Absent,
+  }
+
+  async fn confirmed_update_rollback_fixture(
+    phase: u8,
+    previous: PreviousRollbackFixture,
+  ) {
     use crate::utils::container::cargo::{fail_next_init_wait, rollback_fault};
 
     let system = gen_default_test_system().await;
     let name = format!("rollback-init-{}", uuid::Uuid::new_v4().simple());
     let key = format!("global.{name}");
-    let replacement = operation_fixture_spec(
+    let mut replacement = operation_fixture_spec(
       &name,
       if phase == 0 { "sleep 30" } else { "true" },
     );
+    if previous == PreviousRollbackFixture::Stopped {
+      replacement.containers[0].container_config.host_config =
+        Some(HostConfig {
+          network_mode: Some("host".to_owned()),
+          ..Default::default()
+        });
+    }
     let mut original = replacement.clone();
     original.init_containers.clear();
     assert!(original.port_bindings.is_none());
@@ -593,8 +610,70 @@ mod tests {
       .await;
     assert_eq!(response.status(), http::StatusCode::CREATED);
     start_cargo(&system, &key).await;
+    if previous != PreviousRollbackFixture::Running {
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Stop).await;
+      let response = system
+        .client
+        .send_post(
+          &format!("/processes/cargo/{key}/stop"),
+          None::<String>,
+          None::<String>,
+        )
+        .await;
+      assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+      wait_cargo_completion(&system, &key, NativeEventAction::Stop, events)
+        .await;
+    }
+    if previous == PreviousRollbackFixture::Absent {
+      // Model a durable local assignment with no attached or orphaned runtime.
+      let replicas =
+        CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+          .await
+          .unwrap();
+      for replica in replicas {
+        for mapping in CargoReplicaProcessDb::list_by_replica(
+          replica.key,
+          &system.state.inner.pool,
+        )
+        .await
+        .unwrap()
+        {
+          CargoReplicaProcessDb::clear_process(
+            mapping.key,
+            &system.state.inner.pool,
+          )
+          .await
+          .unwrap();
+        }
+      }
+      for id in cargo_runtime_snapshot(&system, &key).await.keys() {
+        system
+          .state
+          .inner
+          .docker_api
+          .remove_container(
+            id,
+            Some(bollard_next::query_parameters::RemoveContainerOptions {
+              force: true,
+              ..Default::default()
+            }),
+          )
+          .await
+          .unwrap();
+        ProcessDb::del_by_pk(id, &system.state.inner.pool)
+          .await
+          .unwrap();
+      }
+    }
     let before = cargo_runtime_snapshot(&system, &key).await;
-    assert!(!before.is_empty());
+    assert_eq!(
+      before.is_empty(),
+      previous == PreviousRollbackFixture::Absent
+    );
+    assert!(before.values().all(|runtime| {
+      runtime["Running"] == (previous == PreviousRollbackFixture::Running)
+    }));
     let fault = (phase == 0).then(|| fail_next_init_wait(&key));
     let _revalidation_fault = (phase > 0)
       .then(|| rollback_fault::fail_candidate_revalidation(&key, phase == 2));
@@ -633,7 +712,11 @@ mod tests {
       after.keys().collect::<Vec<_>>(),
       before.keys().collect::<Vec<_>>()
     );
-    assert!(after.values().all(|runtime| runtime["Running"] == true));
+    for (id, runtime) in &after {
+      assert_eq!(runtime["Running"], before[id]["Running"]);
+      assert_eq!(runtime["StartedAt"], before[id]["StartedAt"]);
+      assert_eq!(runtime["RestartCount"], before[id]["RestartCount"]);
+    }
     assert!(
       DistributedMutexDb::read_by_pk(
         &failed.key.to_string(),
@@ -675,17 +758,40 @@ mod tests {
   #[ntex::test]
   async fn confirmed_update_rollback_settles_and_admits_retry_stop_and_delete()
   {
-    confirmed_update_rollback_fixture(0).await;
+    confirmed_update_rollback_fixture(0, PreviousRollbackFixture::Running)
+      .await;
   }
 
   #[ntex::test]
   async fn confirmed_prepared_rollback_settles_after_revalidation_failure() {
-    confirmed_update_rollback_fixture(1).await;
+    confirmed_update_rollback_fixture(1, PreviousRollbackFixture::Running)
+      .await;
   }
 
   #[ntex::test]
   async fn confirmed_promoted_rollback_settles_after_revalidation_failure() {
-    confirmed_update_rollback_fixture(2).await;
+    confirmed_update_rollback_fixture(2, PreviousRollbackFixture::Running)
+      .await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_rollback_accepts_proven_absent_previous_runtime() {
+    for phase in 0..3 {
+      confirmed_update_rollback_fixture(phase, PreviousRollbackFixture::Absent)
+        .await;
+    }
+  }
+
+  #[ntex::test]
+  async fn confirmed_rollback_preserves_deliberately_stopped_previous_runtime()
+  {
+    for phase in 0..3 {
+      confirmed_update_rollback_fixture(
+        phase,
+        PreviousRollbackFixture::Stopped,
+      )
+      .await;
+    }
   }
 
   async fn uncertain_update_rollback_fixture(lose_create_reply: bool) {

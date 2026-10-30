@@ -116,7 +116,7 @@ async fn resource_mutation_failure_releases_same_name() {
 struct Controller {
   rules: HashMap<String, serde_json::Value>,
   applies: usize,
-  reject_delete: bool,
+  delete_status: Option<StatusCode>,
 }
 
 // Uses the normal daemon database fixture and a dummy HTTP controller. Compile
@@ -135,9 +135,9 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
           let key = request.match_info().get("name").unwrap().to_owned();
           let mut controller = controller.lock().unwrap();
           if request.method() == ntex::http::Method::DELETE {
-            if controller.reject_delete {
-              return web::HttpResponse::ServiceUnavailable()
-                .json(&serde_json::json!({"msg":"offline"}));
+            if let Some(status) = controller.delete_status {
+              return web::HttpResponse::builder(status)
+                .json(&serde_json::json!({"msg":"delete rejected"}));
             }
             controller.rules.remove(&key);
             web::HttpResponse::Ok().build()
@@ -261,26 +261,34 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
 
   // A failed controller deletion retains both declaration and history; the
   // exact same normal DELETE succeeds once the controller returns.
-  observed.lock().unwrap().reject_delete = true;
-  let response = system.client.send_delete(&endpoint, None::<String>).await;
-  assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-  assert_eq!(
-    ResourceDb::transform_read_by_pk(&name, pool)
-      .await
-      .unwrap()
-      .spec
-      .key,
-    accepted.spec.key
-  );
-  assert_eq!(
-    ResourceDb::history(&name, None, None, pool)
-      .await
-      .unwrap()
-      .len(),
-    3
-  );
-  assert!(observed.lock().unwrap().rules.contains_key(&name));
-  observed.lock().unwrap().reject_delete = false;
+  for status in [
+    StatusCode::BAD_REQUEST,
+    StatusCode::UNAUTHORIZED,
+    StatusCode::FORBIDDEN,
+    StatusCode::CONFLICT,
+    StatusCode::SERVICE_UNAVAILABLE,
+  ] {
+    observed.lock().unwrap().delete_status = Some(status);
+    let response = system.client.send_delete(&endpoint, None::<String>).await;
+    assert_eq!(response.status(), status);
+    assert_eq!(
+      ResourceDb::transform_read_by_pk(&name, pool)
+        .await
+        .unwrap()
+        .spec
+        .key,
+      accepted.spec.key,
+    );
+    assert_eq!(
+      ResourceDb::history(&name, None, None, pool)
+        .await
+        .unwrap()
+        .len(),
+      3
+    );
+    assert!(observed.lock().unwrap().rules.contains_key(&name));
+  }
+  observed.lock().unwrap().delete_status = None;
   assert_eq!(
     system
       .client
@@ -346,6 +354,16 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
       .len(),
     1
   );
+  observed.lock().unwrap().rules.remove(&name);
+  observed.lock().unwrap().delete_status = Some(StatusCode::NOT_FOUND);
+  let stored = ResourceDb::transform_read_by_pk(&name, pool).await.unwrap();
+  assert_eq!(
+    ResourceDb::hook_delete(&stored, pool)
+      .await
+      .unwrap_err()
+      .status,
+    StatusCode::NOT_FOUND
+  );
   assert_eq!(
     system
       .client
@@ -354,6 +372,15 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
       .status(),
     StatusCode::ACCEPTED
   );
+
+  assert!(ResourceDb::transform_read_by_pk(&name, pool).await.is_err());
+  assert!(
+    ResourceDb::history(&name, None, None, pool)
+      .await
+      .unwrap()
+      .is_empty()
+  );
+  observed.lock().unwrap().delete_status = None;
 
   // A failed first publication removes its candidate controller configuration.
   faults()
@@ -376,4 +403,83 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
   SpecDb::del_by_kind_key("ResourceKind", &kind, pool)
     .await
     .unwrap();
+}
+
+// Database regression: an orphaned registration must not make its Resource
+// permanently undeletable through the normal API.
+#[ntex::test]
+async fn resource_delete_removes_orphaned_kind_and_version() {
+  let system = gen_default_test_system().await;
+  let pool = &system.state.inner.pool;
+  let kind = format!("test.io/orphan-{}", uuid::Uuid::new_v4());
+  ResourceKindDb::create_from_spec(
+    &ResourceKindPartial {
+      name: kind.clone(),
+      version: "v1".into(),
+      metadata: None,
+      data: ResourceKindSpec {
+        schema: Some(serde_json::json!({})),
+        url: None,
+      },
+    },
+    pool,
+  )
+  .await
+  .unwrap();
+  let name = format!("orphan-{}", uuid::Uuid::new_v4());
+  let resource = ResourceDb::create_from_spec(
+    &ResourcePartial {
+      name: name.clone(),
+      kind: kind.clone(),
+      data: serde_json::json!({}),
+      metadata: None,
+    },
+    pool,
+  )
+  .await
+  .unwrap();
+
+  // Explicit version lookup: absence permits normal deletion, but does not
+  // provide proof that an uncommitted controller candidate was removed.
+  let mut missing_version = resource.clone();
+  missing_version.kind = format!("{kind}/missing");
+  assert!(
+    ResourceDb::hook_delete_existing(&missing_version, pool)
+      .await
+      .is_ok()
+  );
+  assert_eq!(
+    ResourceDb::hook_delete(&missing_version, pool)
+      .await
+      .unwrap_err()
+      .status,
+    StatusCode::NOT_FOUND
+  );
+
+  ResourceKindDb::del_by_pk(&kind, pool).await.unwrap();
+  SpecDb::del_by_kind_key("ResourceKind", &kind, pool)
+    .await
+    .unwrap();
+  assert_eq!(
+    ResourceDb::hook_delete(&resource, pool)
+      .await
+      .unwrap_err()
+      .status,
+    StatusCode::NOT_FOUND
+  );
+  assert_eq!(
+    system
+      .client
+      .send_delete(&format!("/resources/{name}"), None::<String>)
+      .await
+      .status(),
+    StatusCode::ACCEPTED
+  );
+  assert!(ResourceDb::transform_read_by_pk(&name, pool).await.is_err());
+  assert!(
+    ResourceDb::history(&name, None, None, pool)
+      .await
+      .unwrap()
+      .is_empty()
+  );
 }
