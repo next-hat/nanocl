@@ -626,11 +626,7 @@ mod tests {
       wait_cargo_completion(&system, &key, NativeEventAction::Stop, events)
         .await;
     }
-    let absent = matches!(
-      previous,
-      PreviousRollbackFixture::Absent
-        | PreviousRollbackFixture::DestroyedWithStaleMapping
-    );
+    let absent = previous == PreviousRollbackFixture::Absent;
     if absent {
       // Model a durable local assignment with no attached or orphaned runtime.
       let replicas =
@@ -685,13 +681,25 @@ mod tests {
       )
       .await
       .unwrap();
-      assert!(mappings.iter().any(|mapping| mapping.process_key.is_some()));
+      assert!(
+        mappings.iter().any(|mapping| mapping.process_key.is_some()),
+        "mapping race must begin with an intact attachment"
+      );
     }
     let before = cargo_runtime_snapshot(&system, &key).await;
     assert_eq!(before.is_empty(), absent);
     assert!(before.values().all(|runtime| {
       runtime["Running"] == (previous == PreviousRollbackFixture::Running)
     }));
+    let _mapping_fault = (previous
+      == PreviousRollbackFixture::DestroyedWithStaleMapping)
+      .then(|| {
+        assert_eq!(
+          phase, 0,
+          "mapping race is resolved before candidate preparation"
+        );
+        rollback_fault::remove_previous_after_mapping_snapshot(&key, true)
+      });
     let fault = (phase == 0).then(|| fail_next_init_wait(&key));
     let _revalidation_fault = (phase > 0)
       .then(|| rollback_fault::fail_candidate_revalidation(&key, phase == 2));
@@ -725,11 +733,19 @@ mod tests {
         .all(|process| process.name.ends_with(".tmp.c"))
     );
     let after = cargo_runtime_snapshot(&system, &key).await;
-    // Inventory comes from Docker, including hidden candidates: only prior IDs remain.
-    assert_eq!(
-      after.keys().collect::<Vec<_>>(),
-      before.keys().collect::<Vec<_>>()
-    );
+    // Inventory includes hidden candidates. The raced process was destroyed;
+    // every other fixture must retain exactly its original IDs.
+    if previous == PreviousRollbackFixture::DestroyedWithStaleMapping {
+      assert!(
+        after.is_empty(),
+        "destroyed previous runtime or candidate remains"
+      );
+    } else {
+      assert_eq!(
+        after.keys().collect::<Vec<_>>(),
+        before.keys().collect::<Vec<_>>()
+      );
+    }
     for (id, runtime) in &after {
       assert_eq!(runtime["Running"], before[id]["Running"]);
       assert_eq!(runtime["StartedAt"], before[id]["StartedAt"]);
@@ -814,13 +830,11 @@ mod tests {
 
   #[ntex::test]
   async fn confirmed_rollback_clears_destroyed_process_mapping() {
-    for phase in 0..3 {
-      confirmed_update_rollback_fixture(
-        phase,
-        PreviousRollbackFixture::DestroyedWithStaleMapping,
-      )
-      .await;
-    }
+    confirmed_update_rollback_fixture(
+      0,
+      PreviousRollbackFixture::DestroyedWithStaleMapping,
+    )
+    .await;
   }
 
   #[ntex::test]
@@ -922,6 +936,7 @@ mod tests {
 
   #[ntex::test]
   async fn missing_process_row_with_existing_runtime_keeps_update_pending() {
+    use crate::utils::container::cargo::rollback_fault;
     let system = gen_default_test_system().await;
     let name = format!("missing-process-{}", uuid::Uuid::new_v4().simple());
     let key = format!("global.{name}");
@@ -939,9 +954,8 @@ mod tests {
     let process = ProcessDb::read_by_pk(id, &system.state.inner.pool)
       .await
       .unwrap();
-    ProcessDb::del_by_pk(id, &system.state.inner.pool)
-      .await
-      .unwrap();
+    let _mapping_fault =
+      rollback_fault::remove_previous_after_mapping_snapshot(&key, false);
     let events = cargo_pending_events(&system, &key).await;
     let response = system
       .client
@@ -966,10 +980,24 @@ mod tests {
     )
     .await
     .unwrap();
-    assert_eq!(mappings[0].process_key.as_deref(), Some(id.as_str()));
+    // The FK clears the durable attachment even though active_slots captured
+    // its old ID before deletion. Existing Docker runtime still blocks settlement.
+    assert!(mappings[0].process_key.is_none());
+    assert!(
+      ProcessDb::read_by_pk(id, &system.state.inner.pool)
+        .await
+        .is_err()
+    );
     ProcessDb::create_from(process, &system.state.inner.pool)
       .await
       .unwrap();
+    CargoReplicaProcessDb::attach_process(
+      mappings[0].key,
+      id,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
     finish_pending_cargo_fixture(&system, &key, &pending).await;
     delete_cargo_fixture(&system, &key).await;
     system.state.wait_event_loop().await;

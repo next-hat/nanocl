@@ -1183,6 +1183,8 @@ async fn active_slots(
 ) -> IoResult<Vec<RuntimeSlot>> {
   let mappings =
     CargoReplicaProcessDb::list_by_replica(task.key, &state.inner.pool).await?;
+  #[cfg(test)]
+  rollback_fault::after_mappings_snapshot(&mappings, state).await?;
   let mut slots = Vec::new();
   for mapping in mappings {
     let Some(id) = mapping.process_key.as_deref() else {

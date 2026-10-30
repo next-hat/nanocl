@@ -7,6 +7,8 @@ use std::{
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::process::Process;
 
+use crate::models::{CargoReplicaProcessDb, CargoRuntimeContext, ProcessDb};
+
 use super::is_candidate_process_name;
 
 enum Fault {
@@ -14,6 +16,7 @@ enum Fault {
   LostCreate(usize),
   Revalidation(usize),
   PreviousSnapshot(usize),
+  PreviousMappingRace { remove_runtime: bool },
 }
 static FAULTS: LazyLock<Mutex<HashMap<String, Fault>>> =
   LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -59,6 +62,68 @@ pub(crate) fn fail_candidate_revalidation(
     key,
     Fault::Revalidation(if after_promotion { 2 } else { 1 }),
   )
+}
+
+pub(crate) fn remove_previous_after_mapping_snapshot(
+  key: &str,
+  remove_runtime: bool,
+) -> Guard {
+  install(key, Fault::PreviousMappingRace { remove_runtime })
+}
+
+pub(super) async fn after_mappings_snapshot(
+  mappings: &[CargoReplicaProcessDb],
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  let remove_runtime = {
+    let mut faults = FAULTS.lock().unwrap();
+    if matches!(
+      faults.get(&state.operation.resource_key),
+      Some(Fault::PreviousMappingRace { .. })
+    ) {
+      match faults.remove(&state.operation.resource_key) {
+        Some(Fault::PreviousMappingRace { remove_runtime }) => {
+          Some(remove_runtime)
+        }
+        _ => unreachable!(),
+      }
+    } else {
+      None
+    }
+  };
+  let Some(remove_runtime) = remove_runtime else {
+    return Ok(());
+  };
+  let ids = mappings
+    .iter()
+    .filter_map(|mapping| mapping.process_key.as_deref())
+    .collect::<Vec<_>>();
+  assert_eq!(
+    ids.len(),
+    1,
+    "mapping race requires one captured process attachment"
+  );
+  // The real foreign key clears the persisted attachment; the caller's already
+  // captured mapping still carries the old ID, as in a concurrent destroy event.
+  if remove_runtime {
+    super::lifecycle::delete_instance(
+      ids[0],
+      Some(bollard_next::query_parameters::RemoveContainerOptions {
+        force: true,
+        ..Default::default()
+      }),
+      state,
+    )
+    .await
+  } else {
+    ProcessDb::delete_owned(
+      ids[0],
+      Some(state.operation.owner()),
+      state.lease.clone(),
+      &state.inner.pool,
+    )
+    .await
+  }
 }
 
 pub(crate) fn fail_previous_snapshot(
