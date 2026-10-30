@@ -1188,10 +1188,34 @@ async fn active_slots(
     let Some(id) = mapping.process_key.as_deref() else {
       continue;
     };
-    // A lost process row is not evidence that its Docker runtime is absent.
-    let process = ProcessDb::transform_read_by_pk(id, &state.inner.pool)
-      .await
-      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?;
+    let process =
+      match ProcessDb::transform_read_by_pk(id, &state.inner.pool).await {
+        Ok(process) => process,
+        Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+          // A destroy event can remove the row before its durable attachment.
+          // Only an affirmative absence for this immutable ID permits clearing it.
+          let inspected = state
+            .inner
+            .docker_api
+            .inspect_container(id, None::<InspectContainerOptions>)
+            .await;
+          rollback_result(!docker_reports_missing(&inspected))?;
+          CargoReplicaProcessDb::clear_process_owned(
+            mapping.key,
+            Some(state.operation.owner()),
+            state.lease.clone(),
+            &state.inner.pool,
+          )
+          .await
+          .map_err(|error| {
+            IoError::with_context("Cargo rollback", error.inner)
+          })?;
+          continue;
+        }
+        Err(error) => {
+          return Err(IoError::with_context("Cargo rollback", error.inner));
+        }
+      };
     let identity = process_identity(&process)?;
     slots.push(RuntimeSlot {
       role: mapping.role,
@@ -1216,6 +1240,18 @@ async fn active_slots(
   Ok(slots)
 }
 
+fn docker_reports_missing<T>(
+  result: &Result<T, bollard_next::errors::Error>,
+) -> bool {
+  matches!(
+    result,
+    Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    })
+  )
+}
+
 fn replica_absent_from_inventory(
   replica: uuid::Uuid,
   process_replicas: impl IntoIterator<Item = Option<uuid::Uuid>>,
@@ -1235,6 +1271,22 @@ fn observed_running_state(
     return None;
   }
   state.running
+}
+
+fn previous_running_state(
+  inspected: &bollard_next::models::ContainerInspectResponse,
+) -> Option<bool> {
+  let state = inspected.state.as_ref()?;
+  // Docker's restart policy is active even between process attempts. Permit a
+  // repair rollout, while confirmation still requires stable running state.
+  if state.restarting == Some(true) {
+    return Some(true);
+  }
+  state.running
+}
+
+fn previous_snapshot_error(error: IoError) -> IoError {
+  IoError::with_context("Cargo update preflight", error.inner)
 }
 
 fn previous_runtime_matches_ids<'a>(
@@ -1262,15 +1314,30 @@ async fn capture_previous_runtime(
   state: &CargoRuntimeContext,
 ) -> IoResult<CargoPreviousRuntime> {
   if !old.is_empty() {
+    #[cfg(test)]
+    rollback_fault::before_previous_snapshot(&state.operation.resource_key)
+      .map_err(previous_snapshot_error)?;
     let mut running = HashMap::new();
     for slot in old {
       lifecycle::validate_process(&slot.process.key, state).await?;
-      let inspected = inspect_process(&slot.process.key, state).await?;
+      // No runtime mutation has occurred for this replica. The caller first
+      // confirms rollback of any earlier prepared replicas before returning it.
+      let inspected = inspect_process(&slot.process.key, state)
+        .await
+        .map_err(previous_snapshot_error)?;
       if inspected.id.as_deref() != Some(slot.process.key.as_str()) {
-        return Err(rollback_result(true).unwrap_err());
+        return Err(IoError::interrupted(
+          "Cargo update preflight",
+          "Previous Cargo process identity was not observed",
+        ));
       }
-      let was_running = observed_running_state(&inspected)
-        .ok_or_else(|| rollback_result(true).unwrap_err())?;
+      let was_running =
+        previous_running_state(&inspected).ok_or_else(|| {
+          IoError::interrupted(
+            "Cargo update preflight",
+            "Previous Cargo running state was not observed",
+          )
+        })?;
       running.insert(slot.process.key.clone(), was_running);
       slot.process.data = inspected;
     }
@@ -1284,12 +1351,16 @@ async fn capture_previous_runtime(
       "kind_key",
       GenericClause::Eq(state.operation.resource_key.clone()),
     );
-  let count =
-    usize::try_from(ProcessDb::count_by(&filter, &state.inner.pool).await?)
-      .map_err(|_| rollback_result(true).unwrap_err())?;
+  let count = usize::try_from(
+    ProcessDb::count_by(&filter, &state.inner.pool)
+      .await
+      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?,
+  )
+  .map_err(|_| rollback_result(true).unwrap_err())?;
   let processes =
     ProcessDb::transform_read_by(&filter.limit(count), &state.inner.pool)
-      .await?;
+      .await
+      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?;
   if processes.len() != count {
     return Err(rollback_result(true).unwrap_err());
   }
@@ -1763,9 +1834,7 @@ async fn prepare_replica_update(
 ) -> IoResult<PreparedReplicaUpdate> {
   preflight_replica(cargo, task, state).await?;
   let mut old = active_slots(task, state).await?;
-  let previous = capture_previous_runtime(task, &mut old, state)
-    .await
-    .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?;
+  let previous = capture_previous_runtime(task, &mut old, state).await?;
   if let Err(error) = rename_old_slots(&mut old, state).await {
     rollback_result(
       retain_old_slots(&mut old, false, &previous, state)
@@ -3297,6 +3366,50 @@ mod tests {
         CargoReplicaProcessRole::Sandbox,
       ]
     );
+  }
+
+  #[test]
+  fn missing_process_requires_positive_docker_absence() {
+    assert!(!docker_reports_missing(
+      &Ok::<_, bollard_next::errors::Error>(())
+    ));
+    for status_code in [304, 403, 404, 500] {
+      let result =
+        Err::<(), _>(bollard_next::errors::Error::DockerResponseServerError {
+          status_code,
+          message: "inspect result".to_owned(),
+        });
+      assert_eq!(docker_reports_missing(&result), status_code == 404);
+    }
+  }
+
+  #[test]
+  fn restarting_previous_runtime_allows_repair_but_not_rollback_confirmation() {
+    let mut runtime = ContainerInspectResponse::default();
+    assert_eq!(previous_running_state(&runtime), None);
+    for running in [None, Some(false), Some(true)] {
+      runtime.state = Some(ContainerState {
+        running,
+        restarting: Some(true),
+        ..Default::default()
+      });
+      assert_eq!(previous_running_state(&runtime), Some(true));
+      assert_eq!(observed_running_state(&runtime), None);
+    }
+    runtime.state = Some(ContainerState::default());
+    assert_eq!(previous_running_state(&runtime), None);
+  }
+
+  #[test]
+  fn previous_snapshot_failure_is_terminal_only_after_prior_rollback() {
+    let error = previous_snapshot_error(IoError::interrupted(
+      "InspectCargoProcess",
+      "read failed",
+    ));
+    assert_eq!(error.context(), Some("Cargo update preflight"));
+    assert_eq!(error.inner.to_string(), "read failed");
+    let error = confirmed_rollback_error(error, false);
+    assert_eq!(error.context(), Some("Cargo rollback"));
   }
 
   #[test]

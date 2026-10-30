@@ -13,6 +13,7 @@ enum Fault {
   Cleanup,
   LostCreate(usize),
   Revalidation(usize),
+  PreviousSnapshot(usize),
 }
 static FAULTS: LazyLock<Mutex<HashMap<String, Fault>>> =
   LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -58,6 +59,29 @@ pub(crate) fn fail_candidate_revalidation(
     key,
     Fault::Revalidation(if after_promotion { 2 } else { 1 }),
   )
+}
+
+pub(crate) fn fail_previous_snapshot(
+  key: &str,
+  replica_number: usize,
+) -> Guard {
+  assert!(replica_number > 0);
+  install(key, Fault::PreviousSnapshot(replica_number))
+}
+
+pub(super) fn before_previous_snapshot(key: &str) -> IoResult<()> {
+  let mut faults = FAULTS.lock().unwrap();
+  if let Some(Fault::PreviousSnapshot(remaining)) = faults.get_mut(key) {
+    *remaining -= 1;
+    if *remaining == 0 {
+      faults.remove(key);
+      return Err(IoError::interrupted(
+        "InspectCargoProcess",
+        "previous runtime inspection unavailable",
+      ));
+    }
+  }
+  Ok(())
 }
 
 pub(super) fn before_revalidation(key: &str) -> IoResult<()> {
