@@ -5,7 +5,14 @@ pub mod server;
 
 #[cfg(test)]
 pub(crate) mod tests {
-  use std::{sync::Arc, time::Duration};
+  use std::{
+    path::PathBuf,
+    sync::{
+      Arc,
+      atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+  };
 
   use futures::StreamExt;
 
@@ -24,7 +31,24 @@ pub(crate) mod tests {
     },
   };
 
-  use crate::{services, vars};
+  use crate::{
+    models::{EventEmitter, Store, SystemEventKind, SystemState},
+    services, vars,
+  };
+
+  static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
+
+  pub struct TestConfig {
+    pub state_dir: PathBuf,
+    // Keep handler reload notifications local without starting a supervisor.
+    _reload_events: futures::channel::mpsc::UnboundedReceiver<SystemEventKind>,
+  }
+
+  impl Drop for TestConfig {
+    fn drop(&mut self) {
+      let _ = std::fs::remove_dir_all(&self.state_dir);
+    }
+  }
 
   pub fn before() {
     // Set test env to true to setup test logger
@@ -158,14 +182,31 @@ pub(crate) mod tests {
     Ok(rule)
   }
 
-  pub async fn gen_default_test_client() -> TestClient {
+  pub async fn gen_default_test_client() -> (TestClient, TestConfig) {
     before();
-    let home = std::env::var("HOME").unwrap();
-    let options = crate::cli::Cli {
-      state_dir: format!("{home}/.nanocl_dev/state/proxy"),
-      nginx_dir: "/etc/nginx".to_owned(),
+    let id = NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed);
+    let state_dir = std::env::temp_dir()
+      .join(format!("ncproxy-http-test-{}-{id}", std::process::id()));
+    std::fs::create_dir(&state_dir).unwrap();
+    let (sender, reload_events) = futures::channel::mpsc::unbounded();
+    let config = TestConfig {
+      state_dir,
+      _reload_events: reload_events,
     };
-    let system_state = crate::subsystem::init(&options).await.unwrap();
+    // Direct handler rules are not persisted Resources. A daemon event loop
+    // would reconcile them away, and CI's live proxy owns its own directory.
+    let system_state = Arc::new(SystemState {
+      client: NanocldClient::connect_to(&ConnectOpts {
+        url: "http://nanocl.internal:8585".into(),
+        ..Default::default()
+      })
+      .unwrap(),
+      event_emitter: EventEmitter(Arc::new(sender)),
+      store: Store::new(config.state_dir.to_str().unwrap()),
+      nginx_dir: "/etc/nginx".to_owned(),
+      config_lock: Arc::new(futures::lock::Mutex::new(())),
+    });
+    super::nginx::ensure_conf(&system_state).await.unwrap();
     // Create test server
     let srv = ntex::web::test::server(async move |_| {
       ntex::web::App::new()
@@ -173,6 +214,6 @@ pub(crate) mod tests {
         .configure(services::ntex_config)
         .build_with(ntex::web::AppState::new(Arc::clone(&system_state)))
     });
-    TestClient::new(srv, vars::VERSION)
+    (TestClient::new(srv, vars::VERSION), config)
   }
 }

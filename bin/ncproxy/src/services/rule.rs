@@ -82,7 +82,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     let name = "ncproxy-io-test-resource";
-    let client = gen_default_test_client().await;
+    let (client, config) = gen_default_test_client().await;
     let payload = read_rule("tests/basic.yml").unwrap();
     let mut invalid = payload.clone();
     let udp = invalid
@@ -119,6 +119,7 @@ mod tests {
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
     let cargo_cleanup = clean_test_cargo().await;
+    drop(config);
     // A rejected proxy rule must not leave the shared Cargo fixture behind.
     let body = body.unwrap();
     assert_eq!(
@@ -147,7 +148,7 @@ mod tests {
     };
 
     let name = "ncproxy-io-test-http3";
-    let client = gen_default_test_client().await;
+    let (client, config) = gen_default_test_client().await;
     ensure_test_cargo().await.unwrap();
     let nanocld = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
@@ -237,23 +238,16 @@ mod tests {
       .await;
     let status = res.status();
     let body = res.body().await;
-    let home = std::env::var("HOME").unwrap();
-    let rendered = std::fs::read_to_string(format!(
-      "{home}/.nanocl_dev/state/proxy/sites-available/{name}.conf"
-    ));
+    let rendered_path = config
+      .state_dir
+      .join(format!("sites-available/{name}.conf"));
+    let rendered = std::fs::read_to_string(&rendered_path);
     let res = client
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
     let secret_cleanup = nanocld.delete_secret(&secret_name).await;
     let cargo_cleanup = clean_test_cargo().await;
-    let file_cleanup = ["cert", "key"].map(|extension| {
-      match std::fs::remove_file(format!(
-        "{home}/.nanocl_dev/state/proxy/secrets/{secret_name}.{extension}"
-      )) {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        result => result,
-      }
-    });
+    drop(config);
     // Clean up before assertions so a rejected rule does not leak its secret.
     let body = body.unwrap();
     assert_eq!(
@@ -265,10 +259,9 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "delete h3 rule");
     secret_cleanup.unwrap();
     cargo_cleanup.unwrap();
-    for cleanup in file_cleanup {
-      cleanup.unwrap();
-    }
-    let rendered = rendered.unwrap();
+    let rendered = rendered.unwrap_or_else(|err| {
+      panic!("Unable to read {}: {err}", rendered_path.display())
+    });
     assert!(rendered.lines().any(|line| {
       let line = line.trim();
       line.starts_with("listen ") && line.ends_with(" quic;")
