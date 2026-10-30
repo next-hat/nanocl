@@ -1,6 +1,9 @@
 use std::{
   collections::HashMap,
+  future::Future,
+  pin::Pin,
   sync::{Arc, Mutex, OnceLock},
+  time::Duration,
 };
 
 use nanocl_error::io::{IoError, IoResult};
@@ -34,7 +37,14 @@ pub(super) async fn before_publication(key: &str) -> IoResult<()> {
   match fault {
     Some(PublicationFault::Pause(entered, release)) => {
       let _ = entered.send(());
-      let _ = release.await;
+      let _ = ntex::time::timeout(Duration::from_secs(30), release)
+        .await
+        .map_err(|_| {
+          IoError::other(
+            "Resource fixture",
+            "publication barrier was not released",
+          )
+        })?;
       Ok(())
     }
     Some(PublicationFault::Fail) => {
@@ -52,6 +62,48 @@ fn pause(key: &str) -> (oneshot::Receiver<()>, oneshot::Sender<()>) {
     .unwrap()
     .insert(key.to_owned(), PublicationFault::Pause(entered, held));
   (ready, release)
+}
+
+// HTTP request futures need continued polling to finish connection setup and
+// send the request before the server can reach the publication barrier.
+async fn wait_for_publication<F: Future>(
+  request: Pin<&mut F>,
+  ready: oneshot::Receiver<()>,
+) {
+  match ntex::time::timeout(
+    Duration::from_secs(20),
+    futures::future::select(ready, request),
+  )
+  .await
+  .expect("Resource request did not reach the publication barrier")
+  {
+    futures::future::Either::Left((ready, _)) => {
+      ready.expect("Resource publication barrier stopped before signaling");
+    }
+    futures::future::Either::Right(_) => {
+      panic!("Resource request completed before the publication barrier");
+    }
+  }
+}
+
+#[ntex::test]
+async fn resource_publication_wait_drives_request_until_barrier() {
+  let (entered, ready) = oneshot::channel();
+  let mut entered = Some(entered);
+  let polls = Arc::new(Mutex::new(0));
+  let request_polls = polls.clone();
+  let mut request = Box::pin(std::future::poll_fn(move |context| {
+    let mut polls = request_polls.lock().unwrap();
+    *polls += 1;
+    if *polls == 1 {
+      context.waker().wake_by_ref();
+    } else if let Some(entered) = entered.take() {
+      entered.send(()).unwrap();
+    }
+    std::task::Poll::<()>::Pending
+  }));
+  wait_for_publication(request.as_mut(), ready).await;
+  assert!(*polls.lock().unwrap() >= 2);
 }
 
 #[ntex::test]
@@ -123,6 +175,15 @@ struct Controller {
 // locally; run only in CI/the owner-provided integration environment.
 #[ntex::test]
 async fn resource_publication_orders_updates_and_duplicate_creates() {
+  ntex::time::timeout(
+    Duration::from_secs(120),
+    resource_publication_scenario(),
+  )
+  .await
+  .expect("Resource publication scenario exceeded its timeout");
+}
+
+async fn resource_publication_scenario() {
   let system = gen_default_test_system().await;
   let controller = Arc::new(Mutex::new(Controller::default()));
   let observed = controller.clone();
@@ -197,8 +258,7 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
     Some(&update_a),
     None::<String>,
   ));
-  assert!(futures::poll!(first.as_mut()).is_pending());
-  ready.await.unwrap();
+  wait_for_publication(first.as_mut(), ready).await;
   let mut second = Box::pin(system.client.send_put(
     &endpoint,
     Some(&update_b),
@@ -314,8 +374,7 @@ async fn resource_publication_orders_updates_and_duplicate_creates() {
     Some(&spec),
     None::<String>,
   ));
-  assert!(futures::poll!(first.as_mut()).is_pending());
-  ready.await.unwrap();
+  wait_for_publication(first.as_mut(), ready).await;
   let mut loser_spec = spec.clone();
   loser_spec.data = update_b.data;
   let mut second = Box::pin(system.client.send_post(

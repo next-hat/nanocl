@@ -133,10 +133,47 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 }
 
 async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
-  // Context repair and switching are local and must work without loading the
-  // selected connection (including its endpoint and credential files).
-  if let Command::Context(args) = &cli_args.command {
-    return commands::exec_context(args);
+  // Local context commands and Docker installation do not need the selected
+  // NanoCL connection, including its endpoint and credential files.
+  match &cli_args.command {
+    Command::Context(args) => return commands::exec_context(args),
+    Command::Install(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        // Docker Desktop installation saves a local context after setup.
+        Context::ensure()?;
+        return commands::exec_install(args).await;
+      }
+      #[cfg(target_os = "windows")]
+      {
+        if args.json {
+          return Err(IoError::other(
+            "Install",
+            "Install is not supported on windows yet",
+          ));
+        }
+        println!("Install is not supported on windows yet");
+        return Ok(());
+      }
+    }
+    Command::Uninstall(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        return commands::exec_uninstall(args).await;
+      }
+      #[cfg(target_os = "windows")]
+      {
+        if args.json {
+          return Err(IoError::other(
+            "Uninstall",
+            "Uninstall is not supported on windows yet",
+          ));
+        }
+        println!("Uninstall is not supported on windows yet");
+        return Ok(());
+      }
+    }
+    _ => {}
   }
   let cli_conf = create_cli_config(cli_args).map_err(|err| {
     if matches!(&cli_args.command, Command::State(args) if matches!(args.command, StateCommand::Diff(_))) {
@@ -168,43 +205,9 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
     }
     Command::Kill(args) => commands::kill_process(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
-    Command::Install(args) => {
-      #[cfg(not(target_os = "windows"))]
-      {
-        commands::exec_install(args).await
-      }
-      #[cfg(target_os = "windows")]
-      {
-        if args.json {
-          return Err(IoError::other(
-            "Install",
-            "Install is not supported on windows yet",
-          ));
-        }
-        println!("Install is not supported on windows yet");
-        Ok(())
-      }
-    }
-    Command::Uninstall(args) => {
-      #[cfg(not(target_os = "windows"))]
-      {
-        commands::exec_uninstall(args).await
-      }
-      #[cfg(target_os = "windows")]
-      {
-        if args.json {
-          return Err(IoError::other(
-            "Uninstall",
-            "Uninstall is not supported on windows yet",
-          ));
-        }
-        println!("Uninstall is not supported on windows yet");
-        Ok(())
-      }
-    }
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
-    Command::Context(_) => {
-      unreachable!("local context command dispatched above")
+    Command::Context(_) | Command::Install(_) | Command::Uninstall(_) => {
+      unreachable!("local command dispatched above")
     }
     Command::Info => commands::exec_info(&cli_conf).await,
     Command::Metric(args) => commands::exec_metric(&cli_conf, args).await,

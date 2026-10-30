@@ -124,6 +124,52 @@ fn malformed_user_config_fails_until_explicit_local_switch() {
     fs::read_to_string(&config_path).unwrap(),
     "CurrentContext: ["
   );
+  let listed = fixture.cli(&["context", "ls"]);
+  assert!(listed.status.success());
+  let output = String::from_utf8_lossy(&listed.stdout);
+  assert!(output.contains("default"));
+  assert!(output.contains('?'));
+  assert!(!output.contains("default *"));
+  assert!(
+    String::from_utf8_lossy(&listed.stderr)
+      .contains("current context is unknown")
+  );
+  assert_eq!(
+    fs::read_to_string(&config_path).unwrap(),
+    "CurrentContext: ["
+  );
   assert!(fixture.cli(&["context", "use", "default"]).status.success());
   fixture.assert_no_requests();
+}
+
+#[cfg(not(target_os = "windows"))]
+#[test]
+fn installers_dispatch_without_loading_broken_nanocl_configuration() {
+  for user_config in ["CurrentContext: [", "CurrentContext: broken\n"] {
+    let fixture = ContextFixture::new();
+    let config_path = fixture.home.join(".nanocl/conf.yml");
+    fs::write(&config_path, user_config).unwrap();
+    fs::create_dir(fixture.home.join(".docker")).unwrap();
+    // Reject in Docker discovery before either installer can contact a daemon
+    // or change runtime state. This diagnostic proves local dispatch was reached.
+    fs::write(fixture.home.join(".docker/config.json"), "{").unwrap();
+    fs::remove_dir(fixture.home.join(".nanocl/contexts")).unwrap();
+    for command in ["install", "uninstall"] {
+      let result = fixture.cli(&[command, "--json"]);
+      assert!(!result.status.success());
+      let diagnostic = String::from_utf8_lossy(&result.stderr);
+      assert!(
+        diagnostic.contains("Could not parse docker config"),
+        "{diagnostic}"
+      );
+      assert_eq!(fs::read_to_string(&config_path).unwrap(), user_config);
+      let events = String::from_utf8_lossy(&result.stdout);
+      let event: serde_json::Value =
+        serde_json::from_str(events.trim()).unwrap();
+      assert_eq!(event["operation"], command);
+      assert_eq!(event["success"], false);
+      assert!(fixture.home.join(".nanocl/contexts").is_dir());
+      fixture.assert_no_requests();
+    }
+  }
 }
