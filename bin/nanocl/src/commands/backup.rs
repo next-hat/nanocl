@@ -91,7 +91,8 @@ fn namespace_backup_paths(
         url::form_urlencoded::byte_serialize(namespace.name.as_bytes())
           .collect();
       let path = PathBuf::from("namespaces").join(format!("{name}.yml"));
-      if !seen.insert(path.clone()) {
+      // Encoded names are ASCII. Reject aliases on case-insensitive filesystems.
+      if !seen.insert(name.to_ascii_lowercase()) {
         return Err(IoError::invalid_data(
           "Backup",
           "duplicate namespace export path",
@@ -330,6 +331,24 @@ mod tests {
     assert!(
       namespace_backup_paths(&[namespaces[0].clone(), namespaces[0].clone()])
         .is_err()
+    );
+  }
+
+  #[test]
+  fn backup_namespace_paths_reject_case_insensitive_collisions() {
+    let namespaces = ["Prod", "prod"].map(|name| NamespaceSummary {
+      name: name.into(),
+      cargoes: 0,
+      instances: 0,
+      created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+    });
+    let error = namespace_backup_paths(&namespaces).unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(
+      error
+        .inner
+        .to_string()
+        .contains("duplicate namespace export path")
     );
   }
 
