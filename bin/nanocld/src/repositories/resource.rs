@@ -5,6 +5,7 @@ use diesel::prelude::*;
 use jsonschema::{Draft, Validator};
 use nanocl_error::{
   http::{HttpError, HttpResult},
+  http_client::{HttpClientError, HttpClientResult},
   io::{IoError, IoResult},
 };
 
@@ -24,6 +25,22 @@ use crate::{
 };
 
 use super::generic::*;
+
+// Only a controller's typed HTTP 404 confirms an unknown rule. An IO NotFound
+// (for example a missing controller socket) must retain the normal retry path.
+fn controller_delete_result(
+  result: HttpClientResult<()>,
+  allow_missing: bool,
+) -> HttpResult<()> {
+  match result {
+    Err(HttpClientError::HttpError(error))
+      if allow_missing && error.status == ntex::http::StatusCode::NOT_FOUND =>
+    {
+      Ok(())
+    }
+    result => result.map_err(Into::into),
+  }
+}
 
 impl RepositoryBase for ResourceDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
@@ -210,16 +227,24 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await?;
     let new_item = ResourceDb {
       key: item.name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
       kind,
       spec_key: spec.key.to_owned(),
     };
-    let resource_db = ResourceDb::create_from(new_item, pool).await?;
-    let item = resource_db.with_spec(&spec);
-    Ok(item)
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)?;
+        let resource = diesel::insert_into(resources::table)
+          .values(&new_item)
+          .get_result::<ResourceDb>(conn)?;
+        Ok(resource.with_spec(&spec))
+      })
+    })
+    .await
   }
 
   /// Update a resource from a spec.
@@ -240,15 +265,42 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await?;
     let resource_update = ResourceUpdateDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),
     };
-    let resource_db =
-      ResourceDb::update_pk(&key, resource_update, pool).await?;
-    let item = resource_db.with_spec(&spec);
-    Ok(item)
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)?;
+        let resource = diesel::update(resources::table.find(&key))
+          .set(&resource_update)
+          .get_result::<ResourceDb>(conn)?;
+        Ok(resource.with_spec(&spec))
+      })
+    })
+    .await
+  }
+
+  pub(crate) async fn delete_with_history(
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let key = key.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        diesel::delete(resources::table.find(&key)).execute(conn)?;
+        diesel::delete(
+          specs::table
+            .filter(specs::kind_name.eq("Resource"))
+            .filter(specs::kind_key.eq(&key)),
+        )
+        .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
   }
 
   /// This hook is called when a resource is created.
@@ -292,17 +344,66 @@ impl ResourceDb {
   /// It call a custom controller at a specific url.
   /// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
   pub async fn hook_delete(resource: &Resource, pool: &Pool) -> HttpResult<()> {
-    let (kind, version) = ResourceDb::parse_kind(&resource.kind, pool).await?;
-    let kind: ResourceKind = SpecDb::get_version(&kind, &version, pool)
-      .await?
-      .try_into()?;
+    Self::delete_hook(resource, pool, false).await
+  }
+
+  /// Delete a persisted Resource even when its kind/version or controller rule
+  /// is already absent. Compensation stays strict: a controller may return 404
+  /// because its lookup of an uncommitted canonical Resource failed.
+  pub(crate) async fn hook_delete_existing(
+    resource: &Resource,
+    pool: &Pool,
+  ) -> HttpResult<()> {
+    Self::delete_hook(resource, pool, true).await
+  }
+
+  async fn delete_hook(
+    resource: &Resource,
+    pool: &Pool,
+    allow_missing: bool,
+  ) -> HttpResult<()> {
+    let (kind, version) = match Self::parse_kind(&resource.kind, pool).await {
+      Ok(kind) => kind,
+      Err(error)
+        if allow_missing
+          && error.inner.kind() == std::io::ErrorKind::NotFound =>
+      {
+        log::warn!(
+          "Deleting Resource {} with missing kind {}; external controller cleanup cannot be verified",
+          resource.spec.resource_key,
+          resource.kind,
+        );
+        return Ok(());
+      }
+      Err(error) => return Err(error.into()),
+    };
+    let kind: ResourceKind = match SpecDb::get_version(&kind, &version, pool)
+      .await
+    {
+      Ok(spec) => spec.try_into()?,
+      Err(error)
+        if allow_missing
+          && error.inner.kind() == std::io::ErrorKind::NotFound =>
+      {
+        log::warn!(
+          "Deleting Resource {} with a missing version of kind {}; external controller cleanup cannot be verified",
+          resource.spec.resource_key,
+          resource.kind,
+        );
+        return Ok(());
+      }
+      Err(error) => return Err(error.into()),
+    };
     log::debug!("hook_delete_resource kind: {kind:?}");
     if let Some(url) = &kind.data.url {
       let ctrl_client =
         utils::ctrl_client::CtrlClient::new(&kind.name, url).await?;
-      ctrl_client
-        .delete_rule(&resource.spec.version, &resource.spec.resource_key)
-        .await?;
+      controller_delete_result(
+        ctrl_client
+          .delete_rule(&resource.spec.version, &resource.spec.resource_key)
+          .await,
+        allow_missing,
+      )?;
     }
     Ok(())
   }
@@ -311,6 +412,53 @@ impl ResourceDb {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn resource_delete_accepts_only_typed_controller_absence() {
+    use ntex::http::StatusCode;
+
+    for allow_missing in [false, true] {
+      assert!(controller_delete_result(Ok(()), allow_missing).is_ok());
+      for status in [
+        StatusCode::NOT_FOUND,
+        StatusCode::BAD_REQUEST,
+        StatusCode::UNAUTHORIZED,
+        StatusCode::FORBIDDEN,
+        StatusCode::CONFLICT,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        StatusCode::SERVICE_UNAVAILABLE,
+      ] {
+        let result = controller_delete_result(
+          Err(HttpClientError::HttpError(HttpError::new(
+            status, "fixture",
+          ))),
+          allow_missing,
+        );
+        assert_eq!(
+          result.is_ok(),
+          allow_missing && status == StatusCode::NOT_FOUND
+        );
+      }
+      for kind in [
+        std::io::ErrorKind::NotFound,
+        std::io::ErrorKind::PermissionDenied,
+        std::io::ErrorKind::ConnectionRefused,
+        std::io::ErrorKind::TimedOut,
+      ] {
+        let result = controller_delete_result(
+          Err(HttpClientError::IoError(IoError::with_context(
+            "controller",
+            kind.into(),
+          ))),
+          allow_missing,
+        );
+        assert!(
+          result.is_err(),
+          "IO {kind:?} must not confirm controller deletion"
+        );
+      }
+    }
+  }
 
   #[test]
   fn resource_history_query_paginates_before_loading_with_scoped_order() {

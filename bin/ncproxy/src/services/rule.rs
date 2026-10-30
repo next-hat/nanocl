@@ -72,6 +72,9 @@ pub fn ntex_config(
 
 #[cfg(test)]
 mod tests {
+  use nanocld_client::stubs::proxy::{
+    ProxyRule, ProxySsl, ProxyStreamProtocol,
+  };
   use ntex::http;
 
   use crate::utils::tests::*;
@@ -79,20 +82,54 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     let name = "ncproxy-io-test-resource";
-    let client = gen_default_test_client().await;
-    ensure_test_cargo().await.unwrap();
+    let (client, config) = gen_default_test_client().await;
     let payload = read_rule("tests/basic.yml").unwrap();
+    let mut invalid = payload.clone();
+    let udp = invalid
+      .rules
+      .iter_mut()
+      .find_map(|rule| match rule {
+        ProxyRule::Stream(stream)
+          if matches!(stream.protocol, ProxyStreamProtocol::Udp) =>
+        {
+          Some(stream)
+        }
+        _ => None,
+      })
+      .expect("basic fixture must exercise UDP");
+    udp.ssl = Some(ProxySsl::Secret("test-secret".into()));
+    let rejected = client
+      .send_put(&format!("/rules/{name}"), Some(&invalid), None::<String>)
+      .await;
+    let rejected_status = rejected.status();
+    let rejected_body = rejected.body().await.unwrap();
+    assert_eq!(rejected_status, http::StatusCode::BAD_REQUEST);
+    assert!(
+      String::from_utf8_lossy(&rejected_body)
+        .contains("TLS is not supported for UDP")
+    );
+
+    ensure_test_cargo().await.unwrap();
     let res = client
       .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
       .await;
-    let json = res.json::<serde_yaml::Value>().await.unwrap();
-    println!("{:?}", json);
-    test_status_code!(res.status(), http::StatusCode::OK, "put a rule");
-    let res = client
+    let status = res.status();
+    let body = res.body().await;
+    let cleanup = client
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
-    clean_test_cargo().await.unwrap();
+    let cargo_cleanup = clean_test_cargo().await;
+    drop(config);
+    // A rejected proxy rule must not leave the shared Cargo fixture behind.
+    let body = body.unwrap();
+    assert_eq!(
+      status,
+      http::StatusCode::OK,
+      "put a rule: {}",
+      String::from_utf8_lossy(&body)
+    );
+    test_status_code!(cleanup.status(), http::StatusCode::OK, "delete a rule");
+    cargo_cleanup.unwrap();
   }
 
   #[ntex::test]
@@ -111,7 +148,7 @@ mod tests {
     };
 
     let name = "ncproxy-io-test-http3";
-    let client = gen_default_test_client().await;
+    let (client, config) = gen_default_test_client().await;
     ensure_test_cargo().await.unwrap();
     let nanocld = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
@@ -201,23 +238,16 @@ mod tests {
       .await;
     let status = res.status();
     let body = res.body().await;
-    let home = std::env::var("HOME").unwrap();
-    let rendered = std::fs::read_to_string(format!(
-      "{home}/.nanocl_dev/state/proxy/sites-available/{name}.conf"
-    ));
+    let rendered_path = config
+      .state_dir
+      .join(format!("sites-available/{name}.conf"));
+    let rendered = std::fs::read_to_string(&rendered_path);
     let res = client
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
     let secret_cleanup = nanocld.delete_secret(&secret_name).await;
     let cargo_cleanup = clean_test_cargo().await;
-    let file_cleanup = ["cert", "key"].map(|extension| {
-      match std::fs::remove_file(format!(
-        "{home}/.nanocl_dev/state/proxy/secrets/{secret_name}.{extension}"
-      )) {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        result => result,
-      }
-    });
+    drop(config);
     // Clean up before assertions so a rejected rule does not leak its secret.
     let body = body.unwrap();
     assert_eq!(
@@ -229,10 +259,9 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "delete h3 rule");
     secret_cleanup.unwrap();
     cargo_cleanup.unwrap();
-    for cleanup in file_cleanup {
-      cleanup.unwrap();
-    }
-    let rendered = rendered.unwrap();
+    let rendered = rendered.unwrap_or_else(|err| {
+      panic!("Unable to read {}: {err}", rendered_path.display())
+    });
     assert!(rendered.lines().any(|line| {
       let line = line.trim();
       line.starts_with("listen ") && line.ends_with(" quic;")

@@ -22,6 +22,8 @@ pub enum NginxRuleKind {
 pub struct StoreConfigSnapshot {
   pub sites: BTreeMap<String, String>,
   pub streams: BTreeMap<String, String>,
+  /// Original bytes, or absence, for every credential the candidate can write.
+  pub credentials: BTreeMap<String, Option<Vec<u8>>>,
 }
 
 /// Implement Display for RuleKind for better display message
@@ -231,10 +233,30 @@ impl Store {
     Ok(())
   }
 
-  pub async fn snapshot_config(&self) -> IoResult<StoreConfigSnapshot> {
+  pub async fn snapshot_config(
+    &self,
+    credential_paths: &[&str],
+  ) -> IoResult<StoreConfigSnapshot> {
+    let mut credentials = BTreeMap::new();
+    for path in credential_paths {
+      if credentials.contains_key(*path) {
+        continue;
+      }
+      let data = match tokio::fs::read(path).await {
+        Ok(data) => Some(data),
+        Err(err) if err.kind() == ErrorKind::NotFound => None,
+        Err(err) => {
+          return Err(
+            *err.map_err_context(|| format!("Unable to read {path}")),
+          );
+        }
+      };
+      credentials.insert((*path).to_owned(), data);
+    }
     Ok(StoreConfigSnapshot {
       sites: self.read_config_dir("sites").await?,
       streams: self.read_config_dir("streams").await?,
+      credentials,
     })
   }
 
@@ -254,7 +276,25 @@ impl Store {
     &self,
     snapshot: &StoreConfigSnapshot,
   ) -> IoResult<()> {
-    self.restore_config_dir("sites", &snapshot.sites).await?;
-    self.restore_config_dir("streams", &snapshot.streams).await
+    let mut credentials_result = Ok(());
+    for (path, data) in &snapshot.credentials {
+      let restored = match data {
+        Some(data) => tokio::fs::write(path, data).await,
+        None => match tokio::fs::remove_file(path).await {
+          Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
+          result => result,
+        },
+      };
+      if let Err(err) = restored {
+        // Still restore other credentials and configuration when one path
+        // remains unavailable. The transaction must report incomplete rollback.
+        credentials_result =
+          Err(*err.map_err_context(|| format!("Unable to restore {path}")));
+      }
+    }
+    let sites_result = self.restore_config_dir("sites", &snapshot.sites).await;
+    let streams_result =
+      self.restore_config_dir("streams", &snapshot.streams).await;
+    credentials_result.and(sites_result).and(streams_result)
   }
 }

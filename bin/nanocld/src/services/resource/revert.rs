@@ -28,17 +28,24 @@ pub async fn revert_resource(
   _request_state: (),
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
-  let history =
-    ResourceDb::history_spec(&path.1, path.2, &state.inner.pool).await?;
-  let resource =
-    ResourceDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
-  let new_resource = ResourcePartial {
-    name: resource.spec.resource_key,
-    kind: resource.kind,
-    data: history.data,
-    metadata: history.metadata,
-  };
-  let resource =
-    ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
+  let state = state.clone();
+  let path = path.into_inner();
+
+  let resource = ResourceDb::mutate(&path.1.clone(), async move {
+    let history =
+      ResourceDb::history_spec(&path.1, path.2, &state.inner.pool).await?;
+    let resource =
+      ResourceDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
+    let new_resource = ResourcePartial {
+      name: resource.spec.resource_key,
+      kind: resource.kind,
+      data: history.data,
+      metadata: history.metadata,
+    };
+    let resource =
+      ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
+    Ok(resource)
+  })
+  .await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }

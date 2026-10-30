@@ -5,8 +5,8 @@ use std::{
 };
 
 use bollard_next::query_parameters::{
-  InspectContainerOptions, RemoveContainerOptions, RenameContainerOptions,
-  StartContainerOptions, StopContainerOptions,
+  InspectContainerOptions, ListContainersOptions, RemoveContainerOptions,
+  RenameContainerOptions, StartContainerOptions, StopContainerOptions,
 };
 use futures::future::try_join_all;
 use nanocld_client::{ConnectOpts, NanocldClient};
@@ -23,10 +23,11 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
-    CargoRuntimeContext, CompileDeclaredOpts, EnsureExistingSlotOpts,
-    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
-    ProcessDb, ProcessUpdateDb, SystemState,
+    CargoCandidateFailure, CargoDb, CargoPreviousRuntime, CargoReplicaDb,
+    CargoReplicaProcessDb, CargoReplicaProcessRole, CargoRuntimeContext,
+    CompileDeclaredOpts, EnsureExistingSlotOpts, NewCargoReplicaProcessDb,
+    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, ProcessUpdateDb,
+    SystemState,
   },
   repositories::generic::*,
   utils,
@@ -35,7 +36,7 @@ use crate::{
 use super::{
   cargo_compiler::{
     CargoContainerRole, CargoRuntimeMetadata, ContainerCompileInput,
-    SandboxCompileInput, compile_container, compile_sandbox,
+    LABEL_REPLICA, SandboxCompileInput, compile_container, compile_sandbox,
   },
   network::DEFAULT_NETWORK,
 };
@@ -47,6 +48,8 @@ mod readiness;
 pub(crate) mod recovery;
 mod replacement;
 mod restart;
+#[cfg(test)]
+pub(crate) mod rollback_fault;
 
 pub(crate) use lifecycle::{
   ensure_current, lifecycle_lock, observe, process_action,
@@ -110,6 +113,7 @@ struct ReplicaRuntime {
 struct PreparedReplicaUpdate {
   task: CargoReplicaTask,
   old: Vec<RuntimeSlot>,
+  previous: CargoPreviousRuntime,
   candidate: ReplicaRuntime,
   stop_first: bool,
 }
@@ -606,7 +610,7 @@ async fn create_process(
   );
   labels.insert(LABEL_SPEC.into(), state.operation.spec_key.to_string());
   labels.insert(LABEL_OPERATION.into(), state.operation.key.to_string());
-  super::process::create_owned(
+  let process = super::process::create_owned(
     &ProcessKind::Cargo,
     &name,
     &cargo.spec.cargo_key,
@@ -615,7 +619,12 @@ async fn create_process(
     state.lease.clone(),
     state,
   )
-  .await
+  .await?;
+  #[cfg(test)]
+  if pending {
+    rollback_fault::after_create(&process)?;
+  }
+  Ok(process)
 }
 
 async fn attach_process(
@@ -1174,11 +1183,41 @@ async fn active_slots(
 ) -> IoResult<Vec<RuntimeSlot>> {
   let mappings =
     CargoReplicaProcessDb::list_by_replica(task.key, &state.inner.pool).await?;
+  #[cfg(test)]
+  rollback_fault::after_mappings_snapshot(&mappings, state).await?;
   let mut slots = Vec::new();
   for mapping in mappings {
-    let Some(process) = mapped_process(&mapping, state).await? else {
+    let Some(id) = mapping.process_key.as_deref() else {
       continue;
     };
+    let process =
+      match ProcessDb::transform_read_by_pk(id, &state.inner.pool).await {
+        Ok(process) => process,
+        Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+          // A destroy event can remove the row before its durable attachment.
+          // Only an affirmative absence for this immutable ID permits clearing it.
+          let inspected = state
+            .inner
+            .docker_api
+            .inspect_container(id, None::<InspectContainerOptions>)
+            .await;
+          rollback_result(!docker_reports_missing(&inspected))?;
+          CargoReplicaProcessDb::clear_process_owned(
+            mapping.key,
+            Some(state.operation.owner()),
+            state.lease.clone(),
+            &state.inner.pool,
+          )
+          .await
+          .map_err(|error| {
+            IoError::with_context("Cargo rollback", error.inner)
+          })?;
+          continue;
+        }
+        Err(error) => {
+          return Err(IoError::with_context("Cargo rollback", error.inner));
+        }
+      };
     let identity = process_identity(&process)?;
     slots.push(RuntimeSlot {
       role: mapping.role,
@@ -1201,6 +1240,192 @@ async fn active_slots(
     }
   }
   Ok(slots)
+}
+
+fn docker_reports_missing<T>(
+  result: &Result<T, bollard_next::errors::Error>,
+) -> bool {
+  matches!(
+    result,
+    Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    })
+  )
+}
+
+fn replica_absent_from_inventory(
+  replica: uuid::Uuid,
+  process_replicas: impl IntoIterator<Item = Option<uuid::Uuid>>,
+  runtime_replicas: impl IntoIterator<Item = Option<uuid::Uuid>>,
+) -> bool {
+  process_replicas
+    .into_iter()
+    .chain(runtime_replicas)
+    .all(|observed| observed.is_some_and(|key| key != replica))
+}
+
+fn observed_running_state(
+  inspected: &bollard_next::models::ContainerInspectResponse,
+) -> Option<bool> {
+  let state = inspected.state.as_ref()?;
+  if state.restarting == Some(true) {
+    return None;
+  }
+  state.running
+}
+
+fn previous_running_state(
+  inspected: &bollard_next::models::ContainerInspectResponse,
+) -> Option<bool> {
+  let state = inspected.state.as_ref()?;
+  // Docker's restart policy is active even between process attempts. Permit a
+  // repair rollout, while confirmation still requires stable running state.
+  if state.restarting == Some(true) {
+    return Some(true);
+  }
+  state.running
+}
+
+fn previous_snapshot_error(error: IoError) -> IoError {
+  IoError::with_context("Cargo update preflight", error.inner)
+}
+
+fn previous_runtime_matches_ids<'a>(
+  previous: &CargoPreviousRuntime,
+  ids: impl IntoIterator<Item = &'a str>,
+) -> bool {
+  let ids = ids.into_iter().collect::<HashSet<_>>();
+  match previous {
+    CargoPreviousRuntime::Absent => ids.is_empty(),
+    CargoPreviousRuntime::Observed(running) => {
+      !running.is_empty()
+        && ids.len() == running.len()
+        && running.keys().all(|id| ids.contains(id.as_str()))
+    }
+  }
+}
+
+fn previously_running(previous: &CargoPreviousRuntime, id: &str) -> bool {
+  matches!(previous, CargoPreviousRuntime::Observed(running) if running.get(id) == Some(&true))
+}
+
+async fn capture_previous_runtime(
+  task: &CargoReplicaTask,
+  old: &mut [RuntimeSlot],
+  state: &CargoRuntimeContext,
+) -> IoResult<CargoPreviousRuntime> {
+  if !old.is_empty() {
+    #[cfg(test)]
+    rollback_fault::before_previous_snapshot(&state.operation.resource_key)
+      .map_err(previous_snapshot_error)?;
+    let mut running = HashMap::new();
+    for slot in old {
+      lifecycle::validate_process(&slot.process.key, state).await?;
+      // No runtime mutation has occurred for this replica. The caller first
+      // confirms rollback of any earlier prepared replicas before returning it.
+      let inspected = inspect_process(&slot.process.key, state)
+        .await
+        .map_err(previous_snapshot_error)?;
+      if inspected.id.as_deref() != Some(slot.process.key.as_str()) {
+        return Err(IoError::interrupted(
+          "Cargo update preflight",
+          "Previous Cargo process identity was not observed",
+        ));
+      }
+      let was_running =
+        previous_running_state(&inspected).ok_or_else(|| {
+          IoError::interrupted(
+            "Cargo update preflight",
+            "Previous Cargo running state was not observed",
+          )
+        })?;
+      running.insert(slot.process.key.clone(), was_running);
+      slot.process.data = inspected;
+    }
+    return Ok(CargoPreviousRuntime::Observed(running));
+  }
+  // Empty attachments alone cannot distinguish a never-started replica from
+  // orphaned runtime. Read this Cargo's complete persisted and Docker inventory.
+  let filter = GenericFilter::new()
+    .r#where("kind", GenericClause::Eq(ProcessKind::Cargo.to_string()))
+    .r#where(
+      "kind_key",
+      GenericClause::Eq(state.operation.resource_key.clone()),
+    );
+  let count = usize::try_from(
+    ProcessDb::count_by(&filter, &state.inner.pool)
+      .await
+      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?,
+  )
+  .map_err(|_| rollback_result(true).unwrap_err())?;
+  let processes =
+    ProcessDb::transform_read_by(&filter.limit(count), &state.inner.pool)
+      .await
+      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?;
+  if processes.len() != count {
+    return Err(rollback_result(true).unwrap_err());
+  }
+  let inventory = state
+    .inner
+    .docker_api
+    .list_containers(Some(ListContainersOptions {
+      all: true,
+      filters: Some(HashMap::from([(
+        "label".to_owned(),
+        vec![format!("io.nanocl.c={}", state.operation.resource_key)],
+      )])),
+      ..Default::default()
+    }))
+    .await
+    .map_err(|_| rollback_result(true).unwrap_err())?;
+  let absent = replica_absent_from_inventory(
+    task.key,
+    processes.iter().map(|process| {
+      process_identity(process)
+        .ok()
+        .map(|identity| identity.replica_key)
+    }),
+    inventory.iter().map(|container| {
+      container.id.as_ref().filter(|id| !id.is_empty())?;
+      container.labels.as_ref()?.get(LABEL_REPLICA)?.parse().ok()
+    }),
+  );
+  rollback_result(!absent)?;
+  Ok(CargoPreviousRuntime::Absent)
+}
+
+async fn confirm_previous_runtime(
+  old: &mut [RuntimeSlot],
+  previous: &CargoPreviousRuntime,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
+  rollback_result(!previous_runtime_matches_ids(
+    previous,
+    old.iter().map(|slot| slot.process.key.as_str()),
+  ))?;
+  let CargoPreviousRuntime::Observed(running) = previous else {
+    return Ok(());
+  };
+  // Stopped prior processes must remain stopped. Readiness is relevant only to
+  // the processes that were actually running before this update.
+  let formerly_running = old
+    .iter()
+    .filter(|slot| previously_running(previous, &slot.process.key))
+    .cloned()
+    .collect::<Vec<_>>();
+  wait_until_ready(&formerly_running, state).await?;
+  refresh_slot_observations(old, state).await?;
+  rollback_result(old.iter().any(|slot| {
+    let observed = observed_running_state(&slot.process.data);
+    let expected = running[&slot.process.key];
+    // Init commands can finish while preparing a candidate; never replay them.
+    if slot.role == CargoReplicaProcessRole::Init && expected {
+      observed.is_none()
+    } else {
+      observed != Some(expected)
+    }
+  }))
 }
 
 async fn rename_old_slots(
@@ -1320,6 +1545,7 @@ async fn activate_candidate_slots(
 async fn retain_old_slots(
   slots: &mut [RuntimeSlot],
   restart: bool,
+  previous: &CargoPreviousRuntime,
   state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   // The persisted declaration is already the candidate declaration. Keep the
@@ -1328,16 +1554,16 @@ async fn retain_old_slots(
   // generation from the new spec.
   rename_old_slots(slots, state).await?;
   if restart {
-    for slot in slots
-      .iter()
-      .filter(|slot| slot.role == CargoReplicaProcessRole::Sandbox)
-    {
+    for slot in slots.iter().filter(|slot| {
+      slot.role == CargoReplicaProcessRole::Sandbox
+        && previously_running(previous, &slot.process.key)
+    }) {
       start_process(&slot.process, state).await?;
     }
-    for slot in slots
-      .iter()
-      .filter(|slot| slot.role == CargoReplicaProcessRole::App)
-    {
+    for slot in slots.iter().filter(|slot| {
+      slot.role == CargoReplicaProcessRole::App
+        && previously_running(previous, &slot.process.key)
+    }) {
       start_process(&slot.process, state).await?;
     }
   }
@@ -1382,6 +1608,8 @@ async fn delete_slots(
 ) -> IoResult<()> {
   for role in RUNTIME_DELETION_ORDER {
     for slot in slots.iter().filter(|slot| slot.role == role) {
+      #[cfg(test)]
+      rollback_fault::before_cleanup(&slot.process)?;
       lifecycle::delete_instance(
         &slot.process.key,
         Some(RemoveContainerOptions {
@@ -1400,7 +1628,7 @@ async fn create_candidate(
   cargo: &Cargo,
   task: &CargoReplicaTask,
   state: &CargoRuntimeContext,
-) -> IoResult<ReplicaRuntime> {
+) -> Result<ReplicaRuntime, CargoCandidateFailure> {
   let gateway = internal_gateway(cargo, state).await?;
   let attempt_id = uuid::Uuid::new_v4().to_string();
   let mut slots = Vec::new();
@@ -1508,7 +1736,10 @@ async fn create_candidate(
     Ok(_) => Ok(ReplicaRuntime { slots }),
     Err(error) => {
       rollback_result(delete_slots(&slots, state).await.is_err())?;
-      Err(error)
+      Err(CargoCandidateFailure {
+        error,
+        tracked_candidate_removed: !slots.is_empty(),
+      })
     }
   }
 }
@@ -1539,6 +1770,63 @@ async fn remove_stale_mappings(
   Ok(())
 }
 
+fn rollback_can_resolve_candidate_failure(
+  error: &IoError,
+  tracked_candidate_removed: bool,
+  previous_retained: bool,
+) -> bool {
+  tracked_candidate_removed
+    && previous_retained
+    && matches!(
+      error.context(),
+      Some(
+        "CargoInitContainer"
+          | "InspectCargoProcess"
+          | "StartCargoProcess"
+          | "RenameCargoProcess"
+          | "MarkCargoCandidate"
+      )
+    )
+}
+
+fn confirmed_rollback_error(error: IoError, confirmed: bool) -> IoError {
+  if !confirmed {
+    return rollback_result(true).unwrap_err();
+  }
+  if rollback_can_resolve_candidate_failure(&error, true, true) {
+    IoError::with_context("Cargo update rolled back", error.inner)
+  } else {
+    error
+  }
+}
+
+async fn confirm_candidate_rollback(
+  failure: CargoCandidateFailure,
+  old: &mut [RuntimeSlot],
+  previous: &CargoPreviousRuntime,
+  state: &CargoRuntimeContext,
+) -> IoError {
+  if !rollback_can_resolve_candidate_failure(
+    &failure.error,
+    failure.tracked_candidate_removed,
+    previous_runtime_matches_ids(
+      previous,
+      old.iter().map(|slot| slot.process.key.as_str()),
+    ),
+  ) {
+    return failure.error;
+  }
+  // Successful cleanup cannot discharge an uncertain create or remote work.
+  // For tracked local failures, also positively observe the retained runtime.
+  if confirm_previous_runtime(old, previous, state)
+    .await
+    .is_err()
+  {
+    return rollback_result(true).unwrap_err();
+  }
+  confirmed_rollback_error(failure.error, true)
+}
+
 async fn prepare_replica_update(
   cargo: &Cargo,
   task: &CargoReplicaTask,
@@ -1548,17 +1836,27 @@ async fn prepare_replica_update(
 ) -> IoResult<PreparedReplicaUpdate> {
   preflight_replica(cargo, task, state).await?;
   let mut old = active_slots(task, state).await?;
+  let previous = capture_previous_runtime(task, &mut old, state).await?;
   if let Err(error) = rename_old_slots(&mut old, state).await {
-    rollback_result(retain_old_slots(&mut old, false, state).await.is_err())?;
+    rollback_result(
+      retain_old_slots(&mut old, false, &previous, state)
+        .await
+        .is_err(),
+    )?;
     return Err(error);
   }
   if stop_first && let Err(error) = stop_slots(&old, state).await {
-    rollback_result(retain_old_slots(&mut old, true, state).await.is_err())?;
+    rollback_result(
+      retain_old_slots(&mut old, true, &previous, state)
+        .await
+        .is_err(),
+    )?;
     return Err(error);
   }
   if remove_first {
     if let Err(error) = delete_slots(&old, state).await {
-      if let Err(restore_error) = retain_old_slots(&mut old, true, state).await
+      if let Err(restore_error) =
+        retain_old_slots(&mut old, true, &previous, state).await
       {
         log::error!(
           "Unable to restore Cargo {} replica {} after fixed-port cleanup failure: {restore_error}",
@@ -1575,9 +1873,9 @@ async fn prepare_replica_update(
   }
   let mut candidate = match create_candidate(cargo, task, state).await {
     Ok(candidate) => candidate,
-    Err(error) => {
+    Err(failure) => {
       if let Err(restore_error) =
-        retain_old_slots(&mut old, stop_first, state).await
+        retain_old_slots(&mut old, stop_first, &previous, state).await
       {
         log::error!(
           "Unable to restore Cargo {} replica {} after update failure: {restore_error}",
@@ -1586,7 +1884,9 @@ async fn prepare_replica_update(
         );
         rollback_result(true)?;
       }
-      return Err(error);
+      return Err(
+        confirm_candidate_rollback(failure, &mut old, &previous, state).await,
+      );
     }
   };
   if let Err(error) =
@@ -1594,13 +1894,27 @@ async fn prepare_replica_update(
   {
     let cleanup_failed = delete_slots(&candidate.slots, state).await.is_err();
     let restore_failed =
-      retain_old_slots(&mut old, stop_first, state).await.is_err();
+      retain_old_slots(&mut old, stop_first, &previous, state)
+        .await
+        .is_err();
     rollback_result(cleanup_failed || restore_failed)?;
-    return Err(error);
+    return Err(
+      confirm_candidate_rollback(
+        CargoCandidateFailure {
+          error,
+          tracked_candidate_removed: !candidate.slots.is_empty(),
+        },
+        &mut old,
+        &previous,
+        state,
+      )
+      .await,
+    );
   }
   Ok(PreparedReplicaUpdate {
     task: task.clone(),
     old,
+    previous,
     candidate,
     stop_first,
   })
@@ -1652,7 +1966,17 @@ fn rollback_result(failed: bool) -> IoResult<()> {
 async fn rollback_prepared_updates(
   prepared: &mut [PreparedReplicaUpdate],
   state: &CargoRuntimeContext,
-) -> IoResult<()> {
+) -> IoResult<bool> {
+  // Every successful preparation returned all its candidate IDs. Require both
+  // concrete candidates and a complete previous snapshot, including proven absence.
+  let tracked = !prepared.is_empty()
+    && prepared.iter().all(|replica| {
+      !replica.candidate.slots.is_empty()
+        && previous_runtime_matches_ids(
+          &replica.previous,
+          replica.old.iter().map(|slot| slot.process.key.as_str()),
+        )
+    });
   let mut failed = false;
   for replica in prepared.iter_mut().rev() {
     if let Err(error) =
@@ -1675,8 +1999,13 @@ async fn rollback_prepared_updates(
     }
   }
   for replica in prepared.iter_mut().rev() {
-    if let Err(error) =
-      retain_old_slots(&mut replica.old, replica.stop_first, state).await
+    if let Err(error) = retain_old_slots(
+      &mut replica.old,
+      replica.stop_first,
+      &replica.previous,
+      state,
+    )
+    .await
     {
       log::error!(
         "Unable to restore Cargo replica {} after rollout failure: {error}",
@@ -1685,7 +2014,8 @@ async fn rollback_prepared_updates(
       failed = true;
       continue;
     }
-    if let Err(error) = refresh_slot_observations(&mut replica.old, state).await
+    if let Err(error) =
+      confirm_previous_runtime(&mut replica.old, &replica.previous, state).await
     {
       log::error!(
         "Unable to refresh restored Cargo replica {} observations: {error}",
@@ -1694,13 +2024,16 @@ async fn rollback_prepared_updates(
       failed = true;
     }
   }
-  rollback_result(failed)
+  rollback_result(failed || !tracked)?;
+  Ok(tracked)
 }
 
 async fn revalidate_prepared_candidates(
   prepared: &mut [PreparedReplicaUpdate],
   state: &CargoRuntimeContext,
 ) -> IoResult<bool> {
+  #[cfg(test)]
+  rollback_fault::before_revalidation(&state.operation.resource_key)?;
   let mut any_healthcheck = false;
   for replica in prepared {
     any_healthcheck |=
@@ -1736,8 +2069,13 @@ async fn restore_retained_updates(
 ) -> IoResult<bool> {
   let mut all_ready = true;
   for replica in prepared {
-    if let Err(error) =
-      retain_old_slots(&mut replica.old, replica.stop_first, state).await
+    if let Err(error) = retain_old_slots(
+      &mut replica.old,
+      replica.stop_first,
+      &replica.previous,
+      state,
+    )
+    .await
     {
       log::error!(
         "Unable to restore Cargo replica {} during rollback: {error}",
@@ -1745,14 +2083,8 @@ async fn restore_retained_updates(
       );
       all_ready = false;
     }
-    if let Err(error) = wait_until_ready(&replica.old, state).await {
-      log::error!(
-        "Restored Cargo replica {} did not become ready during rollback: {error}",
-        replica.task.key
-      );
-      all_ready = false;
-    }
-    if let Err(error) = refresh_slot_observations(&mut replica.old, state).await
+    if let Err(error) =
+      confirm_previous_runtime(&mut replica.old, &replica.previous, state).await
     {
       log::error!(
         "Unable to refresh restored Cargo replica {} observations: {error}",
@@ -1853,7 +2185,15 @@ async fn rollback_committed_update(
   prepared: &mut [PreparedReplicaUpdate],
   previous_attachments: &[(uuid::Uuid, Option<String>, bool)],
   state: &CargoRuntimeContext,
-) -> IoResult<()> {
+) -> IoResult<bool> {
+  let tracked = !prepared.is_empty()
+    && prepared.iter().all(|replica| {
+      !replica.candidate.slots.is_empty()
+        && previous_runtime_matches_ids(
+          &replica.previous,
+          replica.old.iter().map(|slot| slot.process.key.as_str()),
+        )
+    });
   let mut failed = false;
   for replica in prepared.iter_mut().rev() {
     if let Err(error) =
@@ -1969,7 +2309,13 @@ async fn rollback_committed_update(
       );
     }
   }
-  rollback_result(failed)
+  // A liveness fallback deliberately keeps candidates. Reject missing proof
+  // here as well, including callers whose original error is otherwise terminal.
+  let confirmed = tracked
+    && retained_ready
+    && candidate_cleanup != RollbackCandidateCleanup::PreserveForLiveness;
+  rollback_result(failed || !confirmed)?;
+  Ok(confirmed)
 }
 
 /// Replace every locally assigned replica serially. Replicas without Cargo
@@ -2029,7 +2375,11 @@ pub(crate) async fn update(
     {
       Ok(replica) => prepared.push(replica),
       Err(error) => {
-        rollback_prepared_updates(&mut prepared, state).await?;
+        // The failing replica carries its own cleanup/restoration evidence.
+        // An empty prepared prefix has no other candidates to roll back.
+        if !prepared.is_empty() {
+          rollback_prepared_updates(&mut prepared, state).await?;
+        }
         return Err(error);
       }
     }
@@ -2038,8 +2388,8 @@ pub(crate) async fn update(
     match revalidate_prepared_candidates(&mut prepared, state).await {
       Ok(any_healthcheck) => any_healthcheck,
       Err(error) => {
-        rollback_prepared_updates(&mut prepared, state).await?;
-        return Err(error);
+        let confirmed = rollback_prepared_updates(&mut prepared, state).await?;
+        return Err(confirmed_rollback_error(error, confirmed));
       }
     };
   match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
@@ -2050,8 +2400,8 @@ pub(crate) async fn update(
       return Err(candidate_readiness_error(key, "pre-promotion snapshot"));
     }
     Err(error) => {
-      rollback_prepared_updates(&mut prepared, state).await?;
-      return Err(error);
+      let confirmed = rollback_prepared_updates(&mut prepared, state).await?;
+      return Err(confirmed_rollback_error(error, confirmed));
     }
   }
   let previous_attachments = previous_attachments(&prepared);
@@ -2063,8 +2413,8 @@ pub(crate) async fn update(
   )
   .await
   {
-    rollback_prepared_updates(&mut prepared, state).await?;
-    return Err(error);
+    let confirmed = rollback_prepared_updates(&mut prepared, state).await?;
+    return Err(confirmed_rollback_error(error, confirmed));
   }
   // Keep the aggregate status Updating while candidates become visible. The
   // proxy therefore continues to select the retained generation, and Docker
@@ -2073,26 +2423,26 @@ pub(crate) async fn update(
     if let Err(error) =
       activate_candidate_slots(&mut replica.candidate.slots, state).await
     {
-      rollback_committed_update(
+      let confirmed = rollback_committed_update(
         cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
       .await?;
-      return Err(error);
+      return Err(confirmed_rollback_error(error, confirmed));
     }
   }
   if let Err(error) = revalidate_prepared_candidates(&mut prepared, state).await
   {
-    rollback_committed_update(
+    let confirmed = rollback_committed_update(
       cargo,
       &mut prepared,
       &previous_attachments,
       state,
     )
     .await?;
-    return Err(error);
+    return Err(confirmed_rollback_error(error, confirmed));
   }
   match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
   {
@@ -2108,14 +2458,14 @@ pub(crate) async fn update(
       return Err(candidate_readiness_error(key, "promotion snapshot"));
     }
     Err(error) => {
-      rollback_committed_update(
+      let confirmed = rollback_committed_update(
         cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
       .await?;
-      return Err(error);
+      return Err(confirmed_rollback_error(error, confirmed));
     }
   }
   let status_result = async {
@@ -2134,14 +2484,14 @@ pub(crate) async fn update(
   }
   .await;
   if let Err(error) = status_result {
-    rollback_committed_update(
+    let confirmed = rollback_committed_update(
       cargo,
       &mut prepared,
       &previous_attachments,
       state,
     )
     .await?;
-    return Err(error);
+    return Err(confirmed_rollback_error(error, confirmed));
   }
   match snapshot_prepared_candidate_readiness(cargo, &mut prepared, state).await
   {
@@ -2157,14 +2507,14 @@ pub(crate) async fn update(
       return Err(candidate_readiness_error(key, "status commit"));
     }
     Err(error) => {
-      rollback_committed_update(
+      let confirmed = rollback_committed_update(
         cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
       .await?;
-      return Err(error);
+      return Err(confirmed_rollback_error(error, confirmed));
     }
   }
   for action in promotion_actions(any_healthcheck) {
@@ -2178,14 +2528,14 @@ pub(crate) async fn update(
     (Ok(true), Ok(status))
       if status.actual == ObjPsStatusKind::Start.to_string() => {}
     (Err(error), _) | (_, Err(error)) => {
-      rollback_committed_update(
+      let confirmed = rollback_committed_update(
         cargo,
         &mut prepared,
         &previous_attachments,
         state,
       )
       .await?;
-      return Err(error);
+      return Err(confirmed_rollback_error(error, confirmed));
     }
     _ => {
       rollback_committed_update(
@@ -3018,6 +3368,179 @@ mod tests {
         CargoReplicaProcessRole::Sandbox,
       ]
     );
+  }
+
+  #[test]
+  fn missing_process_requires_positive_docker_absence() {
+    assert!(!docker_reports_missing(
+      &Ok::<_, bollard_next::errors::Error>(())
+    ));
+    for status_code in [304, 403, 404, 500] {
+      let result =
+        Err::<(), _>(bollard_next::errors::Error::DockerResponseServerError {
+          status_code,
+          message: "inspect result".to_owned(),
+        });
+      assert_eq!(docker_reports_missing(&result), status_code == 404);
+    }
+  }
+
+  #[test]
+  fn restarting_previous_runtime_allows_repair_but_not_rollback_confirmation() {
+    let mut runtime = ContainerInspectResponse::default();
+    assert_eq!(previous_running_state(&runtime), None);
+    for running in [None, Some(false), Some(true)] {
+      runtime.state = Some(ContainerState {
+        running,
+        restarting: Some(true),
+        ..Default::default()
+      });
+      assert_eq!(previous_running_state(&runtime), Some(true));
+      assert_eq!(observed_running_state(&runtime), None);
+    }
+    runtime.state = Some(ContainerState::default());
+    assert_eq!(previous_running_state(&runtime), None);
+  }
+
+  #[test]
+  fn previous_snapshot_failure_is_terminal_only_after_prior_rollback() {
+    let error = previous_snapshot_error(IoError::interrupted(
+      "InspectCargoProcess",
+      "read failed",
+    ));
+    assert_eq!(error.context(), Some("Cargo update preflight"));
+    assert_eq!(error.inner.to_string(), "read failed");
+    let error = confirmed_rollback_error(error, false);
+    assert_eq!(error.context(), Some("Cargo rollback"));
+  }
+
+  #[test]
+  fn previous_runtime_snapshot_distinguishes_absence_from_lost_ids() {
+    assert!(previous_runtime_matches_ids(
+      &CargoPreviousRuntime::Absent,
+      []
+    ));
+    assert!(!previous_runtime_matches_ids(
+      &CargoPreviousRuntime::Absent,
+      ["untracked"]
+    ));
+    let stopped = CargoPreviousRuntime::Observed(HashMap::from([(
+      "old".to_owned(),
+      false,
+    )]));
+    assert!(previous_runtime_matches_ids(&stopped, ["old"]));
+    assert!(!previously_running(&stopped, "old"));
+    assert!(!previous_runtime_matches_ids(&stopped, []));
+    assert!(!previous_runtime_matches_ids(&stopped, ["replacement"]));
+    assert!(!previous_runtime_matches_ids(
+      &CargoPreviousRuntime::Observed(HashMap::new()),
+      []
+    ));
+    let running =
+      CargoPreviousRuntime::Observed(HashMap::from([("old".to_owned(), true)]));
+    assert!(previously_running(&running, "old"));
+  }
+
+  #[test]
+  fn prior_running_snapshot_requires_explicit_stable_observation() {
+    let mut runtime = ContainerInspectResponse::default();
+    assert_eq!(observed_running_state(&runtime), None);
+    runtime.state = Some(ContainerState::default());
+    assert_eq!(observed_running_state(&runtime), None);
+    for running in [false, true] {
+      runtime.state = Some(ContainerState {
+        running: Some(running),
+        ..Default::default()
+      });
+      assert_eq!(observed_running_state(&runtime), Some(running));
+      runtime.state.as_mut().unwrap().restarting = Some(true);
+      assert_eq!(observed_running_state(&runtime), None);
+    }
+  }
+
+  #[test]
+  fn prior_absence_rejects_orphaned_or_unidentified_runtime() {
+    let replica = uuid::Uuid::new_v4();
+    let other = uuid::Uuid::new_v4();
+    assert!(replica_absent_from_inventory(replica, [], []));
+    assert!(replica_absent_from_inventory(
+      replica,
+      [Some(other)],
+      [Some(other)]
+    ));
+    for uncertain in [Some(replica), None] {
+      assert!(!replica_absent_from_inventory(replica, [uncertain], []));
+      assert!(!replica_absent_from_inventory(replica, [], [uncertain]));
+    }
+  }
+
+  #[test]
+  fn confirmed_rollback_requires_tracked_candidate_and_previous_runtime() {
+    for context in [
+      "CargoInitContainer",
+      "InspectCargoProcess",
+      "StartCargoProcess",
+    ] {
+      let error =
+        IoError::interrupted(context, "unknown candidate observation");
+      assert!(rollback_can_resolve_candidate_failure(&error, true, true));
+      assert!(!rollback_can_resolve_candidate_failure(&error, false, true));
+      assert!(!rollback_can_resolve_candidate_failure(&error, true, false));
+    }
+    for context in [
+      "CreateProcess",
+      "Cargo rollback",
+      "Cargo remote execution",
+      "Cargo remote observation",
+    ] {
+      let error = IoError::interrupted(context, "unknown runtime outcome");
+      assert!(!rollback_can_resolve_candidate_failure(&error, true, true));
+    }
+  }
+
+  #[test]
+  fn aggregate_rollback_normalizes_only_confirmed_local_failures() {
+    for context in [
+      "InspectCargoProcess",
+      "RenameCargoProcess",
+      "MarkCargoCandidate",
+    ] {
+      let error = confirmed_rollback_error(
+        IoError::interrupted(context, "original failure"),
+        true,
+      );
+      assert_eq!(error.context(), Some("Cargo update rolled back"));
+      assert_eq!(error.inner.to_string(), "original failure");
+      // Includes missing prior slots and the candidate-preserving liveness path.
+      let error = confirmed_rollback_error(
+        IoError::interrupted(context, "unconfirmed"),
+        false,
+      );
+      assert_eq!(error.context(), Some("Cargo rollback"));
+    }
+    for context in [
+      "CreateProcess",
+      "Cargo rollback",
+      "Cargo remote execution",
+      "Cargo remote observation",
+    ] {
+      let error = confirmed_rollback_error(
+        IoError::interrupted(context, "untracked outcome"),
+        true,
+      );
+      assert_eq!(error.context(), Some(context));
+    }
+  }
+
+  #[test]
+  fn aggregate_rollback_without_evidence_keeps_terminal_errors_pending() {
+    for context in ["CargoReadiness", "NodeDb", "Cargo process rejection"] {
+      let error = confirmed_rollback_error(
+        IoError::interrupted(context, "otherwise terminal failure"),
+        false,
+      );
+      assert_eq!(error.context(), Some("Cargo rollback"));
+    }
   }
 
   #[test]

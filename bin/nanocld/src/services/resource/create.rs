@@ -24,6 +24,12 @@ pub async fn create_resource(
   _request_state: (),
   payload: web::types::Json<ResourcePartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource = ResourceDb::create_obj(&payload, &state).await?;
+  let state = state.clone();
+  let payload = payload.into_inner();
+  let key = payload.name.clone();
+  let resource = ResourceDb::mutate(&key, async move {
+    ResourceDb::create_obj(&payload, &state).await
+  })
+  .await?;
   Ok(web::HttpResponse::Created().json(&resource))
 }
