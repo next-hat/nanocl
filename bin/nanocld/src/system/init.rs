@@ -223,10 +223,11 @@ pub fn docker_healthcheck(state: &SystemState) {
 /// To boot and initialize our state and database.
 ///
 pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
-  spawn_crond();
   set_uds_perm();
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
+  utils::cron::restore_cron_rules(&system_state).await?;
+  spawn_crond();
   docker_healthcheck(&system_state);
   spawn_distributed_mutexes_gc(&system_state);
   NodeDb::register(&system_state).await?;

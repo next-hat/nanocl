@@ -29,15 +29,22 @@ pub async fn put_resource(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceUpdate>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource =
-    ResourceDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
-  let new_resource = ResourcePartial {
-    name: path.1.clone(),
-    kind: resource.kind,
-    data: payload.data.clone(),
-    metadata: payload.metadata.clone(),
-  };
-  let resource =
-    ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
+  let state = state.clone();
+  let path = path.into_inner();
+  let payload = payload.into_inner();
+  let resource = ResourceDb::mutate(&path.1.clone(), async move {
+    let resource =
+      ResourceDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
+    let new_resource = ResourcePartial {
+      name: path.1.clone(),
+      kind: resource.kind,
+      data: payload.data.clone(),
+      metadata: payload.metadata.clone(),
+    };
+    let resource =
+      ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
+    Ok(resource)
+  })
+  .await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }

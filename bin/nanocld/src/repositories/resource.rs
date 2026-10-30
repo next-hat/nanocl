@@ -210,16 +210,24 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await?;
     let new_item = ResourceDb {
       key: item.name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
       kind,
       spec_key: spec.key.to_owned(),
     };
-    let resource_db = ResourceDb::create_from(new_item, pool).await?;
-    let item = resource_db.with_spec(&spec);
-    Ok(item)
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)?;
+        let resource = diesel::insert_into(resources::table)
+          .values(&new_item)
+          .get_result::<ResourceDb>(conn)?;
+        Ok(resource.with_spec(&spec))
+      })
+    })
+    .await
   }
 
   /// Update a resource from a spec.
@@ -240,15 +248,42 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await?;
     let resource_update = ResourceUpdateDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),
     };
-    let resource_db =
-      ResourceDb::update_pk(&key, resource_update, pool).await?;
-    let item = resource_db.with_spec(&spec);
-    Ok(item)
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)?;
+        let resource = diesel::update(resources::table.find(&key))
+          .set(&resource_update)
+          .get_result::<ResourceDb>(conn)?;
+        Ok(resource.with_spec(&spec))
+      })
+    })
+    .await
+  }
+
+  pub(crate) async fn delete_with_history(
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let key = key.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      super::operation::transaction(conn, |conn| {
+        diesel::delete(resources::table.find(&key)).execute(conn)?;
+        diesel::delete(
+          specs::table
+            .filter(specs::kind_name.eq("Resource"))
+            .filter(specs::kind_key.eq(&key)),
+        )
+        .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
   }
 
   /// This hook is called when a resource is created.

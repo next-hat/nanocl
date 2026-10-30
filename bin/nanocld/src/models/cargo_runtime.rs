@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_error::io::IoError;
 use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{Config as DockerConfig, ContainerSpec},
@@ -11,6 +12,22 @@ use super::{
   CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
   CargoRuntimeContext, SystemState,
 };
+
+/// Cleanup evidence is limited to candidate IDs returned by local creation.
+/// An uncertain create may still have produced another, untracked runtime.
+pub(crate) struct CargoCandidateFailure {
+  pub(crate) error: IoError,
+  pub(crate) tracked_candidate_removed: bool,
+}
+
+impl From<IoError> for CargoCandidateFailure {
+  fn from(error: IoError) -> Self {
+    Self {
+      error,
+      tracked_candidate_removed: false,
+    }
+  }
+}
 
 pub(crate) type ProcessesByKey<'a> = HashMap<&'a str, &'a Process>;
 pub(crate) type CargoStableProcesses<'a> =

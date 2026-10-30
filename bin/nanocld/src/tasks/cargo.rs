@@ -1329,6 +1329,28 @@ mod tests {
   }
 
   #[test]
+  fn confirmed_local_rollback_can_settle_while_uncertain_runtime_stays_pending()
+  {
+    assert!(!uncertain_runtime_error(&IoError::interrupted(
+      "Cargo update rolled back",
+      "tracked candidate removed and previous runtime ready",
+    )));
+    for context in [
+      "CreateProcess",
+      "CargoInitContainer",
+      "InspectCargoProcess",
+      "Cargo rollback",
+      "Cargo remote execution",
+      "Cargo remote observation",
+    ] {
+      assert!(uncertain_runtime_error(&IoError::interrupted(
+        context,
+        "unconfirmed"
+      )));
+    }
+  }
+
+  #[test]
   fn cargo_ownership_conflicts_return_http_conflict() {
     let error = IoError::with_context(
       "Cargo ownership",

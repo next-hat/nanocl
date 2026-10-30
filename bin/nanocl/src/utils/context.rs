@@ -85,7 +85,9 @@ impl Context {
       })?;
     }
     let path = format!("{home}/.nanocl/conf.yml");
-    let mut config = UserConfig::new();
+    // An explicit local switch may also repair an unreadable/malformed config.
+    // Daemon commands use the fallible loader and never select this fallback.
+    let mut config = UserConfig::new().unwrap_or_default();
     name.clone_into(&mut config.current_context);
     let s = serde_yaml::to_string(&config).map_err(|err| {
       std::io::Error::new(

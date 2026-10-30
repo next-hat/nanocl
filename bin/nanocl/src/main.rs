@@ -29,21 +29,17 @@ fn load_cli_config(
   if !read_only {
     Context::ensure()?;
   }
-  let user_conf = UserConfig::new();
-  let mut context = Context::new();
-  if user_conf.current_context != "default" {
-    match Context::read_by_name(&user_conf.current_context) {
-      Err(err) => {
-        if read_only {
-          return Err(err);
-        }
-        Context::r#use("default")?;
-      }
-      Ok(cur_context) => {
-        context = cur_context;
-      }
-    }
-  }
+  let user_conf = UserConfig::new()?;
+  let context = if user_conf.current_context == "default" {
+    Context::new()
+  } else {
+    Context::read_by_name(&user_conf.current_context).map_err(|err| {
+      IoError::with_context(
+        format!("Selected context {}", user_conf.current_context),
+        err.inner,
+      )
+    })?
+  };
   let endpoint = context.endpoints.get("Nanocl").ok_or_else(|| {
     IoError::invalid_data("Context", "missing Nanocl endpoint")
   })?;
@@ -137,6 +133,11 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 }
 
 async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
+  // Context repair and switching are local and must work without loading the
+  // selected connection (including its endpoint and credential files).
+  if let Command::Context(args) = &cli_args.command {
+    return commands::exec_context(args);
+  }
   let cli_conf = create_cli_config(cli_args).map_err(|err| {
     if matches!(&cli_args.command, Command::State(args) if matches!(args.command, StateCommand::Diff(_))) {
       // Context errors can include credential paths or connection URLs.
@@ -202,7 +203,9 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
       }
     }
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
-    Command::Context(args) => commands::exec_context(&cli_conf, args).await,
+    Command::Context(_) => {
+      unreachable!("local context command dispatched above")
+    }
     Command::Info => commands::exec_info(&cli_conf).await,
     Command::Metric(args) => commands::exec_metric(&cli_conf, args).await,
     Command::Backup(opts) => commands::exec_backup(&cli_conf, opts).await,

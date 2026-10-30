@@ -1,6 +1,6 @@
 use nanocl_error::io::IoResult;
 
-use crate::config::CliConfig;
+use crate::config::UserConfig;
 use crate::models::{
   Context, ContextArg, ContextCommand, ContextCompactRow, ContextListOpts,
   ContextRow,
@@ -10,12 +10,12 @@ use crate::utils;
 /// Function that execute when running `nanocl context ls`
 /// Will print the list of contexts
 fn exec_context_list(
-  context: &Context,
+  current_name: &str,
   opts: &ContextListOpts,
 ) -> IoResult<()> {
   println!(
     "{}",
-    render_context_list(Context::list()?, &context.name, opts)
+    render_context_list(Context::list()?, current_name, opts)
   );
   Ok(())
 }
@@ -58,13 +58,12 @@ fn exec_context_from(path: &str) -> IoResult<()> {
 }
 
 /// Function that execute when running `nanocl context`
-pub async fn exec_context(
-  cli_conf: &CliConfig,
-  args: &ContextArg,
-) -> IoResult<()> {
-  let context = &cli_conf.context;
+pub fn exec_context(args: &ContextArg) -> IoResult<()> {
+  Context::ensure()?;
   match &args.command {
-    ContextCommand::List(opts) => exec_context_list(context, opts)?,
+    ContextCommand::List(opts) => {
+      exec_context_list(&UserConfig::new()?.current_context, opts)?;
+    }
     ContextCommand::Use { name } => exec_context_use(name)?,
     ContextCommand::From { path } => exec_context_from(path)?,
   }

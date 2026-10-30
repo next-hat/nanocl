@@ -12,7 +12,8 @@ use tokio::{
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::stubs::proxy::{
-  LocationTarget, ProxyHttpLocation, ProxyRule, ResourceProxyRule, StreamTarget,
+  LocationTarget, ProxyHttpLocation, ProxyRule, ProxyStreamProtocol,
+  ResourceProxyRule, StreamTarget,
 };
 
 use crate::models::{
@@ -531,12 +532,16 @@ async fn rollback_config(
   }
 }
 
-async fn config_transaction<F, Fut>(store: &Store, operation: F) -> IoResult<()>
+async fn config_transaction<F, Fut>(
+  store: &Store,
+  credential_paths: &[&str],
+  operation: F,
+) -> IoResult<()>
 where
   F: FnOnce() -> Fut,
   Fut: Future<Output = IoResult<()>>,
 {
-  let snapshot = store.snapshot_config().await?;
+  let snapshot = store.snapshot_config(credential_paths).await?;
   match operation().await {
     Ok(()) => Ok(()),
     Err(err) => rollback_config(&snapshot, err, store).await,
@@ -550,7 +555,12 @@ pub async fn add_rule(
 ) -> IoResult<()> {
   let prepared = prepare_rule(name, rule, state).await?;
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  let credential_paths = prepared
+    .files
+    .iter()
+    .map(|file| file.path.as_str())
+    .collect::<Vec<_>>();
+  config_transaction(&state.store, &credential_paths, || async {
     apply_prepared_rule(name, &prepared, state).await?;
     self::test(&state.store.dir).await
   })
@@ -614,6 +624,7 @@ async fn prepare_rule(
           "enable_logging": matches!(&stream_rule.target,
             StreamTarget::Upstream(target) if target.enable_logging == Some(true)),
           "listen": listen,
+          "udp": matches!(stream_rule.protocol, ProxyStreamProtocol::Udp),
           "key": name,
           "upstream_key": upstream.key,
           "ssl": ssl,
@@ -822,7 +833,13 @@ pub(crate) async fn rebuild_rules(
     prepared_rules.push((name, prepare_rule(name, rule, state).await?));
   }
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  let credential_paths = prepared_rules
+    .iter()
+    .flat_map(|(_, prepared)| {
+      prepared.files.iter().map(|file| file.path.as_str())
+    })
+    .collect::<Vec<_>>();
+  config_transaction(&state.store, &credential_paths, || async {
     state.store.clear_config().await?;
     for (name, prepared) in &prepared_rules {
       apply_prepared_rule(name, prepared, state).await?;
@@ -834,7 +851,7 @@ pub(crate) async fn rebuild_rules(
 
 pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  config_transaction(&state.store, &[], || async {
     state.store.replace_rule(name, None, None).await
   })
   .await
@@ -851,6 +868,176 @@ mod tests {
 
   const GENERATION: &str = "0123456789abcdef0123456789abcdef";
   const NEXT_GENERATION: &str = "abcdef0123456789abcdef0123456789";
+
+  fn test_state(dir: &str) -> SystemStateRef {
+    let (sender, _) = futures::channel::mpsc::unbounded();
+    Arc::new(crate::models::SystemState {
+      store: Store::new(dir),
+      client: nanocld_client::NanocldClient::connect_with_unix_default(),
+      event_emitter: crate::models::EventEmitter(Arc::new(sender)),
+      nginx_dir: String::new(),
+      config_lock: Arc::new(futures::lock::Mutex::new(())),
+    })
+  }
+
+  #[ntex::test]
+  async fn stream_preparation_honors_tcp_and_udp_protocols() {
+    let state = test_state("unused");
+    for (protocol, listener) in [
+      ("Tcp", "listen 127.0.0.1:9000;"),
+      ("Udp", "listen 127.0.0.1:9000 udp;"),
+    ] {
+      let rule: ResourceProxyRule = serde_json::from_value(serde_json::json!({
+        "Rules": [{
+          "Network": "Local",
+          "Protocol": protocol,
+          "Port": 9000,
+          "Target": {"UnixPath": "/unused/upstream.sock"},
+        }],
+      }))
+      .unwrap();
+      let prepared = prepare_rule("stream", &rule, &state).await.unwrap();
+      let stream = prepared.stream.unwrap();
+      let listeners = stream
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| line.starts_with("listen "))
+        .collect::<Vec<_>>();
+      assert_eq!(listeners, vec![listener]);
+      assert!(prepared.site.is_none());
+      assert_eq!(prepared.upstreams.len(), 1);
+    }
+  }
+
+  #[ntex::test]
+  async fn rejected_transaction_restores_all_credentials_and_removes_new_files()
+  {
+    let test_dir = TestDir::new();
+    let state = test_state(test_dir.path().to_str().unwrap());
+    std::fs::create_dir(test_dir.path().join("secrets")).unwrap();
+    let mut files = Vec::new();
+    for suffix in ["cert", "key", "ca", "pem"] {
+      let path = test_dir.path().join(format!("secrets/accepted.{suffix}"));
+      // Snapshots preserve bytes, including content that is not UTF-8.
+      std::fs::write(&path, [0xff, 0, 42]).unwrap();
+      files.push(PreparedFile {
+        path: path.to_str().unwrap().to_owned(),
+        data: "invalid candidate credentials".to_owned(),
+      });
+      files.push(PreparedFile {
+        path: test_dir
+          .path()
+          .join(format!("secrets/new.{suffix}"))
+          .to_str()
+          .unwrap()
+          .to_owned(),
+        data: "new candidate credentials".to_owned(),
+      });
+    }
+    state
+      .store
+      .write_conf_file("rule", "accepted", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let prepared = PreparedRule {
+      site: Some("rejected".to_owned()),
+      stream: None,
+      upstreams: Vec::new(),
+      files,
+    };
+    let paths = prepared
+      .files
+      .iter()
+      .map(|file| file.path.as_str())
+      .collect::<Vec<_>>();
+    let before = state.store.snapshot_config(&paths).await.unwrap();
+    let result = config_transaction(&state.store, &paths, || async {
+      apply_prepared_rule("rule", &prepared, &state).await?;
+      Err(IoError::invalid_data(
+        "candidate",
+        "TLS validation rejected",
+      ))
+    })
+    .await;
+    assert!(
+      result
+        .unwrap_err()
+        .to_string()
+        .contains("TLS validation rejected")
+    );
+    assert_eq!(state.store.snapshot_config(&paths).await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn partial_credential_write_restores_earlier_writes() {
+    let test_dir = TestDir::new();
+    let state = test_state(test_dir.path().to_str().unwrap());
+    let old_path = test_dir.path().join("accepted.cert");
+    let new_path = test_dir.path().join("new.ca");
+    let failed_path = test_dir.path().join("missing-parent/new.key");
+    std::fs::write(&old_path, "accepted certificate").unwrap();
+    let prepared = PreparedRule {
+      site: None,
+      stream: None,
+      upstreams: Vec::new(),
+      files: [old_path, new_path, failed_path]
+        .into_iter()
+        .map(|path| PreparedFile {
+          path: path.to_str().unwrap().to_owned(),
+          data: "candidate".to_owned(),
+        })
+        .collect(),
+    };
+    let paths = prepared
+      .files
+      .iter()
+      .map(|file| file.path.as_str())
+      .collect::<Vec<_>>();
+    let before = state.store.snapshot_config(&paths).await.unwrap();
+    let result = config_transaction(&state.store, &paths, || async {
+      apply_prepared_rule("rule", &prepared, &state).await
+    })
+    .await;
+    assert!(result.is_err());
+    assert_eq!(state.store.snapshot_config(&paths).await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn credential_rollback_continues_after_one_restore_failure() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    let blocked = test_dir.path().join("a-blocked");
+    let old = test_dir.path().join("b-existing.cert");
+    let new = test_dir.path().join("c-new.key");
+    std::fs::write(&old, "accepted").unwrap();
+    store
+      .write_conf_file("rule", "accepted", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let paths = [
+      blocked.to_str().unwrap(),
+      old.to_str().unwrap(),
+      new.to_str().unwrap(),
+    ];
+    let result = config_transaction(&store, &paths, || async {
+      // An inaccessible path must not prevent rollback of other files.
+      std::fs::create_dir(&blocked)?;
+      std::fs::write(&old, "candidate")?;
+      std::fs::write(&new, "candidate")?;
+      store
+        .write_conf_file("rule", "candidate", &NginxRuleKind::Site)
+        .await?;
+      Err(IoError::invalid_data("candidate", "rejected"))
+    })
+    .await;
+    assert!(result.unwrap_err().to_string().contains("rollback failed"));
+    assert_eq!(std::fs::read_to_string(&old).unwrap(), "accepted");
+    assert!(!new.exists());
+    assert_eq!(
+      store.snapshot_config(&[]).await.unwrap().sites["rule.conf"],
+      "accepted"
+    );
+  }
 
   #[test]
   fn http_access_logging_requires_target_opt_in() {
@@ -1110,9 +1297,9 @@ mod tests {
       .write_conf_file("shared-upstream", "old upstream", &NginxRuleKind::Site)
       .await
       .unwrap();
-    let before = store.snapshot_config().await.unwrap();
+    let before = store.snapshot_config(&[]).await.unwrap();
 
-    let result = config_transaction(&store, || async {
+    let result = config_transaction(&store, &[], || async {
       store.replace_rule("rule", Some("new site"), None).await?;
       store
         .write_conf_file(
@@ -1126,7 +1313,7 @@ mod tests {
     .await;
 
     assert!(result.is_err());
-    assert_eq!(store.snapshot_config().await.unwrap(), before);
+    assert_eq!(store.snapshot_config(&[]).await.unwrap(), before);
   }
 
   #[ntex::test]
@@ -1142,13 +1329,13 @@ mod tests {
       .await
       .unwrap();
 
-    config_transaction(&store, || async {
+    config_transaction(&store, &[], || async {
       store.replace_rule("rule", Some("new site"), None).await
     })
     .await
     .unwrap();
 
-    let snapshot = store.snapshot_config().await.unwrap();
+    let snapshot = store.snapshot_config(&[]).await.unwrap();
     assert_eq!(snapshot.sites.get("rule.conf").unwrap(), "new site");
     assert!(!snapshot.streams.contains_key("rule.conf"));
     assert!(!test_dir.path().join("streams-enabled/rule.conf").exists());
@@ -1163,7 +1350,7 @@ mod tests {
       .await
       .unwrap();
 
-    config_transaction(&store, || async {
+    config_transaction(&store, &[], || async {
       store.clear_config().await?;
       store
         .write_conf_file("live-rule", "committed", &NginxRuleKind::Site)
@@ -1172,7 +1359,7 @@ mod tests {
     .await
     .unwrap();
 
-    let snapshot = store.snapshot_config().await.unwrap();
+    let snapshot = store.snapshot_config(&[]).await.unwrap();
     assert!(!snapshot.sites.contains_key("deleted-rule.conf"));
     assert_eq!(snapshot.sites.get("live-rule.conf").unwrap(), "committed");
   }

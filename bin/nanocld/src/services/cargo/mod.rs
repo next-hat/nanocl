@@ -574,6 +574,257 @@ mod tests {
     system.state.wait_event_loop().await;
   }
 
+  async fn confirmed_update_rollback_fixture(phase: u8) {
+    use crate::utils::container::cargo::{fail_next_init_wait, rollback_fault};
+
+    let system = gen_default_test_system().await;
+    let name = format!("rollback-init-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let replacement = operation_fixture_spec(
+      &name,
+      if phase == 0 { "sleep 30" } else { "true" },
+    );
+    let mut original = replacement.clone();
+    original.init_containers.clear();
+    assert!(original.port_bindings.is_none());
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&original), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert!(!before.is_empty());
+    let fault = (phase == 0).then(|| fail_next_init_wait(&key));
+    let _revalidation_fault = (phase > 0)
+      .then(|| rollback_fault::fail_candidate_revalidation(&key, phase == 2));
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_failure(&system, &key, NativeEventAction::Update, events).await;
+    drop(fault);
+
+    let failed = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(failed.action, "update");
+    assert_eq!(failed.outcome.as_deref(), Some("failed"));
+    assert!(failed.completed_at.is_some());
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_eq!(inspected.status.actual, ObjPsStatusKind::Fail);
+    assert!(
+      inspected
+        .instances
+        .iter()
+        .all(|process| process.name.ends_with(".tmp.c"))
+    );
+    let after = cargo_runtime_snapshot(&system, &key).await;
+    // Inventory comes from Docker, including hidden candidates: only prior IDs remain.
+    assert_eq!(
+      after.keys().collect::<Vec<_>>(),
+      before.keys().collect::<Vec<_>>()
+    );
+    assert!(after.values().all(|runtime| runtime["Running"] == true));
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &failed.key.to_string(),
+        &system.state.inner.pool
+      )
+      .await
+      .is_err()
+    );
+
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&original),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_completion(&system, &key, NativeEventAction::Update, events)
+      .await;
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Stop).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(&system, &key, NativeEventAction::Stop, events).await;
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_update_rollback_settles_and_admits_retry_stop_and_delete()
+  {
+    confirmed_update_rollback_fixture(0).await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_prepared_rollback_settles_after_revalidation_failure() {
+    confirmed_update_rollback_fixture(1).await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_promoted_rollback_settles_after_revalidation_failure() {
+    confirmed_update_rollback_fixture(2).await;
+  }
+
+  async fn uncertain_update_rollback_fixture(lose_create_reply: bool) {
+    use crate::models::ObjPsStatusUpdate;
+    use crate::utils::container::cargo::{
+      fail_next_init_wait, lifecycle_lock, recovery::recover_one,
+      rollback_fault,
+    };
+    use crate::utils::operation::{abandoned_owner, cleanup_owner};
+
+    let system = gen_default_test_system().await;
+    let name = format!("rollback-uncertain-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let replacement = operation_fixture_spec(
+      &name,
+      if lose_create_reply {
+        "true"
+      } else {
+        "sleep 30"
+      },
+    );
+    let mut original = replacement.clone();
+    original.init_containers.clear();
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&original), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    let _wait_fault = (!lose_create_reply).then(|| fail_next_init_wait(&key));
+    let _rollback_fault = if lose_create_reply {
+      rollback_fault::lose_second_candidate_create_reply(&key)
+    } else {
+      rollback_fault::fail_candidate_cleanup(&key)
+    };
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_pending(&system, &key, events).await;
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(pending.action, "update");
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    assert_eq!(
+      inspect_cargo_fixture(&system, &key).await.status.actual,
+      ObjPsStatusKind::Updating
+    );
+    let after = cargo_runtime_snapshot(&system, &key).await;
+    for id in before.keys() {
+      assert_eq!(after[id]["Running"], true);
+    }
+    let candidates = after
+      .iter()
+      .filter(|(id, _)| !before.contains_key(*id))
+      .collect::<Vec<_>>();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(
+      candidates[0].1["Labels"][LABEL_ROLE],
+      if lose_create_reply { "app" } else { "init" }
+    );
+    // Lost-create case removed the tracked init, but left the unreturned app ID.
+    // Cleanup-failure case retained the exact tracked init awaiting removal.
+    assert!(recover_one(&pending, &system.state).await.is_err());
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, after);
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&original),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+
+    // Exact-owner fixture teardown only; production recovery remains pending.
+    {
+      let guard = lifecycle_lock(&key).lock_owned().await;
+      let owner = abandoned_owner(
+        &pending.owner(),
+        &system.state.inner.config.hostname,
+        &system.state.inner.config.state_dir,
+      )
+      .unwrap()
+      .expect("failed fixture must release its operation owner");
+      let lease = (std::sync::Arc::new(guard), owner);
+      assert!(
+        CargoDb::finish_operation(
+          &pending,
+          ObjPsStatusUpdate {
+            actual: Some(ObjPsStatusKind::Fail.to_string()),
+            ..Default::default()
+          },
+          "interrupted",
+          Some(serde_json::json!({"Fixture": "uncertain rollback teardown"})),
+          lease.clone(),
+          &system.state.inner.pool
+        )
+        .await
+        .unwrap()
+      );
+      cleanup_owner(&lease.1, &system.state.inner.pool)
+        .await
+        .unwrap();
+    }
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn failed_candidate_cleanup_keeps_update_pending() {
+    uncertain_update_rollback_fixture(false).await;
+  }
+
+  #[ntex::test]
+  async fn uncertain_candidate_create_keeps_update_pending_after_tracked_cleanup()
+   {
+    uncertain_update_rollback_fixture(true).await;
+  }
+
   #[ntex::test]
   async fn uncertain_init_wait_stays_pending_until_observed_recovery() {
     use crate::utils::container::cargo::{
