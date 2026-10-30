@@ -219,24 +219,38 @@ pub fn docker_healthcheck(state: &SystemState) {
   });
 }
 
-/// A failed reconstruction must not activate stale schedules or block API repair.
-fn start_crond_if_restored(restored: IoResult<()>, start: impl FnOnce()) {
-  match restored {
-    Ok(()) => start(),
-    Err(error) => log::error!(
-      "boot::init: Job scheduler disabled because schedules could not be restored: {error}; continuing daemon startup so Jobs can be repaired through the API"
-    ),
+/// Prepare a one-shot start after listener binding. Failed restoration leaves
+/// schedules disabled without blocking API repair.
+fn deferred_crond_start(
+  restored: IoResult<()>,
+  start: impl FnOnce(),
+) -> impl FnOnce() {
+  let start = match restored {
+    Ok(()) => Some(start),
+    Err(error) => {
+      log::error!(
+        "boot::init: Job scheduler disabled because schedules could not be restored: {error}; continuing daemon startup so Jobs can be repaired through the API"
+      );
+      None
+    }
+  };
+  move || {
+    if let Some(start) = start {
+      start();
+    }
   }
 }
 
 /// Init function called before http server start.
 /// To boot and initialize our state and database.
-///
-pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
+/// Return the scheduler starter for invocation only after HTTP listeners bind.
+pub async fn init(
+  conf: &DaemonConfig,
+) -> IoResult<(SystemState, impl FnOnce())> {
   set_uds_perm();
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
-  start_crond_if_restored(
+  let start_crond = deferred_crond_start(
     utils::cron::restore_cron_rules(&system_state).await,
     spawn_crond,
   );
@@ -264,7 +278,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   });
   super::docker_event::analyze(&system_state);
   super::metric::spawn(&system_state);
-  Ok(system_state)
+  Ok((system_state, start_crond))
 }
 
 /// Init unit test
@@ -285,22 +299,37 @@ mod tests {
       std::io::ErrorKind::PermissionDenied,
       std::io::ErrorKind::Interrupted,
     ] {
-      let mut started = false;
-      start_crond_if_restored(
+      let started = std::cell::Cell::new(false);
+      let start = deferred_crond_start(
         Err(IoError::with_context(
           "Cron job",
           std::io::Error::new(kind, "restoration failed"),
         )),
-        || started = true,
+        || started.set(true),
       );
+      assert!(!started.get());
+      start();
       assert!(
-        !started,
+        !started.get(),
         "crond must not consume stale rules after {kind:?}"
       );
     }
-    let mut started = false;
-    start_crond_if_restored(Ok(()), || started = true);
-    assert!(started);
+  }
+
+  #[test]
+  fn cron_start_is_deferred_and_discarded_after_listener_failure() {
+    let started = std::cell::Cell::new(false);
+    let start = deferred_crond_start(Ok(()), || started.set(true));
+    assert!(!started.get(), "restoration must not start crond");
+    // Failed listener binding drops the starter without invoking it.
+    drop(start);
+    assert!(!started.get());
+
+    let start = deferred_crond_start(Ok(()), || started.set(true));
+    assert!(!started.get());
+    // Successful listener binding permits the one-shot scheduler start.
+    start();
+    assert!(started.get());
   }
 
   /// Test init
@@ -328,7 +357,7 @@ mod tests {
     let config = config::init(&args).expect("Expect to init config");
     log::debug!("config: {config:?}");
     // Test state
-    let state = init(&config).await.unwrap();
+    let (state, _start_crond) = init(&config).await.unwrap();
     let state_ptr = state.clone();
     let mut raw_sub = state.subscribe_raw(None).await.unwrap();
     rt::spawn(async move {

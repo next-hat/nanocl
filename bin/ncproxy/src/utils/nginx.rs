@@ -579,6 +579,16 @@ async fn prepare_rule(
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
 ) -> IoResult<PreparedRule> {
+  // Validate before resolving upstreams or preparing any credential files.
+  if rule.rules.iter().any(|rule| {
+    matches!(rule, ProxyRule::Stream(stream)
+      if matches!(stream.protocol, ProxyStreamProtocol::Udp) && stream.ssl.is_some())
+  }) {
+    return Err(IoError::invalid_input(
+      "Proxy stream",
+      "TLS is not supported for UDP stream rules",
+    ));
+  }
   let mut stream_conf = String::new();
   let mut http_conf = String::new();
   let mut upstreams = Vec::new();
@@ -883,14 +893,22 @@ mod tests {
   #[ntex::test]
   async fn stream_preparation_honors_tcp_and_udp_protocols() {
     let state = test_state("unused");
-    for (protocol, listener) in [
-      ("Tcp", "listen 127.0.0.1:9000;"),
-      ("Udp", "listen 127.0.0.1:9000 udp;"),
+    for (protocol, tls, listener) in [
+      ("Tcp", false, "listen 127.0.0.1:9000;"),
+      ("Udp", false, "listen 127.0.0.1:9000 udp;"),
+      ("Tcp", true, "listen 127.0.0.1:9000 ssl;"),
     ] {
+      let ssl = tls.then(|| {
+        serde_json::json!({
+          "Certificate": "/unused/server.crt",
+          "CertificateKey": "/unused/server.key",
+        })
+      });
       let rule: ResourceProxyRule = serde_json::from_value(serde_json::json!({
         "Rules": [{
           "Network": "Local",
           "Protocol": protocol,
+          "Ssl": ssl,
           "Port": 9000,
           "Target": {"UnixPath": "/unused/upstream.sock"},
         }],
@@ -904,9 +922,35 @@ mod tests {
         .filter(|line| line.starts_with("listen "))
         .collect::<Vec<_>>();
       assert_eq!(listeners, vec![listener]);
+      assert_eq!(stream.contains("ssl_certificate "), tls);
+      assert!(prepared.files.is_empty());
       assert!(prepared.site.is_none());
       assert_eq!(prepared.upstreams.len(), 1);
     }
+  }
+
+  #[ntex::test]
+  async fn stream_preparation_rejects_udp_tls() {
+    let state = test_state("unused");
+    let rule: ResourceProxyRule = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Udp",
+        "Port": 9000,
+        "Target": {"UnixPath": "/unused/upstream.sock"},
+        "Ssl": {
+          "Certificate": "/unused/server.crt",
+          "CertificateKey": "/unused/server.key",
+        },
+      }],
+    }))
+    .unwrap();
+    let error = prepare_rule("stream", &rule, &state)
+      .await
+      .err()
+      .expect("UDP with TLS must be rejected before preparing a candidate");
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("TLS is not supported for UDP"));
   }
 
   #[ntex::test]
