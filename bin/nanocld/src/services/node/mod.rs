@@ -8,11 +8,46 @@ pub use cargo::*;
 pub use count::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
   config
-    .service(start_node_cargo)
-    .service(list_node)
-    .service(count_node);
+    .service(
+      web::resource("/nodes/cargoes/operations/start")
+        .name("start_node_cargo_operation")
+        .guard(web::guard::Post())
+        .to_with_state(start_node_cargo_operation),
+    )
+    .service(
+      web::resource("/nodes/cargoes/operations")
+        .name("delete_node_cargo_operation")
+        .guard(web::guard::Delete())
+        .to_with_state(delete_node_cargo_operation),
+    )
+    .service(
+      web::resource("/nodes/cargoes/start")
+        .name("start_node_cargo")
+        .guard(web::guard::Post())
+        .to_with_state(start_node_cargo),
+    )
+    .service(
+      web::resource("/nodes/cargoes")
+        .name("delete_node_cargo")
+        .guard(web::guard::Delete())
+        .to_with_state(delete_node_cargo),
+    )
+    .service(
+      web::resource("/nodes")
+        .name("list_node")
+        .guard(web::guard::Get())
+        .to_with_state(list_node),
+    )
+    .service(
+      web::resource("/nodes/count")
+        .name("count_node")
+        .guard(web::guard::Get())
+        .to_with_state(count_node),
+    );
 }
 
 #[cfg(test)]

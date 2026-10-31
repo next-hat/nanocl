@@ -21,9 +21,9 @@ use crate::{
     (status = 200, description = "List of jobs", body = [nanocl_stubs::resource_kind::ResourceKind]),
   ),
 ))]
-#[web::get("/resource/kinds")]
 pub async fn list_resource_kind(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   _version: web::types::Path<String>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {

@@ -1,11 +1,14 @@
-use bollard_next::container::WaitContainerOptions;
-use futures::StreamExt;
+use bollard_next::{
+  errors::Error as DockerError, models::ContainerWaitResponse,
+  query_parameters::WaitContainerOptions,
+};
+use futures::{Stream, StreamExt};
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{cargo::Cargo, node::CargoReplicaTask, process::Process};
 
 use crate::models::{
-  CargoReplicaProcessRole, CompileDeclaredOpts, EnsureExistingSlotOpts,
-  SystemState,
+  CargoReplicaProcessRole, CargoRuntimeContext, CompileDeclaredOpts,
+  EnsureExistingSlotOpts,
 };
 
 use super::{
@@ -13,13 +16,16 @@ use super::{
   ensure_mapping, inspect_process, start_process,
 };
 
+#[cfg(test)]
+pub(crate) use wait_fault::{fail_next_init_wait, pause_next_init_start};
+
 pub(super) async fn reconcile_containers(
   cargo: &Cargo,
   task: &CargoReplicaTask,
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for declared in &cargo.spec.init_containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -64,7 +70,7 @@ pub(super) async fn create_candidate_containers(
   attempt_id: &str,
   gateway: &str,
   slots: &mut Vec<RuntimeSlot>,
-  state: &SystemState,
+  state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   for declared in &cargo.spec.init_containers {
     let config = compile_declared(CompileDeclaredOpts {
@@ -116,7 +122,10 @@ pub(super) async fn create_candidate_containers(
   Ok(())
 }
 
-async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
+async fn wait_init(
+  process: &Process,
+  state: &CargoRuntimeContext,
+) -> IoResult<()> {
   let inspected = inspect_process(&process.key, state).await?;
   let container_state = inspected.state.as_ref();
   let running = container_state
@@ -128,31 +137,62 @@ async fn wait_init(process: &Process, state: &SystemState) -> IoResult<()> {
   let exit_code = container_state.and_then(|state| state.exit_code);
   match init_container_disposition(running, status.as_deref(), exit_code) {
     InitContainerDisposition::Complete => return Ok(()),
-    InitContainerDisposition::Start => start_process(process, state).await?,
+    InitContainerDisposition::Start => {
+      #[cfg(test)]
+      wait_fault::before_start(&process.kind_key, &process.key).await?;
+      start_process(process, state).await?;
+    }
     InitContainerDisposition::Wait => {}
   }
-  let mut stream = state.inner.docker_api.wait_container(
+  #[cfg(test)]
+  if wait_fault::take(&process.kind_key) {
+    return wait_init_outcome(futures::stream::iter([Err(
+      DockerError::DockerResponseServerError {
+        status_code: 500,
+        message: "injected unavailable init wait response".to_owned(),
+      },
+    )]))
+    .await;
+  }
+  let stream = state.inner.docker_api.wait_container(
     &process.key,
     Some(WaitContainerOptions {
-      condition: "not-running",
+      condition: "not-running".to_owned(),
     }),
   );
-  while let Some(status) = stream.next().await {
-    let status = status.map_err(|error| {
-      IoError::interrupted("CargoInitContainer", &error.to_string())
-    })?;
-    if status.status_code != 0 {
-      let message = status
-        .error
-        .and_then(|error| error.message)
-        .unwrap_or_else(|| "Unknown init-container error".to_owned());
-      return Err(IoError::interrupted(
-        "CargoInitContainer",
-        &format!("{message} (exit {})", status.status_code),
-      ));
+  wait_init_outcome(stream).await
+}
+
+async fn wait_init_outcome(
+  mut stream: impl Stream<Item = Result<ContainerWaitResponse, DockerError>> + Unpin,
+) -> IoResult<()> {
+  match stream.next().await {
+    Some(Ok(ContainerWaitResponse {
+      status_code: code, ..
+    }))
+    | Some(Err(DockerError::DockerContainerWaitError { code, .. }))
+      if code > 0 =>
+    {
+      // Bollard reports confirmed nonzero exits as structured errors.
+      // Keep the reason useful without retaining arbitrary Docker messages.
+      Err(IoError::interrupted(
+        "CargoInitContainerExit",
+        &format!("Init container exited with code {code}"),
+      ))
     }
+    Some(Ok(ContainerWaitResponse {
+      status_code: 0,
+      error: None,
+    })) => Ok(()),
+    Some(Err(error)) => Err(IoError::interrupted(
+      "CargoInitContainer",
+      &error.to_string(),
+    )),
+    Some(Ok(_)) | None => Err(IoError::interrupted(
+      "CargoInitContainer",
+      "Docker wait did not establish an init-container exit result",
+    )),
   }
-  Ok(())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -179,8 +219,233 @@ fn init_container_disposition(
 }
 
 #[cfg(test)]
+mod wait_fault {
+  use std::{
+    collections::HashMap,
+    sync::{LazyLock, Mutex},
+  };
+
+  use nanocl_error::io::{IoError, IoResult};
+  use tokio::sync::oneshot;
+
+  enum Hook {
+    WaitFailure(bool),
+    BeforeStart(oneshot::Sender<String>, oneshot::Receiver<()>),
+  }
+
+  static FAULTS: LazyLock<Mutex<HashMap<String, Hook>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+  pub(crate) struct InitWaitFaultGuard {
+    key: String,
+  }
+
+  impl Drop for InitWaitFaultGuard {
+    fn drop(&mut self) {
+      FAULTS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .remove(&self.key);
+    }
+  }
+
+  pub(crate) fn fail_next_init_wait(key: &str) -> InitWaitFaultGuard {
+    let mut faults = FAULTS.lock().expect("init wait fault lock");
+    assert!(
+      !faults.contains_key(key),
+      "init wait fault already registered"
+    );
+    faults.insert(key.to_owned(), Hook::WaitFailure(true));
+    InitWaitFaultGuard {
+      key: key.to_owned(),
+    }
+  }
+
+  pub(super) fn take(key: &str) -> bool {
+    let mut faults = FAULTS.lock().expect("init wait fault lock");
+    match faults.get_mut(key) {
+      Some(Hook::WaitFailure(pending)) => std::mem::take(pending),
+      _ => false,
+    }
+  }
+
+  pub(crate) struct InitStartBarrier {
+    _guard: InitWaitFaultGuard,
+    entered: oneshot::Receiver<String>,
+    release: Option<oneshot::Sender<()>>,
+  }
+
+  impl InitStartBarrier {
+    pub(crate) async fn wait_start(&mut self) -> String {
+      (&mut self.entered)
+        .await
+        .expect("init start barrier dropped")
+    }
+
+    pub(crate) fn release(mut self) {
+      let _ = self.release.take().unwrap().send(());
+    }
+  }
+
+  pub(crate) fn pause_next_init_start(key: &str) -> InitStartBarrier {
+    let (entered, receiver) = oneshot::channel();
+    let (release, resume) = oneshot::channel();
+    let mut faults = FAULTS.lock().expect("init wait fault lock");
+    assert!(
+      !faults.contains_key(key),
+      "init wait fault already registered"
+    );
+    faults.insert(key.to_owned(), Hook::BeforeStart(entered, resume));
+    InitStartBarrier {
+      _guard: InitWaitFaultGuard {
+        key: key.to_owned(),
+      },
+      entered: receiver,
+      release: Some(release),
+    }
+  }
+
+  pub(super) async fn before_start(key: &str, id: &str) -> IoResult<()> {
+    let hook = {
+      let mut faults = FAULTS.lock().expect("init wait fault lock");
+      if matches!(faults.get(key), Some(Hook::BeforeStart(..))) {
+        faults.remove(key)
+      } else {
+        None
+      }
+    };
+    if let Some(Hook::BeforeStart(entered, release)) = hook {
+      let _ = entered.send(id.to_owned());
+      release.await.map_err(|_| {
+        IoError::interrupted(
+          "CargoInitContainer",
+          "init start barrier cancelled",
+        )
+      })?;
+    }
+    Ok(())
+  }
+}
+
+#[cfg(test)]
 mod tests {
+  use bollard_next::models::ContainerWaitExitError;
+  use futures::{FutureExt, executor::block_on, stream};
+
   use super::*;
+
+  #[test]
+  fn init_wait_fault_is_one_shot_scoped_and_cleared_on_drop() {
+    let key = format!("global.init-wait-fault-{}", uuid::Uuid::new_v4());
+    let guard = fail_next_init_wait(&key);
+    assert!(!wait_fault::take("global.other-init-wait"));
+    assert!(wait_fault::take(&key));
+    assert!(!wait_fault::take(&key));
+    drop(guard);
+
+    let guard = fail_next_init_wait(&key);
+    drop(guard);
+    assert!(!wait_fault::take(&key));
+  }
+
+  #[test]
+  fn init_start_barrier_is_scoped_one_shot_and_cancels_on_drop() {
+    let key = format!("global.init-start-barrier-{}", uuid::Uuid::new_v4());
+    let mut barrier = pause_next_init_start(&key);
+    assert!(
+      block_on(wait_fault::before_start("global.other", "other")).is_ok()
+    );
+    let start = wait_fault::before_start(&key, "candidate-id");
+    futures::pin_mut!(start);
+    assert!(start.as_mut().now_or_never().is_none());
+    assert_eq!(block_on(barrier.wait_start()), "candidate-id");
+    barrier.release();
+    assert!(block_on(start).is_ok());
+    assert!(block_on(wait_fault::before_start(&key, "next-id")).is_ok());
+
+    let barrier = pause_next_init_start(&key);
+    let start = wait_fault::before_start(&key, "cancelled-id");
+    futures::pin_mut!(start);
+    assert!(start.as_mut().now_or_never().is_none());
+    drop(barrier);
+    assert!(block_on(start).is_err());
+    drop(pause_next_init_start(&key));
+    assert!(block_on(wait_fault::before_start(&key, "after-drop")).is_ok());
+  }
+
+  #[test]
+  fn init_wait_completes_on_confirmed_zero_exit() {
+    let results = stream::iter([Ok(ContainerWaitResponse {
+      status_code: 0,
+      error: None,
+    })])
+    .chain(stream::pending());
+    assert!(
+      wait_init_outcome(results)
+        .now_or_never()
+        .expect("a confirmed exit must not require another stream result")
+        .is_ok()
+    );
+  }
+
+  #[test]
+  fn init_wait_classifies_confirmed_nonzero_exits() {
+    let message = "untrusted Docker detail".to_owned();
+    for result in [
+      Ok(ContainerWaitResponse {
+        status_code: 17,
+        error: None,
+      }),
+      Ok(ContainerWaitResponse {
+        status_code: 17,
+        error: Some(ContainerWaitExitError {
+          message: Some(message.clone()),
+        }),
+      }),
+      Err(DockerError::DockerContainerWaitError {
+        code: 17,
+        error: message,
+      }),
+    ] {
+      let error = block_on(wait_init_outcome(stream::iter([result])))
+        .expect_err("a confirmed nonzero exit must fail");
+      assert_eq!(error.context(), Some("CargoInitContainerExit"));
+      assert_eq!(
+        error.inner.to_string(),
+        "Init container exited with code 17"
+      );
+    }
+  }
+
+  #[test]
+  fn init_wait_keeps_unknown_outcomes_uncertain() {
+    for result in [
+      Some(Err(DockerError::RequestTimeoutError)),
+      Some(Err(DockerError::DockerResponseServerError {
+        status_code: 500,
+        message: "Docker unavailable".to_owned(),
+      })),
+      Some(Err(DockerError::DockerContainerWaitError {
+        code: 0,
+        error: "wait failed without an exit status".to_owned(),
+      })),
+      Some(Ok(ContainerWaitResponse {
+        status_code: -1,
+        error: None,
+      })),
+      Some(Ok(ContainerWaitResponse {
+        status_code: 0,
+        error: Some(ContainerWaitExitError {
+          message: Some("wait canceled".to_owned()),
+        }),
+      })),
+      None,
+    ] {
+      let error = block_on(wait_init_outcome(stream::iter(result)))
+        .expect_err("missing exit evidence must remain uncertain");
+      assert_eq!(error.context(), Some("CargoInitContainer"));
+    }
+  }
 
   #[test]
   fn init_container_must_run_before_exit_zero_counts_as_complete() {

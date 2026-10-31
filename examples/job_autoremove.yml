@@ -1,4 +1,6 @@
-ApiVersion: v0.16
+ApiVersion: v0.19
+# AutoRemove does not archive logs. If Docker removes a container before its
+# exit is observed, history retains an unknown exit code rather than success.
 
 Jobs:
 - Name: certbot-gen

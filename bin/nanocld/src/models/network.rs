@@ -76,7 +76,7 @@ impl TryFrom<NetworkDb> for Network {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::service::Network as DockerNetwork;
+  use bollard_next::models::NetworkInspect as DockerNetwork;
 
   use super::*;
 
@@ -100,6 +100,13 @@ mod tests {
       DockerNetwork {
         name: Some("private-api".to_owned()),
         driver: Some("bridge".to_owned()),
+        containers: Some(std::collections::HashMap::from([(
+          "container-id".to_owned(),
+          bollard_next::models::EndpointResource {
+            name: Some("web".to_owned()),
+            ..Default::default()
+          },
+        )])),
         ..Default::default()
       },
     );
@@ -107,5 +114,6 @@ mod tests {
     let network = Network::try_from(db).unwrap();
     assert_eq!(network.key, "node-a.private-api");
     assert_eq!(network.data.driver.as_deref(), Some("bridge"));
+    assert_eq!(network.data, partial.data);
   }
 }

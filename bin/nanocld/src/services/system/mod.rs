@@ -8,10 +8,27 @@ pub use info::*;
 pub use ping::*;
 pub use version::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(get_ping);
-  config.service(get_version);
-  config.service(get_info);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/_ping")
+      .name("get_ping")
+      .guard(web::guard::Head())
+      .to(get_ping),
+  );
+  config.service(
+    web::resource("/version")
+      .name("get_version")
+      .guard(web::guard::Get())
+      .to(get_version),
+  );
+  config.service(
+    web::resource("/info")
+      .name("get_info")
+      .guard(web::guard::Get())
+      .to_with_state(get_info),
+  );
 }
 
 #[cfg(test)]

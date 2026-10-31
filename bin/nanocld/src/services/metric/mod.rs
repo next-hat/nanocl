@@ -10,11 +10,33 @@ pub use create::*;
 pub use inspect::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_metric);
-  config.service(create_metric);
-  config.service(inspect_metric);
-  config.service(count_metric);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/metrics")
+      .name("list_metric")
+      .guard(web::guard::Get())
+      .to_with_state(list_metric),
+  );
+  config.service(
+    web::resource("/metrics")
+      .name("create_metric")
+      .guard(web::guard::Post())
+      .to_with_state(create_metric),
+  );
+  config.service(
+    web::resource("/metrics/{key}/inspect")
+      .name("inspect_metric")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_metric),
+  );
+  config.service(
+    web::resource("/metrics/count")
+      .name("count_metric")
+      .guard(web::guard::Get())
+      .to_with_state(count_metric),
+  );
 }
 
 #[cfg(test)]

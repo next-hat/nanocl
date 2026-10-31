@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_error::io::IoError;
 use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{Config as DockerConfig, ContainerSpec},
@@ -8,8 +9,34 @@ use nanocl_stubs::{
 };
 
 use super::{
-  CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole, SystemState,
+  CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+  CargoRuntimeContext, SystemState,
 };
+
+/// Cleanup evidence is limited to candidate IDs returned by local creation.
+/// An uncertain create may still have produced another, untracked runtime.
+pub(crate) struct CargoCandidateFailure {
+  pub(crate) error: IoError,
+  pub(crate) tracked_candidate_removed: bool,
+}
+
+impl From<IoError> for CargoCandidateFailure {
+  fn from(error: IoError) -> Self {
+    Self {
+      error,
+      tracked_candidate_removed: false,
+    }
+  }
+}
+
+/// Operation-local evidence captured before a replica rollout mutates runtime.
+#[derive(Clone, Debug)]
+pub(crate) enum CargoPreviousRuntime {
+  /// No attachment, persisted process, or Docker runtime belongs to this replica.
+  Absent,
+  /// Immutable process IDs and their positively observed running state.
+  Observed(HashMap<String, bool>),
+}
 
 pub(crate) type ProcessesByKey<'a> = HashMap<&'a str, &'a Process>;
 pub(crate) type CargoStableProcesses<'a> =
@@ -34,7 +61,7 @@ pub(crate) struct EnsureExistingSlotOpts<'a> {
   pub(crate) container_name: &'a str,
   pub(crate) essential: bool,
   pub(crate) config: &'a DockerConfig,
-  pub(crate) state: &'a SystemState,
+  pub(crate) state: &'a CargoRuntimeContext,
 }
 
 pub(crate) struct ValidateRestartSlotOpts<'opts, 'process> {

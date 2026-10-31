@@ -1,12 +1,11 @@
 use ntex::{
-  ServiceFactory,
   client::{Client, ClientResponse},
   http::StatusCode,
   rt,
 };
 
+use nanocl_error::http::HttpError;
 use nanocl_error::io::FromIo;
-use nanocl_error::{http::HttpError, io::IoError};
 use nanocl_error::{http_client::HttpClientError, io::IoResult};
 
 /// Controller client
@@ -27,40 +26,19 @@ impl CtrlClient {
       url if url.starts_with("unix://") => {
         let url = url.to_owned();
         let client = Client::builder()
-          .connector::<&str>(
-            ntex::client::Connector::default().connector(
-              ntex::service::fn_service(move |_| {
-                let unix_socket = url.trim_start_matches("unix://").to_owned();
-                async {
-                  Ok(
-                    rt::unix_connect(unix_socket, ntex::SharedCfg::default())
-                      .await?,
-                  )
-                }
+          .connector(ntex::service::fn_service(async move |_| {
+            let unix_socket = url.trim_start_matches("unix://").to_owned();
+            rt::unix_connect(unix_socket, ntex::SharedCfg::default())
+              .await
+              .map_err(|err| {
+                ntex::Error::from(ntex::connect::ConnectError::from(err))
               })
-              .map_init_err(|_| unreachable!()),
-            ),
-          )
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::invalid_data(
-              "Unable to build http client",
-              err.to_string().as_str(),
-            )
-          })?;
+          }))
+          .build(ntex::SharedCfg::default());
         (client, "http://localhost")
       }
       url if url.starts_with("http://") || url.starts_with("https://") => {
-        let client = Client::builder()
-          .build(ntex::SharedCfg::default())
-          .await
-          .map_err(|err| {
-            IoError::invalid_data(
-              "Unable to build http client",
-              err.to_string().as_str(),
-            )
-          })?;
+        let client = Client::builder().build(ntex::SharedCfg::default());
         (client, url)
       }
       _ => panic!("Invalid url: {}", url),

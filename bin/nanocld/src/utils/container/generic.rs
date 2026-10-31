@@ -1,16 +1,16 @@
-use bollard_next::network::InspectNetworkOptions;
+use bollard_next::query_parameters::InspectNetworkOptions;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   cargo::Cargo,
   cargo_spec::{ConstraintOp, NodeConstraint},
   process::{Process, ProcessKind},
-  system::{NativeEventAction, ObjPsHealthStatusKind, ObjPsStatusKind},
+  system::NativeEventAction,
 };
 
 use crate::{
   models::{
-    BalanceWeights, CapacityQuery, CargoDb, JobDb, JobUpdateDb, MetricDb,
-    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, SystemState, VmDb,
+    BalanceWeights, CapacityQuery, CargoDb, JobDb, MetricDb, NodeDb,
+    SystemState, VmDb,
   },
   repositories::generic::*,
 };
@@ -35,14 +35,6 @@ pub async fn emit(
       state.emit_normal_native_action_sync(&cargo, action).await;
     }
     ProcessKind::Job => {
-      JobDb::update_pk(
-        kind_key,
-        JobUpdateDb {
-          updated_at: Some(chrono::Utc::now().naive_utc()),
-        },
-        &state.inner.pool,
-      )
-      .await?;
       let job =
         JobDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
       state.emit_normal_native_action_sync(&job, action).await;
@@ -94,64 +86,6 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
   )
 }
 
-/// Emit a starting event to the system for the related process object (job, cargo, vm)
-/// This will update the status of the process and emit a event
-/// So the system start to start the group of processes in the background
-///
-pub async fn emit_starting(
-  kind_key: &str,
-  kind: &ProcessKind,
-  state: &SystemState,
-) -> IoResult<()> {
-  log::debug!("starting {kind:?} {kind_key}");
-  let current_status =
-    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  let wanted = if ProcessKind::Job == *kind {
-    ObjPsStatusKind::Finish
-  } else {
-    ObjPsStatusKind::Start
-  }
-  .to_string();
-  let status_update = ObjPsStatusUpdate {
-    wanted: Some(wanted),
-    prev_wanted: Some(current_status.wanted),
-    actual: Some(ObjPsStatusKind::Starting.to_string()),
-    prev_actual: Some(current_status.actual),
-    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-  };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
-  emit(kind_key, kind, NativeEventAction::Starting, state).await?;
-  Ok(())
-}
-
-/// Emit a stopping event to the system for the related process object (job, cargo, vm)
-/// This will update the status of the process and emit a event
-/// So the system start to stop the group of processes in the background
-///
-pub async fn emit_stopping(
-  kind_key: &str,
-  kind: &ProcessKind,
-  state: &SystemState,
-) -> IoResult<()> {
-  log::debug!("stopping {kind:?} {kind_key}");
-  let current_status =
-    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
-  if current_status.actual == ObjPsStatusKind::Stop.to_string() {
-    log::debug!("{kind:?} {kind_key} already stopped",);
-    return Ok(());
-  }
-  let status_update = ObjPsStatusUpdate {
-    wanted: Some(ObjPsStatusKind::Stop.to_string()),
-    prev_wanted: Some(current_status.wanted),
-    actual: Some(ObjPsStatusKind::Stopping.to_string()),
-    prev_actual: Some(current_status.actual),
-    health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-  };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
-  emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
-  Ok(())
-}
-
 /// Resolve the gateway used by the Cargo compiler for
 /// `$$INTERNAL_GATEWAY` without mutating an authored declaration.
 pub async fn resolve_internal_gateway(
@@ -171,7 +105,7 @@ pub async fn resolve_internal_gateway(
   let network_gateway = state
     .inner
     .docker_api
-    .inspect_network(&network_name, None::<InspectNetworkOptions<String>>)
+    .inspect_network(&network_name, None::<InspectNetworkOptions>)
     .await
     .map_err(|err| {
       IoError::interrupted(

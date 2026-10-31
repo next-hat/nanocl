@@ -11,7 +11,7 @@ Resources:
       - Path: /
         Target:
           Key: global.deploy-example.c
-          Port: 9001
+          Port: 9000
 
 Cargoes:
 - Name: deploy-example

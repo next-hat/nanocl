@@ -37,7 +37,7 @@ pub(crate) fn promotion_actions(
   actions
 }
 
-pub(super) fn restart_required_slots_ready(slots: &[RuntimeSlot]) -> bool {
+pub(super) fn required_slots_ready(slots: &[RuntimeSlot]) -> bool {
   slots
     .iter()
     .filter(|slot| requires_steady_state_readiness(slot.role, slot.essential))

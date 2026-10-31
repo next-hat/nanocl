@@ -21,9 +21,9 @@ use crate::{
     (status = 200, description = "List of instances", body = [nanocl_stubs::process::Process]),
   ),
 ))]
-#[web::get("/processes")]
 pub async fn list_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;

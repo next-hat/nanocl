@@ -88,9 +88,7 @@ impl TestClient {
   {
     let mut req = self.get(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap_or_else(|err| {
-        panic!("Failed to serialize query GET {url}: {err}")
-      })
+      req = req.query(&query);
     }
     req
       .send()
@@ -110,9 +108,7 @@ impl TestClient {
   {
     let mut req = self.post(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap_or_else(|err| {
-        panic!("Failed to serialize query POST {url}: {err}")
-      });
+      req = req.query(&query);
     }
     match body {
       None => req
@@ -135,9 +131,7 @@ impl TestClient {
   {
     let mut req = self.delete(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap_or_else(|err| {
-        panic!("Failed to serialize query DELETE {url}: {err}")
-      })
+      req = req.query(&query);
     }
     req
       .send()
@@ -157,9 +151,7 @@ impl TestClient {
   {
     let mut req = self.patch(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap_or_else(|err| {
-        panic!("Failed to serialize query PATCH {url}: {err}")
-      })
+      req = req.query(&query);
     }
     match body {
       None => req
@@ -182,9 +174,7 @@ impl TestClient {
   {
     let mut req = self.head(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap_or_else(|err| {
-        panic!("Failed to serialize query HEAD {url}: {err}")
-      })
+      req = req.query(&query);
     }
     req
       .send()
@@ -204,7 +194,7 @@ impl TestClient {
   {
     let mut req = self.put(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap()
+      req = req.query(&query);
     }
     match body {
       None => req.send().await.unwrap(),

@@ -3,21 +3,82 @@ use ntex::web;
 pub mod count;
 pub mod create;
 pub mod delete;
+pub mod history;
 pub mod inspect;
 pub mod list;
+pub mod runs;
 
 pub use count::*;
 pub use create::*;
 pub use delete::*;
+pub use history::*;
 pub use inspect::*;
 pub use list::*;
+pub use runs::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_job);
-  config.service(create_job);
-  config.service(delete_job);
-  config.service(inspect_job);
-  config.service(count_job);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/jobs")
+      .name("list_job")
+      .guard(web::guard::Get())
+      .to_with_state(list_job),
+  );
+  config.service(
+    web::resource("/jobs")
+      .name("create_job")
+      .guard(web::guard::Post())
+      .to_with_state(create_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}")
+      .name("delete_job")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}/inspect")
+      .name("inspect_job")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}/histories")
+      .name("list_job_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_job_history),
+  );
+  config.service(
+    web::resource("/jobs/{name}/histories/{id}")
+      .name("inspect_job_history")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job_history),
+  );
+  config.service(
+    web::resource("/jobs/{name}/histories/{id}/revert")
+      .name("revert_job")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_job),
+  );
+  config.service(
+    web::resource("/jobs/{name}/runs")
+      .name("list_job_runs")
+      .guard(web::guard::Get())
+      .to_with_state(list_job_runs),
+  );
+  config.service(
+    web::resource("/jobs/{name}/runs/{run}")
+      .name("inspect_job_run")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_job_run),
+  );
+  config.service(
+    web::resource("/jobs/count")
+      .name("count_job")
+      .guard(web::guard::Get())
+      .to_with_state(count_job),
+  );
 }
 
 #[cfg(test)]

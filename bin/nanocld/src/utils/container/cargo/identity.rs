@@ -103,6 +103,7 @@ pub(super) fn process_identity(
 
 pub(super) fn validate_observed_identities(
   cargo_key: &str,
+  spec_key: uuid::Uuid,
   requested: &[CargoReplicaTask],
   processes: &[Process],
   local_node: &str,
@@ -130,6 +131,34 @@ pub(super) fn validate_observed_identities(
     let Some(expected_ordinal) = requested.get(&identity.replica_key) else {
       continue;
     };
+    let labels = process
+      .data
+      .config
+      .as_ref()
+      .and_then(|config| config.labels.as_ref());
+    let creation_spec = labels.and_then(|labels| labels.get(super::LABEL_SPEC));
+    let has_operation_identity = labels.is_some_and(|labels| {
+      [
+        super::LABEL_INCARNATION,
+        super::LABEL_SPEC,
+        super::LABEL_OPERATION,
+      ]
+      .iter()
+      .any(|key| labels.contains_key(*key))
+    });
+    // A failed update can leave old mappings attached after the desired spec
+    // changed. Starting those processes must not report the new spec as ready.
+    // Bootstrap processes predate operation labels and retain their existing path.
+    if is_rollout_process_name(&process.name)
+      || (has_operation_identity
+        && creation_spec.and_then(|value| value.parse::<uuid::Uuid>().ok())
+          != Some(spec_key))
+    {
+      return Err(IoError::other(
+        "CargoRuntimeIdentity",
+        "Cargo start cannot reuse a rollout process or a process from another specification; retry the update",
+      ));
+    }
     if identity.ordinal != *expected_ordinal {
       return Err(IoError::other(
         "CargoRuntimeIdentity",
@@ -206,6 +235,84 @@ mod tests {
         ..Default::default()
       },
     }
+  }
+
+  #[test]
+  fn cargo_start_rejects_old_spec_and_rollout_processes() {
+    let spec = uuid::Uuid::new_v4();
+    let mut process = labelled_process();
+    let replica = process_identity(&process).unwrap();
+    let requested = [CargoReplicaTask {
+      key: replica.replica_key,
+      ordinal: replica.ordinal,
+    }];
+    let validate = |process: &Process| {
+      validate_observed_identities(
+        "global.api",
+        spec,
+        &requested,
+        std::slice::from_ref(process),
+        "node-a",
+      )
+    };
+    // Untouched installer runtimes have no operation labels.
+    assert!(validate(&process).is_ok());
+    process
+      .data
+      .config
+      .as_mut()
+      .unwrap()
+      .labels
+      .as_mut()
+      .unwrap()
+      .extend([
+        (
+          super::super::LABEL_INCARNATION.to_owned(),
+          uuid::Uuid::new_v4().to_string(),
+        ),
+        (
+          super::super::LABEL_OPERATION.to_owned(),
+          uuid::Uuid::new_v4().to_string(),
+        ),
+        (super::super::LABEL_SPEC.to_owned(), spec.to_string()),
+      ]);
+    assert!(validate(&process).is_ok());
+    for stale in [uuid::Uuid::new_v4().to_string(), "invalid".to_owned()] {
+      process
+        .data
+        .config
+        .as_mut()
+        .unwrap()
+        .labels
+        .as_mut()
+        .unwrap()
+        .insert(super::super::LABEL_SPEC.to_owned(), stale);
+      assert!(validate(&process).is_err());
+    }
+    process
+      .data
+      .config
+      .as_mut()
+      .unwrap()
+      .labels
+      .as_mut()
+      .unwrap()
+      .insert(super::super::LABEL_SPEC.to_owned(), spec.to_string());
+    for name in ["global.api-r7.tmp.c", "global.api-r7.candidate.c"] {
+      process.name = name.to_owned();
+      assert!(validate(&process).is_err());
+    }
+    process.name = "global.api-r7.c".to_owned();
+    process
+      .data
+      .config
+      .as_mut()
+      .unwrap()
+      .labels
+      .as_mut()
+      .unwrap()
+      .remove(super::super::LABEL_SPEC);
+    assert!(validate(&process).is_err());
   }
 
   #[test]

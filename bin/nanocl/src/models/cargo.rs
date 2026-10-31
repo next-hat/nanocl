@@ -8,8 +8,8 @@ use nanocld_client::stubs::{
 };
 
 use super::{
-  GenericInspectOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-  GenericStartOpts, GenericStopOpts, NamespacedListOpts,
+  GenericHistoryOpts, GenericInspectOpts, GenericRemoveForceOpts,
+  GenericRemoveOpts, GenericStartOpts, GenericStopOpts, NamespacedListOpts,
 };
 
 /// `nanocl cargo create` available options
@@ -126,13 +126,6 @@ pub struct CargoPatchOpts {
   pub(crate) volumes: Option<Vec<String>>,
 }
 
-/// `nanocl cargo history` available options
-#[derive(Clone, Parser)]
-pub struct CargoHistoryOpts {
-  /// Canonical key of the cargo whose history to browse
-  pub key: String,
-}
-
 /// `nanocl cargo revert` available options
 #[derive(Clone, Parser)]
 pub struct CargoRevertOpts {
@@ -197,8 +190,8 @@ pub enum CargoCommand {
   Inspect(GenericInspectOpts),
   /// Update a cargo by its canonical key
   Patch(CargoPatchOpts),
-  /// List cargo history
-  History(CargoHistoryOpts),
+  /// List cargo specification history or inspect a revision
+  History(GenericHistoryOpts),
   /// Revert cargo to a specific history
   Revert(CargoRevertOpts),
   /// Show logs
@@ -232,6 +225,30 @@ pub struct CargoRow {
   /// When the cargo was last updated
   #[tabled(rename = "UPDATED AT")]
   pub(crate) updated_at: String,
+  /// Age since the cargo was created, used in compact output
+  #[tabled(skip)]
+  pub(crate) age: String,
+}
+
+/// A compact row of the cargo table
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct CargoCompactRow {
+  pub(crate) key: String,
+  pub(crate) status: String,
+  pub(crate) instances: String,
+  pub(crate) age: String,
+}
+
+impl From<CargoRow> for CargoCompactRow {
+  fn from(row: CargoRow) -> Self {
+    Self {
+      key: row.key,
+      status: row.status,
+      instances: row.instances,
+      age: row.age,
+    }
+  }
 }
 
 /// Convert CargoSummary to CargoRow
@@ -256,6 +273,10 @@ impl From<CargoSummary> for CargoRow {
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
+      age: super::format_age(
+        Some(&cargo.created_at.and_utc()),
+        chrono::Utc::now(),
+      ),
     }
   }
 }
@@ -265,11 +286,64 @@ mod tests {
   use std::path::{Path, PathBuf};
 
   use clap::Parser;
+  use nanocld_client::stubs::{
+    cargo_spec::CargoSpecRevision, system::ObjPsStatus,
+  };
   use regex::Regex;
 
   use crate::utils::cargo::build_cargo_patch;
 
   use super::*;
+
+  #[test]
+  fn compact_cargo_row_preserves_key_status_and_age() {
+    let created_at =
+      (chrono::Utc::now() - chrono::Duration::hours(49)).naive_utc();
+    let status = ObjPsStatus::default();
+    let expected_status =
+      format!("{}/{} ({})", status.actual, status.wanted, status.health);
+    let row = CargoRow::from(CargoSummary {
+      namespace_name: "production".to_owned(),
+      status,
+      created_at,
+      instance_total: 3,
+      instance_running: 2,
+      spec: CargoSpecRevision {
+        key: Default::default(),
+        cargo_key: "production.api".to_owned(),
+        version: "v1".to_owned(),
+        created_at: chrono::Utc::now().naive_utc(),
+        name: "api".to_owned(),
+        metadata: None,
+        replicas: 3,
+        network_mode: None,
+        port_bindings: None,
+        hostname: None,
+        dns: None,
+        secrets: Vec::new(),
+        placement: None,
+        resource_requirement: None,
+        init_containers: Vec::new(),
+        containers: vec![container("api", "example/api:1")],
+      },
+    });
+    assert_eq!(row.age, "2d");
+    assert!(!row.created_at.is_empty());
+    assert!(!row.updated_at.is_empty());
+    assert_eq!(
+      CargoRow::headers(),
+      ["KEY", "STATUS", "INSTANCES", "CREATED AT", "UPDATED AT"]
+    );
+    let compact = CargoCompactRow::from(row);
+    assert_eq!(compact.key, "production.api");
+    assert_eq!(compact.status, expected_status);
+    assert_eq!(compact.instances, "2/3");
+    assert_eq!(compact.age, "2d");
+    assert_eq!(
+      CargoCompactRow::headers(),
+      ["KEY", "STATUS", "INSTANCES", "AGE"]
+    );
+  }
 
   fn container(name: &str, image: &str) -> ContainerSpec {
     ContainerSpec {
@@ -572,6 +646,7 @@ mod tests {
         instances: "1/1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
+        age: String::new(),
       },
       CargoRow {
         key: "system.same".to_owned(),
@@ -579,6 +654,7 @@ mod tests {
         instances: "1/1".to_owned(),
         created_at: String::new(),
         updated_at: String::new(),
+        age: String::new(),
       },
     ])
     .to_string();

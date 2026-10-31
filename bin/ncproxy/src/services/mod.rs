@@ -24,7 +24,6 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
     (status = 200, description = "The health status", body = String),
   ),
 ))]
-#[web::get("/health")]
 pub async fn health() -> Result<web::HttpResponse, HttpError> {
   Ok(web::HttpResponse::Ok().json(&serde_json::json!({
     "status": "ok",
@@ -34,7 +33,9 @@ pub async fn health() -> Result<web::HttpResponse, HttpError> {
   })))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn app_config() -> web::WebAppConfig {
+  #[allow(unused_mut)]
+  let mut config = web::WebAppConfig::new();
   #[cfg(feature = "dev")]
   {
     use nanocl_utils::ntex::swagger;
@@ -48,13 +49,24 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     .expect("Unable to write swagger.yaml");
     let swagger_conf =
       swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
-    config.service(
-      web::scope("/explorer/")
-        .state(swagger_conf)
-        .configure(swagger::register),
-    );
+    config = config.set_state(swagger_conf);
   }
-  config.service(health);
+  config
+}
+
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<web::AppState<crate::models::SystemStateRef>>,
+) {
+  #[cfg(feature = "dev")]
+  config.service(
+    web::scope("/explorer/").configure(nanocl_utils::ntex::swagger::register),
+  );
+  config.service(
+    web::resource("/health")
+      .name("health")
+      .guard(web::guard::Get())
+      .to(health),
+  );
   let versioning = middlewares::Versioning::new(vars::VERSION).finish();
   config.service(
     web::scope("/{version}")

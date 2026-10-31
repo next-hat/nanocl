@@ -34,7 +34,10 @@ mod logs;
 mod man;
 mod remove;
 mod render;
+mod start;
+mod stats;
 mod status;
+mod stop;
 
 use apply::exec_state_apply;
 use logs::exec_state_logs;
@@ -149,6 +152,9 @@ pub enum ArgParseMode {
   Apply,
   Diff,
   Status,
+  Stats,
+  Start,
+  Stop,
   Remove,
   Logs,
 }
@@ -159,6 +165,9 @@ impl std::fmt::Display for ArgParseMode {
       ArgParseMode::Apply => "apply",
       ArgParseMode::Diff => "diff",
       ArgParseMode::Status => "status",
+      ArgParseMode::Stats => "stats",
+      ArgParseMode::Start => "start",
+      ArgParseMode::Stop => "stop",
       ArgParseMode::Remove => "remove",
       ArgParseMode::Logs => "logs",
     };
@@ -662,6 +671,9 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
     StateCommand::Status(opts) => {
       status::exec_state_status(cli_conf, opts).await
     }
+    StateCommand::Stats(opts) => stats::exec_state_stats(cli_conf, opts).await,
+    StateCommand::Start(opts) => start::exec_state_start(cli_conf, opts).await,
+    StateCommand::Stop(opts) => stop::exec_state_stop(cli_conf, opts).await,
     StateCommand::Render(opts) => exec_state_render(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
     StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,
@@ -678,7 +690,12 @@ mod tests {
     let state: Statefile =
       serde_json::from_value(serde_json::json!({"ApiVersion": "v0.18"}))
         .unwrap();
-    for mode in [ArgParseMode::Apply, ArgParseMode::Remove] {
+    for mode in [
+      ArgParseMode::Apply,
+      ArgParseMode::Remove,
+      ArgParseMode::Start,
+      ArgParseMode::Stop,
+    ] {
       let error = parse_build_args(&state, mode, &["--unknown".into()], true)
         .unwrap_err();
       assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);

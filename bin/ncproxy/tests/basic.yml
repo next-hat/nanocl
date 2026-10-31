@@ -48,7 +48,6 @@ Rules:
 - Protocol: Udp
   Port: 9999
   Network: Local
-  Ssl: test-secret
   Target:
     Key: global.ncproxy-test.c
     Port: 9000

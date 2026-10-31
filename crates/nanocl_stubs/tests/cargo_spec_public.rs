@@ -876,19 +876,29 @@ fn assert_related_cargo_schemas(
 #[cfg(feature = "schemars")]
 #[test]
 fn schemars_exposes_only_the_final_cargo_models() {
-  let spec = serde_json::to_value(schemars::schema_for!(CargoSpec)).unwrap();
+  let spec = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<CargoSpec>()
+    .to_value();
+  assert_eq!(spec["$schema"], "http://json-schema.org/draft-07/schema#");
   assert_final_cargo_schema(&spec);
   let spec_json = serde_json::to_string(&spec).unwrap();
   assert!(spec_json.contains("additionalProperties"));
   assert!(spec_json.contains("HostIp"));
   assert!(spec_json.contains("HostPort"));
 
-  let revision =
-    serde_json::to_value(schemars::schema_for!(CargoSpecRevision)).unwrap();
-  let patch =
-    serde_json::to_value(schemars::schema_for!(CargoSpecPatch)).unwrap();
-  let placement =
-    serde_json::to_value(schemars::schema_for!(CargoPlacementSpec)).unwrap();
+  let revision = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<CargoSpecRevision>()
+    .to_value();
+  let patch = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<CargoSpecPatch>()
+    .to_value();
+  let placement = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<CargoPlacementSpec>()
+    .to_value();
   assert_related_cargo_schemas(&revision, &patch, &placement);
 }
 

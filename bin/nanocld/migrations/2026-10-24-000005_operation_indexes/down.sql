@@ -1,0 +1,1 @@
+DROP INDEX resource_incarnations_live_idx, operations_pending_incarnation_idx, operations_pending_node_idx, operations_history_idx, specs_incarnation_idx;

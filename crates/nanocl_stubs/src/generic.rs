@@ -4,7 +4,7 @@ use std::{collections::HashMap, net::IpAddr};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "utoipa")]
-use bollard_next::secret::GenericResourcesInner;
+use bollard_next::models::GenericResourcesInner;
 
 /// Generic namespace query filter
 #[derive(Debug, Clone)]
@@ -455,13 +455,13 @@ impl utoipa::PartialSchema for NetworkKind {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for NetworkKind {
-  fn schema_name() -> String {
-    "NetworkKind".to_owned()
+  fn schema_name() -> std::borrow::Cow<'static, str> {
+    "NetworkKind".into()
   }
 
   fn json_schema(
-    _generator: &mut schemars::r#gen::SchemaGenerator,
-  ) -> schemars::schema::Schema {
+    _generator: &mut schemars::SchemaGenerator,
+  ) -> schemars::Schema {
     serde_json::from_value(serde_json::json!({
       "description": "Network binding selector",
       "oneOf": [
@@ -765,5 +765,30 @@ mod network_kind_tests {
     assert_eq!(schema["oneOf"][0]["type"], "string");
     assert_eq!(schema["oneOf"][1]["required"][0], "Named");
     assert_eq!(schema["oneOf"][2]["required"][0], "Other");
+  }
+
+  #[cfg(feature = "schemars")]
+  #[test]
+  fn statefile_schema_preserves_network_selector_forms() {
+    let schema = schemars::generate::SchemaSettings::draft07()
+      .into_generator()
+      .into_root_schema_for::<NetworkKind>()
+      .to_value();
+    assert_eq!(schema["$schema"], "http://json-schema.org/draft-07/schema#");
+    assert_eq!(schema["oneOf"].as_array().unwrap().len(), 3);
+    assert_eq!(schema["oneOf"][0]["type"], "string");
+    assert_eq!(schema["oneOf"][0]["minLength"], 1);
+    for (index, field) in [(1, "Named"), (2, "Other")] {
+      assert_eq!(
+        schema["oneOf"][index]["required"],
+        serde_json::json!([field])
+      );
+      assert_eq!(schema["oneOf"][index]["additionalProperties"], false);
+      assert_eq!(
+        schema["oneOf"][index]["properties"][field]["type"],
+        "string"
+      );
+    }
+    assert_eq!(schema["oneOf"][1]["properties"]["Named"]["minLength"], 1);
   }
 }

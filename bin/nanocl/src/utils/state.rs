@@ -26,7 +26,7 @@ pub async fn download_statefile(url: &str) -> IoResult<(String, String)> {
   } else {
     format!("https://{url}")
   };
-  let client = ntex::client::Client::new().await;
+  let client = ntex::client::Client::new();
   let mut res = client
     .get(&url)
     .header("User-Agent", "nanocl")

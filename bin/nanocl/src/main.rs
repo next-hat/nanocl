@@ -29,21 +29,17 @@ fn load_cli_config(
   if !read_only {
     Context::ensure()?;
   }
-  let user_conf = UserConfig::new();
-  let mut context = Context::new();
-  if user_conf.current_context != "default" {
-    match Context::read_by_name(&user_conf.current_context) {
-      Err(err) => {
-        if read_only {
-          return Err(err);
-        }
-        Context::r#use("default")?;
-      }
-      Ok(cur_context) => {
-        context = cur_context;
-      }
-    }
-  }
+  let user_conf = UserConfig::new()?;
+  let context = if user_conf.current_context == "default" {
+    Context::new()
+  } else {
+    Context::read_by_name(&user_conf.current_context).map_err(|err| {
+      IoError::with_context(
+        format!("Selected context {}", user_conf.current_context),
+        err.inner,
+      )
+    })?
+  };
   let endpoint = context.endpoints.get("Nanocl").ok_or_else(|| {
     IoError::invalid_data("Context", "missing Nanocl endpoint")
   })?;
@@ -104,12 +100,16 @@ fn load_cli_config(
 }
 
 fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
-  let Command::State(args) = &cli_args.command else {
-    return None;
-  };
-  let (operation, source) = match &args.command {
-    StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
-    StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
+  let (operation, source) = match &cli_args.command {
+    Command::Install(opts) if opts.json => ("install", &opts.template),
+    Command::Uninstall(opts) if opts.json => ("uninstall", &opts.template),
+    Command::State(args) => match &args.command {
+      StateCommand::Apply(opts) if opts.json => ("apply", &opts.source),
+      StateCommand::Remove(opts) if opts.json => ("remove", &opts.source),
+      StateCommand::Start(opts) if opts.json => ("start", &opts.source),
+      StateCommand::Stop(opts) if opts.json => ("stop", &opts.source),
+      _ => return None,
+    },
     _ => return None,
   };
   Some(StateOutput {
@@ -118,7 +118,7 @@ fn state_json_output(cli_args: &Cli) -> Option<StateOutput> {
   })
 }
 
-/// Report JSON results, including failures before state command dispatch.
+/// Report JSON results, including failures before command dispatch.
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let output = state_json_output(cli_args);
   let result = execute_arg_inner(cli_args).await;
@@ -133,6 +133,48 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 }
 
 async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
+  // Local context commands and Docker installation do not need the selected
+  // NanoCL connection, including its endpoint and credential files.
+  match &cli_args.command {
+    Command::Context(args) => return commands::exec_context(args),
+    Command::Install(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        // Docker Desktop installation saves a local context after setup.
+        Context::ensure()?;
+        return commands::exec_install(args).await;
+      }
+      #[cfg(target_os = "windows")]
+      {
+        if args.json {
+          return Err(IoError::other(
+            "Install",
+            "Install is not supported on windows yet",
+          ));
+        }
+        println!("Install is not supported on windows yet");
+        return Ok(());
+      }
+    }
+    Command::Uninstall(args) => {
+      #[cfg(not(target_os = "windows"))]
+      {
+        return commands::exec_uninstall(args).await;
+      }
+      #[cfg(target_os = "windows")]
+      {
+        if args.json {
+          return Err(IoError::other(
+            "Uninstall",
+            "Uninstall is not supported on windows yet",
+          ));
+        }
+        println!("Uninstall is not supported on windows yet");
+        return Ok(());
+      }
+    }
+    _ => {}
+  }
   let cli_conf = create_cli_config(cli_args).map_err(|err| {
     if matches!(&cli_args.command, Command::State(args) if matches!(args.command, StateCommand::Diff(_))) {
       // Context errors can include credential paths or connection URLs.
@@ -163,30 +205,10 @@ async fn execute_arg_inner(cli_args: &Cli) -> IoResult<()> {
     }
     Command::Kill(args) => commands::kill_process(&cli_conf, args).await,
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
-    Command::Install(args) => {
-      #[cfg(not(target_os = "windows"))]
-      {
-        commands::exec_install(args).await
-      }
-      #[cfg(target_os = "windows")]
-      {
-        println!("Install is not supported on windows yet");
-        Ok(())
-      }
-    }
-    Command::Uninstall(args) => {
-      #[cfg(not(target_os = "windows"))]
-      {
-        commands::exec_uninstall(args).await
-      }
-      #[cfg(target_os = "windows")]
-      {
-        println!("Uninstall is not supported on windows yet");
-        Ok(())
-      }
-    }
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
-    Command::Context(args) => commands::exec_context(&cli_conf, args).await,
+    Command::Context(_) | Command::Install(_) | Command::Uninstall(_) => {
+      unreachable!("local command dispatched above")
+    }
     Command::Info => commands::exec_info(&cli_conf).await,
     Command::Metric(args) => commands::exec_metric(&cli_conf, args).await,
     Command::Backup(opts) => commands::exec_backup(&cli_conf, opts).await,
@@ -241,10 +263,14 @@ mod tests {
   use super::*;
 
   #[test]
-  fn json_state_output_selects_only_apply_and_remove() {
-    for (command, operation) in
-      [("apply", "apply"), ("remove", "remove"), ("rm", "remove")]
-    {
+  fn json_state_output_selects_apply_remove_start_and_stop() {
+    for (command, operation) in [
+      ("apply", "apply"),
+      ("remove", "remove"),
+      ("rm", "remove"),
+      ("start", "start"),
+      ("stop", "stop"),
+    ] {
       let args = Cli::try_parse_from([
         "nanocl",
         "state",
@@ -262,11 +288,41 @@ mod tests {
     for args in [
       vec!["nanocl", "state", "apply", "-y"],
       vec!["nanocl", "state", "rm", "-y"],
+      vec!["nanocl", "state", "start", "-y"],
+      vec!["nanocl", "state", "stop", "-y"],
       vec!["nanocl", "version"],
       vec!["nanocl", "state", "diff", "--json"],
+      vec!["nanocl", "install"],
+      vec!["nanocl", "uninstall"],
     ] {
       assert!(state_json_output(&Cli::try_parse_from(args).unwrap()).is_none());
     }
+  }
+
+  #[test]
+  fn json_installer_output_selects_install_and_uninstall() {
+    for command in ["install", "uninstall"] {
+      let args = Cli::try_parse_from(["nanocl", command, "--json"]).unwrap();
+      let output = state_json_output(&args).unwrap();
+      assert_eq!(output.operation, command);
+      assert!(output.statefile.is_none());
+
+      let args = Cli::try_parse_from([
+        "nanocl",
+        command,
+        "--json",
+        "--template",
+        "installer.yml",
+      ])
+      .unwrap();
+      let output = state_json_output(&args).unwrap();
+      assert_eq!(output.operation, command);
+      assert_eq!(output.statefile.as_deref(), Some("installer.yml"));
+    }
+    let err = Cli::try_parse_from(["nanocl", "install", "--json", "-f"])
+      .err()
+      .expect("JSON progress cannot be mixed with raw container logs");
+    assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
   }
 
   /// Test version command
@@ -882,7 +938,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_logs() {
-    assert_cli_ok!("cargo", "logs", "system.nanocld");
+    assert_cli_ok!("cargo", "logs", "system.ndaemon");
     assert_cli_ok!("cargo", "logs", "system.nstore");
     assert_cli_ok!("cargo", "logs", "system.nstore", "-t", "10");
   }
@@ -1009,7 +1065,9 @@ mod tests {
     assert_cli_ok!("vm", "ls");
     assert_cli_ok!("vm", "inspect", VM_KEY);
     assert_cli_ok!("vm", "start", VM_KEY);
-    assert_cli_ok!("vm", "stop", VM_KEY);
+    // This CLI smoke test checks runtime lifecycle without waiting for the
+    // guest OS to boot and handle ACPI. Graceful shutdown has separate probes.
+    assert_cli_ok!("vm", "stop", VM_KEY, "--force");
     assert_cli_ok!("vm", "rm", "-y", VM_KEY);
     assert_cli_ok!(
       "vm",
@@ -1017,6 +1075,7 @@ mod tests {
       "test-cli-vm",
       "../../tests/ubuntu-24.04-minimal-cloudimg-amd64.img"
     );
+    assert_cli_ok!("vm", "stop", VM_KEY, "--force");
     assert_cli_ok!("vm", "rm", "-y", VM_KEY);
   }
 

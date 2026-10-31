@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Migrate the networking stack to ntex 4.2 and require Rust 1.99.0 for builds.
+- Refresh Rust dependencies to their latest compatible stable releases.
+- Leave request bodies, query strings, and Referer URLs empty in HTTP metrics
+  and omit them from access logs. Nginx HTTP error logging remains enabled
+  for diagnosis and can still include request URLs and Referer headers.
+
+### Fixed
+
+- Explicitly enable TLS on the default HTTPS listeners while preserving
+  handshake rejection and `reuseport`.
+- Verify a serving Nginx worker through a private local HTTP probe and require
+  the requested configuration generation to answer before a reload succeeds.
+  Bound readiness waits and preserve reload serialization when new events arrive.
+- Read complete newline-delimited metric records across partial and batched
+  writes, preserving UTF-8 without repeatedly prepending bytes. Avoid exposing
+  metric payloads in trace messages or parse errors.
+
 ## [0.15.1] - 2026-09-16
 
 ### Added

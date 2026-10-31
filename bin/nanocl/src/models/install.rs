@@ -1,4 +1,16 @@
 use clap::Parser;
+use indicatif::{MultiProgress, ProgressBar};
+
+use super::StateOutput;
+
+/// Progress display and output context for a direct Docker image pull.
+pub struct ImagePullProgress<'a> {
+  pub progress: &'a MultiProgress,
+  pub summary: &'a ProgressBar,
+  pub resource: &'a str,
+  pub node: &'a str,
+  pub output: Option<&'a StateOutput>,
+}
 
 /// `nanocl install` available options
 #[derive(Clone, Parser)]
@@ -39,6 +51,9 @@ pub struct InstallOpts {
   /// Attach to the container logs after installation
   #[clap(short = 'f')]
   pub(crate) follow: bool,
+  /// Stream newline-delimited JSON to stdout
+  #[clap(long, conflicts_with = "follow")]
+  pub(crate) json: bool,
 }
 
 /// Arguments for the nanocl daemon used by the install template

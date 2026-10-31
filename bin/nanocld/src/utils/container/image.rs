@@ -94,9 +94,9 @@ where
   let credentials = get_credentials(secret, state).await?;
   let (name, tag) = parse_name(image)?;
   let mut stream = state.inner.docker_api.create_image(
-    Some(bollard_next::image::CreateImageOptions {
-      from_image: name.clone(),
-      tag: tag.clone(),
+    Some(bollard_next::query_parameters::CreateImageOptions {
+      from_image: Some(name.clone()),
+      tag: Some(tag.clone()),
       ..Default::default()
     }),
     None,

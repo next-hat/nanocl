@@ -8,6 +8,7 @@ diesel::table! {
         spec_key -> Uuid,
         status_key -> Varchar,
         namespace_name -> Varchar,
+        incarnation_key -> Uuid,
     }
 }
 
@@ -71,8 +72,9 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         status_key -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
+        spec_key -> Uuid,
+        incarnation_key -> Uuid,
+        current_run_key -> Nullable<Uuid>,
     }
 }
 
@@ -182,6 +184,7 @@ diesel::table! {
         version -> Varchar,
         data -> Jsonb,
         metadata -> Nullable<Jsonb>,
+        incarnation_key -> Nullable<Uuid>,
     }
 }
 
@@ -200,6 +203,36 @@ diesel::table! {
 }
 
 diesel::table! {
+    resource_incarnations (key) {
+        key -> Uuid,
+        resource_kind -> Text,
+        resource_key -> Text,
+        created_at -> Timestamptz,
+        deleted_at -> Nullable<Timestamptz>,
+        current_operation_key -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
+    operations (key) {
+        key -> Uuid,
+        incarnation_key -> Uuid,
+        resource_kind -> Text,
+        resource_key -> Text,
+        action -> Text,
+        spec_key -> Uuid,
+        node_name -> Text,
+        owner_boot_id -> Text,
+        lock_device -> Int8,
+        lock_inode -> Int8,
+        accepted_at -> Timestamptz,
+        completed_at -> Nullable<Timestamptz>,
+        outcome -> Nullable<Text>,
+        diagnostic -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     vms (key) {
         key -> Varchar,
         name -> Varchar,
@@ -207,10 +240,12 @@ diesel::table! {
         namespace_name -> Varchar,
         status_key -> Varchar,
         spec_key -> Uuid,
+        incarnation_key -> Uuid,
     }
 }
 
 diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(cargoes -> resource_incarnations (incarnation_key));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(cargo_replica_processes -> cargo_replicas (replica_key));
@@ -218,11 +253,21 @@ diesel::joinable!(cargo_replica_processes -> processes (process_key));
 diesel::joinable!(cargo_replicas -> cargoes (cargo_key));
 diesel::joinable!(cargo_replicas -> nodes (node_name));
 diesel::joinable!(jobs -> object_process_statuses (status_key));
+diesel::joinable!(jobs -> specs (spec_key));
+diesel::joinable!(jobs -> resource_incarnations (incarnation_key));
+diesel::joinable!(job_run_steps -> job_runs (run_key));
+diesel::joinable!(job_runs -> operations (operation_key));
+diesel::joinable!(job_runs -> specs (spec_key));
+diesel::joinable!(job_runs -> resource_incarnations (incarnation_key));
 diesel::joinable!(networks -> nodes (node_name));
 diesel::joinable!(processes -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
 diesel::joinable!(vm_images -> nodes (node_name));
+diesel::joinable!(operations -> resource_incarnations (incarnation_key));
+diesel::joinable!(operations -> specs (spec_key));
+diesel::joinable!(specs -> resource_incarnations (incarnation_key));
+diesel::joinable!(vms -> resource_incarnations (incarnation_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
@@ -234,6 +279,8 @@ diesel::allow_tables_to_appear_in_same_query!(
   distributed_mutexes,
   events,
   jobs,
+  job_runs,
+  job_run_steps,
   metrics,
   namespaces,
   networks,
@@ -245,5 +292,36 @@ diesel::allow_tables_to_appear_in_same_query!(
   secrets,
   specs,
   vm_images,
+  operations,
+  resource_incarnations,
   vms,
 );
+
+diesel::table! {
+    job_runs (key) {
+        key -> Uuid,
+        job_name -> Text,
+        incarnation_key -> Uuid,
+        spec_key -> Uuid,
+        operation_key -> Uuid,
+        accepted_at -> Timestamptz,
+        started_at -> Nullable<Timestamptz>,
+        finished_at -> Nullable<Timestamptz>,
+        state -> Text,
+        reason -> Nullable<Text>,
+        cancellation_requested -> Bool,
+    }
+}
+
+diesel::table! {
+    job_run_steps (run_key, step_index) {
+        run_key -> Uuid,
+        step_index -> Int4,
+        container_id -> Nullable<Text>,
+        state -> Text,
+        started_at -> Nullable<Timestamptz>,
+        finished_at -> Nullable<Timestamptz>,
+        exit_code -> Nullable<Int8>,
+        error -> Nullable<Text>,
+    }
+}

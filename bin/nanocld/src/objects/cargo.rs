@@ -18,8 +18,9 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    CargoDb, CargoObjCreateIn, CargoObjPatchIn, CargoObjPutIn, CargoReplicaDb,
-    ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SpecDb, SystemState,
+    AcceptedCargoOperation, CargoDb, CargoObjCreateIn, CargoObjPatchIn,
+    CargoObjPutIn, CargoOperationLease, CargoReplicaDb, ObjPsStatusDb,
+    OperationDb, OperationOwner, ProcessDb, SpecDb, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -123,9 +124,6 @@ impl ObjCreate for CargoDb {
       .map_err(HttpError::bad_request)?
       .to_string();
     let new_spec = SpecDb::try_from_cargo_spec(&key, &obj.version, &obj.spec)?;
-    let spec = SpecDb::create_from(new_spec, &state.inner.pool)
-      .await?
-      .try_to_cargo_spec_revision()?;
     let status = ObjPsStatusPartial {
       key: key.clone(),
       wanted: ObjPsStatusKind::Create,
@@ -134,23 +132,15 @@ impl ObjCreate for CargoDb {
       prev_actual: ObjPsStatusKind::Create,
       health: ObjPsHealthStatusKind::Unknown,
     };
-    let status = ObjPsStatusDb::create_from(status, &state.inner.pool).await?;
-    let new_item = CargoDb {
-      key: key.clone(),
-      name: obj.spec.name.clone(),
-      created_at: chrono::Utc::now().naive_utc(),
-      namespace_name: obj.namespace.clone(),
-      status_key: key,
-      spec_key: spec.key,
-    };
-    let cargo = CargoDb::create_from(new_item, &state.inner.pool)
-      .await?
-      .with_spec(&(
-        spec,
-        status
-          .try_into()
-          .map_err(HttpError::internal_server_error)?,
-      ));
+    let cargo = CargoDb::create_with_spec(
+      &key,
+      &obj.spec.name,
+      &obj.namespace,
+      new_spec,
+      status,
+      &state.inner.pool,
+    )
+    .await?;
     Ok(cargo)
   }
 }
@@ -163,53 +153,193 @@ impl ObjDelByPk for CargoDb {
     NativeEventAction::Destroying
   }
 
+  async fn del_obj_by_pk(
+    pk: &str,
+    opts: &Self::ObjDelOpts,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjDelOut> {
+    Self::delete_with_operation(pk, opts, state)
+      .await
+      .map(|(cargo, _)| cargo)
+  }
+
   async fn fn_del_obj_by_pk(
     pk: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
-    let processes = ProcessDb::read_by_kind_key(
-      &cargo.spec.cargo_key,
-      None,
-      &state.inner.pool,
-    )
-    .await?;
-    let (_, _, _, running) =
-      utils::container::generic::count_status(&processes);
-    if running > 0 && !opts.force.unwrap_or(false) {
-      return Err(HttpError::bad_request(
-        "Unable to delete cargo with running instances without force option",
-      ));
-    }
-    let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
-    let new_status = ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Destroy.to_string()),
-      prev_wanted: Some(status.wanted),
-      actual: Some(ObjPsStatusKind::Destroying.to_string()),
-      prev_actual: Some(status.actual),
-      ..Default::default()
-    };
-    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
-    Ok(cargo)
+    Self::del_obj_by_pk(pk, opts, state).await
   }
 }
 
-impl ObjPutByPk for CargoDb {
-  type ObjPutIn = CargoObjPutIn;
-  type ObjPutOut = Cargo;
-
-  async fn fn_put_obj_by_pk(
+impl CargoDb {
+  pub(crate) async fn delete_with_operation(
     pk: &str,
-    obj: &Self::ObjPutIn,
+    opts: &CargoDeleteQuery,
     state: &SystemState,
-  ) -> HttpResult<Self::ObjPutOut> {
-    validate_cargo_spec(&obj.spec)?;
-    let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let force = opts.force.unwrap_or(false);
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Destroying,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let processes = ProcessDb::read_by_kind_key(
+          &key,
+          None,
+          &prepare_state.inner.pool,
+        )
+        .await?;
+        let (_, _, _, running) =
+          utils::container::generic::count_status(&processes);
+        if running > 0 && !force {
+          return Err(HttpError::bad_request(
+            "Unable to delete cargo with running instances without force option",
+          ));
+        }
+        let operation =
+          OperationDb::new(&owner, "Cargo", &key, cargo.spec.key, "delete");
+        Self::accept_operation(
+          &cargo,
+          None,
+          operation,
+          lease,
+          &prepare_state.inner.pool,
+        )
+        .await
+        .map_err(crate::tasks::cargo::http_error)
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn put_with_operation(
+    pk: &str,
+    obj: &CargoObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let spec = obj.spec.clone();
+    let version = obj.version.clone();
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        Self::prepare_replacement(
+          &cargo,
+          &spec,
+          &version,
+          &prepare_state,
+          owner,
+          lease,
+        )
+        .await
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn patch_with_operation(
+    pk: &str,
+    obj: &CargoObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let patch = obj.spec.clone();
+    let version = obj.version.clone();
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let current =
+          SpecDb::read_by_pk(&cargo.spec.key, &prepare_state.inner.pool)
+            .await?
+            .try_to_cargo_spec()?;
+        let spec =
+          apply_cargo_spec_patch(current, &patch).map_err(|error| {
+            IoError::invalid_input("CargoSpec".to_owned(), error.to_string())
+          })?;
+        Self::prepare_replacement(
+          &cargo,
+          &spec,
+          &version,
+          &prepare_state,
+          owner,
+          lease,
+        )
+        .await
+      },
+    )
+    .await
+  }
+
+  pub(crate) async fn revert_to_history_with_operation(
+    pk: &str,
+    history_key: uuid::Uuid,
+    version: &str,
+    state: &SystemState,
+  ) -> HttpResult<(Cargo, uuid::Uuid)> {
+    let key = pk.to_owned();
+    let version = version.to_owned();
+    let prepare_state = state.clone();
+    crate::tasks::cargo::accept_task_with_operation(
+      pk,
+      NativeEventAction::Updating,
+      state,
+      move |owner, lease| async move {
+        let cargo =
+          Self::transform_read_by_pk(&key, &prepare_state.inner.pool).await?;
+        let stored =
+          Self::history_spec(&key, history_key, &prepare_state.inner.pool)
+            .await?;
+        let spec = stored.try_to_cargo_spec()?;
+        if spec.name != cargo.spec.name {
+          return Err(HttpError::bad_request(
+            "Cannot revert a cargo to a history with another resource name",
+          ));
+        }
+        Self::prepare_replacement(
+          &cargo,
+          &spec,
+          &version,
+          &prepare_state,
+          owner,
+          lease,
+        )
+        .await
+      },
+    )
+    .await
+  }
+
+  /// The accepted lease spans the base-spec read, validation and revision
+  /// transaction, so a patch cannot restore a concurrently replaced value.
+  async fn prepare_replacement(
+    cargo: &Cargo,
+    spec: &CargoSpec,
+    version: &str,
+    state: &SystemState,
+    owner: OperationOwner,
+    lease: CargoOperationLease,
+  ) -> HttpResult<AcceptedCargoOperation> {
+    validate_cargo_spec(spec)?;
+    let pk = &cargo.spec.cargo_key;
     let current = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
       .await?
       .try_to_cargo_spec()?;
-    validate_supported_rollout_change(&current, &obj.spec)
+    validate_supported_rollout_change(&current, spec)
       .map_err(HttpError::from)?;
     let replicas = CargoReplicaDb::list_by_cargo(pk, &state.inner.pool).await?;
     if !replicas.is_empty()
@@ -235,21 +365,41 @@ impl ObjPutByPk for CargoDb {
       )
       .into());
     }
-    let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
-    let new_status = ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Start.to_string()),
-      prev_wanted: Some(status.wanted),
-      actual: Some(ObjPsStatusKind::Updating.to_string()),
-      prev_actual: Some(status.actual),
-      health: Some(ObjPsHealthStatusKind::Unknown.to_string()),
-    };
-    CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.inner.pool)
+    let replacement = SpecDb::try_from_cargo_spec(pk, version, spec)?;
+    let operation =
+      OperationDb::new(&owner, "Cargo", pk, replacement.key, "update");
+    Self::accept_operation(
+      cargo,
+      Some(replacement),
+      operation,
+      lease,
+      &state.inner.pool,
+    )
+    .await
+    .map_err(crate::tasks::cargo::http_error)
+  }
+}
+
+impl ObjPutByPk for CargoDb {
+  type ObjPutIn = CargoObjPutIn;
+  type ObjPutOut = Cargo;
+
+  async fn put_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPutOut> {
+    Self::put_with_operation(pk, obj, state)
       .await
-      .map_err(HttpError::from)?;
-    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
-    CargoDb::transform_read_by_pk(pk, &state.inner.pool)
-      .await
-      .map_err(HttpError::from)
+      .map(|(cargo, _)| cargo)
+  }
+
+  async fn fn_put_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPutOut> {
+    Self::put_obj_by_pk(pk, obj, state).await
   }
 }
 
@@ -257,23 +407,22 @@ impl ObjPatchByPk for CargoDb {
   type ObjPatchIn = CargoObjPatchIn;
   type ObjPatchOut = Cargo;
 
+  async fn patch_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPatchOut> {
+    Self::patch_with_operation(pk, obj, state)
+      .await
+      .map(|(cargo, _)| cargo)
+  }
+
   async fn fn_patch_obj_by_pk(
     pk: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
-    let current = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
-      .await?
-      .try_to_cargo_spec()?;
-    let spec = apply_cargo_spec_patch(current, &obj.spec).map_err(|error| {
-      IoError::invalid_input("CargoSpec".to_owned(), error.to_string())
-    })?;
-    let obj = &CargoObjPutIn {
-      spec,
-      version: obj.version.to_owned(),
-    };
-    CargoDb::fn_put_obj_by_pk(pk, obj, state).await
+    Self::patch_obj_by_pk(pk, obj, state).await
   }
 }
 

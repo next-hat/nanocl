@@ -38,9 +38,9 @@ fn prepare_create_input(
     (status = 409, description = "Cargo already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/cargoes")]
 pub async fn create_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<String>,
   payload: web::types::Json<CargoSpec>,
   qs: web::types::Query<GenericNspQuery>,

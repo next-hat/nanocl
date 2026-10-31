@@ -405,6 +405,19 @@ where
 }
 
 #[cfg(feature = "ntex")]
+impl<T> FromIo<Box<IoError>> for ntex::error::Error<T>
+where
+  T: Clone + FromIo<Box<IoError>>,
+{
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    self.into_error().map_err_context(context)
+  }
+}
+
+#[cfg(feature = "ntex")]
 impl FromIo<Box<IoError>> for ntex::client::error::ClientError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
@@ -448,6 +461,19 @@ impl FromIo<Box<IoError>> for ntex::client::error::JsonPayloadError {
 }
 
 #[cfg(feature = "ntex")]
+impl FromIo<Box<IoError>> for ntex::client::error::ClientPayloadError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError::with_context(
+      (context)().to_string(),
+      std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{self}")),
+    ))
+  }
+}
+
+#[cfg(feature = "ntex")]
 impl FromIo<Box<IoError>> for ntex::http::error::PayloadError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
@@ -461,10 +487,7 @@ impl FromIo<Box<IoError>> for ntex::http::error::PayloadError {
 }
 
 #[cfg(feature = "ntex")]
-impl<T> FromIo<Box<IoError>> for ntex::ws::error::WsClientBuilderError<T>
-where
-  T: std::fmt::Display,
-{
+impl FromIo<Box<IoError>> for ntex::ws::error::WsConfigError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,

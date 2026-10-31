@@ -1,6 +1,6 @@
 pub mod generic;
 
-mod cargo;
-mod job;
+pub(crate) mod cargo;
+pub(crate) mod job;
 mod task_manager;
-mod vm;
+pub(crate) mod vm;

@@ -38,7 +38,7 @@ impl NanocldClient {
   ///    secrets: Vec::new(),
   ///    image_pull_secret: None,
   ///    image_pull_policy: ImagePullPolicy::IfNotPresent,
-  ///    container_config: bollard_next::container::Config {
+  ///    container_config: bollard_next::models::ContainerCreateBody {
   ///      image: Some(String::from("alpine")),
   ///      ..Default::default()
   ///    },
@@ -165,6 +165,27 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Patch a Cargo and return its accepted operation ID.
+  pub async fn patch_cargo_operation(
+    &self,
+    key: &str,
+    spec: &CargoSpecPatch,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}", Self::CARGO_PATH),
+        Some(spec),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+
   /// Put a cargo by its canonical key.
   /// It will create a new cargo spec and store old one in history
   ///
@@ -191,7 +212,7 @@ impl NanocldClient {
   ///     secrets: Vec::new(),
   ///     image_pull_secret: None,
   ///     image_pull_policy: ImagePullPolicy::IfNotPresent,
-  ///     container_config: bollard_next::container::Config {
+  ///     container_config: bollard_next::models::ContainerCreateBody {
   ///       image: Some("alpine".into()),
   ///       ..Default::default()
   ///     },
@@ -213,6 +234,27 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+
+  /// Replace a Cargo specification and return its accepted operation ID.
+  pub async fn put_cargo_operation(
+    &self,
+    key: &str,
+    spec: &CargoSpec,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_put(
+        &format!("{}/{key}", Self::CARGO_PATH),
+        Some(spec),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
   }
 
   /// List cargo histories
@@ -271,16 +313,38 @@ impl NanocldClient {
       .await?;
     Self::res_json(res).await
   }
+  /// Revert a Cargo and return its response plus the accepted operation ID.
+  pub async fn revert_cargo_operation(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<(Cargo, uuid::Uuid)> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}/histories/{id}/revert", Self::CARGO_PATH),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+    let operation = Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )?;
+    Ok((Self::res_json(response).await?, operation))
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use std::sync::{Arc, Mutex};
 
+  use futures::StreamExt;
   use ntex::web;
   use serde_json::{Value, json};
 
-  use crate::ConnectOpts;
+  use crate::{ConnectOpts, NANOCLD_DEFAULT_VERSION};
 
   use super::*;
 
@@ -288,6 +352,10 @@ mod tests {
   use nanocl_stubs::{
     cargo_spec::{Config, ContainerSpec},
     generic::ImagePullPolicy,
+    system::{
+      EventActorKind, EventCondition, EventKind, NativeEventAction,
+      ObjPsStatusKind,
+    },
   };
 
   fn container_spec(name: &str, image: &str) -> ContainerSpec {
@@ -350,9 +418,10 @@ mod tests {
   }
 
   async fn record_create(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     let body = body.into_inner();
     recorder.record("POST", body.clone());
     web::HttpResponse::Created().json(&json!({
@@ -371,19 +440,21 @@ mod tests {
   }
 
   async fn record_put(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     recorder.record("PUT", body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   async fn record_patch(
-    recorder: web::types::State<RequestRecorder>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<RequestRecorder>().unwrap();
     recorder.record("PATCH", body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   async fn serve_history() -> web::HttpResponse {
@@ -395,24 +466,27 @@ mod tests {
   -> (NanocldClient, RequestRecorder, web::test::TestServer) {
     let recorder = RequestRecorder::default();
     let server_recorder = recorder.clone();
-    let server = web::test::server(async move || {
+    let server = web::test::server(async move |_| {
       web::App::new()
-        .state(server_recorder.clone())
+        .with_config(
+          web::WebAppConfig::new().set_state(server_recorder.clone()),
+        )
         .service(
-          web::resource("/v0.18.0/cargoes")
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/cargoes"))
             .route(web::post().to(record_create)),
         )
         .service(
-          web::resource("/v0.18.0/cargoes/{key}")
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/cargoes/{{key}}"))
             .route(web::put().to(record_put))
             .route(web::patch().to(record_patch)),
         )
         .service(
-          web::resource("/v0.18.0/cargoes/{key}/histories")
-            .route(web::get().to(serve_history)),
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/cargoes/{{key}}/histories"
+          ))
+          .route(web::get().to(serve_history)),
         )
-    })
-    .await;
+    });
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: format!("http://localhost:{}", server.addr().port()),
       ..Default::default()
@@ -485,6 +559,48 @@ mod tests {
     );
   }
 
+  async fn wait_cargo_state(
+    client: &NanocldClient,
+    key: &str,
+    action: NativeEventAction,
+  ) -> ntex::rt::JoinHandle<()> {
+    let condition = EventCondition {
+      actor_key: Some(key.to_owned()),
+      actor_kind: Some(EventActorKind::Cargo),
+      kind: vec![EventKind::Normal, EventKind::Error],
+      action: vec![action],
+      ..Default::default()
+    };
+    // Subscribe before admission. Update is the terminal rollout event;
+    // promotion Start/Healthy can arrive while the operation still owns its lease.
+    let mut stream = client
+      .watch_events(Some(vec![condition.clone()]))
+      .await
+      .unwrap();
+    let key = key.to_owned();
+    ntex::rt::spawn(async move {
+      ntex::time::timeout(std::time::Duration::from_secs(360), async move {
+        while let Some(event) = stream.next().await {
+          let event = event.expect("Cargo event stream failed");
+          if event.kind == EventKind::Error
+            && event.actor.as_ref().is_some_and(|actor| {
+              actor.key.as_deref() == Some(key.as_str())
+                && actor.kind == EventActorKind::Cargo
+            })
+          {
+            panic!("Cargo {key} transition failed: {:?}", event.note);
+          }
+          if event.kind == EventKind::Normal && condition == event {
+            return;
+          }
+        }
+        panic!("Cargo {key} event stream ended before terminal completion");
+      })
+      .await
+      .expect("timed out waiting for Cargo terminal completion");
+    })
+  }
+
   #[ntex::test]
   async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
@@ -497,8 +613,19 @@ mod tests {
     let new_cargo = cargo_spec(CARGO_NAME);
     client.create_cargo(&new_cargo, None).await.unwrap();
     let cargo_key = format!("global.{CARGO_NAME}");
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Start).await;
     client.start_process("cargo", &cargo_key).await.unwrap();
-    client.inspect_cargo(&cargo_key).await.unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
+    assert_eq!(
+      client
+        .inspect_cargo(&cargo_key)
+        .await
+        .unwrap()
+        .status
+        .actual,
+      ObjPsStatusKind::Start
+    );
     let mut replacement =
       container_spec("main", "ghcr.io/next-hat/nanocl-get-started:latest");
     replacement.container_config.env = Some(vec!["TEST=1".into()]);
@@ -506,8 +633,14 @@ mod tests {
       containers: Some(vec![replacement]),
       ..Default::default()
     };
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Update).await;
     client.patch_cargo(&cargo_key, &cargo_update).await.unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Update).await;
     client.put_cargo(&cargo_key, &new_cargo).await.unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
     let histories = client.list_history_cargo(&cargo_key).await.unwrap();
     assert!(histories.len() > 1);
     let history = histories
@@ -515,6 +648,8 @@ mod tests {
       .find(|history| history.containers != new_cargo.containers)
       .expect("Expected to find the patched Cargo declaration")
       .clone();
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Update).await;
     let reverted = client
       .revert_cargo(&cargo_key, &history.key.to_string())
       .await
@@ -532,11 +667,27 @@ mod tests {
     );
     assert_eq!(reverted.spec.init_containers, history.init_containers);
     assert_eq!(reverted.spec.containers, history.containers);
+    waiter.await.expect("Cargo completion waiter failed");
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Stop).await;
     client.stop_process("cargo", &cargo_key).await.unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
+    assert_eq!(
+      client
+        .inspect_cargo(&cargo_key)
+        .await
+        .unwrap()
+        .status
+        .actual,
+      ObjPsStatusKind::Stop
+    );
+    let waiter =
+      wait_cargo_state(&client, &cargo_key, NativeEventAction::Destroy).await;
     client
       .delete_cargo(&cargo_key, Some(&CargoDeleteQuery { force: Some(true) }))
       .await
       .unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
   }
 
   #[ntex::test]
@@ -555,9 +706,16 @@ mod tests {
       }
       _ => panic!("Wrong error type"),
     }
+    let waiter = wait_cargo_state(
+      &client,
+      "global.client-test-cargodup",
+      NativeEventAction::Destroy,
+    )
+    .await;
     client
       .delete_cargo("global.client-test-cargodup", None)
       .await
       .unwrap();
+    waiter.await.expect("Cargo completion waiter failed");
   }
 }

@@ -16,13 +16,15 @@ Resources:
         Target:
           Key: global.deploy-example.c
           Port: 9000
+          # Access logging is disabled unless explicitly enabled.
+          EnableLogging: true
 
       - Path: /v2/
         Target:
           Key: global.deploy-example.c
           Port: 9000
           Path: /v2/
-          DisableLogging: true
+          EnableLogging: false
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
@@ -32,4 +34,4 @@ Cargoes:
   - Name: deploy-example
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
-    - APP=DISABLE_LOGGING
+    - APP=ENABLE_LOGGING

@@ -1,9 +1,12 @@
 use futures::{StreamExt, TryStreamExt, stream::select_all};
 use ntex::web;
 
-use bollard_next::container::StatsOptions;
+use bollard_next::query_parameters::StatsOptions;
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::process::{ProcessStats, ProcessStatsQuery};
+use nanocl_stubs::{
+  generic::{GenericClause, GenericFilter},
+  process::{ProcessStats, ProcessStatsQuery},
+};
 
 use crate::{
   models::{ProcessDb, SystemState},
@@ -26,9 +29,9 @@ use crate::{
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/processes/{kind}/{key}/stats")]
 pub async fn stats_processes(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -36,23 +39,26 @@ pub async fn stats_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   utils::key::validate_kind_key(&kind, &key).map_err(HttpError::bad_request)?;
   let opts: StatsOptions = qs.clone().into();
+  let filter =
+    GenericFilter::new().r#where("kind", GenericClause::Eq(kind.to_string()));
   let processes =
-    ProcessDb::read_by_kind_key(&key, None, &state.inner.pool).await?;
-  let streams =
-    processes
-      .into_iter()
-      .map(|process| {
-        state.inner.docker_api.stats(&process.key, Some(opts)).map(
-          move |elem| match elem {
-            Err(err) => Err(err),
-            Ok(stats) => Ok(ProcessStats {
-              name: process.name.clone(),
-              stats,
-            }),
-          },
-        )
-      })
-      .collect::<Vec<_>>();
+    ProcessDb::read_by_kind_key(&key, Some(filter), &state.inner.pool).await?;
+  let streams = processes
+    .into_iter()
+    .map(|process| {
+      state
+        .inner
+        .docker_api
+        .stats(&process.key, Some(opts.clone()))
+        .map(move |elem| match elem {
+          Err(err) => Err(err),
+          Ok(stats) => Ok(ProcessStats {
+            name: process.name.clone(),
+            stats,
+          }),
+        })
+    })
+    .collect::<Vec<_>>();
   let stream = select_all(streams).into_stream();
   Ok(
     web::HttpResponse::Ok()
@@ -78,9 +84,9 @@ pub async fn stats_processes(
     (status = 404, description = "Process does not exist", body = crate::services::openapi::ApiError),
   )
 ))]
-#[web::get("/process/{name}/stats")]
 pub async fn process_stats_by_name(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<ProcessStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {

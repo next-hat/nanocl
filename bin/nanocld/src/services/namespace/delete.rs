@@ -21,9 +21,9 @@ use crate::{
     (status = 403, description = "Deletion of this namespace is forbidden", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/namespaces/{name}")]
 pub async fn delete_namespace(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   if path.1 == "global" || path.1 == "system" {

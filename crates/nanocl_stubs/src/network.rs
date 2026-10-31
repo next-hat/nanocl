@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use bollard_next::service::Network as DockerNetwork;
+use bollard_next::models::NetworkInspect as DockerNetwork;
 
 /// Generate the stable database key for a node-scoped Docker network.
 ///

@@ -92,10 +92,7 @@ fn effective_ip_address(
         })
         .cloned();
     }
-    // Older Docker snapshots may expose bridge addresses only at this level.
-    return (mode == "bridge")
-      .then(|| settings.ip_address.clone().filter(|ip| !ip.is_empty()))
-      .flatten();
+    return None;
   }
   None
 }
@@ -203,6 +200,8 @@ mod tests {
       process("ipv6", "node", "app-net"),
       process("empty", "node", "app-net"),
       process("bridge", "node", "bridge"),
+      process("missing-bridge", "node", "bridge"),
+      process("no-endpoints", "node", "bridge"),
     ];
     for (index, ipv6) in [(5, "fd00::7"), (6, "")] {
       let network = processes[index]
@@ -219,8 +218,16 @@ mod tests {
       network.global_ipv6_address = Some(ipv6.to_owned());
     }
     let bridge = processes[7].data.network_settings.as_mut().unwrap();
-    bridge.networks = None;
-    bridge.ip_address = Some("172.17.0.2".to_owned());
+    bridge.networks = Some(HashMap::from([(
+      "bridge".to_owned(),
+      serde_json::from_value(json!({"IPAddress": "172.17.0.2"})).unwrap(),
+    )]));
+    processes[9]
+      .data
+      .network_settings
+      .as_mut()
+      .unwrap()
+      .networks = None;
     apply_ip_addresses(&mut processes, &[]);
     let addresses: Vec<_> =
       processes.iter().map(|p| p.ip_address.as_deref()).collect();
@@ -234,7 +241,9 @@ mod tests {
         None,
         Some("fd00::7"),
         None,
-        Some("172.17.0.2")
+        Some("172.17.0.2"),
+        None,
+        None,
       ]
     );
   }

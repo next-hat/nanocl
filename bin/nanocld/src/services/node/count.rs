@@ -21,9 +21,9 @@ use crate::{
     (status = 200, description = "List of nodes", body = [GenericCount]),
   ),
 ))]
-#[web::get("/nodes/count")]
 pub async fn count_node(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;

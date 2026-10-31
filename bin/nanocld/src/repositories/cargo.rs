@@ -11,14 +11,15 @@ use nanocl_stubs::{
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpec, CargoSpecRevision},
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
-  system::ObjPsStatus,
+  system::{ObjPsStatus, ObjPsStatusPartial},
 };
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
-    CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb, Pool,
-    ProcessDb, SpecDb, SystemState,
+    CargoDb, CargoUpdateDb, ColumnType, NamespaceDb, ObjPsStatusDb,
+    OperationTransactionError, Pool, ProcessDb, ResourceIncarnationDb, SpecDb,
+    SystemState,
   },
   objects::generic::*,
   schema::cargoes,
@@ -26,6 +27,16 @@ use crate::{
 };
 
 use super::generic::*;
+
+fn map_create_error(error: diesel::result::Error) -> OperationTransactionError {
+  match error {
+    error @ diesel::result::Error::DatabaseError(
+      diesel::result::DatabaseErrorKind::UniqueViolation,
+      _,
+    ) => OperationTransactionError::State(*CargoDb::map_err(error)),
+    error => OperationTransactionError::Database(error),
+  }
+}
 
 impl RepositoryBase for CargoDb {
   fn get_columns<'a>() -> HashMap<&'a str, (ColumnType, &'a str)> {
@@ -141,27 +152,224 @@ impl WithSpec for CargoDb {
 }
 
 impl CargoDb {
+  /// Initial definition, specification and identity are committed together.
+  pub(crate) async fn create_with_spec(
+    key: &str,
+    name: &str,
+    namespace: &str,
+    spec: SpecDb,
+    status: ObjPsStatusPartial,
+    pool: &Pool,
+  ) -> IoResult<Cargo> {
+    Self::create_with_spec_checked(
+      key, name, namespace, spec, status, false, pool,
+    )
+    .await
+  }
+
+  pub(crate) async fn create_bootstrap_with_spec(
+    key: &str,
+    name: &str,
+    namespace: &str,
+    spec: SpecDb,
+    status: ObjPsStatusPartial,
+    pool: &Pool,
+  ) -> IoResult<Cargo> {
+    Self::create_with_spec_checked(
+      key, name, namespace, spec, status, true, pool,
+    )
+    .await
+  }
+
+  async fn create_with_spec_checked(
+    key: &str,
+    name: &str,
+    namespace: &str,
+    mut spec: SpecDb,
+    status: ObjPsStatusPartial,
+    bootstrap: bool,
+    pool: &Pool,
+  ) -> IoResult<Cargo> {
+    use super::operation::{conflict, run_query_owned, transaction};
+    use crate::schema::{
+      object_process_statuses, resource_incarnations, specs,
+    };
+    if spec.kind_name != "Cargo"
+      || spec.kind_key != key
+      || spec.incarnation_key.is_some()
+      || status.key != key
+      || spec.try_to_cargo_spec()?.name != name
+    {
+      return Err(
+        conflict("Initial Cargo definition has another identity").into(),
+      );
+    }
+    let identity = ResourceIncarnationDb {
+      key: uuid::Uuid::new_v4(),
+      resource_kind: "Cargo".into(),
+      resource_key: key.into(),
+      created_at: chrono::Utc::now().naive_utc(),
+      deleted_at: None,
+      current_operation_key: None,
+    };
+    spec.incarnation_key = Some(identity.key);
+    let status = ObjPsStatusDb::from(status);
+    let cargo = CargoDb {
+      key: key.into(),
+      name: name.into(),
+      created_at: identity.created_at,
+      namespace_name: namespace.into(),
+      status_key: key.into(),
+      spec_key: spec.key,
+      incarnation_key: identity.key,
+    };
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        if bootstrap
+          && resource_incarnations::table
+            .filter(resource_incarnations::resource_kind.eq("Cargo"))
+            .filter(resource_incarnations::resource_key.eq(&cargo.key))
+            .select(resource_incarnations::key)
+            .first::<uuid::Uuid>(conn)
+            .optional()?
+            .is_some()
+        {
+          return Err(conflict(
+            "Retained Cargo identity prevents runtime reconstruction",
+          ));
+        }
+        diesel::insert_into(resource_incarnations::table)
+          .values(&identity)
+          .execute(conn)
+          .map_err(map_create_error)?;
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)
+          .map_err(map_create_error)?;
+        let status = diesel::insert_into(object_process_statuses::table)
+          .values(&status)
+          .get_result::<ObjPsStatusDb>(conn)
+          .map_err(map_create_error)?;
+        let cargo = diesel::insert_into(cargoes::table)
+          .values(&cargo)
+          .get_result::<CargoDb>(conn)
+          .map_err(map_create_error)?;
+        Ok(Self::transform((cargo, spec, status))?)
+      })
+    })
+    .await
+  }
+
+  pub(crate) async fn incarnation(
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<uuid::Uuid> {
+    Ok(Self::read_by_pk(key, pool).await?.0.incarnation_key)
+  }
+
+  pub(crate) async fn history(
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<CargoSpecRevision>> {
+    let cargo = Self::read_by_pk(key, pool).await?.0;
+    super::operation::run_query_owned(pool, (), move |conn| {
+      use crate::{models::OperationTransactionError, schema::specs};
+      specs::table
+        .filter(specs::kind_name.eq("Cargo"))
+        .filter(specs::kind_key.eq(&cargo.key))
+        .filter(specs::incarnation_key.eq(cargo.incarnation_key))
+        .order((specs::created_at.desc(), specs::key.desc()))
+        .load::<SpecDb>(conn)
+        .map_err(OperationTransactionError::from)?
+        .into_iter()
+        .map(|spec| spec.try_to_cargo_spec_revision())
+        .collect()
+    })
+    .await
+  }
+
+  pub(crate) async fn history_spec(
+    key: &str,
+    revision: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<SpecDb> {
+    let cargo = Self::read_by_pk(key, pool).await?.0;
+    super::operation::run_query_owned(pool, (), move |conn| {
+      use crate::{models::OperationTransactionError, schema::specs};
+      let stored = specs::table
+        .find(revision)
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(OperationTransactionError::from)?
+        .ok_or_else(|| {
+          IoError::not_found("Cargo history", "Revision does not exist")
+        })?;
+      if stored.kind_name != "Cargo" || stored.kind_key != cargo.key {
+        return Err(IoError::invalid_input(
+          "Cargo history",
+          "Cannot revert a cargo using a history from another cargo",
+        ));
+      }
+      if stored.incarnation_key != Some(cargo.incarnation_key) {
+        return Err(IoError::not_found(
+          "Cargo history",
+          "Revision does not belong to the current Cargo incarnation",
+        ));
+      }
+      Ok(stored)
+    })
+    .await
+  }
+
   /// Update a cargo from its specification.
+  /// Bootstrap-only revision replacement; runtime actions use accept_operation.
   pub async fn update_from_spec(
     key: &str,
     item: &CargoSpec,
     version: &str,
     pool: &Pool,
   ) -> IoResult<Cargo> {
-    let version = version.to_owned();
-    let mut cargo = CargoDb::transform_read_by_pk(key, pool).await?;
-    let new_spec = SpecDb::try_from_cargo_spec(key, &version, item)?;
-    let spec = SpecDb::create_from(new_spec, pool)
-      .await?
-      .try_to_cargo_spec_revision()?;
-    let new_item = CargoUpdateDb {
-      name: Some(item.name.to_owned()),
-      spec_key: Some(spec.key),
-      ..Default::default()
+    use super::operation::{
+      conflict, lock_incarnation, run_query_owned, transaction,
     };
-    CargoDb::update_pk(key, new_item, pool).await?;
-    cargo.spec = spec;
-    Ok(cargo)
+    use crate::schema::{object_process_statuses, specs};
+    let expected = Self::read_by_pk(key, pool).await?.0;
+    let mut spec = SpecDb::try_from_cargo_spec(key, version, item)?;
+    spec.incarnation_key = Some(expected.incarnation_key);
+    let name = item.name.clone();
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        let identity = lock_incarnation(conn, expected.incarnation_key)?;
+        let cargo = cargoes::table
+          .find(&expected.key)
+          .for_update()
+          .first::<CargoDb>(conn)?;
+        let status = object_process_statuses::table
+          .find(&cargo.status_key)
+          .for_update()
+          .first::<ObjPsStatusDb>(conn)?;
+        if identity.deleted_at.is_some()
+          || identity.resource_kind != "Cargo"
+          || identity.resource_key != cargo.key
+          || cargo.incarnation_key != expected.incarnation_key
+          || cargo.spec_key != expected.spec_key
+          || identity.current_operation_key.is_some()
+          || super::cargo_operation::pending_phase(&status.actual)
+        {
+          return Err(conflict(
+            "Cargo identity changed or has an unresolved pending transition",
+          ));
+        }
+        let spec = diesel::insert_into(specs::table)
+          .values(&spec)
+          .get_result::<SpecDb>(conn)?;
+        let cargo = diesel::update(cargoes::table.find(&cargo.key))
+          .set((cargoes::spec_key.eq(spec.key), cargoes::name.eq(&name)))
+          .get_result::<CargoDb>(conn)?;
+        Ok(Self::transform((cargo, spec, status))?)
+      })
+    })
+    .await
   }
 
   /// Find cargoes by namespace.
@@ -284,11 +492,89 @@ impl CargoDb {
     Ok(filter)
   }
 
-  /// Delete a cargo and it's relations (Spec, ObjPsStatus).
+  /// Delete an idle live definition while retaining its identity and revisions.
   pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
-    CargoDb::del_by_pk(pk, pool).await?;
-    SpecDb::del_by_kind_key(pk, pool).await?;
-    ObjPsStatusDb::del_by_pk(pk, pool).await?;
-    Ok(())
+    use super::operation::{
+      conflict, lock_incarnation, run_query_owned, transaction,
+    };
+    use crate::schema::{
+      object_process_statuses, operations, resource_incarnations,
+    };
+    let expected = Self::read_by_pk(pk, pool).await?.0;
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        let identity = lock_incarnation(conn, expected.incarnation_key)?;
+        let Some(cargo) = cargoes::table
+          .find(&expected.key)
+          .for_update()
+          .first::<CargoDb>(conn)
+          .optional()?
+        else {
+          return Ok(());
+        };
+        if cargo.incarnation_key != expected.incarnation_key {
+          return Err(conflict("Cargo name belongs to another incarnation"));
+        }
+        if let Some(key) = identity.current_operation_key
+          && operations::table
+            .find(key)
+            .for_update()
+            .first::<crate::models::OperationDb>(conn)?
+            .outcome
+            .is_none()
+        {
+          return Err(conflict(
+            "An unresolved operation requires exact operation deletion",
+          ));
+        }
+        diesel::delete(cargoes::table.find(&cargo.key)).execute(conn)?;
+        diesel::delete(object_process_statuses::table.find(&cargo.status_key))
+          .execute(conn)?;
+        diesel::update(resource_incarnations::table.find(identity.key))
+          .set(
+            resource_incarnations::deleted_at
+              .eq(chrono::Utc::now().naive_utc()),
+          )
+          .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn duplicate_cargo_creation_preserves_http_conflict() {
+    let error = map_create_error(diesel::result::Error::DatabaseError(
+      diesel::result::DatabaseErrorKind::UniqueViolation,
+      Box::new("duplicate Cargo identity".to_owned()),
+    ));
+    let error = IoError::from(error);
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::AlreadyExists);
+    let error = nanocl_error::http::HttpError::from(error);
+    assert_eq!(error.status, ntex::http::StatusCode::CONFLICT);
+  }
+
+  #[test]
+  fn cargo_creation_preserves_database_errors_for_transaction_retry() {
+    for kind in [
+      diesel::result::DatabaseErrorKind::SerializationFailure,
+      diesel::result::DatabaseErrorKind::ForeignKeyViolation,
+    ] {
+      let error = map_create_error(diesel::result::Error::DatabaseError(
+        kind,
+        Box::new("database failure".to_owned()),
+      ));
+      assert!(matches!(
+        error,
+        OperationTransactionError::Database(
+          diesel::result::Error::DatabaseError(_, _)
+        )
+      ));
+    }
   }
 }
