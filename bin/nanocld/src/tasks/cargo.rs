@@ -691,13 +691,63 @@ async fn dispatch_start(
       },
     )
     .await
-    .map_err(|_| {
-      IoError::interrupted(
-        "Cargo remote execution",
-        "Node did not confirm completion of the accepted Cargo operation",
-      )
+    .map_err(|error| {
+      if let Some(name) =
+        remote_missing_reference(&error, &cargo, &context.operation)
+      {
+        IoError::interrupted(
+          "Cargo remote missing secret",
+          &format!("A node reported that secret {name:?} does not exist"),
+        )
+      } else {
+        IoError::interrupted(
+          "Cargo remote execution",
+          "Node did not confirm completion of the accepted Cargo operation",
+        )
+      }
     })?;
   Ok(())
+}
+
+// A node response can be stale or untrusted. Only show a locally formatted
+// reference from the captured specification and the exact accepted operation.
+fn remote_missing_reference(
+  error: &nanocl_error::http_client::HttpClientError,
+  cargo: &Cargo,
+  operation: &OperationDb,
+) -> Option<String> {
+  use nanocl_error::http_client::HttpClientError;
+  let HttpClientError::HttpError(error) = error else {
+    return None;
+  };
+  if error.status != ntex::http::StatusCode::NOT_FOUND {
+    return None;
+  }
+  let report: crate::models::CargoNodeMissingSecretReport =
+    serde_json::from_str(&error.msg).ok()?;
+  if report.kind != "missing_secret_reference_v1"
+    || report.operation != operation.key
+    || report.incarnation != operation.incarnation_key
+    || report.spec != operation.spec_key
+    || cargo.spec.key != operation.spec_key
+    || cargo.spec.cargo_key != operation.resource_key
+  {
+    return None;
+  }
+  cargo
+    .spec
+    .secrets
+    .iter()
+    .chain(
+      cargo
+        .spec
+        .init_containers
+        .iter()
+        .chain(&cargo.spec.containers)
+        .flat_map(|container| container.secrets.iter()),
+    )
+    .find(|reference| reference.as_str() == report.name)
+    .cloned()
 }
 
 async fn execute_start(
@@ -809,6 +859,7 @@ fn uncertain_runtime_error(error: &IoError) -> bool {
         | "InspectCargoProcess"
         | "CargoInitContainer"
         | "Cargo remote execution"
+        | "Cargo remote missing secret"
         | "Cargo remote observation"
         | "Cargo process restart"
         | "Cargo process signal"
@@ -824,11 +875,17 @@ fn operation_note(
   settled: bool,
   failed: bool,
   missing_reference: Option<&str>,
+  remote_reference: Option<&str>,
 ) -> String {
   if !settled {
-    format!(
+    let mut note = format!(
       "Cargo operation {operation} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying"
-    )
+    );
+    if let Some(detail) = remote_reference {
+      note.push_str("; ");
+      note.push_str(detail);
+    }
+    note
   } else if !failed {
     format!("Cargo {resource_key}")
   } else if let Some(detail) = missing_reference {
@@ -909,6 +966,7 @@ async fn execute(
   });
   let mut settled = false;
   let mut missing_reference = None;
+  let mut remote_reference = None;
   match result {
     Ok(()) => {
       let finished = if action == "delete" {
@@ -961,6 +1019,12 @@ async fn execute(
       )
       .await
       .unwrap_or(false);
+      if owns_failure
+        && error.context() == Some("Cargo remote missing secret")
+        && error.inner.kind() == std::io::ErrorKind::Interrupted
+      {
+        remote_reference = Some(error.inner.to_string());
+      }
       let remote = CargoReplicaDb::list_by_cargo(
         &accepted.operation.resource_key,
         &state.inner.pool,
@@ -1048,6 +1112,7 @@ async fn execute(
       settled,
       reported.is_err(),
       missing_reference.as_deref(),
+      remote_reference.as_deref(),
     );
     for event_action in actions {
       // Do not publish Healthy when recording or delivering Start failed.
@@ -1196,6 +1261,174 @@ mod tests {
   use super::*;
 
   #[test]
+  fn remote_missing_secret_report_requires_matching_identity_and_reference() {
+    use nanocl_error::http_client::HttpClientError;
+    let operation = OperationDb {
+      key: uuid::Uuid::from_u128(1),
+      incarnation_key: uuid::Uuid::from_u128(2),
+      resource_kind: "Cargo".into(),
+      resource_key: "global.api".into(),
+      action: "start".into(),
+      spec_key: uuid::Uuid::from_u128(3),
+      node_name: "coordinator".into(),
+      owner_boot_id: "boot".into(),
+      lock_device: 1,
+      lock_inode: 2,
+      accepted_at: chrono::DateTime::from_timestamp(1, 0).unwrap().naive_utc(),
+      completed_at: None,
+      outcome: None,
+      diagnostic: None,
+    };
+    let mut cargo = Cargo::default();
+    cargo.spec.key = operation.spec_key;
+    cargo.spec.cargo_key = operation.resource_key.clone();
+    cargo.spec.secrets = vec!["global.ref\n\u{1b}".into()];
+    cargo.spec.init_containers = vec![
+      serde_json::from_value(serde_json::json!({
+        "Name": "init", "Image": "example", "Secrets": ["init.ref"]
+      }))
+      .unwrap(),
+    ];
+    cargo.spec.containers = vec![
+      serde_json::from_value(serde_json::json!({
+        "Name": "app", "Image": "example", "Secrets": ["app.ref"]
+      }))
+      .unwrap(),
+    ];
+    let report = |name: &str| {
+      serde_json::json!({
+        "kind": "missing_secret_reference_v1", "operation": operation.key,
+        "incarnation": operation.incarnation_key, "spec": operation.spec_key,
+        "name": name,
+      })
+    };
+    let error = |status, msg: String| {
+      HttpClientError::HttpError(HttpError::new(status, msg))
+    };
+    // Exercise the real node error builder through the same HTTP error envelope
+    // consumed by the client before validating it against the accepted spec.
+    let node_error = crate::services::node_start_error(
+      crate::utils::secret::missing_secret_reference("app.ref"),
+      operation.key,
+      operation.incarnation_key,
+      operation.spec_key,
+    );
+    let wire = serde_json::json!({"msg": node_error.msg}).to_string();
+    let envelope: serde_json::Value = serde_json::from_str(&wire).unwrap();
+    let client_error = error(
+      node_error.status,
+      envelope["msg"].as_str().unwrap().to_owned(),
+    );
+    assert_eq!(
+      remote_missing_reference(&client_error, &cargo, &operation).as_deref(),
+      Some("app.ref")
+    );
+    for name in ["global.ref\n\u{1b}", "init.ref", "app.ref"] {
+      let err =
+        error(ntex::http::StatusCode::NOT_FOUND, report(name).to_string());
+      assert_eq!(
+        remote_missing_reference(&err, &cargo, &operation).as_deref(),
+        Some(name)
+      );
+      let safe = format!("A node reported that secret {name:?} does not exist");
+      assert!(!safe.contains('\n'));
+      assert!(!safe.contains('\u{1b}'));
+    }
+    for (field, replacement) in [
+      ("kind", serde_json::json!("other")),
+      ("operation", serde_json::json!(uuid::Uuid::from_u128(4))),
+      ("incarnation", serde_json::json!(uuid::Uuid::from_u128(4))),
+      ("spec", serde_json::json!(uuid::Uuid::from_u128(4))),
+      ("name", serde_json::json!("unrelated")),
+    ] {
+      let mut invalid = report("init.ref");
+      invalid[field] = replacement;
+      assert!(
+        remote_missing_reference(
+          &error(ntex::http::StatusCode::NOT_FOUND, invalid.to_string()),
+          &cargo,
+          &operation
+        )
+        .is_none(),
+        "{field}"
+      );
+    }
+    for msg in [
+      "not JSON".to_owned(),
+      "{}".to_owned(),
+      report("app.ref")
+        .to_string()
+        .replace("{", "{\"kind\":\"duplicate\","),
+    ] {
+      assert!(
+        remote_missing_reference(
+          &error(ntex::http::StatusCode::NOT_FOUND, msg),
+          &cargo,
+          &operation
+        )
+        .is_none()
+      );
+    }
+    assert!(
+      remote_missing_reference(
+        &error(
+          ntex::http::StatusCode::CONFLICT,
+          report("app.ref").to_string()
+        ),
+        &cargo,
+        &operation
+      )
+      .is_none()
+    );
+    assert!(
+      remote_missing_reference(
+        &HttpClientError::IoError(IoError::interrupted("transport", "private")),
+        &cargo,
+        &operation
+      )
+      .is_none()
+    );
+    cargo.spec.key = uuid::Uuid::from_u128(9);
+    assert!(
+      remote_missing_reference(
+        &error(
+          ntex::http::StatusCode::NOT_FOUND,
+          report("app.ref").to_string()
+        ),
+        &cargo,
+        &operation
+      )
+      .is_none()
+    );
+    let pending =
+      IoError::interrupted("Cargo remote missing secret", "reported");
+    assert!(uncertain_runtime_error(&pending));
+    let note = operation_note(
+      operation.key,
+      "global.api",
+      "start",
+      false,
+      true,
+      None,
+      Some("A node reported that secret \"app.ref\" does not exist"),
+    );
+    assert!(note.contains("outcome is unknown"));
+    assert!(
+      note.contains("A node reported that secret \"app.ref\" does not exist")
+    );
+    let settled = operation_note(
+      operation.key,
+      "global.api",
+      "start",
+      true,
+      true,
+      None,
+      Some("untrusted"),
+    );
+    assert!(!settled.contains("untrusted"));
+  }
+
+  #[test]
   fn cargo_noop_status_requires_matching_desired_and_observed_state() {
     for (action, requested) in [
       ("start", ObjPsStatusKind::Start),
@@ -1243,7 +1476,8 @@ mod tests {
         "update",
         true,
         true,
-        detail.as_deref()
+        detail.as_deref(),
+        None,
       )
       .contains(&diagnostic)
     );
@@ -1254,6 +1488,7 @@ mod tests {
       false,
       true,
       detail.as_deref(),
+      None,
     );
     assert!(pending.contains("outcome is unknown"));
     assert!(!pending.contains(&diagnostic));
@@ -1275,7 +1510,8 @@ mod tests {
           "update",
           true,
           true,
-          detail.as_deref()
+          detail.as_deref(),
+          None,
         )
         .contains("private")
       );

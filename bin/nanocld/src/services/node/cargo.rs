@@ -126,8 +126,38 @@ pub async fn start_node_cargo_operation(
   .await?;
   crate::tasks::cargo::run_node_start(operation, params.replicas, state)
     .await
-    .map_err(crate::tasks::cargo::http_error)?;
+    .map_err(|error| {
+      node_start_error(
+        error,
+        params.operation_key,
+        params.incarnation_key,
+        params.spec_key,
+      )
+    })?;
   Ok(web::HttpResponse::Ok().build())
+}
+
+pub(crate) fn node_start_error(
+  error: nanocl_error::io::IoError,
+  operation: uuid::Uuid,
+  incarnation: uuid::Uuid,
+  spec: uuid::Uuid,
+) -> HttpError {
+  if let Some(name) = crate::utils::secret::missing_reference_name(&error) {
+    // Non-success keeps older coordinators from mistaking this for completed work.
+    let report = crate::models::CargoNodeMissingSecretReport {
+      kind: "missing_secret_reference_v1".to_owned(),
+      operation,
+      incarnation,
+      spec,
+      name: name.to_owned(),
+    };
+    HttpError::not_found(
+      serde_json::to_string(&report).expect("report serialization cannot fail"),
+    )
+  } else {
+    crate::tasks::cargo::http_error(error)
+  }
 }
 
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -168,6 +198,42 @@ pub async fn delete_node_cargo_operation(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn node_start_error_reports_only_typed_missing_secret_with_identity() {
+    let operation = uuid::Uuid::from_u128(1);
+    let incarnation = uuid::Uuid::from_u128(2);
+    let spec = uuid::Uuid::from_u128(3);
+    let name = "cert.\n\u{1b}registry";
+    let typed = crate::utils::secret::missing_secret_reference(name);
+    let display = typed.inner.to_string();
+    assert_eq!(display, r#"Secret "cert.\n\u{1b}registry" does not exist"#);
+    let erased = typed.clone();
+    let error = node_start_error(typed, operation, incarnation, spec);
+    assert_eq!(error.status, ntex::http::StatusCode::NOT_FOUND);
+    let report: crate::models::CargoNodeMissingSecretReport =
+      serde_json::from_str(&error.msg).unwrap();
+    assert_eq!(report.kind, "missing_secret_reference_v1");
+    assert_eq!(
+      (report.operation, report.incarnation, report.spec),
+      (operation, incarnation, spec)
+    );
+    assert_eq!(report.name, name);
+    for error in [
+      erased,
+      nanocl_error::io::IoError::invalid_data("Secret", "private"),
+      nanocl_error::io::IoError::not_found("other", "missing"),
+    ] {
+      let response = node_start_error(error, operation, incarnation, spec);
+      assert!(!response.status.is_success());
+      assert!(
+        serde_json::from_str::<crate::models::CargoNodeMissingSecretReport>(
+          &response.msg
+        )
+        .is_err()
+      );
+    }
+  }
 
   #[test]
   fn cargo_node_operation_rejects_stale_or_cross_resource_identity() {

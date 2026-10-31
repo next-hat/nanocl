@@ -92,11 +92,27 @@ fn env_name(value: &str) -> &str {
 // to report. Other secret errors can contain sensitive values and stay redacted.
 const MISSING_SECRET_REFERENCE: &str = "MissingSecretReference";
 
-fn missing_secret_reference(name: &str) -> IoError {
-  IoError::not_found(
+pub(crate) fn missing_secret_reference(name: &str) -> IoError {
+  IoError::with_context(
     MISSING_SECRET_REFERENCE,
-    &format!("Secret {name:?} does not exist"),
+    std::io::Error::new(
+      std::io::ErrorKind::NotFound,
+      crate::models::MissingSecretReference(name.to_owned()),
+    ),
   )
+}
+
+pub(crate) fn missing_reference_name(error: &IoError) -> Option<&str> {
+  if error.context() != Some(MISSING_SECRET_REFERENCE)
+    || error.inner.kind() != std::io::ErrorKind::NotFound
+  {
+    return None;
+  }
+  error
+    .inner
+    .get_ref()?
+    .downcast_ref::<crate::models::MissingSecretReference>()
+    .map(|reference| reference.0.as_str())
 }
 
 pub(crate) fn missing_reference_diagnostic(error: &IoError) -> Option<String> {
@@ -253,6 +269,15 @@ mod tests {
   fn missing_secret_reference_reports_only_the_escaped_name() {
     let error = missing_secret_reference("registry\n\u{1b}[31m\"key");
     assert_eq!(error.inner.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(
+      missing_reference_name(&error),
+      Some("registry\n\u{1b}[31m\"key")
+    );
+    assert_eq!(
+      error.inner.to_string(),
+      r#"Secret "registry\n\u{1b}[31m\"key" does not exist"#
+    );
+    assert!(missing_reference_name(&error.clone()).is_none());
     assert_eq!(
       missing_reference_diagnostic(&error).as_deref(),
       Some(r#"Secret "registry\n\u{1b}[31m\"key" does not exist"#)
