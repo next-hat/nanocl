@@ -2,8 +2,8 @@ use futures::StreamExt;
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocld_client::stubs::{
-  job::{JobHistoryQuery, JobInspect},
-  process::{ProcessLogQuery, ProcessWaitQuery},
+  job::{JobHistoryQuery, JobInspect, JobRunState},
+  process::{JobWaitFrame, ProcessLogQuery, ProcessWaitQuery},
 };
 
 use crate::{
@@ -157,32 +157,90 @@ async fn exec_job_wait(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut stream = client
-    .wait_process(
-      "job",
+    .wait_job(
       &opts.name,
       Some(&ProcessWaitQuery {
         condition: opts.condition.clone(),
       }),
     )
     .await?;
-  let mut has_error = false;
+  let mut terminal = None;
+  let mut step_failed = false;
   while let Some(chunk) = stream.next().await {
-    let resp = match chunk {
-      Ok(ref chunk) => chunk,
-      Err(e) => return Err(e.map_err_context(|| "Stream logs").into()),
-    };
-    if resp.status_code != 0 {
-      eprintln!(
-        "Job container {}-{} ended with error code {}",
-        opts.name, resp.process_name, resp.status_code,
-      );
-      has_error = true;
+    let frame = chunk.map_err(|e| e.map_err_context(|| "Job wait stream"))?;
+    if terminal.is_some() {
+      return Err(IoError::invalid_data(
+        "Job wait",
+        "Received a frame after the terminal outcome",
+      ));
+    }
+    match frame {
+      JobWaitFrame::Step { response } => {
+        if response.status_code != 0 || response.error.is_some() {
+          if response.status_code != 0 {
+            eprintln!(
+              "Job container {}-{} ended with error code {}",
+              opts.name, response.process_name, response.status_code,
+            );
+          } else {
+            eprintln!(
+              "Job container {}-{} reported an error",
+              opts.name, response.process_name
+            );
+          }
+          if let Some(message) = response.error.and_then(|error| error.message)
+          {
+            eprintln!("{message}");
+          }
+          step_failed = true;
+        }
+      }
+      JobWaitFrame::Terminal {
+        run_key,
+        state,
+        reason,
+      } => {
+        terminal = Some((run_key.to_string(), state, reason));
+      }
+      JobWaitFrame::Error { message } => {
+        return Err(IoError::other("Job wait".to_owned(), message));
+      }
     }
   }
-  if has_error {
-    return Err(IoError::other("Job wait", "task ended with error"));
+  job_wait_result(terminal, step_failed)
+}
+
+fn job_wait_result(
+  terminal: Option<(String, JobRunState, Option<String>)>,
+  step_failed: bool,
+) -> IoResult<()> {
+  let (run_key, state, reason) = terminal.ok_or_else(|| {
+    IoError::invalid_data(
+      "Job wait",
+      "Stream ended without a terminal Job outcome",
+    )
+  })?;
+  if !state.is_terminal() {
+    return Err(IoError::invalid_data(
+      "Job wait",
+      "Stream reported a non-terminal Job outcome",
+    ));
   }
-  Ok(())
+  if state == JobRunState::Succeeded && !step_failed {
+    return Ok(());
+  }
+  if state == JobRunState::Succeeded {
+    return Err(IoError::other(
+      "Job wait",
+      "Job reported a failed step despite a successful run outcome",
+    ));
+  }
+  Err(IoError::other(
+    "Job wait".to_owned(),
+    reason
+      .filter(|message| !message.trim().is_empty())
+      .unwrap_or_else(|| format!("Job run {run_key} ended as {state:?}")),
+  ))
 }
 
 /// Function that execute when running `nanocl job`
@@ -222,6 +280,48 @@ mod tests {
     config::UserConfig,
     models::{Context, DisplayFormat, GenericStartOpts, GenericStopOpts},
   };
+
+  #[test]
+  fn job_wait_result_requires_terminal_and_reports_durable_reason() {
+    assert!(
+      job_wait_result(None, false)
+        .unwrap_err()
+        .to_string()
+        .contains("without a terminal")
+    );
+    assert!(
+      job_wait_result(
+        Some(("run".into(), JobRunState::Succeeded, None)),
+        false
+      )
+      .is_ok()
+    );
+    for state in [JobRunState::Failed, JobRunState::Interrupted] {
+      let error = job_wait_result(
+        Some(("run".into(), state, Some("image pull denied".into()))),
+        false,
+      )
+      .unwrap_err();
+      assert!(error.inner.to_string().contains("image pull denied"));
+    }
+    assert!(
+      job_wait_result(
+        Some(("run".into(), JobRunState::Failed, Some(" ".into()))),
+        false
+      )
+      .unwrap_err()
+      .to_string()
+      .contains("run run")
+    );
+    assert!(
+      job_wait_result(Some(("run".into(), JobRunState::Running, None)), false)
+        .is_err()
+    );
+    assert!(
+      job_wait_result(Some(("run".into(), JobRunState::Succeeded, None)), true)
+        .is_err()
+    );
+  }
 
   struct HistoryFixture {
     requests: Mutex<Vec<(String, String)>>,

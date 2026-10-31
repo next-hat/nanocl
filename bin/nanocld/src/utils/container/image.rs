@@ -32,6 +32,53 @@ fn map_pull_secret_error(name: &str, error: IoError) -> IoError {
   }
 }
 
+/// Describe image preparation failures without publishing registry responses or credentials.
+pub(crate) fn pull_failure_diagnostic(error: &IoError) -> Option<String> {
+  if let Some(detail) =
+    crate::utils::secret::missing_reference_diagnostic(error)
+  {
+    return Some(detail);
+  }
+  if error.context() == Some("DownloadImage") {
+    use bollard_next::errors::Error as DockerError;
+    return Some(match error.inner.get_ref().and_then(|source| source.downcast_ref::<DockerError>()) {
+      Some(DockerError::DockerResponseServerError { status_code, .. }) => {
+        format!("Docker API returned HTTP status {status_code} while pulling an image")
+      }
+      Some(DockerError::RequestTimeoutError) => "Docker image pull request timed out".to_owned(),
+      Some(DockerError::DockerStreamError { error }) => {
+        let lower = error.to_ascii_lowercase();
+        let reason = if lower.contains("manifest unknown") || lower.contains("manifest not found") {
+          "the registry reported a missing image manifest"
+        } else if lower.contains("unauthorized") || lower.contains("authentication required") || lower.contains("access denied") || lower.contains("denied: requested access") {
+          "registry authentication or access appears to have been denied"
+        } else if lower.contains("too many requests") || lower.contains("toomanyrequests") {
+          "the registry appears to have rate limited the request"
+        } else if lower.contains("timeout") || lower.contains("timed out") {
+          "the registry request appears to have timed out"
+        } else if lower.contains("no such host") || lower.contains("temporary failure in name resolution") {
+          "registry hostname resolution appears to have failed"
+        } else {
+          "Docker reported an image download failure; inspect Docker logs for details"
+        };
+        reason.to_owned()
+      },
+      _ => "Unable to download an image through Docker; inspect Docker logs for details".to_owned(),
+    });
+  }
+  match error.context() {
+    Some("ParseName") => Some("Invalid container image name".to_owned()),
+    Some("GetCredentials") => Some(
+      "Unable to read image-pull credentials from the configured secret"
+        .to_owned(),
+    ),
+    Some("SecretDb") => {
+      Some("Unable to read a secret from the database".to_owned())
+    }
+    _ => None,
+  }
+}
+
 /// Get the docker credentials to authenticate with the registry from the secret
 ///
 async fn get_credentials(
@@ -167,16 +214,20 @@ where
   while let Some(chunk) = stream.next().await {
     let chunk = match chunk {
       Err(err) => {
+        let err = *err.map_err_context(|| "DownloadImage");
+        let note = pull_failure_diagnostic(&err).unwrap_or_else(|| {
+          "Docker reported an image download failure".to_owned()
+        });
         emit_download_status(
           event_actor.clone(),
           event_related_actor.clone(),
-          &format!("{err}"),
+          &note,
           NativeEventAction::Downloading,
           EventKind::Error,
           None,
           state,
         );
-        return Err(*err.map_err_context(|| "DownloadImage"));
+        return Err(err);
       }
       Ok(chunk) => chunk,
     };

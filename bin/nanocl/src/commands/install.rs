@@ -58,6 +58,20 @@ pub(super) fn supports_modern_cockroachdb_image() -> bool {
   true
 }
 
+pub(super) fn docker_resource_exists<T>(
+  result: Result<T, bollard_next::errors::Error>,
+  context: &str,
+) -> IoResult<bool> {
+  match result {
+    Ok(_) => Ok(true),
+    Err(bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 404,
+      ..
+    }) => Ok(false),
+    Err(err) => Err(err.map_err_context(|| context).into()),
+  }
+}
+
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
 ///
@@ -154,11 +168,12 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
-  if docker
-    .inspect_network("nanoclbr0", None::<InspectNetworkOptions>)
-    .await
-    .is_err()
-  {
+  if !docker_resource_exists(
+    docker
+      .inspect_network("nanoclbr0", None::<InspectNetworkOptions>)
+      .await,
+    "Unable to inspect nanoclbr0 network",
+  )? {
     docker
       .create_network(NetworkCreateRequest {
         name: "nanoclbr0".to_owned(),
@@ -214,7 +229,11 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
               "invalid format expect image:tag".into(),
             ));
           };
-          if docker.inspect_image(image).await.is_err() || args.force_pull {
+          let image_exists = docker_resource_exists(
+            docker.inspect_image(image).await,
+            &format!("Unable to inspect image for cargo {}", cargo.name),
+          )?;
+          if !image_exists || args.force_pull {
             utils::progress::set_state_message(
               &pg, summary, "Pulling", output,
             )?;
@@ -342,6 +361,35 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn docker_inspect_only_treats_not_found_as_absent() {
+    use bollard_next::errors::Error;
+
+    assert!(docker_resource_exists(Ok(()), "inspect").unwrap());
+    let response = |status_code| Error::DockerResponseServerError {
+      status_code,
+      message: "docker error".to_owned(),
+    };
+    assert!(
+      !docker_resource_exists::<()>(Err(response(404)), "inspect").unwrap()
+    );
+    let error =
+      docker_resource_exists::<()>(Err(response(500)), "inspect").unwrap_err();
+    assert!(error.to_string().contains("inspect"));
+    assert!(error.to_string().contains("docker error"));
+    let error = docker_resource_exists::<()>(
+      Err(Error::IOError {
+        err: std::io::Error::new(
+          std::io::ErrorKind::PermissionDenied,
+          "denied",
+        ),
+      }),
+      "inspect",
+    )
+    .unwrap_err();
+    assert!(error.to_string().to_ascii_lowercase().contains("denied"));
+  }
 
   fn nstore_image(supports_modern_cockroachdb_image: bool) -> String {
     let data = liquid::object!({
