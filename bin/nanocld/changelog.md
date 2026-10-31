@@ -7,8 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.19.0] - unreleased
 
+### Breaking
+
+- The VM, Cargo, and Job operation and incarnation schemas require a fresh
+  cluster recreated from Statefiles. Existing schemas and runtimes are not
+  backfilled or adopted, and overlapping old and new daemons are unsupported.
+
 ### Added
 
+- VM provisioning on Docker bridge networks with persistent guest MAC
+  addresses, isolated DHCP, optional cloud-init user data, and an operator
+  console. A stable MAC does not reserve an IP across runtime replacement.
+  Custom user data is stored in VM specifications and history and appears in
+  the interactive Statefile apply preview; `state diff` redacts it.
+- Guest-aware VM shutdown and restart, status and resource inspection, and live
+  CPU, memory, and disk growth within the configured runtime limits.
+- Persisted VM, Cargo, and Job operations with conservative recovery of
+  interrupted work based on confirmed runtime state.
+- Job configuration revisions and retained execution and step outcomes, with
+  Job and VM configuration history and revert APIs.
 - Optional `IpAddress` in process list and inspection responses, resolved from
   stored network state, including shared container networks and IPv6.
 
@@ -22,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop old Cargo init containers before replacement and settle failed updates
+  only after confirming cleanup and the previous runtime's state.
+- Restore persisted Job schedules at startup after listeners are ready, and
+  roll back unpublished Jobs when schedule setup fails. If global schedule
+  restoration fails, the API remains available with scheduling disabled.
+- Correlate lifecycle completion and errors with the accepted operation.
+- Preserve selected node ordering during capacity-based placement and retain
+  Resource ownership through controller application and publication.
 - Scope process statistics by workload kind as well as resource key,
   preventing cargoes and VMs with the same key from sharing stats results.
 
