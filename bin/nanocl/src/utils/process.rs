@@ -271,6 +271,32 @@ mod tests {
   }
 
   #[test]
+  fn operation_failure_surfaces_missing_secret_reference() {
+    let operation = uuid::Uuid::from_u128(1);
+    let mut value = deletion_event(operation, None, "error", "update");
+    value["Actor"]["Key"] = json!("global.registry");
+    value["Actor"]["Kind"] = json!("Cargo");
+    value["Metadata"] = json!({"Operation": operation});
+    value["Note"] =
+      json!("Cargo operation failed: Secret \"cert.registry\" does not exist");
+    let event = serde_json::from_value::<Event>(value).unwrap();
+    let error = operation_event_result(
+      &event,
+      "global.registry",
+      &EventActorKind::Cargo,
+      &NativeEventAction::Update,
+      operation,
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+      error
+        .to_string()
+        .contains("Secret \"cert.registry\" does not exist")
+    );
+  }
+
+  #[test]
   fn operation_outcome_unchanged_drops_stream_without_polling() {
     struct DropSignal(std::rc::Rc<std::cell::Cell<bool>>);
     impl Drop for DropSignal {

@@ -12,6 +12,8 @@ mod metric;
 mod namespace;
 mod network;
 mod node;
+#[cfg(test)]
+pub(crate) use node::cargo::node_start_error;
 mod process;
 mod resource;
 mod resource_kind;
