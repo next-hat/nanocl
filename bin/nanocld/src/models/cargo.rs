@@ -36,6 +36,18 @@ pub(crate) struct AcceptedCargoOperation {
   pub operation: super::OperationDb,
 }
 
+/// Versioned node observation carried in the existing HTTP error message.
+/// It is never authoritative for operation settlement.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CargoNodeMissingSecretReport {
+  pub kind: String,
+  pub operation: uuid::Uuid,
+  pub incarnation: uuid::Uuid,
+  pub spec: uuid::Uuid,
+  pub name: String,
+}
+
 pub(crate) type CargoLifecycleLock = std::sync::Arc<tokio::sync::Mutex<()>>;
 pub(crate) type CargoLifecycleLocks = std::sync::Mutex<
   std::collections::HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>,

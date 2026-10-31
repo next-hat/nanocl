@@ -82,3 +82,15 @@ impl From<&SecretUpdate> for SecretUpdateDb {
     }
   }
 }
+
+/// Carries a missing reference without changing the human-readable error.
+#[derive(Debug)]
+pub(crate) struct MissingSecretReference(pub String);
+
+impl std::fmt::Display for MissingSecretReference {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(formatter, "Secret {:?} does not exist", self.0)
+  }
+}
+
+impl std::error::Error for MissingSecretReference {}
