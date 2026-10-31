@@ -88,6 +88,39 @@ fn env_name(value: &str) -> &str {
   value.split_once('=').map_or(value, |(name, _)| name)
 }
 
+// This context is reserved for a missing reference, whose escaped name is safe
+// to report. Other secret errors can contain sensitive values and stay redacted.
+const MISSING_SECRET_REFERENCE: &str = "MissingSecretReference";
+
+pub(crate) fn missing_secret_reference(name: &str) -> IoError {
+  IoError::with_context(
+    MISSING_SECRET_REFERENCE,
+    std::io::Error::new(
+      std::io::ErrorKind::NotFound,
+      crate::models::MissingSecretReference(name.to_owned()),
+    ),
+  )
+}
+
+pub(crate) fn missing_reference_name(error: &IoError) -> Option<&str> {
+  if error.context() != Some(MISSING_SECRET_REFERENCE)
+    || error.inner.kind() != std::io::ErrorKind::NotFound
+  {
+    return None;
+  }
+  error
+    .inner
+    .get_ref()?
+    .downcast_ref::<crate::models::MissingSecretReference>()
+    .map(|reference| reference.0.as_str())
+}
+
+pub(crate) fn missing_reference_diagnostic(error: &IoError) -> Option<String> {
+  (error.context() == Some(MISSING_SECRET_REFERENCE)
+    && error.inner.kind() == std::io::ErrorKind::NotFound)
+    .then(|| error.inner.to_string())
+}
+
 fn overlay_env(
   target: &mut Vec<String>,
   positions: &mut HashMap<String, usize>,
@@ -129,9 +162,9 @@ async fn resolve_secrets(
   let mut resolved = ResolvedSecrets::default();
   let mut env_positions = HashMap::new();
   for name in secrets {
-    let secret = found.remove(name).ok_or_else(|| {
-      IoError::not_found("Secret", &format!("Secret {name:?} does not exist"))
-    })?;
+    let secret = found
+      .remove(name)
+      .ok_or_else(|| missing_secret_reference(name))?;
     match secret.kind.as_str() {
       "nanocl.io/env" => {
         let values = serde_json::from_value::<Vec<String>>(secret.data)?;
@@ -231,6 +264,32 @@ pub async fn create_tls_secrets(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn missing_secret_reference_reports_only_the_escaped_name() {
+    let error = missing_secret_reference("registry\n\u{1b}[31m\"key");
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(
+      missing_reference_name(&error),
+      Some("registry\n\u{1b}[31m\"key")
+    );
+    assert_eq!(
+      error.inner.to_string(),
+      r#"Secret "registry\n\u{1b}[31m\"key" does not exist"#
+    );
+    assert!(missing_reference_name(&error.clone()).is_none());
+    assert_eq!(
+      missing_reference_diagnostic(&error).as_deref(),
+      Some(r#"Secret "registry\n\u{1b}[31m\"key" does not exist"#)
+    );
+    assert!(
+      missing_reference_diagnostic(&IoError::invalid_data(
+        "Secret",
+        "secret value"
+      ))
+      .is_none()
+    );
+  }
 
   #[test]
   fn secret_path_components_preserve_safe_names_and_reject_traversal() {
