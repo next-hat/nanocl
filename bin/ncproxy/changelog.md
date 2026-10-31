@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Render UDP proxy rules correctly, reject unsupported UDP with TLS, and
+  attempt to restore changed credentials if a proxy configuration is rejected,
+  reporting rollback failures.
+- Keep Nginx configuration checks from leaving an empty runtime PID file.
 - Explicitly enable TLS on the default HTTPS listeners while preserving
   handshake rejection and `reuseport`.
 - Verify a serving Nginx worker through a private local HTTP probe and require
