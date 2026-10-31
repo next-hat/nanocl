@@ -2183,7 +2183,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2207,7 +2207,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "futures-util",
  "log",
