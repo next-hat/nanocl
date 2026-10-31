@@ -95,7 +95,7 @@ Cargoes:
   Containers:
   - Name: ncdns
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncdns:0.10.0-nightly
+    Image: ghcr.io/next-hat/ncdns:0.11.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncdns:0.10.0
     # {% endif %}
@@ -171,7 +171,7 @@ Cargoes:
   Containers:
   - Name: ncvpnkit
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncvpnkit:0.8.0-nightly
+    Image: ghcr.io/next-hat/ncvpnkit:0.9.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncvpnkit:0.8.0
     # {% endif %}
