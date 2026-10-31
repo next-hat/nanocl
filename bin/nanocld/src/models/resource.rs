@@ -1,3 +1,8 @@
+use std::{
+  collections::HashMap,
+  sync::{Arc, Mutex, Weak},
+};
+
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -6,6 +11,11 @@ use nanocl_stubs::resource::ResourceSpec;
 use super::SpecDb;
 
 use crate::schema::resources;
+
+pub(crate) type ResourceMutationLocks =
+  Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>;
+
+pub(crate) type ResourceMutationLock = Arc<tokio::sync::Mutex<()>>;
 
 /// This structure represent a resource in the database.
 /// A resource is a representation of a specification for internal nanocl services (controllers).

@@ -1,18 +1,23 @@
 mod cargo;
+pub(crate) mod cargo_operation;
 mod cargo_replica;
 mod distributed_mutex;
 mod event;
 mod job;
+mod job_operation;
+mod job_run;
 pub mod metric;
 mod namespace;
 mod network;
 mod node;
 mod object_process_status;
+pub(crate) mod operation;
 mod process;
 mod resource;
 mod resource_kind;
 mod secret;
 mod spec;
 mod vm;
+mod vm_operation;
 
 pub mod generic;

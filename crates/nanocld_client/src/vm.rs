@@ -1,14 +1,196 @@
-use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::http_client::{HttpClientError, HttpClientResult};
+use nanocl_error::io::{FromIo, IoError};
+use ntex::{io, ws};
 
-use nanocl_stubs::generic::{GenericFilterNsp, GenericNspQuery};
-use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
+use nanocl_stubs::generic::{GenericFilter, GenericFilterNsp, GenericNspQuery};
+use nanocl_stubs::vm::{
+  Vm, VmInspect, VmLifecycleOptions, VmResizeOptions, VmResources,
+  VmRuntimeStatus, VmSummary,
+};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for vms
   const VM_PATH: &'static str = "/vms";
+
+  fn vm_lifecycle_path(key: &str, action: &str) -> HttpClientResult<String> {
+    let key = key
+      .parse::<nanocl_stubs::resource_key::ResourceKey>()
+      .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
+    Ok(format!("{}/{key}/{action}", Self::VM_PATH))
+  }
+
+  async fn send_vm_lifecycle(
+    &self,
+    key: &str,
+    action: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<bool> {
+    options
+      .validate()
+      .map_err(|err| IoError::invalid_input("VM lifecycle", &err))?;
+    let path = Self::vm_lifecycle_path(key, action)?;
+    // Include bounded protocol/cleanup time beyond the guest's grace period.
+    // Do not retry: a lost response cannot prove the action did not happen.
+    let mut response = self
+      .post(&path)
+      .await?
+      .timeout(ntex::time::Millis::from_secs((options.timeout + 60) as u32))
+      .send_json(options)
+      .await
+      .map_err(|err| self.send_error(err))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status).await?;
+    Ok(Self::vm_lifecycle_unchanged(
+      status,
+      response
+        .headers()
+        .get("x-nanocl-unchanged")
+        .map(|value| value.as_bytes()),
+    ))
+  }
+
+  fn vm_lifecycle_unchanged(
+    status: ntex::http::StatusCode,
+    value: Option<&[u8]>,
+  ) -> bool {
+    status == ntex::http::StatusCode::OK && value == Some(&b"true"[..])
+  }
+
+  /// Stop a VM, waiting for guest shutdown unless force is explicitly requested.
+  /// A timeout never forces power-off; inspect its status before retrying.
+  pub async fn stop_vm(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<()> {
+    self.stop_vm_with_outcome(key, options).await.map(|_| ())
+  }
+
+  /// Stop a VM and report whether the daemon confirmed it was already stopped.
+  pub async fn stop_vm_with_outcome(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<bool> {
+    self.send_vm_lifecycle(key, "stop", options).await
+  }
+
+  /// Shut down and start a VM. A shutdown timeout prevents the start operation.
+  pub async fn restart_vm(
+    &self,
+    key: &str,
+    options: &VmLifecycleOptions,
+  ) -> HttpClientResult<()> {
+    self
+      .send_vm_lifecycle(key, "restart", options)
+      .await
+      .map(|_| ())
+  }
+
+  /// Query actual QEMU execution state through the configured daemon transport.
+  pub async fn vm_status(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<VmRuntimeStatus> {
+    let path = Self::vm_lifecycle_path(key, "status")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
+
+  /// Grow running QEMU resources. Errors may follow partially applied changes;
+  /// query resources before retrying. No automatic retry is performed.
+  pub async fn resize_vm(
+    &self,
+    key: &str,
+    options: &VmResizeOptions,
+  ) -> HttpClientResult<VmResources> {
+    options
+      .validate()
+      .map_err(|err| IoError::invalid_input("VM resize", &err))?;
+    let path = Self::vm_lifecycle_path(key, "resize")?;
+    let mut response = self
+      .post(&path)
+      .await?
+      .timeout(ntex::time::Millis::from_secs(120))
+      .send_json(options)
+      .await
+      .map_err(|err| self.send_error(err))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status).await?;
+    Self::res_json(response).await
+  }
+
+  /// Query QEMU capacity and CPU/memory persistence, independently of guest online state.
+  pub async fn vm_resources(&self, key: &str) -> HttpClientResult<VmResources> {
+    let path = Self::vm_lifecycle_path(key, "resources")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
+
+  fn vm_console_url(&self, key: &str) -> HttpClientResult<String> {
+    let key = key
+      .parse::<nanocl_stubs::resource_key::ResourceKey>()
+      .map_err(|err| {
+        IoError::invalid_input("VM console key", &err.to_string())
+      })?;
+    Ok(self.gen_url(&format!("{}/{key}/console", Self::VM_PATH)))
+  }
+
+  /// Connect to an enabled VM graphical console. Binary frames are raw RFB.
+  /// Uses the client's configured Unix, HTTP or HTTPS transport and SSL policy.
+  pub async fn console_vm(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<ws::WsConnection<io::Sealed>> {
+    let url = self.vm_console_url(key)?;
+    #[cfg(not(target_os = "windows"))]
+    if let Some(path) = &self.unix_socket {
+      let socket_path = path.clone();
+      return Ok(
+        ws::WsClient::new(&url, ntex::SharedCfg::default())
+          .connector(async move |cfg: &ntex::SharedCfg, _| {
+            Ok(
+              ntex::rt::unix_connect(&socket_path, cfg.clone())
+                .await
+                .map_err(ntex::connect::ConnectError::from)?,
+            )
+          })
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| "VM console Unix connection"))?
+          .seal(),
+      );
+    }
+    if self.url.starts_with("https://") {
+      #[cfg(feature = "openssl")]
+      return Ok(
+        ws::WsClient::new(&url, ntex::SharedCfg::default())
+          .openssl(crate::http_client::tls_connector(self.ssl.as_ref())?)
+          .connect()
+          .await
+          .map_err(|err| err.map_err_context(|| "VM console HTTPS connection"))?
+          .seal(),
+      );
+      #[cfg(not(feature = "openssl"))]
+      return Err(
+        IoError::invalid_input(
+          "VM console",
+          "Enable the nanocld_client openssl feature for HTTPS",
+        )
+        .into(),
+      );
+    }
+    Ok(
+      ws::WsClient::new(&url, ntex::SharedCfg::default())
+        .connect()
+        .await
+        .map_err(|err| err.map_err_context(|| "VM console HTTP connection"))?
+        .seal(),
+    )
+  }
 
   /// Create a new virtual machine in the system.
   pub async fn create_vm(
@@ -48,6 +230,105 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
+  /// List specification revisions for the current VM incarnation.
+  pub async fn list_history_vm(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<Vec<VmSpec>> {
+    let path = Self::vm_lifecycle_path(key, "histories")?;
+    let response = self.send_get(&path, None::<String>).await?;
+    Self::res_json(response).await
+  }
+
+  /// List a bounded page of current-incarnation VM revisions, newest first.
+  /// Omitting pagination with `list_history_vm` still returns the full history.
+  pub async fn list_history_vm_page(
+    &self,
+    key: &str,
+    limit: usize,
+    offset: usize,
+  ) -> HttpClientResult<Vec<VmSpec>> {
+    let path = Self::vm_lifecycle_path(key, "histories")?;
+    let filter = GenericFilter::new().limit(limit).offset(offset);
+    let query = Self::convert_query(Some(&filter))?;
+    let response = self.send_get(&path, Some(query)).await?;
+    Self::res_json(response).await
+  }
+
+  /// Revert a VM to a revision of its current incarnation.
+  /// Waits for admission without a response-header deadline. If cancelled or
+  /// the response is lost, inspect the VM before retrying: the daemon retains
+  /// ownership of the operation after disconnection.
+  pub async fn revert_vm(&self, key: &str, id: &str) -> HttpClientResult<Vm> {
+    let response = self.send_vm_revert(key, id).await?;
+    Self::res_json(response)
+      .await
+      .map_err(Self::vm_revert_outcome_error)
+  }
+
+  /// Revert a VM and return its response plus the accepted operation ID.
+  /// Admission has no response-header deadline. On cancellation or a lost or
+  /// invalid receipt, inspect the VM before retrying the operation.
+  pub async fn revert_vm_operation(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<(Vm, uuid::Uuid)> {
+    let response = self.send_vm_revert(key, id).await?;
+    let operation = Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+    .map_err(Self::vm_revert_outcome_error)?;
+    let vm = Self::res_json(response)
+      .await
+      .map_err(Self::vm_revert_outcome_error)?;
+    Ok((vm, operation))
+  }
+
+  async fn send_vm_revert(
+    &self,
+    key: &str,
+    id: &str,
+  ) -> HttpClientResult<ntex::client::ClientResponse> {
+    let path = Self::vm_revert_path(key, id)?;
+    // Admission can wait for lifecycle observation, preceding bookkeeping,
+    // and MAC allocation. Keep connect/payload deadlines, but do not abandon
+    // its receipt at the general response-header deadline. Never retry it.
+    let mut response = self
+      .patch(&path)
+      .await?
+      .timeout(ntex::time::Millis::ZERO)
+      .send()
+      .await
+      .map_err(|error| Self::vm_revert_outcome_error(self.send_error(error)))?;
+    let status = response.status();
+    crate::error::is_api_error(&mut response, &status)
+      .await
+      .map_err(Self::vm_revert_outcome_error)?;
+    Ok(response)
+  }
+
+  fn vm_revert_outcome_error(error: HttpClientError) -> HttpClientError {
+    match error {
+      HttpClientError::IoError(error) => {
+        HttpClientError::IoError(error.map_err_context(
+          || "VM revert outcome is unknown; inspect the VM before retrying",
+        ))
+      }
+      error => error,
+    }
+  }
+
+  fn vm_revert_path(key: &str, id: &str) -> HttpClientResult<String> {
+    let id = id.parse::<uuid::Uuid>().map_err(|err| {
+      IoError::invalid_input("VM history ID", &err.to_string())
+    })?;
+    Self::vm_lifecycle_path(key, &format!("histories/{id}/revert"))
+  }
+
   /// Delete a VM by its canonical key.
   ///
   /// ## Example
@@ -59,10 +340,20 @@ impl NanocldClient {
   /// let res = client.delete_vm("global.my-vm").await;
   /// ```
   pub async fn delete_vm(&self, key: &str) -> HttpClientResult<()> {
+    self.delete_vm_operation(key).await.map(|_| ())
+  }
+
+  /// Delete a VM by its canonical key and return the accepted operation ID.
+  pub async fn delete_vm_operation(
+    &self,
+    key: &str,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let key = key
+      .parse::<nanocl_stubs::resource_key::ResourceKey>()
+      .map_err(|err| IoError::invalid_input("VM key", &err.to_string()))?;
     self
-      .send_delete(&format!("{}/{key}", Self::VM_PATH), None::<String>)
-      .await?;
-    Ok(())
+      .delete_process_operation("vm", key.as_str(), None::<String>)
+      .await
   }
 
   /// Inspect a VM by its canonical key.
@@ -97,5 +388,484 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+  /// Patch a VM and return its accepted operation ID.
+  pub async fn patch_vm_operation(
+    &self,
+    key: &str,
+    vm: &VmSpecUpdate,
+  ) -> HttpClientResult<uuid::Uuid> {
+    let response = self
+      .send_patch(
+        &format!("{}/{key}", Self::VM_PATH),
+        Some(vm),
+        None::<String>,
+      )
+      .await?;
+    Self::process_operation_header(
+      response
+        .headers()
+        .get("x-nanocl-operation")
+        .map(|value| value.as_bytes()),
+    )
+  }
+}
+
+#[cfg(test)]
+mod console_tests {
+  use super::*;
+
+  #[test]
+  fn vm_revert_unknown_outcome_preserves_transport_and_api_errors() {
+    for kind in [
+      std::io::ErrorKind::TimedOut,
+      std::io::ErrorKind::ConnectionReset,
+      std::io::ErrorKind::InvalidData,
+    ] {
+      let error = NanocldClient::vm_revert_outcome_error(
+        IoError::without_context(std::io::Error::new(
+          kind,
+          "response was lost",
+        ))
+        .into(),
+      );
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+      assert!(matches!(error, HttpClientError::IoError(error)
+        if error.inner.kind() == kind
+          && error.inner.to_string() == "response was lost"));
+    }
+    for status in [
+      ntex::http::StatusCode::BAD_REQUEST,
+      ntex::http::StatusCode::NOT_FOUND,
+      ntex::http::StatusCode::CONFLICT,
+    ] {
+      let error = NanocldClient::vm_revert_outcome_error(
+        nanocl_error::http::HttpError::new(status, "rejected").into(),
+      );
+      assert!(!error.to_string().contains("outcome is unknown"));
+      assert!(matches!(error, HttpClientError::HttpError(error)
+        if error.status == status && error.msg == "rejected"));
+    }
+  }
+
+  #[test]
+  fn vm_revert_missing_or_invalid_receipt_reports_unknown_outcome() {
+    for value in [None, Some(&b"invalid-receipt"[..]), Some(&b"\xff"[..])] {
+      let error = NanocldClient::process_operation_header(value)
+        .map_err(NanocldClient::vm_revert_outcome_error)
+        .unwrap_err();
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+      assert!(
+        error
+          .to_string()
+          .contains("completion cannot be correlated")
+      );
+      assert!(matches!(error, HttpClientError::IoError(error)
+        if error.inner.kind() == std::io::ErrorKind::InvalidData));
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_history_pagination_preserves_optional_query_contract() {
+    use nanocl_stubs::generic::GenericListQuery;
+    use ntex::{http::StatusCode, web::types::Query};
+
+    let (client, requests, _server) =
+      crate::process::receipt_test::client_with_body(
+        StatusCode::OK,
+        None,
+        None,
+        Some(serde_json::json!([])),
+      );
+    assert!(
+      client
+        .list_history_vm_page("team.guest", 100, 20)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(
+      client
+        .list_history_vm("team.guest")
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(client.list_history_vm_page("guest", 100, 0).await.is_err());
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 2);
+    for request in recorded.iter() {
+      assert_eq!(request.method, "GET");
+      assert_eq!(
+        request.path,
+        format!(
+          "/v{}/vms/team.guest/histories",
+          crate::NANOCLD_DEFAULT_VERSION,
+        ),
+      );
+      assert!(request.body.is_empty());
+    }
+    let query = Query::<GenericListQuery>::from_query(&recorded[0].query)
+      .unwrap()
+      .into_inner();
+    let filter = GenericFilter::try_from(query).unwrap();
+    assert_eq!(filter.limit, Some(100));
+    assert_eq!(filter.offset, Some(20));
+    assert!(filter.r#where.is_none());
+    assert!(filter.order_by.is_none());
+    assert!(recorded[1].query.is_empty());
+  }
+
+  #[test]
+  fn vm_revert_path_validates_key_and_revision() {
+    let id = uuid::Uuid::from_u128(42);
+    assert_eq!(
+      NanocldClient::vm_revert_path("team.guest", &id.to_string()).unwrap(),
+      format!("/vms/team.guest/histories/{id}/revert"),
+    );
+    for key in ["guest", "../vm", "global.vm?force=true", "global.vm/status"] {
+      assert!(NanocldClient::vm_revert_path(key, &id.to_string()).is_err());
+    }
+    for id in [
+      "",
+      "invalid",
+      "../other",
+      "00000000-0000-0000-0000-000000000042?x=y",
+    ] {
+      assert!(NanocldClient::vm_revert_path("team.guest", id).is_err());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_revert_preserves_wire_contract_and_operation_receipt() {
+    use ntex::http::StatusCode;
+    let operation = uuid::Uuid::from_u128(23);
+    let revision = uuid::Uuid::from_u128(42);
+    let vm = Vm {
+      namespace_name: "team".to_owned(),
+      created_at: "1970-01-01T00:00:00".parse().unwrap(),
+      status: Default::default(),
+      spec: VmSpec {
+        key: uuid::Uuid::from_u128(43),
+        vm_key: "team.guest".to_owned(),
+        name: "guest".to_owned(),
+        ..Default::default()
+      },
+    };
+    let (client, requests, _server) =
+      crate::process::receipt_test::client_with_body(
+        StatusCode::OK,
+        Some(&operation.to_string()),
+        None,
+        Some(serde_json::to_value(&vm).unwrap()),
+      );
+    let (restored, receipt) = client
+      .revert_vm_operation("team.guest", &revision.to_string())
+      .await
+      .unwrap();
+    assert_eq!(receipt, operation);
+    assert_eq!(restored.spec.key, vm.spec.key);
+    assert_eq!(restored.spec.vm_key, "team.guest");
+    let restored = client
+      .revert_vm("team.guest", &revision.to_string())
+      .await
+      .unwrap();
+    assert_eq!(restored.spec.key, vm.spec.key);
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 2);
+    for request in recorded.iter() {
+      assert_eq!(request.method, "PATCH");
+      assert_eq!(
+        request.path,
+        format!(
+          "/v{}/vms/team.guest/histories/{revision}/revert",
+          crate::NANOCLD_DEFAULT_VERSION,
+        ),
+      );
+      assert!(request.query.is_empty());
+      assert!(request.body.is_empty());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_revert_rejects_missing_receipts_and_propagates_conflicts() {
+    use ntex::http::StatusCode;
+    let revision = uuid::Uuid::from_u128(42).to_string();
+    for receipt in [None, Some("invalid-receipt")] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(StatusCode::OK, receipt, None);
+      let error = client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err();
+      assert!(
+        error
+          .to_string()
+          .contains("completion cannot be correlated")
+      );
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+      assert_eq!(requests.lock().unwrap().len(), 1);
+    }
+    let (client, requests, _server) =
+      crate::process::receipt_test::client(StatusCode::CONFLICT, None, None);
+    for error in [
+      client.revert_vm("team.guest", &revision).await.unwrap_err(),
+      client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err(),
+    ] {
+      assert!(matches!(error,
+        nanocl_error::http_client::HttpClientError::HttpError(error)
+          if error.status == StatusCode::CONFLICT));
+    }
+    assert_eq!(requests.lock().unwrap().len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_revert_lost_response_body_reports_unknown_outcome_without_retry()
+  {
+    let operation = uuid::Uuid::from_u128(23).to_string();
+    let revision = uuid::Uuid::from_u128(42).to_string();
+    let (client, requests, _server) = crate::process::receipt_test::client(
+      ntex::http::StatusCode::OK,
+      Some(&operation),
+      None,
+    );
+    for error in [
+      client.revert_vm("team.guest", &revision).await.unwrap_err(),
+      client
+        .revert_vm_operation("team.guest", &revision)
+        .await
+        .unwrap_err(),
+    ] {
+      assert!(error.to_string().contains("VM revert outcome is unknown"));
+      assert!(error.to_string().contains("inspect the VM before retrying"));
+    }
+    assert_eq!(requests.lock().unwrap().len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_receipt_methods_preserve_delete_and_patch_wire_contracts() {
+    use ntex::http::StatusCode;
+    let operation = uuid::Uuid::from_u128(23);
+    let encoded = operation.to_string();
+    let (client, requests, _server) = crate::process::receipt_test::client(
+      StatusCode::OK,
+      Some(&encoded),
+      None,
+    );
+    let patch = VmSpecUpdate {
+      hostname: Some("database-node".to_owned()),
+      console: Some(true),
+      ..Default::default()
+    };
+    assert_eq!(
+      client
+        .patch_vm_operation("team.database", &patch)
+        .await
+        .unwrap(),
+      operation,
+    );
+    assert_eq!(
+      client.delete_vm_operation("team.database").await.unwrap(),
+      operation,
+    );
+    client.delete_vm("team.database").await.unwrap();
+    for key in [
+      "database",
+      "../vm",
+      "global.vm?force=true",
+      "global.vm/status",
+    ] {
+      assert!(client.delete_vm_operation(key).await.is_err());
+    }
+    let recorded = requests.lock().unwrap();
+    assert_eq!(recorded.len(), 3);
+    assert_eq!(recorded[0].method, "PATCH");
+    assert_eq!(
+      serde_json::from_str::<serde_json::Value>(&recorded[0].body).unwrap(),
+      serde_json::to_value(&patch).unwrap(),
+    );
+    for request in &recorded[1..] {
+      assert_eq!(request.method, "DELETE");
+      assert!(request.body.is_empty());
+    }
+    for request in recorded.iter() {
+      assert_eq!(
+        request.path,
+        format!("/v{}/vms/team.database", crate::NANOCLD_DEFAULT_VERSION),
+      );
+      assert!(request.query.is_empty());
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_receipt_methods_reject_missing_or_invalid_completion_ids() {
+    use ntex::http::StatusCode;
+    for receipt in [None, Some("not-a-uuid")] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(StatusCode::OK, receipt, None);
+      let errors = [
+        client
+          .patch_vm_operation("team.database", &VmSpecUpdate::default())
+          .await
+          .unwrap_err(),
+        client
+          .delete_vm_operation("team.database")
+          .await
+          .unwrap_err(),
+        client.delete_vm("team.database").await.unwrap_err(),
+      ];
+      for error in errors {
+        assert!(
+          error
+            .to_string()
+            .contains("completion cannot be correlated")
+        );
+      }
+      assert_eq!(requests.lock().unwrap().len(), 3);
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_stop_outcome_uses_explicit_header_and_preserves_shutdown_options()
+  {
+    use ntex::http::StatusCode;
+    let options = VmLifecycleOptions {
+      timeout: 17,
+      force: true,
+    };
+    for (status, unchanged, expected) in [
+      (StatusCode::OK, Some("true"), true),
+      (StatusCode::OK, None, false),
+      (StatusCode::ACCEPTED, Some("true"), false),
+    ] {
+      let (client, requests, _server) =
+        crate::process::receipt_test::client(status, None, unchanged);
+      assert_eq!(
+        client
+          .stop_vm_with_outcome("team.database", &options)
+          .await
+          .unwrap(),
+        expected,
+      );
+      client.stop_vm("team.database", &options).await.unwrap();
+      client.restart_vm("team.database", &options).await.unwrap();
+      assert!(
+        client
+          .stop_vm_with_outcome(
+            "team.database",
+            &VmLifecycleOptions {
+              timeout: 0,
+              force: false,
+            }
+          )
+          .await
+          .is_err()
+      );
+      let recorded = requests.lock().unwrap();
+      assert_eq!(recorded.len(), 3);
+      for (request, action) in recorded.iter().zip(["stop", "stop", "restart"])
+      {
+        assert_eq!(request.method, "POST");
+        assert_eq!(
+          request.path,
+          format!(
+            "/v{}/vms/team.database/{action}",
+            crate::NANOCLD_DEFAULT_VERSION,
+          )
+        );
+        assert!(request.query.is_empty());
+        assert_eq!(
+          serde_json::from_str::<serde_json::Value>(&request.body).unwrap(),
+          serde_json::to_value(&options).unwrap(),
+        );
+      }
+    }
+    let (client, _, _server) = crate::process::receipt_test::client(
+      StatusCode::CONFLICT,
+      None,
+      Some("true"),
+    );
+    let error = client
+      .stop_vm_with_outcome("team.database", &options)
+      .await
+      .unwrap_err();
+    assert!(matches!(
+      error,
+      nanocl_error::http_client::HttpClientError::HttpError(error)
+        if error.status == StatusCode::CONFLICT
+    ));
+  }
+
+  #[test]
+  fn vm_lifecycle_unchanged_requires_explicit_success_header() {
+    use ntex::http::StatusCode;
+    assert!(NanocldClient::vm_lifecycle_unchanged(
+      StatusCode::OK,
+      Some(b"true"),
+    ));
+    for value in [
+      None,
+      Some(&b"false"[..]),
+      Some(&b""[..]),
+      Some(&b"invalid"[..]),
+    ] {
+      assert!(!NanocldClient::vm_lifecycle_unchanged(
+        StatusCode::OK,
+        value
+      ));
+    }
+    for status in [
+      StatusCode::ACCEPTED,
+      StatusCode::NO_CONTENT,
+      StatusCode::CONFLICT,
+    ] {
+      assert!(!NanocldClient::vm_lifecycle_unchanged(
+        status,
+        Some(b"true")
+      ));
+    }
+  }
+
+  #[test]
+  fn vm_lifecycle_paths_require_canonical_keys() {
+    for action in [
+      "stop",
+      "restart",
+      "status",
+      "resize",
+      "resources",
+      "histories",
+    ] {
+      assert_eq!(
+        NanocldClient::vm_lifecycle_path("team.database", action).unwrap(),
+        format!("/vms/team.database/{action}")
+      );
+      for key in [
+        "database",
+        "../vm",
+        "global.vm?force=true",
+        "global.vm/status",
+      ] {
+        assert!(NanocldClient::vm_lifecycle_path(key, action).is_err());
+      }
+    }
+  }
+
+  #[test]
+  fn vm_console_url_requires_a_canonical_key() {
+    let client = NanocldClient::connect_with_unix_default();
+    assert_eq!(
+      client.vm_console_url("global.desktop").unwrap(),
+      "http://localhost/v0.19.0/vms/global.desktop/console"
+    );
+    for key in ["desktop", "global.vm?other", "../vm", "global.vm/console"] {
+      assert!(client.vm_console_url(key).is_err());
+    }
   }
 }

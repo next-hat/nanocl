@@ -22,42 +22,44 @@ vendored = ["openssl/vendored"]
 test = []
 
 [build-dependencies]
-liquid = "0.26"
-tabled = "0.21"
-clap_mangen = { version = "0.3" }
-clap = { version = "4.6", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-chrono = { version = "0.4", default-features = false, features = [
+uuid = { version = "1.28.0" }
+indicatif = "0.18.6"
+liquid = "0.26.11"
+tabled = "0.22.0"
+clap_mangen = { version = "0.3.3" }
+clap = { version = "4.6.7", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
 ] }
-bollard-next = { version = "0.18.1" }
+bollard-next = { version = "0.22.1" }
 nanocl_utils = { version = "0.9", features = ["build_tools"] }
 nanocld_client = { version = "0.19" }
-serde_json = "1.0"
+serde_json = "1.0.154"
 nanocl_error = { version = "0.7", features = ["io", "serde_json"] }
 
 [dependencies]
-bollard-next = { version = "0.18.1" }
-futures = "0.3"
-serde_yaml = "0.9"
-tabled = "0.21"
-indicatif = "0.18"
-serde_json = "1.0"
-ntex = { version = "3", features = ["tokio", "openssl"] }
-similar = "3.2"
-serde = { version = "1.0", features = ["derive"] }
-clap = { version = "4.6", features = ["derive", "cargo"] }
+bollard-next = { version = "0.22.1" }
+futures = "0.3.34"
+serde_yaml = "0.9.34"
+tabled = "0.22.0"
+indicatif = "0.18.6"
+serde_json = "1.0.154"
+ntex = { version = "4.2.0", features = ["tokio", "openssl"] }
+similar = "3.2.0"
+serde = { version = "1.0.229", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive", "cargo"] }
 clap_complete = { version = "=4.6.11", features = ["unstable-dynamic"] }
-tokio = { version = "1.49", features = ["fs"] }
-tokio-util = "0.7"
-chrono = { version = "0.4", default-features = false, features = [
+tokio = { version = "1.53.3", features = ["fs"] }
+tokio-util = "0.7.20"
+chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
 ] }
-dialoguer = "0.12"
-liquid = { version = "0.26", features = ["stdlib"] }
-regex = "1.11"
+dialoguer = "0.12.0"
+liquid = { version = "0.26.11", features = ["stdlib"] }
+regex = "1.13.1"
 nanocld_client = { version = "0.19", features = ["tokio", "openssl"] }
 nanocl_error = { version = "0.7", features = [
   "io",
@@ -67,21 +69,21 @@ nanocl_error = { version = "0.7", features = [
   "bollard",
   "serde_yaml",
 ] }
-ctrlc = "3.5"
-toml = "1"
-ring = "0.17"
-dotenvy = "0.15"
-openssl = "0.10"
-async-recursion = "1.1"
-url = "2.5"
-colored = "3.0.0"
-termimad = "0.35"
-uuid = { version = "1.23", features = ["v4"] }
+ctrlc = "3.5.2"
+toml = "1.1.8"
+ring = "0.17.14"
+dotenvy = "0.15.7"
+openssl = "0.10.81"
+async-recursion = "1.2.0"
+url = "2.5.8"
+colored = "3.1.1"
+termimad = "0.35.5"
+uuid = { version = "1.28.0", features = ["v4"] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-nix = { version = "0.31", features = ["user"] }
+nix = { version = "0.31.3", features = ["user"] }
 nanocl_utils = { version = "0.9", features = ["unix"] }
-termios = "0.3"
+termios = "0.3.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 nanocl_utils = { version = "0.9" }

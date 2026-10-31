@@ -428,7 +428,7 @@ HostConfig:
     - /srv/nginx:/etc/nginx:ro
 "#,
   );
-  let _: &bollard_next::container::Config = &spec.container_config;
+  let _: &bollard_next::models::ContainerCreateBody = &spec.container_config;
 
   let yaml = serde_yaml::to_string(&spec).unwrap();
   let yaml_value: serde_yaml::Value = serde_yaml::from_str(&yaml).unwrap();
@@ -748,8 +748,11 @@ fn assert_container_spec_schema(
 #[cfg(feature = "schemars")]
 #[test]
 fn schemars_schema_preserves_required_pascal_case_container_shape() {
-  let schema =
-    serde_json::to_value(schemars::schema_for!(ContainerSpec)).unwrap();
+  let schema = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<ContainerSpec>()
+    .to_value();
+  assert_eq!(schema["$schema"], "http://json-schema.org/draft-07/schema#");
   let references = schema["definitions"]
     .as_object()
     .unwrap()
@@ -758,8 +761,10 @@ fn schemars_schema_preserves_required_pascal_case_container_shape() {
     .collect();
   assert_container_spec_schema(&schema, &references);
 
-  let cargo_mode =
-    serde_json::to_value(schemars::schema_for!(CargoNetworkMode)).unwrap();
+  let cargo_mode = schemars::generate::SchemaSettings::draft07()
+    .into_generator()
+    .into_root_schema_for::<CargoNetworkMode>()
+    .to_value();
   assert_eq!(cargo_mode["type"], "string");
 }
 

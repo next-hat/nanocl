@@ -19,9 +19,9 @@ use crate::{
     (status = 409, description = "Namespace already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/namespaces")]
 pub async fn create_namespace(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   payload: web::types::Json<NamespacePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let item = NamespaceDb::create_obj(&payload, &state).await?;

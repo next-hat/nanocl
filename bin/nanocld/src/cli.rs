@@ -66,6 +66,25 @@ impl Default for Cli {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use clap::CommandFactory;
+
+  #[test]
+  fn daemon_cli_has_no_offline_reconciliation_command() {
+    assert!(
+      Cli::try_parse_from([
+        "nanocld",
+        "vm-reconcile",
+        "--vm-key",
+        "global.example",
+      ])
+      .is_err()
+    );
+    let mut command = Cli::command();
+    assert!(command.get_subcommands().next().is_none());
+    let help = command.render_long_help().to_string();
+    assert!(!help.contains("vm-reconcile"));
+    assert!(!help.contains("confirm-quiescent"));
+  }
 
   /// Test cli arguments with default values
   #[test]

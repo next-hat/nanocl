@@ -1,0 +1,1 @@
+ALTER TABLE resource_incarnations DROP CONSTRAINT current_operation_incarnation_fk;

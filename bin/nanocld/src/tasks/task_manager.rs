@@ -55,10 +55,24 @@ impl TaskManager {
     let key_ptr = key.clone();
     let tasks = self.tasks.clone();
     log::debug!("Creating task: {key} {}", kind);
+    // Registration must precede execution, and completion must remove only
+    // this handle. A delayed waiter/callback must not cancel its successor.
+    let (registered, identity) = tokio::sync::oneshot::channel();
     let new_task = ObjTask::new(kind.clone(), async move {
-      if let Err(err) = task.await {
+      let identity = identity.await.map_err(|_| {
+        IoError::interrupted("Task manager", "Task registration failed")
+      })?;
+      let result = task.await;
+      {
+        let mut tasks = tasks.lock().await;
+        if tasks.get(&key_ptr).is_some_and(|current| {
+          std::sync::Weak::ptr_eq(&Arc::downgrade(&current.fut), &identity)
+        }) {
+          tasks.remove(&key_ptr);
+        }
+      }
+      if let Err(err) = result {
         log::error!("Task failed: {kind} {key_ptr} {}", err);
-        tasks.lock().await.remove(&key_ptr);
         if let Err(err) = on_error(err.clone()).await {
           log::error!("on_error failed: {kind} {key_ptr} {}", err);
           return Err(err);
@@ -66,10 +80,11 @@ impl TaskManager {
         return Err(err);
       };
       log::debug!("Task completed: {kind} {key_ptr}");
-      tasks.lock().await.remove(&key_ptr);
       Ok::<_, IoError>(())
     });
+    let identity = Arc::downgrade(&new_task.fut);
     self.tasks.lock().await.insert(key, new_task);
+    let _ = registered.send(identity);
   }
 
   pub async fn remove_task(&self, key: &str) {
@@ -97,9 +112,103 @@ impl TaskManager {
 
   pub async fn wait_task(&self, key: &str) {
     if let Some(task) = self.get_task(key).await {
-      task.wait().await;
-      log::debug!("Task finished: {key} {} removing it", task.kind);
-      self.remove_task(key).await;
+      self.wait_registered_task(key, task).await;
     }
+  }
+
+  async fn wait_registered_task(&self, key: &str, task: ObjTask) {
+    task.wait().await;
+    let mut tasks = self.tasks.lock().await;
+    if tasks
+      .get(key)
+      .is_some_and(|current| Arc::ptr_eq(&current.fut, &task.fut))
+    {
+      log::debug!("Task finished: {key} {} removing it", task.kind);
+      tasks.remove(key);
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[ntex::test]
+  async fn delayed_task_waiter_preserves_the_registered_successor() {
+    let manager = TaskManager::new();
+    manager
+      .add_task(
+        "Vm@test",
+        NativeEventAction::Starting,
+        Box::pin(async { Ok(()) }),
+        |_| async { Ok(()) },
+      )
+      .await;
+    let previous = manager.get_task("Vm@test").await.unwrap();
+    previous.wait().await;
+
+    let (complete, blocked) = tokio::sync::oneshot::channel();
+    manager
+      .add_task(
+        "Vm@test",
+        NativeEventAction::Updating,
+        Box::pin(async move {
+          let _ = blocked.await;
+          Ok(())
+        }),
+        |_| async { Ok(()) },
+      )
+      .await;
+    let successor = manager.get_task("Vm@test").await.unwrap();
+    // The completion event captured the previous handle before the new
+    // request registered its task, then resumed its cleanup afterward.
+    manager.wait_registered_task("Vm@test", previous).await;
+    let remaining = manager.get_task("Vm@test").await.unwrap();
+    assert!(Arc::ptr_eq(&successor.fut, &remaining.fut));
+    assert!(!successor.fut.lock().await.as_ref().unwrap().is_finished());
+    complete.send(()).unwrap();
+    manager.wait_task("Vm@test").await;
+  }
+
+  #[ntex::test]
+  async fn delayed_task_failure_preserves_the_registered_successor() {
+    let manager = TaskManager::new();
+    let (failed, failure_started) = tokio::sync::oneshot::channel();
+    let (release, callback_blocked) = tokio::sync::oneshot::channel();
+    manager
+      .add_task(
+        "Vm@test",
+        NativeEventAction::Starting,
+        Box::pin(async {
+          Err(IoError::other("test", "injected setup failure"))
+        }),
+        move |_| async move {
+          failed.send(()).unwrap();
+          let _ = callback_blocked.await;
+          Ok(())
+        },
+      )
+      .await;
+    let previous = manager.get_task("Vm@test").await.unwrap();
+    failure_started.await.unwrap();
+    let (complete, blocked) = tokio::sync::oneshot::channel();
+    manager
+      .add_task(
+        "Vm@test",
+        NativeEventAction::Updating,
+        Box::pin(async move {
+          let _ = blocked.await;
+          Ok(())
+        }),
+        |_| async { Ok(()) },
+      )
+      .await;
+    let successor = manager.get_task("Vm@test").await.unwrap();
+    release.send(()).unwrap();
+    manager.wait_registered_task("Vm@test", previous).await;
+    let remaining = manager.get_task("Vm@test").await.unwrap();
+    assert!(Arc::ptr_eq(&successor.fut, &remaining.fut));
+    complete.send(()).unwrap();
+    manager.wait_task("Vm@test").await;
   }
 }

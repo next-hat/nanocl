@@ -1,10 +1,12 @@
+use std::io::{self, Write};
+
 use futures::{StreamExt, stream::FuturesUnordered};
 use indicatif::{MultiProgress, ProgressBar};
 use serde_json::Value;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocld_client::stubs::{
-  cargo_spec::CargoSpec,
+  cargo_spec::{CargoSpec, Config},
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
   resource::{ResourcePartial, ResourceUpdate},
   secret::{SecretPartial, SecretUpdate},
@@ -15,7 +17,10 @@ use nanocld_client::stubs::{
 
 use crate::{
   config::CliConfig,
-  models::{StateApplyOpts, StateLogsOpts, StateOutput, StateRef},
+  models::{
+    StateApplyOpts, StateCargoReceipt, StateLogsOpts, StateOutput,
+    StateOutputEvent, StateRef,
+  },
   utils::{self, cargo::cargo_spec_from_revision},
 };
 
@@ -41,6 +46,177 @@ fn insert_nanocl_group(
     None => serde_json::json!({
       "io.nanocl.group": group,
     }),
+  }
+}
+
+fn normalize_container_map_keys(config: &mut Config) {
+  // These native vectors represent Docker map keys. Canonicalize only the
+  // comparison copies; the authored payload and ordered fields stay intact.
+  for keys in [&mut config.exposed_ports, &mut config.volumes]
+    .into_iter()
+    .flatten()
+  {
+    keys.sort_unstable();
+  }
+}
+
+fn cargo_specs_match(current: &CargoSpec, desired: &CargoSpec) -> bool {
+  let mut current = current.clone();
+  let mut desired = desired.clone();
+  for spec in [&mut current, &mut desired] {
+    for container in spec.init_containers.iter_mut().chain(&mut spec.containers)
+    {
+      normalize_container_map_keys(&mut container.container_config);
+    }
+  }
+  current == desired
+}
+
+fn vm_spec_for_comparison(
+  desired: &VmSpecPartial,
+  current: &VmSpecPartial,
+) -> IoResult<VmSpecPartial> {
+  utils::state_diff::validate_vm_identity(
+    desired.mac_address.as_deref(),
+    current.mac_address.as_deref(),
+  )?;
+  // Resolve omitted values only for comparison. PATCH must retain omissions
+  // so a concurrent change after this inspect is not overwritten.
+  let mut desired = desired.clone();
+  desired.mac_address = current.mac_address.clone();
+  desired.cloud_init = desired.cloud_init.or(current.cloud_init);
+  desired.cloud_init_user_data = desired
+    .cloud_init_user_data
+    .clone()
+    .or_else(|| current.cloud_init_user_data.clone());
+  desired.console = desired.console.or(current.console);
+  if matches!(
+    desired.cloud_init_user_data,
+    Some(nanocld_client::stubs::vm_spec::VmCloudInitUserData::Reset)
+  ) {
+    desired.cloud_init_user_data = None;
+  }
+  Ok(desired)
+}
+
+fn vm_specs_match(
+  current: &VmSpecPartial,
+  desired: &VmSpecPartial,
+) -> IoResult<bool> {
+  let mut desired = vm_spec_for_comparison(desired, current)?;
+  let mut current = current.clone();
+  for config in [&mut current.init_container, &mut desired.init_container]
+    .into_iter()
+    .flatten()
+  {
+    normalize_container_map_keys(config);
+  }
+  Ok(current == desired)
+}
+
+async fn apply_matching_vm(
+  client: &nanocld_client::NanocldClient,
+  key: &str,
+  actual: &ObjPsStatusKind,
+  pg: &ProgressBar,
+  summary: &ProgressBar,
+  output: Option<&StateOutput>,
+) -> IoResult<&'static str> {
+  match actual {
+    ObjPsStatusKind::Start => Ok("Unchanged"),
+    ObjPsStatusKind::Stop => {
+      utils::progress::set_state_message(pg, summary, "Starting", output)?;
+      utils::process::wait_process_operation(
+        key,
+        EventActorKind::Vm,
+        NativeEventAction::Start,
+        client,
+        client.start_process_operation("vm", key),
+      )
+      .await?;
+      Ok("Running")
+    }
+    _ => Err(IoError::other(
+      "StateApply",
+      &format!(
+        "VM {key} has observed status {actual:?}; expected Start or Stop"
+      ),
+    )),
+  }
+}
+
+/// A best-effort snapshot after the existing operation has completed. This is
+/// reporting, not an additional readiness gate: an unavailable snapshot must
+/// not turn a successful operation into a failed deployment.
+async fn report_cargo_receipt(
+  client: &nanocld_client::NanocldClient,
+  key: &str,
+  token: &str,
+  progress: &MultiProgress,
+  output: Option<&StateOutput>,
+) {
+  let inspect = tokio::time::timeout(
+    std::time::Duration::from_secs(5),
+    client.inspect_cargo(key),
+  )
+  .await;
+  let receipt = match inspect {
+    Ok(Ok(inspect)) => {
+      Some(utils::state_receipt::cargo_receipt(token, &inspect))
+    }
+    _ => None,
+  };
+  if output.is_some() {
+    write_cargo_receipt(
+      token,
+      receipt.as_ref(),
+      progress,
+      output,
+      &mut io::stdout().lock(),
+    );
+  } else {
+    write_cargo_receipt(
+      token,
+      receipt.as_ref(),
+      progress,
+      None,
+      &mut io::stderr(),
+    );
+  }
+}
+
+fn write_cargo_receipt(
+  token: &str,
+  receipt: Option<&StateCargoReceipt>,
+  progress: &MultiProgress,
+  output: Option<&StateOutput>,
+  writer: &mut impl Write,
+) {
+  // Receipts are optional observations. Their output must not interrupt later
+  // Statefile items or replace an already completed operation's result.
+  if let Some(output) = output {
+    let _ = output.write_to(
+      writer,
+      StateOutputEvent::CargoReceipt {
+        resource: token,
+        status: if receipt.is_some() {
+          "observed"
+        } else {
+          "unavailable"
+        },
+        receipt,
+      },
+    );
+  } else {
+    let line = receipt.map_or_else(
+      || format!("  {token}  Current snapshot unavailable; use nanocl state status to inspect"),
+      utils::state_receipt::format_cargo_receipt,
+    );
+    if progress.is_hidden() {
+      let _ = writeln!(writer, "{line}");
+    } else {
+      let _ = progress.println(line);
+    }
   }
 }
 
@@ -105,40 +281,31 @@ async fn state_apply(
         |pg| async move {
           let metadata = insert_nanocl_group(&job.metadata, nanocl_group);
           job.metadata = Some(metadata);
-          if client.inspect_job(&job.name).await.is_ok() {
+          if let Ok(previous) = client.inspect_job(&job.name).await {
             utils::progress::set_state_message(
               &pg, summary, "Clearing", output,
             )?;
-            let waiter = utils::process::wait_process_state(
+            utils::process::wait_job_deletion(
               &job.name,
-              EventActorKind::Job,
-              vec![NativeEventAction::Destroy],
+              previous.incarnation_key,
+              previous.current_run_key,
               client,
+              client.delete_job_if_current(
+                &job.name,
+                previous.incarnation_key,
+                previous.current_run_key,
+              ),
             )
             .await?;
-            client.delete_job(&job.name).await?;
-            waiter.await.map_err(|err| {
-              IoError::interrupted("wait_process_state", &err.to_string())
-            })??;
             utils::progress::set_state_message(
               &pg, summary, "Cleared", output,
             )?;
           }
           utils::progress::set_state_message(&pg, summary, "Creating", output)?;
           client.create_job(&job).await?;
-          let waiter = utils::process::wait_process_state(
-            &job.name,
-            EventActorKind::Job,
-            vec![NativeEventAction::Start],
-            client,
-          )
-          .await?;
           utils::progress::set_state_message(&pg, summary, "Starting", output)?;
           client.start_process("job", &job.name).await?;
-          waiter.await.map_err(|err| {
-            IoError::interrupted("wait_process_state", &err.to_string())
-          })??;
-          Ok("Running")
+          Ok("Accepted")
         },
       )
       .await?;
@@ -167,43 +334,47 @@ async fn state_apply(
                   &pg, summary, "Creating", output,
                 )?;
                 client.create_cargo(&cargo, Some(namespace)).await?;
-                let waiter = utils::process::wait_process_state(
-                  key,
-                  EventActorKind::Cargo,
-                  vec![NativeEventAction::Start],
-                  client,
-                )
-                .await?;
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("cargo", key).await?;
-                waiter.await.map_err(|err| {
-                  IoError::interrupted("wait_process_state", &err.to_string())
-                })??;
+                utils::process::wait_process_operation(
+                  key, EventActorKind::Cargo, NativeEventAction::Start, client,
+                  client.start_process_operation("cargo", key),
+                ).await?;
               }
               Ok(inspect) => {
                 let cmp = cargo_spec_from_revision(&inspect.spec);
-                if (cmp != cargo) || opts.reload {
+                if !cargo_specs_match(&cmp, &cargo) || opts.reload {
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
                   )?;
-                  let waiter = utils::process::wait_process_state(
-                    key,
-                    EventActorKind::Cargo,
-                    vec![NativeEventAction::Update],
-                    client,
-                  )
-                  .await?;
-                  client.put_cargo(key, &cargo).await?;
-                  waiter.await.map_err(|err| {
-                    IoError::interrupted("wait_process_state", &err.to_string())
-                  })??;
+                  utils::process::wait_process_operation(
+                    key, EventActorKind::Cargo, NativeEventAction::Update, client,
+                    client.put_cargo_operation(key, &cargo),
+                  ).await?;
                   utils::progress::set_state_message(
                     &pg, summary, "Updated", output,
                   )?;
-                } else if inspect.status.actual == ObjPsStatusKind::Start {
-                  return Ok("Unchanged");
+                } else {
+                  match inspect.status.actual {
+                    ObjPsStatusKind::Start => return Ok("Unchanged"),
+                    ObjPsStatusKind::Create
+                    | ObjPsStatusKind::Stop
+                    | ObjPsStatusKind::Fail
+                    | ObjPsStatusKind::Finish => {
+                      utils::progress::set_state_message(
+                        &pg, summary, "Starting", output,
+                      )?;
+                      utils::process::wait_process_operation(
+                        key, EventActorKind::Cargo, NativeEventAction::Start, client,
+                        client.start_process_operation("cargo", key),
+                      ).await?;
+                    }
+                    actual => return Err(IoError::other(
+                      "StateApply",
+                      &format!("Cargo {key} has observed status {actual:?}; expected a settled Start, Create, Stop, Fail, or Finish status"),
+                    )),
+                  }
                 }
               }
             }
@@ -212,6 +383,7 @@ async fn state_apply(
         },
       )
       .await?;
+      report_cargo_receipt(client, &key, &token, progress, output).await;
     }
   }
 
@@ -240,44 +412,46 @@ async fn state_apply(
                   utils::path::resolve_full_path(&vm.image)?;
                 vm.image = image_full_path;
                 client.create_vm(&vm, Some(namespace)).await?;
-                let waiter = utils::process::wait_process_state(
-                  key,
-                  EventActorKind::Vm,
-                  vec![NativeEventAction::Start],
-                  client,
-                )
-                .await?;
                 utils::progress::set_state_message(
                   &pg, summary, "Starting", output,
                 )?;
-                client.start_process("vm", key).await?;
-                waiter.await.map_err(|err| {
-                  IoError::interrupted("wait_process_state", &err.to_string())
-                })??;
+                utils::process::wait_process_operation(
+                  key,
+                  EventActorKind::Vm,
+                  NativeEventAction::Start,
+                  client,
+                  client.start_process_operation("vm", key),
+                )
+                .await?;
               }
               Ok(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
-                if (cmp != vm) || opts.reload {
+                if !vm_specs_match(&cmp, &vm)? || opts.reload {
                   let update: VmSpecUpdate = vm.clone().into();
                   utils::progress::set_state_message(
                     &pg, summary, "Updating", output,
                   )?;
-                  let waiter = utils::process::wait_process_state(
+                  utils::process::wait_process_operation(
                     key,
                     EventActorKind::Vm,
-                    vec![NativeEventAction::Start],
+                    NativeEventAction::Update,
                     client,
+                    client.patch_vm_operation(key, &update),
                   )
                   .await?;
-                  client.patch_vm(key, &update).await?;
-                  waiter.await.map_err(|err| {
-                    IoError::interrupted("wait_process_state", &err.to_string())
-                  })??;
                   utils::progress::set_state_message(
                     &pg, summary, "Updated", output,
                   )?;
-                } else if inspect.status.actual == ObjPsStatusKind::Start {
-                  return Ok("Unchanged");
+                } else {
+                  return apply_matching_vm(
+                    client,
+                    key,
+                    &inspect.status.actual,
+                    &pg,
+                    summary,
+                    output,
+                  )
+                  .await;
                 }
               }
             }
@@ -453,6 +627,32 @@ pub(super) async fn exec_state_apply(
     print_states(&states);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
+  } else {
+    // Show every rendered source before mutations, including orphan removal.
+    // Interactive users still review the complete Statefile above.
+    for state in &states {
+      let summary =
+        utils::state_summary::summarize_state(state, &get_nanocl_group(state));
+      if opts.json {
+        StateOutput {
+          operation: "apply",
+          statefile: Some(summary.source.clone()),
+        }
+        .emit(StateOutputEvent::Summary {
+          summary: &summary,
+          reload: opts.reload,
+          remove_orphans: opts.remove_orphans,
+        })?;
+      } else {
+        eprintln!("{}", utils::state_summary::format_state_summary(&summary));
+        if opts.reload || opts.remove_orphans {
+          eprintln!(
+            "  Options: reload={}, remove-orphans={}",
+            opts.reload, opts.remove_orphans
+          );
+        }
+      }
+    }
   }
   for state in &states {
     if opts.remove_orphans {
@@ -502,4 +702,702 @@ pub(super) async fn exec_state_apply(
       .await;
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::{Arc, Mutex};
+
+  use futures::{
+    channel::{mpsc, oneshot},
+    future::Either,
+  };
+  use nanocld_client::{ConnectOpts, NANOCLD_DEFAULT_VERSION, NanocldClient};
+  use ntex::{util::Bytes, web};
+
+  use super::*;
+
+  fn cargo_comparison_fixture() -> CargoSpec {
+    use nanocld_client::stubs::cargo_spec::ContainerSpec;
+
+    let container = |name: &str| ContainerSpec {
+      name: name.to_owned(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some("alpine:latest".to_owned()),
+        exposed_ports: Some(vec!["9000/tcp".to_owned(), "8080/tcp".to_owned()]),
+        volumes: Some(vec!["/logs".to_owned(), "/data".to_owned()]),
+        env: Some(vec!["A=1".to_owned(), "B=2".to_owned()]),
+        cmd: Some(vec!["first".to_owned(), "second".to_owned()]),
+        ..Default::default()
+      },
+    };
+    CargoSpec {
+      name: "app".to_owned(),
+      init_containers: vec![container("prepare"), container("migrate")],
+      containers: vec![container("api"), container("worker")],
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn cargo_state_apply_skips_reordered_map_keys_without_mutating_payloads() {
+    let current = cargo_comparison_fixture();
+    let mut desired = current.clone();
+    for container in desired
+      .init_containers
+      .iter_mut()
+      .chain(&mut desired.containers)
+    {
+      container
+        .container_config
+        .exposed_ports
+        .as_mut()
+        .unwrap()
+        .reverse();
+      container
+        .container_config
+        .volumes
+        .as_mut()
+        .unwrap()
+        .reverse();
+    }
+    let original_desired = desired.clone();
+    let original_current = current.clone();
+    assert_ne!(current, desired);
+    assert!(cargo_specs_match(&current, &desired));
+    assert_eq!(current, original_current);
+    assert_eq!(desired, original_desired);
+  }
+
+  #[test]
+  fn cargo_state_apply_preserves_real_map_and_ordered_field_changes() {
+    let current = cargo_comparison_fixture();
+    for init in [false, true] {
+      for field in ["ExposedPorts", "Volumes", "Env", "Cmd", "Containers"] {
+        let mut desired = current.clone();
+        let containers = if init {
+          &mut desired.init_containers
+        } else {
+          &mut desired.containers
+        };
+        let config = &mut containers.first_mut().unwrap().container_config;
+        match field {
+          "ExposedPorts" => {
+            config.exposed_ports.as_mut().unwrap().pop();
+          }
+          "Volumes" => {
+            config.volumes.as_mut().unwrap().pop();
+          }
+          "Env" => config.env.as_mut().unwrap().reverse(),
+          "Cmd" => config.cmd.as_mut().unwrap().reverse(),
+          _ => containers.reverse(),
+        }
+        assert!(
+          !cargo_specs_match(&current, &desired),
+          "init={init} {field}"
+        );
+      }
+    }
+  }
+
+  struct FailingReceiptWriter {
+    fail_on_flush: bool,
+    writes: usize,
+    flushes: usize,
+  }
+
+  impl Write for FailingReceiptWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+      self.writes += 1;
+      if self.fail_on_flush {
+        Ok(bytes.len())
+      } else {
+        Err(io::Error::new(
+          io::ErrorKind::BrokenPipe,
+          "closed receipt sink",
+        ))
+      }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+      self.flushes += 1;
+      Err(io::Error::new(
+        io::ErrorKind::BrokenPipe,
+        "closed receipt sink",
+      ))
+    }
+  }
+
+  #[test]
+  fn optional_cargo_receipt_ignores_write_and_flush_failures() {
+    let progress =
+      MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let receipt = StateCargoReceipt {
+      resource: "cargo/global.web".to_owned(),
+      revision: "revision".to_owned(),
+      running: 0,
+      total: 0,
+      processes: Vec::new(),
+    };
+    for receipt in [Some(&receipt), None] {
+      for output in [Some(&output), None] {
+        for fail_on_flush in [false, true] {
+          let mut writer = FailingReceiptWriter {
+            fail_on_flush,
+            writes: 0,
+            flushes: 0,
+          };
+          write_cargo_receipt(
+            "cargo/global.web",
+            receipt,
+            &progress,
+            output,
+            &mut writer,
+          );
+          assert!(writer.writes > 0);
+          assert_eq!(
+            writer.flushes,
+            usize::from(output.is_some() && fail_on_flush),
+          );
+          // Required output retains its existing error contract.
+          if let Some(output) = output {
+            assert!(
+              output
+                .write_to(
+                  &mut writer,
+                  StateOutputEvent::Result {
+                    success: true,
+                    error: None,
+                  }
+                )
+                .is_err()
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn optional_cargo_receipt_writes_json_and_plain_snapshots() {
+    let progress =
+      MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let mut bytes = Vec::new();
+    write_cargo_receipt(
+      "cargo/global.web",
+      None,
+      &progress,
+      Some(&output),
+      &mut bytes,
+    );
+    let record: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(record["type"], "cargo_receipt");
+    assert_eq!(record["resource"], "cargo/global.web");
+    assert_eq!(record["status"], "unavailable");
+    assert!(record.get("success").is_none());
+    bytes.clear();
+    write_cargo_receipt("cargo/global.web", None, &progress, None, &mut bytes);
+    assert_eq!(
+      String::from_utf8(bytes).unwrap(),
+      "  cargo/global.web  Current snapshot unavailable; use nanocl state status to inspect\n"
+    );
+  }
+
+  struct VmApplyRequests {
+    paths: Vec<String>,
+    conditions: Option<Value>,
+    started: Option<oneshot::Sender<()>>,
+    events: Option<mpsc::UnboundedReceiver<Result<Bytes, std::io::Error>>>,
+    reject_start: bool,
+  }
+
+  struct VmApplyFixture {
+    client: NanocldClient,
+    _server: web::test::TestServer,
+    requests: Arc<Mutex<VmApplyRequests>>,
+    started: oneshot::Receiver<()>,
+    events: mpsc::UnboundedSender<Result<Bytes, std::io::Error>>,
+  }
+
+  fn vm_event(
+    failed: bool,
+    action: &str,
+    actor_key: &str,
+    actor_kind: &str,
+  ) -> Bytes {
+    let event = serde_json::json!({
+      "Key": "3e8f6eef-f03a-446d-9e7a-635728c3f565",
+      "CreatedAt": "2026-01-01T00:00:00",
+      "ExpiresAt": "2026-01-01T01:00:00",
+      "ReportingNode": "test",
+      "ReportingController": "nanocl.io/core",
+      "Kind": if failed { "error" } else { "normal" },
+      "Action": action,
+      "Reason": "VM start",
+      "Note": if failed { "VM start failed" } else { "VM started" },
+      "Actor": {"Key": actor_key, "Kind": actor_kind},
+      "Metadata": {"Operation": "a54feac1-3cdf-43bd-9f02-1ad2183f9e92"},
+    });
+    Bytes::from(format!("{event}\n"))
+  }
+
+  async fn watch_vm_start(
+    req: web::HttpRequest,
+    body: Bytes,
+  ) -> web::HttpResponse {
+    let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
+    let events = {
+      let mut requests = requests.lock().unwrap();
+      requests.paths.push(req.path().to_owned());
+      assert!(body.is_empty());
+      requests.conditions = Some(Value::Null);
+      requests.events.take().unwrap()
+    };
+    web::HttpResponse::Ok().streaming(Box::pin(events))
+  }
+
+  async fn start_matching_vm(req: web::HttpRequest) -> web::HttpResponse {
+    let requests = req.app_state::<Arc<Mutex<VmApplyRequests>>>().unwrap();
+    let mut requests = requests.lock().unwrap();
+    requests.paths.push(req.path().to_owned());
+    let _ = requests.started.take().unwrap().send(());
+    if requests.reject_start {
+      web::HttpResponse::Conflict()
+        .json(&serde_json::json!({"msg": "VM start rejected"}))
+    } else {
+      web::HttpResponse::Accepted()
+        .set_header(
+          "X-Nanocl-Operation",
+          "a54feac1-3cdf-43bd-9f02-1ad2183f9e92",
+        )
+        .build()
+    }
+  }
+
+  fn vm_apply_fixture(reject_start: bool) -> VmApplyFixture {
+    let (start, started) = oneshot::channel();
+    let (events, stream) = mpsc::unbounded();
+    let requests = Arc::new(Mutex::new(VmApplyRequests {
+      paths: Vec::new(),
+      conditions: None,
+      started: Some(start),
+      events: Some(stream),
+      reject_start,
+    }));
+    let server_requests = requests.clone();
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(
+          web::WebAppConfig::new().set_state(server_requests.clone()),
+        )
+        .service(
+          web::resource(format!("/v{NANOCLD_DEFAULT_VERSION}/events/watch"))
+            .route(web::post().to(watch_vm_start)),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/processes/vm/global.guest/start"
+          ))
+          .route(web::post().to(start_matching_vm)),
+        )
+    });
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: format!("http://localhost:{}", server.addr().port()),
+      ..Default::default()
+    })
+    .unwrap();
+    VmApplyFixture {
+      client,
+      _server: server,
+      requests,
+      started,
+      events,
+    }
+  }
+
+  async fn stopped_vm_apply(
+    events: Vec<Result<Bytes, std::io::Error>>,
+    close_stream: bool,
+  ) -> IoResult<&'static str> {
+    let fixture = vm_apply_fixture(false);
+    fixture
+      .events
+      .unbounded_send(Ok(vm_event(false, "starting", "global.guest", "Vm")))
+      .unwrap();
+    let pg = ProgressBar::hidden();
+    let summary = ProgressBar::hidden();
+    let apply = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &pg,
+      &summary,
+      None,
+    );
+    futures::pin_mut!(apply);
+    match tokio::time::timeout(
+      std::time::Duration::from_secs(5),
+      futures::future::select(apply.as_mut(), fixture.started),
+    )
+    .await
+    .expect("apply did not request start")
+    {
+      Either::Left((result, _)) => {
+        panic!("apply finished before requesting start: {result:?}");
+      }
+      Either::Right((started, _)) => started.unwrap(),
+    }
+    // The accepted HTTP request alone cannot produce a successful apply.
+    assert!(futures::poll!(apply.as_mut()).is_pending());
+    for event in events {
+      fixture.events.unbounded_send(event).unwrap();
+    }
+    if close_stream {
+      fixture.events.close_channel();
+    }
+    // When close_stream is false, success must not depend on receiving EOF.
+    let result = tokio::time::timeout(std::time::Duration::from_secs(5), apply)
+      .await
+      .expect("apply did not settle after the supplied events");
+    let requests = fixture.requests.lock().unwrap();
+    assert_eq!(
+      requests.paths,
+      [
+        format!("/v{NANOCLD_DEFAULT_VERSION}/events/watch"),
+        format!("/v{NANOCLD_DEFAULT_VERSION}/processes/vm/global.guest/start"),
+      ]
+    );
+    assert_eq!(requests.conditions, Some(Value::Null));
+    result
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_running_is_unchanged() {
+    let fixture = vm_apply_fixture(false);
+    let result = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Start,
+      &ProgressBar::hidden(),
+      &ProgressBar::hidden(),
+      None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result, "Unchanged");
+    assert!(fixture.requests.lock().unwrap().paths.is_empty());
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_waits_for_start() {
+    assert_eq!(
+      stopped_vm_apply(
+        vec![Ok(vm_event(false, "start", "global.guest", "Vm"))],
+        false,
+      )
+      .await
+      .unwrap(),
+      "Running"
+    );
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_start_failure() {
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "start", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("VM start failed"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_update_failure() {
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "update", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.inner.to_string(), "VM start failed");
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_starting_failure() {
+    let error = stopped_vm_apply(
+      vec![Ok(vm_event(true, "starting", "global.guest", "Vm"))],
+      false,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.inner.to_string(), "VM start failed");
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_start_rejection() {
+    let fixture = vm_apply_fixture(true);
+    fixture
+      .events
+      .unbounded_send(Ok(vm_event(false, "starting", "global.guest", "Vm")))
+      .unwrap();
+    let result = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &ProgressBar::hidden(),
+      &ProgressBar::hidden(),
+      None,
+    )
+    .await;
+    // Close the fixture's event stream after the rejected request.
+    fixture.events.close_channel();
+    assert!(
+      result
+        .unwrap_err()
+        .to_string()
+        .contains("VM start rejected")
+    );
+    assert_eq!(fixture.requests.lock().unwrap().paths.len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_empty_eof() {
+    let fixture = vm_apply_fixture(false);
+    fixture.events.close_channel();
+    let pg = ProgressBar::hidden();
+    let summary = ProgressBar::hidden();
+    let apply = apply_matching_vm(
+      &fixture.client,
+      "global.guest",
+      &ObjPsStatusKind::Stop,
+      &pg,
+      &summary,
+      None,
+    );
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), apply)
+      .await
+      .expect("apply did not settle after empty EOF")
+      .unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    assert!(error.to_string().contains("global.guest"));
+    assert!(
+      error
+        .to_string()
+        .contains("before the requested completion")
+    );
+    assert_eq!(fixture.requests.lock().unwrap().paths.len(), 2);
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_nonterminal_eof() {
+    let error = stopped_vm_apply(Vec::new(), true).await.unwrap_err();
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    assert!(
+      error
+        .to_string()
+        .contains("before the requested completion")
+    );
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_rejects_unrelated_events_then_eof() {
+    for (failed, action, actor_key, actor_kind) in [
+      (false, "start", "global.other", "Vm"),
+      (false, "start", "global.guest", "Cargo"),
+      (false, "stop", "global.guest", "Vm"),
+      (false, "starting", "global.guest", "Vm"),
+      (true, "start", "global.other", "Vm"),
+      (true, "start", "global.guest", "Cargo"),
+      (true, "update", "global.other", "Vm"),
+      (true, "update", "global.guest", "Cargo"),
+    ] {
+      let error = stopped_vm_apply(
+        vec![Ok(vm_event(failed, action, actor_key, actor_kind))],
+        true,
+      )
+      .await
+      .unwrap_err();
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+      assert!(error.to_string().contains("global.guest"));
+      assert!(
+        error
+          .to_string()
+          .contains("before the requested completion")
+      );
+    }
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_stream_decode_failure() {
+    let error =
+      stopped_vm_apply(vec![Ok(Bytes::from_static(b"invalid event\n"))], true)
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("Unable to parse stream"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_stopped_propagates_stream_transport_failure()
+  {
+    let error = stopped_vm_apply(
+      vec![Err(std::io::Error::new(
+        std::io::ErrorKind::ConnectionReset,
+        "event stream disconnected",
+      ))],
+      true,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("Unable to read stream"));
+  }
+
+  #[ntex::test]
+  async fn vm_state_apply_matching_other_statuses_fail_without_requests() {
+    for actual in [
+      ObjPsStatusKind::Create,
+      ObjPsStatusKind::Fail,
+      ObjPsStatusKind::Starting,
+    ] {
+      let fixture = vm_apply_fixture(false);
+      let error = apply_matching_vm(
+        &fixture.client,
+        "global.guest",
+        &actual,
+        &ProgressBar::hidden(),
+        &ProgressBar::hidden(),
+        None,
+      )
+      .await
+      .unwrap_err();
+      assert!(error.to_string().contains(&format!("{actual:?}")));
+      assert!(error.to_string().contains("global.guest"));
+      assert!(fixture.requests.lock().unwrap().paths.is_empty());
+    }
+  }
+
+  #[test]
+  fn vm_state_apply_compares_init_map_keys_without_masking_real_changes() {
+    let current = VmSpecPartial {
+      name: "guest".to_owned(),
+      image: "/vm.qcow2".to_owned(),
+      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
+      init_container: Some(
+        cargo_comparison_fixture()
+          .containers
+          .into_iter()
+          .next()
+          .unwrap()
+          .container_config,
+      ),
+      ..Default::default()
+    };
+    let mut desired = current.clone();
+    desired.mac_address = None;
+    let config = desired.init_container.as_mut().unwrap();
+    config.exposed_ports.as_mut().unwrap().reverse();
+    config.volumes.as_mut().unwrap().reverse();
+    let original_current = current.clone();
+    let original_desired = desired.clone();
+    assert!(vm_specs_match(&current, &desired).unwrap());
+    assert_eq!(current, original_current);
+    assert_eq!(desired, original_desired);
+
+    for field in ["ExposedPorts", "Volumes", "Env", "Cmd"] {
+      let mut changed = desired.clone();
+      let config = changed.init_container.as_mut().unwrap();
+      match field {
+        "ExposedPorts" => {
+          config.exposed_ports.as_mut().unwrap().pop();
+        }
+        "Volumes" => {
+          config.volumes.as_mut().unwrap().pop();
+        }
+        "Env" => config.env.as_mut().unwrap().reverse(),
+        _ => config.cmd.as_mut().unwrap().reverse(),
+      }
+      assert!(!vm_specs_match(&current, &changed).unwrap(), "{field}");
+    }
+    let mut changed = desired.clone();
+    changed.init_container = None;
+    assert!(!vm_specs_match(&current, &changed).unwrap());
+    changed.mac_address = Some("02:00:00:00:00:02".to_owned());
+    assert!(vm_specs_match(&current, &changed).is_err());
+    let mut invalid_current = current;
+    invalid_current.mac_address = None;
+    assert!(vm_specs_match(&invalid_current, &desired).is_err());
+  }
+
+  #[test]
+  fn vm_state_apply_preserves_generated_identity_and_omitted_options() {
+    let current = VmSpecPartial {
+      name: "guest".to_owned(),
+      image: "/vm.qcow2".to_owned(),
+      mac_address: Some("02:ab:cd:ef:00:01".to_owned()),
+      cloud_init: Some(false),
+      cloud_init_user_data: Some(
+        serde_json::from_value(serde_json::json!({"packages": ["curl"]}))
+          .unwrap(),
+      ),
+      console: Some(true),
+      ..Default::default()
+    };
+    let mut desired = VmSpecPartial {
+      name: current.name.clone(),
+      image: current.image.clone(),
+      ..Default::default()
+    };
+    assert_eq!(vm_spec_for_comparison(&desired, &current).unwrap(), current);
+    let payload =
+      serde_json::to_value(VmSpecUpdate::from(desired.clone())).unwrap();
+    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
+      assert!(payload.get(field).is_none(), "{field} must remain omitted");
+    }
+    desired.console = Some(false);
+    desired.cloud_init_user_data = Some(String::new().into());
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert_eq!(comparison.console, Some(false));
+    assert_eq!(comparison.cloud_init_user_data, Some(String::new().into()));
+    assert_eq!(desired.console, Some(false));
+    assert_eq!(desired.cloud_init_user_data, Some(String::new().into()));
+    desired.mac_address = Some("02:00:00:00:00:02".to_owned());
+    assert!(vm_spec_for_comparison(&desired, &current).is_err());
+    let mut invalid_current = current.clone();
+    invalid_current.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+    desired.mac_address = None;
+    assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+  }
+
+  #[test]
+  fn vm_state_apply_explicit_null_clears_user_data_without_mutating_payload() {
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: "/vm.qcow2".into(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
+      cloud_init_user_data: Some("#cloud-config\n".to_owned().into()),
+      ..Default::default()
+    };
+    let desired: VmSpecPartial = serde_json::from_value(serde_json::json!({
+      "Name": "guest", "Image": "/vm.qcow2", "CloudInitUserData": null,
+    }))
+    .unwrap();
+    let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+    assert!(comparison.cloud_init_user_data.is_none());
+    assert_ne!(comparison, current);
+    let payload = serde_json::to_value(VmSpecUpdate::from(desired)).unwrap();
+    assert_eq!(payload.get("CloudInitUserData"), Some(&Value::Null));
+  }
 }

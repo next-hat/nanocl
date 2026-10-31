@@ -2,10 +2,9 @@ use ntex::web;
 
 use nanocl_error::http::HttpError;
 
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
-use crate::{dnsmasq, utils};
+use crate::{models::SystemState, utils};
 
 /// Create/Update a new DnsRule
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -20,18 +19,17 @@ use crate::{dnsmasq, utils};
     (status = 200, description = "The created rule", body = ResourceDnsRule),
   ),
 ))]
-#[web::put("/rules/{name}")]
 pub(crate) async fn apply_rule(
   // To follow the resource service convention, we have to use a tuple
-  client: web::types::State<NanocldClient>,
-  dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::debug!("rule::apply: resolving {}", path.1);
-  let scope = utils::resolve_rule(&payload, &client).await?;
+  let scope = utils::resolve_rule(&payload, &state.client).await?;
   log::debug!("rule::apply: applying {}", path.1);
-  dnsmasq.apply_rule(&path.1, scope).await?;
+  state.dnsmasq.apply_rule(&path.1, scope).await?;
   log::debug!("rule::apply: applied {}", path.1);
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
@@ -48,23 +46,34 @@ pub(crate) async fn apply_rule(
     (status = 200, description = "Rule has been deleted"),
   ),
 ))]
-#[web::delete("/rules/{name}")]
 pub(crate) async fn remove_rule(
-  client: web::types::State<NanocldClient>,
-  dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   // Nanocld invokes the controller before deleting the persisted resource.
-  client.inspect_resource(&path.1).await?;
+  state.client.inspect_resource(&path.1).await?;
   log::debug!("rule::remove: removing {}", path.1);
-  dnsmasq.remove_rule(&path.1).await?;
+  state.dnsmasq.remove_rule(&path.1).await?;
   log::debug!("rule::remove: removed {}", path.1);
-  Ok(web::HttpResponse::Ok().finish())
+  Ok(web::HttpResponse::Ok().build())
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(apply_rule);
-  config.service(remove_rule);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/rules/{name}")
+      .name("apply_rule")
+      .guard(web::guard::Put())
+      .to_with_state(apply_rule),
+  );
+  config.service(
+    web::resource("/rules/{name}")
+      .name("remove_rule")
+      .guard(web::guard::Delete())
+      .to_with_state(remove_rule),
+  );
 }
 
 #[cfg(test)]

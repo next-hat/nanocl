@@ -26,8 +26,10 @@ use crate::{
     StateDiff, StateDiffItem, StateDiffOpts, StateDiffSnapshot, StateRef,
   },
   utils::{
-    cargo::cargo_spec_from_revision, process::resource_key,
-    state_diff::diff_item, state_diff_pager,
+    cargo::cargo_spec_from_revision,
+    process::resource_key,
+    state_diff::{diff_item, validate_vm_identity},
+    state_diff_pager,
   },
 };
 
@@ -86,7 +88,16 @@ async fn inspect_object(
       .map(|value| serde_json::to_value(ResourcePartial::from(value))),
     _ => unreachable!("internal object kind"),
   };
-  Ok(value.transpose()?)
+  let value = value.transpose()?;
+  if kind == "vm"
+    && let Some(value) = &value
+  {
+    validate_vm_identity(
+      None,
+      value.get("MacAddress").and_then(Value::as_str),
+    )?;
+  }
+  Ok(value)
 }
 
 fn desired_value(value: &impl Serialize, group: &str) -> IoResult<Value> {
@@ -229,6 +240,7 @@ async fn group_objects(
     .map_err(read_error)?
     {
       let value = VmSpecPartial::from(value.spec);
+      validate_vm_identity(None, value.mac_address.as_deref())?;
       objects.insert(
         ("vm".into(), resource_key(&value.name, namespace)?),
         serde_json::to_value(value)?,
@@ -420,6 +432,19 @@ pub(super) async fn exec_state_diff(
         Some(value) => value.clone(),
         None => inspect_object(&cli_conf.client, &kind, &name).await?,
       };
+      // Actual VM reads already require an allocated address. A VM created
+      // earlier in this preview can still omit it until the daemon creates it.
+      if kind == "vm"
+        && let Some(current_mac) = before
+          .as_ref()
+          .and_then(|value| value.get("MacAddress"))
+          .and_then(Value::as_str)
+      {
+        validate_vm_identity(
+          after.get("MacAddress").and_then(Value::as_str),
+          Some(current_mac),
+        )?;
+      }
       let reason = if before.is_some() && kind == "job" {
         Some("apply recreates existing jobs")
       } else if before.is_some()
@@ -440,7 +465,15 @@ pub(super) async fn exec_state_diff(
         false,
         reason,
       ));
-      snapshot.insert(key, Some(after));
+      let mut projected = after;
+      if kind == "vm"
+        && projected.get("MacAddress").is_none_or(Value::is_null)
+        && let Some(address) =
+          before.as_ref().and_then(|value| value.get("MacAddress"))
+      {
+        projected["MacAddress"] = address.clone();
+      }
+      snapshot.insert(key, Some(projected));
     }
   }
   // Print only after the entire preview succeeds, so failures never emit a partial plan.

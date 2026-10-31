@@ -21,9 +21,9 @@ use crate::{
     (status = 200, description = "Count result", body = GenericCount),
   ),
 ))]
-#[web::get("/namespaces/count")]
 pub async fn count_namespace(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = utils::query_string::parse_qs_filter(&qs)?;

@@ -20,9 +20,9 @@ use crate::{
     (status = 404, description = "Secret doesn't exists", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/secrets/{key}")]
 pub async fn delete_secret(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   SecretDb::del_obj_by_pk(&path.1, &(), &state).await?;

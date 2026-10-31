@@ -20,21 +20,68 @@ pub use patch::*;
 pub use put::*;
 pub use revert::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(create_cargo);
-  config.service(delete_cargo);
-  config.service(patch_cargo);
-  config.service(put_cargo);
-  config.service(list_cargo);
-  config.service(inspect_cargo);
-  config.service(list_cargo_history);
-  config.service(revert_cargo);
-  config.service(count_cargo);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/cargoes")
+      .name("create_cargo")
+      .guard(web::guard::Post())
+      .to_with_state(create_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("delete_cargo")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("patch_cargo")
+      .guard(web::guard::Patch())
+      .to_with_state(patch_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}")
+      .name("put_cargo")
+      .guard(web::guard::Put())
+      .to_with_state(put_cargo),
+  );
+  config.service(
+    web::resource("/cargoes")
+      .name("list_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(list_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}/inspect")
+      .name("inspect_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/{key}/histories")
+      .name("list_cargo_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_cargo_history),
+  );
+  config.service(
+    web::resource("/cargoes/{cargo_key}/histories/{history_key}/revert")
+      .name("revert_cargo")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_cargo),
+  );
+  config.service(
+    web::resource("/cargoes/count")
+      .name("count_cargo")
+      .guard(web::guard::Get())
+      .to_with_state(count_cargo),
+  );
 }
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::models::HealthConfig;
+  use bollard_next::models::{HealthConfig, HostConfig};
   use futures::{StreamExt, TryStreamExt};
   use ntex::http;
 
@@ -59,7 +106,8 @@ mod tests {
 
   use crate::{
     models::{
-      CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole, ProcessDb,
+      CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+      DistributedMutexDb, OperationDb, ProcessDb,
     },
     repositories::generic::*,
     utils::{
@@ -166,6 +214,109 @@ mod tests {
       .and_then(|state| state.started_at.as_deref())
   }
 
+  async fn cargo_completion_events(
+    system: &TestSystem,
+    key: &str,
+    action: NativeEventAction,
+  ) -> crate::models::RawEventReceiver {
+    let mut condition = cargo_event_condition(key, EventKind::Normal, action);
+    condition.kind.push(EventKind::Error);
+    system
+      .state
+      .subscribe_raw(Some(vec![condition]))
+      .await
+      .unwrap()
+  }
+
+  async fn cargo_pending_events(
+    system: &TestSystem,
+    key: &str,
+  ) -> crate::models::RawEventReceiver {
+    system
+      .state
+      .subscribe_raw(Some(vec![cargo_event_condition(
+        key,
+        EventKind::Warning,
+        NativeEventAction::Other("operation_pending".to_owned()),
+      )]))
+      .await
+      .unwrap()
+  }
+
+  async fn wait_cargo_pending(
+    system: &TestSystem,
+    key: &str,
+    events: crate::models::RawEventReceiver,
+  ) {
+    // collect_events bounds the wait and retains events before the warning.
+    let events = collect_events(events).await;
+    let condition = cargo_event_condition(
+      key,
+      EventKind::Warning,
+      NativeEventAction::Other("operation_pending".to_owned()),
+    );
+    let pending = events
+      .iter()
+      .find(|event| condition == **event)
+      .unwrap_or_else(|| {
+        panic!("Cargo {key} did not report pending: {events:?}")
+      });
+    assert_eq!(pending.reason, "operation_pending");
+    let operation =
+      OperationDb::current("Cargo", key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+      pending
+        .metadata
+        .as_ref()
+        .and_then(|data| data.get("Operation")),
+      Some(&serde_json::json!(operation.key))
+    );
+    assert!(operation.outcome.is_none());
+    assert!(operation.completed_at.is_none());
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+    let guard = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      crate::utils::container::cargo::lifecycle_lock(key).lock_owned(),
+    )
+    .await
+    .expect("Cargo executor did not release its lifecycle guard");
+    drop(guard);
+  }
+
+  async fn wait_cargo_completion(
+    system: &TestSystem,
+    key: &str,
+    action: NativeEventAction,
+    events: crate::models::RawEventReceiver,
+  ) {
+    let events = collect_events(events).await;
+    let completed =
+      cargo_event_condition(key, EventKind::Normal, action.clone());
+    let failed = cargo_event_condition(key, EventKind::Error, action.clone());
+    assert!(
+      events.iter().any(|event| completed == *event),
+      "Cargo {key} did not complete {action}: {events:?}"
+    );
+    assert!(
+      !events.iter().any(|event| failed == *event),
+      "Cargo {key} failed {action}: {events:?}"
+    );
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+  }
+
   async fn start_cargo(system: &TestSystem, key: &str) {
     let events = system
       .state
@@ -238,6 +389,1272 @@ mod tests {
       .await;
   }
 
+  async fn inspect_cargo_fixture(
+    system: &TestSystem,
+    key: &str,
+  ) -> CargoInspect {
+    let response = system
+      .client
+      .send_get(&format!("{ENDPOINT}/{key}/inspect"), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    response.json::<CargoInspect>().await.unwrap()
+  }
+
+  async fn wait_cargo_failure(
+    system: &TestSystem,
+    key: &str,
+    action: NativeEventAction,
+    events: crate::models::RawEventReceiver,
+  ) {
+    let events = collect_events(events).await;
+    let failed = cargo_event_condition(key, EventKind::Error, action);
+    assert!(events.iter().any(|event| failed == *event), "{events:?}");
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{key}", EventActorKind::Cargo))
+      .await;
+    // The registered task waits for the detached executor. Acquiring its
+    // lifecycle guard also proves all operation-owned work has released it.
+    let guard = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      crate::utils::container::cargo::lifecycle_lock(key).lock_owned(),
+    )
+    .await
+    .expect("Cargo executor did not release its lifecycle guard");
+    drop(guard);
+  }
+
+  async fn delete_cargo_fixture(system: &TestSystem, key: &str) {
+    let events =
+      cargo_completion_events(system, key, NativeEventAction::Destroy).await;
+    let response = system
+      .client
+      .send_delete(
+        &format!("{ENDPOINT}/{key}"),
+        Some(CargoDeleteQuery { force: Some(true) }),
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(system, key, NativeEventAction::Destroy, events)
+      .await;
+  }
+
+  fn operation_fixture_spec(name: &str, init_command: &str) -> CargoSpec {
+    let mut spec = cargo_spec(name, "alpine:latest");
+    spec.containers[0].container_config.cmd =
+      Some(vec!["sleep".to_owned(), "3600".to_owned()]);
+    let mut init = container("prepare", "alpine:latest");
+    init.container_config.cmd = Some(vec![
+      "sh".to_owned(),
+      "-c".to_owned(),
+      init_command.to_owned(),
+    ]);
+    spec.init_containers.push(init);
+    spec
+  }
+
+  async fn cargo_runtime_snapshot(
+    system: &TestSystem,
+    key: &str,
+  ) -> std::collections::BTreeMap<String, serde_json::Value> {
+    use bollard_next::query_parameters::ListContainersOptions;
+    let containers = system
+      .state
+      .inner
+      .docker_api
+      .list_containers(Some(ListContainersOptions {
+        all: true,
+        filters: Some(std::collections::HashMap::from([(
+          "label".to_owned(),
+          vec![format!("io.nanocl.c={key}")],
+        )])),
+        ..Default::default()
+      }))
+      .await
+      .unwrap();
+    let mut result = std::collections::BTreeMap::new();
+    for container in containers {
+      let id = container.id.expect("Docker inventory must contain IDs");
+      let runtime = system
+        .state
+        .inner
+        .docker_api
+        .inspect_container(&id, None)
+        .await
+        .unwrap();
+      let state = runtime.state.unwrap();
+      result.insert(
+        id,
+        serde_json::json!({
+          "StartedAt": state.started_at,
+          "Running": state.running,
+          "ExitCode": state.exit_code,
+          "RestartCount": runtime.restart_count,
+          "Labels": runtime.config.and_then(|config| config.labels),
+        }),
+      );
+    }
+    result
+  }
+
+  fn assert_no_application(cargo: &CargoInspect) {
+    assert!(!cargo.instances.iter().any(|process| {
+      process
+        .data
+        .config
+        .as_ref()
+        .and_then(|config| config.labels.as_ref())
+        .and_then(|labels| labels.get(LABEL_ROLE))
+        .is_some_and(|role| role == "app")
+    }));
+  }
+
+  #[ntex::test]
+  async fn confirmed_init_failure_settles_and_allows_delete() {
+    let system = gen_default_test_system().await;
+    let name = format!("init-exit-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let spec =
+      operation_fixture_spec(&name, "echo sensitive-init-output; exit 7");
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Start).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_failure(&system, &key, NativeEventAction::Start, events).await;
+
+    let failed = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(failed.action, "start");
+    assert_eq!(failed.outcome.as_deref(), Some("failed"));
+    assert!(failed.completed_at.is_some());
+    assert_eq!(
+      failed.diagnostic,
+      Some(serde_json::json!({
+        "Phase": "start", "Failure": "Init container exited with code 7"
+      }))
+    );
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_eq!(inspected.status.actual, ObjPsStatusKind::Fail);
+    assert_no_application(&inspected);
+    let init = active_cargo_process(&inspected, "init", "prepare");
+    let runtime = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(runtime[&init.key]["ExitCode"], 7);
+    assert!(
+      !runtime
+        .values()
+        .any(|runtime| runtime["Labels"][LABEL_ROLE] == "app")
+    );
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &failed.key.to_string(),
+        &system.state.inner.pool
+      )
+      .await
+      .is_err()
+    );
+
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[derive(Clone, Copy, PartialEq)]
+  enum PreviousRollbackFixture {
+    Running,
+    Stopped,
+    Absent,
+    DestroyedWithStaleMapping,
+  }
+
+  async fn confirmed_update_rollback_fixture(
+    phase: u8,
+    previous: PreviousRollbackFixture,
+  ) {
+    use crate::utils::container::cargo::{fail_next_init_wait, rollback_fault};
+
+    let system = gen_default_test_system().await;
+    let name = format!("rollback-init-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let mut replacement = operation_fixture_spec(
+      &name,
+      if phase == 0 { "sleep 30" } else { "true" },
+    );
+    if previous == PreviousRollbackFixture::Stopped {
+      replacement.containers[0].container_config.host_config =
+        Some(HostConfig {
+          network_mode: Some("host".to_owned()),
+          ..Default::default()
+        });
+    }
+    let mut original = replacement.clone();
+    original.init_containers.clear();
+    assert!(original.port_bindings.is_none());
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&original), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    if previous != PreviousRollbackFixture::Running {
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Stop).await;
+      let response = system
+        .client
+        .send_post(
+          &format!("/processes/cargo/{key}/stop"),
+          None::<String>,
+          None::<String>,
+        )
+        .await;
+      assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+      wait_cargo_completion(&system, &key, NativeEventAction::Stop, events)
+        .await;
+    }
+    let absent = previous == PreviousRollbackFixture::Absent;
+    if absent {
+      // Model a durable local assignment with no attached or orphaned runtime.
+      let replicas =
+        CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+          .await
+          .unwrap();
+      for replica in replicas {
+        for mapping in CargoReplicaProcessDb::list_by_replica(
+          replica.key,
+          &system.state.inner.pool,
+        )
+        .await
+        .unwrap()
+        {
+          if previous == PreviousRollbackFixture::Absent {
+            CargoReplicaProcessDb::clear_process(
+              mapping.key,
+              &system.state.inner.pool,
+            )
+            .await
+            .unwrap();
+          }
+        }
+      }
+      for id in cargo_runtime_snapshot(&system, &key).await.keys() {
+        system
+          .state
+          .inner
+          .docker_api
+          .remove_container(
+            id,
+            Some(bollard_next::query_parameters::RemoveContainerOptions {
+              force: true,
+              ..Default::default()
+            }),
+          )
+          .await
+          .unwrap();
+        ProcessDb::del_by_pk(id, &system.state.inner.pool)
+          .await
+          .unwrap();
+      }
+    }
+    if previous == PreviousRollbackFixture::DestroyedWithStaleMapping {
+      let replicas =
+        CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+          .await
+          .unwrap();
+      let mappings = CargoReplicaProcessDb::list_by_replica(
+        replicas[0].key,
+        &system.state.inner.pool,
+      )
+      .await
+      .unwrap();
+      assert!(
+        mappings.iter().any(|mapping| mapping.process_key.is_some()),
+        "mapping race must begin with an intact attachment"
+      );
+    }
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(before.is_empty(), absent);
+    assert!(before.values().all(|runtime| {
+      runtime["Running"] == (previous == PreviousRollbackFixture::Running)
+    }));
+    let _mapping_fault = (previous
+      == PreviousRollbackFixture::DestroyedWithStaleMapping)
+      .then(|| {
+        assert_eq!(
+          phase, 0,
+          "mapping race is resolved before candidate preparation"
+        );
+        rollback_fault::remove_previous_after_mapping_snapshot(&key, true)
+      });
+    let fault = (phase == 0).then(|| fail_next_init_wait(&key));
+    let _revalidation_fault = (phase > 0)
+      .then(|| rollback_fault::fail_candidate_revalidation(&key, phase == 2));
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_failure(&system, &key, NativeEventAction::Update, events).await;
+    drop(fault);
+
+    let failed = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(failed.action, "update");
+    assert_eq!(failed.outcome.as_deref(), Some("failed"));
+    assert!(failed.completed_at.is_some());
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_eq!(inspected.status.actual, ObjPsStatusKind::Fail);
+    assert!(
+      inspected
+        .instances
+        .iter()
+        .all(|process| process.name.ends_with(".tmp.c"))
+    );
+    let after = cargo_runtime_snapshot(&system, &key).await;
+    // Inventory includes hidden candidates. The raced process was destroyed;
+    // every other fixture must retain exactly its original IDs.
+    if previous == PreviousRollbackFixture::DestroyedWithStaleMapping {
+      assert!(
+        after.is_empty(),
+        "destroyed previous runtime or candidate remains"
+      );
+    } else {
+      assert_eq!(
+        after.keys().collect::<Vec<_>>(),
+        before.keys().collect::<Vec<_>>()
+      );
+    }
+    for (id, runtime) in &after {
+      assert_eq!(runtime["Running"], before[id]["Running"]);
+      assert_eq!(runtime["StartedAt"], before[id]["StartedAt"]);
+      assert_eq!(runtime["RestartCount"], before[id]["RestartCount"]);
+    }
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &failed.key.to_string(),
+        &system.state.inner.pool
+      )
+      .await
+      .is_err()
+    );
+
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&original),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_completion(&system, &key, NativeEventAction::Update, events)
+      .await;
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Stop).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(&system, &key, NativeEventAction::Stop, events).await;
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_update_rollback_settles_and_admits_retry_stop_and_delete()
+  {
+    confirmed_update_rollback_fixture(0, PreviousRollbackFixture::Running)
+      .await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_prepared_rollback_settles_after_revalidation_failure() {
+    confirmed_update_rollback_fixture(1, PreviousRollbackFixture::Running)
+      .await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_promoted_rollback_settles_after_revalidation_failure() {
+    confirmed_update_rollback_fixture(2, PreviousRollbackFixture::Running)
+      .await;
+  }
+
+  #[ntex::test]
+  async fn confirmed_rollback_accepts_proven_absent_previous_runtime() {
+    for phase in 0..3 {
+      confirmed_update_rollback_fixture(phase, PreviousRollbackFixture::Absent)
+        .await;
+    }
+  }
+
+  #[ntex::test]
+  async fn confirmed_rollback_preserves_deliberately_stopped_previous_runtime()
+  {
+    for phase in 0..3 {
+      confirmed_update_rollback_fixture(
+        phase,
+        PreviousRollbackFixture::Stopped,
+      )
+      .await;
+    }
+  }
+
+  #[ntex::test]
+  async fn confirmed_rollback_clears_destroyed_process_mapping() {
+    confirmed_update_rollback_fixture(
+      0,
+      PreviousRollbackFixture::DestroyedWithStaleMapping,
+    )
+    .await;
+  }
+
+  #[ntex::test]
+  async fn read_only_snapshot_failure_settles_after_prepared_replica_cleanup() {
+    use crate::utils::container::cargo::rollback_fault;
+    // Reject before any mutation, and after an earlier replica was prepared.
+    for replicas in [1, 2] {
+      let system = gen_default_test_system().await;
+      let name = format!("snapshot-failure-{}", uuid::Uuid::new_v4().simple());
+      let key = format!("global.{name}");
+      let mut spec = operation_fixture_spec(&name, "true");
+      spec.init_containers.clear();
+      spec.replicas = replicas;
+      let response = system
+        .client
+        .send_post(ENDPOINT, Some(&spec), None::<String>)
+        .await;
+      assert_eq!(response.status(), http::StatusCode::CREATED);
+      start_cargo(&system, &key).await;
+      let before = cargo_runtime_snapshot(&system, &key).await;
+      assert_eq!(before.len(), replicas);
+      let _fault = rollback_fault::fail_previous_snapshot(&key, replicas);
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+      let response = system
+        .client
+        .send_put(&format!("{ENDPOINT}/{key}"), Some(&spec), None::<String>)
+        .await;
+      assert_eq!(response.status(), http::StatusCode::OK);
+      wait_cargo_failure(&system, &key, NativeEventAction::Update, events)
+        .await;
+      let failed =
+        OperationDb::current("Cargo", &key, &system.state.inner.pool)
+          .await
+          .unwrap()
+          .unwrap();
+      assert_eq!(failed.outcome.as_deref(), Some("failed"));
+      assert!(failed.completed_at.is_some());
+      assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+      assert!(
+        DistributedMutexDb::read_by_pk(
+          &failed.key.to_string(),
+          &system.state.inner.pool
+        )
+        .await
+        .is_err()
+      );
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Update).await;
+      let response = system
+        .client
+        .send_put(&format!("{ENDPOINT}/{key}"), Some(&spec), None::<String>)
+        .await;
+      assert_eq!(response.status(), http::StatusCode::OK);
+      wait_cargo_completion(&system, &key, NativeEventAction::Update, events)
+        .await;
+      delete_cargo_fixture(&system, &key).await;
+      system.state.wait_event_loop().await;
+    }
+  }
+
+  async fn finish_pending_cargo_fixture(
+    system: &TestSystem,
+    key: &str,
+    pending: &OperationDb,
+  ) {
+    use crate::models::ObjPsStatusUpdate;
+    use crate::utils::container::cargo::lifecycle_lock;
+    use crate::utils::operation::{abandoned_owner, cleanup_owner};
+    // Exact-owner fixture teardown only; production recovery remains pending.
+    let guard = lifecycle_lock(key).lock_owned().await;
+    let owner = abandoned_owner(
+      &pending.owner(),
+      &system.state.inner.config.hostname,
+      &system.state.inner.config.state_dir,
+    )
+    .unwrap()
+    .expect("failed fixture must release its operation owner");
+    let lease = (std::sync::Arc::new(guard), owner);
+    assert!(
+      CargoDb::finish_operation(
+        pending,
+        ObjPsStatusUpdate {
+          actual: Some(ObjPsStatusKind::Fail.to_string()),
+          ..Default::default()
+        },
+        "interrupted",
+        Some(serde_json::json!({"Fixture": "uncertain rollback teardown"})),
+        lease.clone(),
+        &system.state.inner.pool,
+      )
+      .await
+      .unwrap()
+    );
+    cleanup_owner(&lease.1, &system.state.inner.pool)
+      .await
+      .unwrap();
+  }
+
+  #[ntex::test]
+  async fn missing_process_row_with_existing_runtime_keeps_update_pending() {
+    use crate::utils::container::cargo::rollback_fault;
+    let system = gen_default_test_system().await;
+    let name = format!("missing-process-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let mut spec = operation_fixture_spec(&name, "true");
+    spec.init_containers.clear();
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(before.len(), 1);
+    let id = before.keys().next().unwrap();
+    let process = ProcessDb::read_by_pk(id, &system.state.inner.pool)
+      .await
+      .unwrap();
+    let _mapping_fault =
+      rollback_fault::remove_previous_after_mapping_snapshot(&key, false);
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_put(&format!("{ENDPOINT}/{key}"), Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_pending(&system, &key, events).await;
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+    let replicas =
+      CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    let mappings = CargoReplicaProcessDb::list_by_replica(
+      replicas[0].key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    // The FK clears the durable attachment even though active_slots captured
+    // its old ID before deletion. Existing Docker runtime still blocks settlement.
+    assert!(mappings[0].process_key.is_none());
+    assert!(
+      ProcessDb::read_by_pk(id, &system.state.inner.pool)
+        .await
+        .is_err()
+    );
+    ProcessDb::create_from(process, &system.state.inner.pool)
+      .await
+      .unwrap();
+    CargoReplicaProcessDb::attach_process(
+      mappings[0].key,
+      id,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    finish_pending_cargo_fixture(&system, &key, &pending).await;
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  async fn uncertain_update_rollback_fixture(lose_create_reply: bool) {
+    use crate::utils::container::cargo::{
+      fail_next_init_wait, recovery::recover_one, rollback_fault,
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("rollback-uncertain-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let replacement = operation_fixture_spec(
+      &name,
+      if lose_create_reply {
+        "true"
+      } else {
+        "sleep 30"
+      },
+    );
+    let mut original = replacement.clone();
+    original.init_containers.clear();
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&original), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    let _wait_fault = (!lose_create_reply).then(|| fail_next_init_wait(&key));
+    let _rollback_fault = if lose_create_reply {
+      rollback_fault::lose_second_candidate_create_reply(&key)
+    } else {
+      rollback_fault::fail_candidate_cleanup(&key)
+    };
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    wait_cargo_pending(&system, &key, events).await;
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(pending.action, "update");
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    assert_eq!(
+      inspect_cargo_fixture(&system, &key).await.status.actual,
+      ObjPsStatusKind::Updating
+    );
+    let after = cargo_runtime_snapshot(&system, &key).await;
+    for id in before.keys() {
+      assert_eq!(after[id]["Running"], true);
+    }
+    let candidates = after
+      .iter()
+      .filter(|(id, _)| !before.contains_key(*id))
+      .collect::<Vec<_>>();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(
+      candidates[0].1["Labels"][LABEL_ROLE],
+      if lose_create_reply { "app" } else { "init" }
+    );
+    // Lost-create case removed the tracked init, but left the unreturned app ID.
+    // Cleanup-failure case retained the exact tracked init awaiting removal.
+    assert!(recover_one(&pending, &system.state).await.is_err());
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, after);
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&original),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+
+    finish_pending_cargo_fixture(&system, &key, &pending).await;
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn failed_candidate_cleanup_keeps_update_pending() {
+    uncertain_update_rollback_fixture(false).await;
+  }
+
+  #[ntex::test]
+  async fn uncertain_candidate_create_keeps_update_pending_after_tracked_cleanup()
+   {
+    uncertain_update_rollback_fixture(true).await;
+  }
+
+  #[ntex::test]
+  async fn uncertain_init_wait_stays_pending_until_observed_recovery() {
+    use crate::utils::container::cargo::{
+      fail_next_init_wait, recovery::recover_one,
+    };
+    use bollard_next::{
+      errors::Error as DockerError, query_parameters::WaitContainerOptions,
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("init-wait-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let spec = operation_fixture_spec(&name, "sleep 1; exit 7");
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let _fault = fail_next_init_wait(&key);
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_pending(&system, &key, events).await;
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_no_application(&inspected);
+    let init = active_cargo_process(&inspected, "init", "prepare");
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    let observed_exit = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      system
+        .state
+        .inner
+        .docker_api
+        .wait_container(
+          &init.key,
+          Some(WaitContainerOptions {
+            condition: "not-running".to_owned(),
+          }),
+        )
+        .next(),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+      observed_exit,
+      Some(Err(DockerError::DockerContainerWaitError { code: 7, .. }))
+    ));
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    let cargo = CargoDb::transform_read_by_pk(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    let observed =
+      crate::utils::container::cargo::observe(&cargo, &system.state)
+        .await
+        .unwrap();
+    assert!(recover_one(&pending, &system.state).await.unwrap());
+    let recovered = OperationDb::get(pending.key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.outcome.as_deref(), Some("interrupted"));
+    assert_eq!(
+      inspect_cargo_fixture(&system, &key)
+        .await
+        .status
+        .actual
+        .to_string(),
+      observed.actual.unwrap()
+    );
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  async fn recovered_host_init_fixture()
+  -> (TestSystem, CargoSpec, OperationDb, String) {
+    use crate::utils::container::cargo::{
+      fail_next_init_wait, recovery::recover_one,
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("replace-host-init-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let mut spec =
+      operation_fixture_spec(&name, "trap 'exit 0' TERM; sleep 3600 & wait $!");
+    spec.init_containers[0].container_config.host_config = Some(HostConfig {
+      network_mode: Some("host".to_owned()),
+      ..Default::default()
+    });
+    assert!(spec.port_bindings.is_none());
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let fault = fail_next_init_wait(&key);
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_pending(&system, &key, events).await;
+    drop(fault);
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    let inspected = inspect_cargo_fixture(&system, &key).await;
+    assert_no_application(&inspected);
+    let init_id = active_cargo_process(&inspected, "init", "prepare")
+      .key
+      .clone();
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(before[&init_id]["Running"], true);
+    assert!(recover_one(&pending, &system.state).await.unwrap());
+    let recovered = OperationDb::get(pending.key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.outcome.as_deref(), Some("interrupted"));
+    assert!(recovered.completed_at.is_some());
+    // Recovery observes the still-running init without replaying or stopping it.
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+    (system, spec, recovered, init_id)
+  }
+
+  #[ntex::test]
+  async fn stop_first_replacement_stops_recovered_host_init_before_start() {
+    use crate::utils::container::cargo::{
+      LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC, pause_next_init_start,
+      recovery::recover_one,
+    };
+
+    let (system, mut replacement, recovered, old_init_id) =
+      recovered_host_init_fixture().await;
+    let key = &recovered.resource_key;
+    replacement.init_containers[0].container_config.cmd =
+      Some(vec!["true".to_owned()]);
+    let mut barrier = pause_next_init_start(key);
+    let events =
+      cargo_completion_events(&system, key, NativeEventAction::Update).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let accepted = response.json::<Cargo>().await.unwrap();
+    let candidate_id = tokio::time::timeout(
+      std::time::Duration::from_secs(30),
+      barrier.wait_start(),
+    )
+    .await
+    .expect("replacement init did not reach its start barrier");
+    let at_start = cargo_runtime_snapshot(&system, key).await;
+    // The old init must still exist (stop-first, not remove-first) and be
+    // stopped before the barrier allows any replacement init command to run.
+    assert_eq!(at_start[&old_init_id]["Running"], false);
+    assert_ne!(candidate_id, old_init_id);
+    assert_eq!(at_start[&candidate_id]["Running"], false);
+    let updating = OperationDb::current("Cargo", key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_ne!(updating.key, recovered.key);
+    assert_eq!(updating.action, "update");
+    assert_eq!(updating.incarnation_key, recovered.incarnation_key);
+    assert_eq!(updating.spec_key, accepted.spec.key);
+    assert!(updating.outcome.is_none());
+    for (label, expected) in [
+      (LABEL_INCARNATION, updating.incarnation_key),
+      (LABEL_SPEC, updating.spec_key),
+      (LABEL_OPERATION, updating.key),
+    ] {
+      assert_eq!(
+        at_start[&candidate_id]["Labels"][label],
+        expected.to_string()
+      );
+    }
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &updating.key.to_string(),
+        &system.state.inner.pool,
+      )
+      .await
+      .is_ok()
+    );
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    barrier.release();
+    wait_cargo_completion(&system, key, NativeEventAction::Update, events)
+      .await;
+    let completed =
+      OperationDb::current("Cargo", key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(completed.key, updating.key);
+    assert_eq!(completed.outcome.as_deref(), Some("completed"));
+    assert!(completed.completed_at.is_some());
+    assert!(!recover_one(&recovered, &system.state).await.unwrap());
+    let inspected = inspect_cargo_fixture(&system, key).await;
+    assert_eq!(inspected.status.actual, ObjPsStatusKind::Start);
+    assert_eq!(
+      active_cargo_process(&inspected, "init", "prepare").key,
+      candidate_id
+    );
+    let runtime = cargo_runtime_snapshot(&system, key).await;
+    assert!(!runtime.contains_key(&old_init_id));
+    assert_eq!(runtime[&candidate_id]["ExitCode"], 0);
+    let app = active_cargo_process(&inspected, "app", "main");
+    assert_eq!(runtime[&app.key]["Running"], true);
+    let events =
+      cargo_completion_events(&system, key, NativeEventAction::Stop).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(&system, key, NativeEventAction::Stop, events).await;
+    delete_cargo_fixture(&system, key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn unconfirmed_old_init_stop_prevents_replacement_without_replay() {
+    use crate::models::ObjPsStatusUpdate;
+    use crate::utils::container::cargo::{
+      forget_next_init_stop, lifecycle_lock, pause_next_init_start,
+      recovery::recover_one,
+    };
+    use crate::utils::operation::{abandoned_owner, cleanup_owner};
+
+    let (system, mut replacement, recovered, old_init_id) =
+      recovered_host_init_fixture().await;
+    let key = &recovered.resource_key;
+    let before = cargo_runtime_snapshot(&system, key).await;
+    replacement.init_containers[0].container_config.cmd =
+      Some(vec!["true".to_owned()]);
+    let _fault = forget_next_init_stop(key);
+    let mut barrier = pause_next_init_start(key);
+    let events = cargo_pending_events(&system, key).await;
+    let response = system
+      .client
+      .send_put(
+        &format!("{ENDPOINT}/{key}"),
+        Some(&replacement),
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    {
+      let failure = wait_cargo_pending(&system, key, events);
+      let start = barrier.wait_start();
+      futures::pin_mut!(failure, start);
+      if let futures::future::Either::Right((id, _)) =
+        futures::future::select(failure, start).await
+      {
+        panic!(
+          "candidate {id} reached startup without confirmed init shutdown"
+        );
+      }
+    }
+    drop(barrier);
+    let pending = OperationDb::current("Cargo", key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_ne!(pending.key, recovered.key);
+    assert_eq!(pending.action, "update");
+    assert_eq!(pending.incarnation_key, recovered.incarnation_key);
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    let after = cargo_runtime_snapshot(&system, key).await;
+    assert_eq!(
+      before.keys().collect::<Vec<_>>(),
+      after.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(after[&old_init_id]["Running"], false);
+    assert_eq!(
+      after[&old_init_id]["StartedAt"],
+      before[&old_init_id]["StartedAt"]
+    );
+    assert_eq!(
+      after[&old_init_id]["RestartCount"],
+      before[&old_init_id]["RestartCount"]
+    );
+    assert!(recover_one(&pending, &system.state).await.is_err());
+    assert_eq!(
+      OperationDb::get(pending.key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap(),
+      pending
+    );
+    assert_eq!(cargo_runtime_snapshot(&system, key).await, after);
+    // Retained generations keep real recovery conservative and pending. Only
+    // fixture teardown settles its exact owner, allowing ordinary deletion.
+    {
+      let guard = lifecycle_lock(key).lock_owned().await;
+      let owner = abandoned_owner(
+        &pending.owner(),
+        &system.state.inner.config.hostname,
+        &system.state.inner.config.state_dir,
+      )
+      .unwrap()
+      .expect("failed fixture must release its operation owner");
+      let lease = (std::sync::Arc::new(guard), owner);
+      assert!(
+        CargoDb::finish_operation(
+          &pending,
+          ObjPsStatusUpdate {
+            actual: Some(ObjPsStatusKind::Fail.to_string()),
+            ..Default::default()
+          },
+          "interrupted",
+          Some(serde_json::json!({"Fixture": "required init stop teardown"})),
+          lease.clone(),
+          &system.state.inner.pool,
+        )
+        .await
+        .unwrap()
+      );
+      cleanup_owner(&lease.1, &system.state.inner.pool)
+        .await
+        .unwrap();
+    }
+    delete_cargo_fixture(&system, key).await;
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn restart_completion_write_failure_recovers_without_replay() {
+    use crate::{
+      repositories::cargo_operation::completion_fault::fail_next_completion,
+      utils::{
+        container::cargo::recovery::recover_one, operation::abandoned_owner,
+      },
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("restart-finish-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let spec = operation_fixture_spec(&name, "true");
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    let original = inspect_cargo_fixture(&system, &key).await;
+    let app_id = active_cargo_process(&original, "app", "main").key.clone();
+    let fault = fail_next_completion(&key, "restart");
+    let events = cargo_pending_events(&system, &key).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_pending(&system, &key, events).await;
+    assert!(fault.was_triggered());
+    let pending = OperationDb::current("Cargo", &key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(pending.action, "restart");
+    assert!(pending.outcome.is_none());
+    assert!(pending.completed_at.is_none());
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &pending.key.to_string(),
+        &system.state.inner.pool
+      )
+      .await
+      .is_ok()
+    );
+    let restarted = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(
+      before.keys().collect::<Vec<_>>(),
+      restarted.keys().collect::<Vec<_>>()
+    );
+    assert_ne!(
+      before[&app_id]["StartedAt"],
+      restarted[&app_id]["StartedAt"]
+    );
+    assert_eq!(restarted[&app_id]["Running"], true);
+    assert_eq!(
+      inspect_cargo_fixture(&system, &key).await.status.actual,
+      ObjPsStatusKind::Start
+    );
+
+    // A real file owner prevents recovery even when the task has ended.
+    let owner = abandoned_owner(
+      &pending.owner(),
+      &system.state.inner.config.hostname,
+      &system.state.inner.config.state_dir,
+    )
+    .unwrap()
+    .expect("completed executor retained its operation file lock");
+    assert!(!recover_one(&pending, &system.state).await.unwrap());
+    drop(owner);
+    let mut stale = pending.clone();
+    stale.key = uuid::Uuid::new_v4();
+    assert!(!recover_one(&stale, &system.state).await.unwrap());
+    stale = pending.clone();
+    stale.incarnation_key = uuid::Uuid::new_v4();
+    assert!(!recover_one(&stale, &system.state).await.unwrap());
+
+    // Incomplete attachment evidence must not settle a healthy-looking runtime.
+    let replica = CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .remove(0);
+    let mapping = CargoReplicaProcessDb::list_by_replica(
+      replica.key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap()
+    .into_iter()
+    .find(|mapping| mapping.process_key.as_deref() == Some(app_id.as_str()))
+    .unwrap();
+    CargoReplicaProcessDb::clear_process(mapping.key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    let recovery = recover_one(&pending, &system.state).await;
+    CargoReplicaProcessDb::attach_process(
+      mapping.key,
+      &app_id,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    assert!(recovery.is_err());
+    assert!(
+      OperationDb::get(pending.key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap()
+        .outcome
+        .is_none()
+    );
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, restarted);
+
+    assert!(recover_one(&pending, &system.state).await.unwrap());
+    let recovered = OperationDb::get(pending.key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.outcome.as_deref(), Some("interrupted"));
+    assert!(recovered.completed_at.is_some());
+    assert_eq!(recovered.incarnation_key, pending.incarnation_key);
+    assert_eq!(recovered.spec_key, pending.spec_key);
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, restarted);
+    assert_eq!(
+      inspect_cargo_fixture(&system, &key).await.status.actual,
+      ObjPsStatusKind::Start
+    );
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &pending.key.to_string(),
+        &system.state.inner.pool
+      )
+      .await
+      .is_err()
+    );
+
+    restart_cargo(&system, &key).await;
+    let successor =
+      OperationDb::current("Cargo", &key, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(successor.key, pending.key);
+    assert_eq!(successor.outcome.as_deref(), Some("completed"));
+    assert!(!recover_one(&pending, &system.state).await.unwrap());
+    delete_cargo_fixture(&system, &key).await;
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let (recreated, _, _) = CargoDb::read_by_pk(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    assert_ne!(recreated.incarnation_key, pending.incarnation_key);
+    assert!(!recover_one(&pending, &system.state).await.unwrap());
+    delete_cargo_fixture(&system, &key).await;
+    system.state.wait_event_loop().await;
+  }
+
   #[ntex::test]
   async fn collection_namespace_and_key_semantics() {
     const NAME: &str = "same-name-namespace-test";
@@ -246,7 +1663,7 @@ mod tests {
     const OTHER_KEY: &str = "cargo-collection-test.same-name-namespace-test";
 
     let system = gen_default_test_system().await;
-    let client = system.client;
+    let client = &system.client;
     let response = client
       .send_post(
         "/namespaces",
@@ -366,6 +1783,25 @@ mod tests {
       http::StatusCode::OK,
       "patch cargo by canonical key"
     );
+    // This test exercises definition/key semantics on a stopped Cargo. The
+    // accepted update may fail because no runtime was started; it must finish
+    // before the independent foreign-history validation is submitted.
+    system
+      .state
+      .inner
+      .task_manager
+      .wait_task(&format!("{}@{OTHER_KEY}", EventActorKind::Cargo))
+      .await;
+    let operation =
+      OperationDb::current("Cargo", OTHER_KEY, &system.state.inner.pool)
+        .await
+        .unwrap()
+        .expect("accepted Cargo update operation");
+    assert_eq!(operation.action, "update");
+    assert!(
+      operation.outcome.is_some(),
+      "Cargo update must settle before revert validation"
+    );
 
     let response = client
       .send_get(
@@ -396,7 +1832,25 @@ mod tests {
       "reject another Cargo's history even when its name matches"
     );
 
+    let response = client
+      .send_patch(
+        &format!(
+          "{ENDPOINT}/{OTHER_KEY}/histories/{}/revert",
+          uuid::Uuid::new_v4()
+        ),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      response.status(),
+      http::StatusCode::NOT_FOUND,
+      "missing Cargo history remains not found"
+    );
+
     for key in [GLOBAL_KEY, OTHER_KEY] {
+      let events =
+        cargo_completion_events(&system, key, NativeEventAction::Destroy).await;
       let response = client
         .send_delete(
           &format!("{ENDPOINT}/{key}"),
@@ -408,6 +1862,8 @@ mod tests {
         http::StatusCode::ACCEPTED,
         "delete cargo by canonical key"
       );
+      wait_cargo_completion(&system, key, NativeEventAction::Destroy, events)
+        .await;
     }
   }
 
@@ -566,6 +2022,12 @@ mod tests {
       containers: vec![replacement_container],
       ..Default::default()
     };
+    let events = cargo_completion_events(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+    )
+    .await;
     let res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_key}"),
@@ -578,6 +2040,13 @@ mod tests {
     assert_eq!(patch_response.spec.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(patch_response.spec.containers, replacement.containers);
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+      events,
+    )
+    .await;
     let res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_key}/histories"),
@@ -597,6 +2066,12 @@ mod tests {
       .expect("Expected to find the original Cargo declaration")
       .clone();
     let id = history.key;
+    let events = cargo_completion_events(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+    )
+    .await;
     let res = client
       .send_patch(
         &format!("{ENDPOINT}/{main_test_key}/histories/{id}/revert"),
@@ -619,6 +2094,16 @@ mod tests {
     );
     assert_eq!(reverted.spec.init_containers, history.init_containers);
     assert_eq!(reverted.spec.containers, history.containers);
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Update,
+      events,
+    )
+    .await;
+    let events =
+      cargo_completion_events(&system, &main_test_key, NativeEventAction::Stop)
+        .await;
     let res = client
       .send_post(
         &format!("/processes/cargo/{main_test_key}/stop"),
@@ -631,7 +2116,18 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "basic cargo stop"
     );
+    wait_cargo_completion(
+      &system,
+      &main_test_key,
+      NativeEventAction::Stop,
+      events,
+    )
+    .await;
     for test_cargo in test_cargoes.iter() {
+      let key = format!("global.{test_cargo}");
+      let events =
+        cargo_completion_events(&system, &key, NativeEventAction::Destroy)
+          .await;
       let res = client
         .send_delete(
           &format!("{ENDPOINT}/global.{test_cargo}"),
@@ -643,6 +2139,8 @@ mod tests {
         http::StatusCode::ACCEPTED,
         "basic cargo delete"
       );
+      wait_cargo_completion(&system, &key, NativeEventAction::Destroy, events)
+        .await;
     }
     // test init container
     let mut init = container("init", "alpine:latest");
@@ -667,31 +2165,13 @@ mod tests {
     );
     let cargo = TestClient::res_json::<Cargo>(res).await;
     assert_eq!(cargo.spec.name, "init-test-cargo", "Invalid cargo name");
-    let res = client
-      .send_post(
-        "/processes/cargo/global.init-test-cargo/start",
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    assert_eq!(res.status(), http::StatusCode::ACCEPTED, "init cargo start");
-    let res = client
-      .send_post(
-        "/events/watch",
-        Some(vec![EventCondition {
-          actor_key: Some("global.init-test-cargo".to_owned()),
-          actor_kind: Some(EventActorKind::Cargo),
-          related_key: None,
-          related_kind: None,
-          kind: vec![EventKind::Normal],
-          action: vec![NativeEventAction::Start],
-        }]),
-        None::<String>,
-      )
-      .await;
-    assert_eq!(res.status(), http::StatusCode::OK, "init cargo watch");
-    let mut stream = res.into_stream();
-    while let Some(_chunk) = stream.next().await {}
+    start_cargo(&system, "global.init-test-cargo").await;
+    let events = cargo_completion_events(
+      &system,
+      "global.init-test-cargo",
+      NativeEventAction::Destroy,
+    )
+    .await;
     let res = client
       .send_delete(
         &format!("{ENDPOINT}/global.init-test-cargo"),
@@ -703,7 +2183,13 @@ mod tests {
       http::StatusCode::ACCEPTED,
       "init cargo delete"
     );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    wait_cargo_completion(
+      &system,
+      "global.init-test-cargo",
+      NativeEventAction::Destroy,
+      events,
+    )
+    .await;
     system.state.wait_event_loop().await;
   }
 
@@ -1080,7 +2566,7 @@ mod tests {
         .docker_api
         .inspect_container(
           &sandbox_id,
-          None::<bollard_next::container::InspectContainerOptions>,
+          None::<bollard_next::query_parameters::InspectContainerOptions>,
         )
         .await
         .is_ok(),

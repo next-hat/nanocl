@@ -20,11 +20,16 @@ use crate::{
     (status = 404, description = "Resource doesn't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::delete("/resources/{name}")]
 pub async fn delete_resource(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  ResourceDb::del_obj_by_pk(&path.1, &(), &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
+  let state = state.clone();
+  let key = path.1.clone();
+  ResourceDb::mutate(&key.clone(), async move {
+    ResourceDb::del_obj_by_pk(&key, &(), &state).await
+  })
+  .await?;
+  Ok(web::HttpResponse::Accepted().build())
 }

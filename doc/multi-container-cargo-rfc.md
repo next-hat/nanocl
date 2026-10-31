@@ -218,11 +218,29 @@ Reserved Docker labels repeat the stable replica UUID, ordinal, role, logical
 name, and essential flag. Generated Docker names are operational details and
 must not be used as durable identity.
 
+Each live Cargo also references a retained `resource_incarnations` UUID. Its
+authored revisions and shared `operations` records belong to that incarnation.
+New runtime containers carry the incarnation, specification, and creating
+operation UUIDs. Recreating a canonical Cargo key creates a new incarnation.
+
 The generic `processes` table remains the concrete Docker inventory for
 Cargoes, Jobs, and VMs. Cargo-specific identity augments it rather than
 changing its meaning for other workload kinds.
 
 ## 8. Replica lifecycle
+
+Start, stop, restart, update/revert, delete, and individual managed-process
+control enter the shared operation admission path. Acceptance atomically pins
+the specification, records the operation, and updates desired/pending status.
+Rejected admission leaves those values unchanged. One pending operation owns
+an incarnation; mutex expiry or cancellation of an HTTP/task waiter does not
+release that ownership. The detached worker retains its lease through database
+commits and runtime cleanup.
+
+Secret refresh uses the same admission path against the current revision.
+Lifecycle events report accepted work; they do not authorize another worker.
+Individual process controls retain their targeted-container semantics and use
+the selected immutable Docker ID rather than acting again by name.
 
 ### 8.1 Start and reconciliation
 
@@ -238,6 +256,10 @@ Replicas are reconciled in ordinal order on their assigned node:
 A completed init container is retained as an observation. Starting or
 restarting an unchanged Cargo does not rerun a successfully completed init
 container.
+
+A confirmed nonzero init exit fails the accepted local operation and retains
+its exit code, allowing a later lifecycle request. An unavailable or ambiguous
+Docker wait result remains pending until the outcome can be safely observed.
 
 ### 8.2 Restart
 
@@ -266,7 +288,9 @@ containers, then the sandbox so no live application retains a deleted network
 namespace.
 
 Destroy removes runtime processes before deleting desired Cargo state and its
-dependent replica mappings.
+dependent replica mappings. It retains the incarnation, authored revisions,
+and operation outcomes. The live Cargo history/revert interface uses its current
+incarnation, as VM history does; it cannot select an earlier same-name Cargo.
 
 ## 9. Readiness and Docker events
 
@@ -290,14 +314,14 @@ Stopped init containers and retained or candidate rollout processes do not
 become runtime failures. Intentional stop and destroy transitions also suppress
 unexpected-death handling. During synchronous reconciliation, the reconciler
 owns promotion and rollback so out-of-order Docker events cannot promote an
-incomplete candidate.
+incomplete candidate. Aggregate observations are fenced by the current
+incarnation, revision, operation pointer, and exact mapped container IDs.
 
 ## 10. Startup recovery
 
-Startup inventory rebuilds concrete process observations from Docker and uses
-the reserved identity labels to reattach stable Cargo mappings. Existing
-authored Cargo revisions remain the desired declaration during ordinary
-reattachment.
+Startup inventory rebuilds concrete process observations from Docker. Once a
+Cargo has accepted an operation, inventory does not reconstruct its authored
+revision or replace its durable mappings from container names or labels.
 
 Installer/bootstrap workloads are the explicit adoption exception. When
 desired rows are absent, or an installer generation must be finalized, Nanocl
@@ -305,7 +329,38 @@ may reconstruct a validated declaration from a complete stable labelled
 generation. Reconstruction removes compiler-owned labels, runtime environment,
 internal secret mounts, effective network references, and rollout artifacts
 before persisting the declaration. Contradictory or incomplete identity is an
-error rather than a reason to guess.
+error rather than a reason to guess. Adoption requires an initial incarnation
+with no accepted operation; an absent Cargo with retained identity history must
+not be reconstructed. Retired or foreign operation labels cannot resurrect a
+deleted Cargo or attach its containers to a replacement.
+
+Recovery first establishes whether the local execution owner is abandoned,
+then inspects the captured incarnation and exact runtime. A safely observed
+local operation can finish as `interrupted`, recording the current runtime
+state without claiming that its requested action succeeded. Reused containers
+retain their validated creation operation identity. Recovery does not replay
+init commands, restarts, signals, rollouts, or cleanup, and it does not promote
+a partial candidate. Unavailable or ambiguous evidence keeps the operation
+pending. Deletion still requires separate proof that runtime removal finished.
+
+Remote start and delete retain their existing node dispatch. Operation-aware
+node routes require the accepted operation, incarnation, specification, and
+assigned replica identities. All participating nodes must support these routes;
+there is no key-only or mixed-version fallback. A lost remote response or a
+coordinator restart does not prove that the remote worker stopped. Such work
+remains pending when completion cannot be established; this release adds no
+distributed failover or participant-recovery protocol.
+
+Stop and restart currently execute on the accepting node. If durable replica
+assignments or existing processes require another node, these requests are
+rejected before operation admission. Remote start errors, including validation
+rejections, remain pending because one rejected request does not prove that no
+other request for the same operation is executing. Safely releasing ownership
+requires durable participant tracking, which is outside this release.
+
+The schema requires a fresh cluster recreated from Statefiles. There is no
+upgrade/backfill or rolling migration path. Recreating an installation remains
+an explicit operator action.
 
 ## 11. API, CLI, and observability boundaries
 
@@ -354,6 +409,9 @@ automatic compatibility behavior.
   [`bin/nanocld/src/models/cargo_replica.rs`](../bin/nanocld/src/models/cargo_replica.rs)
   and
   [`bin/nanocld/src/repositories/cargo_replica.rs`](../bin/nanocld/src/repositories/cargo_replica.rs)
+- Shared operation admission, completion, and retained identity:
+  [`bin/nanocld/src/repositories/cargo_operation.rs`](../bin/nanocld/src/repositories/cargo_operation.rs)
+  and [`bin/nanocld/src/tasks/cargo.rs`](../bin/nanocld/src/tasks/cargo.rs)
 - Durable replica schema:
   [`cargo_replicas`](../bin/nanocld/migrations/2026-08-22-000000_cargo_replicas/up.sql)
   and

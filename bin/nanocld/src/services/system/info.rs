@@ -1,6 +1,6 @@
 use ntex::web;
 
-use bollard_next::network::InspectNetworkOptions;
+use bollard_next::query_parameters::InspectNetworkOptions;
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::HostInfo;
 
@@ -15,16 +15,16 @@ use crate::models::SystemState;
     (status = 200, description = "Host/Node information", body = HostInfo),
   ),
 ))]
-#[web::get("/info")]
 pub async fn get_info(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
 ) -> HttpResult<web::HttpResponse> {
   let docker = state.inner.docker_api.info().await?;
   let host_gateway = state.inner.config.gateway.clone();
   let network = state
     .inner
     .docker_api
-    .inspect_network("nanoclbr0", None::<InspectNetworkOptions<String>>)
+    .inspect_network("nanoclbr0", None::<InspectNetworkOptions>)
     .await?;
   let info = HostInfo {
     docker,

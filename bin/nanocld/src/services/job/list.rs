@@ -20,9 +20,9 @@ use crate::{
     (status = 200, description = "List of jobs", body = [nanocl_stubs::job::JobSummary]),
   ),
 ))]
-#[web::get("/jobs")]
 pub async fn list_job(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   _version: web::types::Path<String>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {

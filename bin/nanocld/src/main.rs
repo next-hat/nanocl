@@ -42,12 +42,20 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(config) => config,
   };
+  // Keep the exclusive gate for the process lifetime, including runtime teardown
+  // after the HTTP server stops. The kernel closes it when the process exits.
+  let daemon_guard =
+    match utils::operation::acquire_daemon_guard(&config.state_dir) {
+      Ok(guard) => guard,
+      Err(error) => error.print_and_exit(),
+    };
+  std::mem::forget(daemon_guard);
   // Boot internal dependencies (database, event bus, etc...)
-  let daemon_state = match system::init(&config).await {
+  let (daemon_state, start_crond) = match system::init(&config).await {
     Err(err) => {
       err.print_and_exit();
     }
-    Ok(daemon_state) => daemon_state,
+    Ok(initialized) => initialized,
   };
   // Start http server
   match utils::server::generate(&daemon_state).await {
@@ -55,6 +63,9 @@ async fn main() -> std::io::Result<()> {
       err.map_err_context(|| "Http server").print_and_exit();
     }
     Ok(server) => {
+      // Listeners are bound and accepting; @reboot requests can now queue
+      // while HTTP workers finish starting.
+      start_crond();
       // Start http server and wait for shutdown
       // Server should never shutdown unless it's explicitly asked
       if let Err(err) = server.await {

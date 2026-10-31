@@ -5,7 +5,6 @@ use nanocl_stubs::cargo_spec::CargoSpecPatch;
 
 use crate::{
   models::{CargoDb, CargoObjPatchIn, SystemState},
-  objects::generic::*,
   utils,
 };
 
@@ -19,13 +18,15 @@ use crate::{
     ("key" = String, Path, description = "Canonical cargo key in `{namespace}.{name}` format"),
   ),
   responses(
-    (status = 200, description = "Cargo updated", body = nanocl_stubs::cargo::Cargo),
+    (status = 200, description = "Cargo update accepted", body = nanocl_stubs::cargo::Cargo, headers(
+      ("X-Nanocl-Operation" = String, description = "Accepted operation UUID. Match terminal event Metadata.Operation to confirm completion.")
+    )),
     (status = 404, description = "Cargo does not exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/cargoes/{key}")]
 pub async fn patch_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecPatch>,
 ) -> HttpResult<web::HttpResponse> {
@@ -43,6 +44,11 @@ pub async fn patch_cargo(
     spec: payload.into_inner(),
     version: path.0.clone(),
   };
-  let cargo = CargoDb::patch_obj_by_pk(key.as_str(), obj, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&cargo))
+  let (cargo, operation) =
+    CargoDb::patch_with_operation(key.as_str(), obj, &state).await?;
+  Ok(
+    web::HttpResponse::Ok()
+      .set_header("X-Nanocl-Operation", operation.to_string())
+      .json(&cargo),
+  )
 }

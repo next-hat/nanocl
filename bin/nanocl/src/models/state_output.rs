@@ -21,6 +21,17 @@ pub struct StateOutputRecord<'a> {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StateOutputEvent<'a> {
+  Summary {
+    summary: &'a super::StateSummary,
+    reload: bool,
+    remove_orphans: bool,
+  },
+  CargoReceipt {
+    resource: &'a str,
+    status: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    receipt: Option<&'a super::StateCargoReceipt>,
+  },
   State {
     status: &'a str,
     completed: u64,

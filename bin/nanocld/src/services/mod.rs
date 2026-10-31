@@ -17,13 +17,17 @@ mod resource;
 mod resource_kind;
 mod secret;
 mod system;
-mod vm;
+pub(crate) mod vm;
 
 pub async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError::not_found("Route or method unhandled"))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn app_config() -> web::WebAppConfig {
+  #[allow(unused_mut)]
+  let mut config = web::WebAppConfig::new()
+    .set_state(web::types::PayloadConfig::new(20_000_000_000))
+    .set_state(web::types::JsonConfig::default().limit(20_000_000_000));
   #[cfg(feature = "dev")]
   {
     use nanocl_utils::ntex::swagger;
@@ -37,31 +41,39 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     .expect("Unable to write swagger.yaml");
     let swagger_conf =
       swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
-    config.service(
-      web::scope("/explorer/")
-        .state(swagger_conf)
-        .configure(swagger::register),
-    );
+    config = config.set_state(swagger_conf);
   }
+  config
+}
+
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  #[cfg(feature = "dev")]
+  config.service(
+    web::scope("/explorer/").configure(nanocl_utils::ntex::swagger::register),
+  );
   config.service(
     web::scope("/{version}")
       .middleware(
         nanocl_utils::ntex::middlewares::Versioning::new(crate::vars::VERSION)
           .finish(),
       )
-      .configure(network::ntex_config)
-      .configure(node::ntex_config)
-      .configure(namespace::ntex_config)
-      .configure(system::ntex_config)
-      .configure(resource::ntex_config)
-      .configure(cargo::ntex_config)
-      .configure(vm::ntex_config)
-      .configure(metric::ntex_config)
-      .configure(secret::ntex_config)
-      .configure(process::ntex_config)
-      .configure(job::ntex_config)
-      .configure(event::ntex_config)
-      .configure(resource_kind::ntex_config),
+      .configure(|config| {
+        network::ntex_config(config);
+        node::ntex_config(config);
+        namespace::ntex_config(config);
+        system::ntex_config(config);
+        resource::ntex_config(config);
+        cargo::ntex_config(config);
+        vm::ntex_config(config);
+        metric::ntex_config(config);
+        secret::ntex_config(config);
+        process::ntex_config(config);
+        job::ntex_config(config);
+        event::ntex_config(config);
+        resource_kind::ntex_config(config);
+      }),
   );
 }
 

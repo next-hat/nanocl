@@ -695,7 +695,11 @@ mod tests {
 
   #[test]
   fn status_job_distinguishes_schedule_from_completed_runs() {
+    let spec_key = uuid::Uuid::new_v4();
     let mut job = JobInspect {
+      incarnation_key: uuid::Uuid::new_v4(),
+      spec_key,
+      current_run_key: None,
       created_at: time(10),
       updated_at: time(10),
       status: Default::default(),
@@ -704,6 +708,10 @@ mod tests {
       instance_running: 0,
       instance_failed: 0,
       spec: JobSpec {
+        key: spec_key,
+        job_key: "migrate".into(),
+        version: "v0.19".into(),
+        created_at: time(10),
         name: "migrate".into(),
         schedule: Some("@daily".into()),
         ..Default::default()

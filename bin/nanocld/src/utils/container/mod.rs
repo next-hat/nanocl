@@ -6,4 +6,5 @@ pub mod image;
 pub mod job;
 pub mod network;
 pub mod process;
+pub(crate) mod qmp;
 pub mod vm;

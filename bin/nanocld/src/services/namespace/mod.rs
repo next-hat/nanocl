@@ -12,12 +12,39 @@ pub use delete::*;
 pub use inspect::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_namespace);
-  config.service(create_namespace);
-  config.service(inspect_namespace);
-  config.service(delete_namespace);
-  config.service(count_namespace);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/namespaces")
+      .name("list_namespace")
+      .guard(web::guard::Get())
+      .to_with_state(list_namespace),
+  );
+  config.service(
+    web::resource("/namespaces")
+      .name("create_namespace")
+      .guard(web::guard::Post())
+      .to_with_state(create_namespace),
+  );
+  config.service(
+    web::resource("/namespaces/{name}/inspect")
+      .name("inspect_namespace")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_namespace),
+  );
+  config.service(
+    web::resource("/namespaces/{name}")
+      .name("delete_namespace")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_namespace),
+  );
+  config.service(
+    web::resource("/namespaces/count")
+      .name("count_namespace")
+      .guard(web::guard::Get())
+      .to_with_state(count_namespace),
+  );
 }
 
 #[cfg(test)]

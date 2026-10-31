@@ -27,6 +27,24 @@ pub struct VmDb {
   pub status_key: String,
   /// The spec key reference
   pub spec_key: uuid::Uuid,
+  /// Immutable identity retained after this live definition is deleted.
+  pub incarnation_key: uuid::Uuid,
+}
+
+#[derive(Debug)]
+pub(crate) struct AcceptedVmOperation {
+  pub vm: nanocl_stubs::vm::Vm,
+  pub operation: super::OperationDb,
+}
+
+pub(crate) type VmOperationLease =
+  (std::sync::Arc<VmLifecycleGuard>, super::OperationGuard);
+
+/// In-memory restart arguments; the accepted operation records recovery identity.
+pub(crate) struct VmRestartTask {
+  pub options: nanocl_stubs::vm::VmLifecycleOptions,
+  pub expected_id: Option<String>,
+  pub completion: tokio::sync::oneshot::Sender<nanocl_error::io::IoResult<()>>,
 }
 
 /// This structure is used to update a vm in the database.
@@ -60,4 +78,40 @@ pub struct VmObjPutIn {
 pub struct VmObjPatchIn {
   pub spec: VmSpecUpdate,
   pub version: String,
+}
+
+/// Local serialization of a VM's sockets, runtime and desired specification.
+/// Weak entries are pruned so deleted VM names do not accumulate forever.
+pub(crate) type VmLifecycleLocks = std::sync::Mutex<
+  std::collections::HashMap<String, std::sync::Weak<VmLifecycleLock>>,
+>;
+
+/// Mutation admission is separate from Docker observation serialization.
+#[derive(Default)]
+pub(crate) struct VmLifecycleLock {
+  pub key: String,
+  pub mutation: std::sync::Arc<tokio::sync::Mutex<()>>,
+  pub observation: std::sync::Arc<tokio::sync::Mutex<()>>,
+}
+
+/// Keep the weak registry entry alive until both protected sections finish.
+pub(crate) struct VmLifecycleGuard {
+  pub _observation: tokio::sync::OwnedMutexGuard<()>,
+  pub _mutation: tokio::sync::OwnedMutexGuard<()>,
+  pub _lock: std::sync::Arc<VmLifecycleLock>,
+}
+
+pub(crate) struct VmLifecycleObservationGuard {
+  pub _observation: tokio::sync::OwnedMutexGuard<()>,
+  pub _lock: std::sync::Arc<VmLifecycleLock>,
+}
+
+/// Private restart projection for the QEMU generation mounted by Docker.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "PascalCase", deny_unknown_fields)]
+pub(crate) struct VmRuntimeResources {
+  pub cpu: u64,
+  pub memory: u64,
+  pub max_cpu: u64,
+  pub max_memory: u64,
 }

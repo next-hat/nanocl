@@ -22,7 +22,7 @@ cleanup_nanocl_artifacts() {
     e2e-private-peer \
     e2e-default-client
   do
-    nanocl cargo rm -yf "$cargo" >/dev/null 2>&1 || true
+    nanocl cargo rm -yf "global.$cargo" >/dev/null 2>&1 || true
   done
   docker network rm e2e-private >/dev/null 2>&1 || true
 }
@@ -136,6 +136,21 @@ setup_file() {
 }
 
 teardown() {
+  if [ -z "${BATS_TEST_COMPLETED:-}" ] && [ -n "${E2E_DIAGNOSTIC_CARGO:-}" ]; then
+    echo "Cargo container state before cleanup: $E2E_DIAGNOSTIC_CARGO" >&2
+    local container_ids container_id
+    container_ids="$(timeout 10s docker ps --all --no-trunc --quiet \
+      --filter "label=io.nanocl.c=$E2E_DIAGNOSTIC_CARGO")" || true
+    if [ -n "$container_ids" ]; then
+      for container_id in $container_ids; do
+        timeout 10s docker inspect --format \
+          '{{.Id}} {{.Name}} status={{.State.Status}} exit_code={{.State.ExitCode}}' \
+          "$container_id" >&2 || true
+      done
+    else
+      echo "No matching Cargo containers remain" >&2
+    fi
+  fi
   cleanup_nanocl_artifacts
 }
 
@@ -169,22 +184,38 @@ teardown_file() {
 }
 
 @test "nanocl runs and removes a Cargo" {
+  E2E_DIAGNOSTIC_CARGO="global.test"
   run nanocl cargo run test nginx:latest
   [ "$status" -eq 0 ]
 
+  # Existing Cargo operations require a canonical namespace.name key.
+  # A rejected batch item must fail the command and leave the Cargo intact.
   run nanocl cargo rm -yf test
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"400 Bad Request"* ]]
+
+  run nanocl cargo inspect global.test
   [ "$status" -eq 0 ]
+
+  run nanocl cargo rm -yf global.test
+  [ "$status" -eq 0 ]
+
+  run nanocl cargo inspect global.test
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"404 Not Found"* ]]
 }
 
 @test "nanocl applies, renders, serves, and removes a deployment Statefile" {
+  E2E_DIAGNOSTIC_CARGO="global.deploy-example"
   run nanocl state apply -ys ./examples/deploy_example.yml
   [ "$status" -eq 0 ]
 
   run nanocl state render -s ./examples/deploy_example.yml
   [ "$status" -eq 0 ]
 
-  run sleep 2
-  run curl --header "Host: deploy-example.com" 127.0.0.1
+  run curl --silent --show-error --fail --retry 10 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 \
+    --header "Host: deploy-example.com" 127.0.0.1
   [ "$status" -eq 0 ]
 
   run nanocl state rm -ys ./examples/deploy_example.yml
@@ -402,7 +433,8 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [ "$output" = "$gateway" ]
 
-  run curl --silent --fail --retry 10 --retry-all-errors \
+  run curl --silent --show-error --fail --retry 10 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 \
     --header 'Host: network-partitioning.nanocl.test' "http://${gateway}"
   [ "$status" -eq 0 ]
 

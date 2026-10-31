@@ -55,3 +55,27 @@ The controller proxy will watch for events:
   - Creation, Update, Suppresion
 - Cargo,Vm:
   - Creation, Update, Suppression
+
+## Access logs
+
+Access logging is disabled by default. Opt in for a cargo or VM target with
+`Target.EnableLogging: true` in an `ncproxy.io/rule`. Omission or `false` keeps
+logging disabled. This replaces the old `Target.DisableLogging` option.
+
+```yaml
+Target:
+  Key: my-service.global.c
+  Port: 80
+  EnableLogging: true
+```
+
+Nginx writes HTTP access logs to `<state-dir>/log/access.log` in a combined-log
+layout suitable for Fail2ban filters. The request contains the path without the
+query string; user and Referer fields are `-`, and request bodies are omitted.
+TCP/UDP session logs go to `<state-dir>/log/stream.log` using `stream_basic`.
+Set Fail2ban's `logpath` to the corresponding file in the mounted state directory.
+
+Nginx error logs remain enabled at `<state-dir>/log/error.log` for outage
+diagnosis. They can still include full request URLs and Referer headers.
+ncproxy no longer watches access-log files, parses JSON log records, or sends
+HTTP/stream access metrics to nanocld.

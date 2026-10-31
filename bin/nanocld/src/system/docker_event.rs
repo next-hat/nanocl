@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use futures_util::StreamExt;
 use ntex::rt;
@@ -6,9 +6,8 @@ use ntex::rt;
 use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
-  container::InspectContainerOptions,
-  service::{EventMessage, EventMessageTypeEnum},
-  system::EventsOptions,
+  models::{ContainerInspectResponse, EventMessage, EventMessageTypeEnum},
+  query_parameters::{EventsOptions, InspectContainerOptions},
 };
 use nanocl_stubs::system::{
   EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
@@ -17,8 +16,8 @@ use nanocl_stubs::system::{
 
 use crate::{
   models::{
-    CargoDb, CargoReplicaDb, ObjPsStatusDb, ProcessDb, ProcessUpdateDb,
-    SystemState, VmDb,
+    CargoDb, CargoReplicaDb, CargoReplicaProcessDb, ObjPsStatusDb, OperationDb,
+    ProcessDb, ProcessUpdateDb, SystemState, VmDb, VmLifecycleObservationGuard,
   },
   repositories::generic::*,
   utils, vars,
@@ -102,18 +101,185 @@ fn vm_runtime_failure_effect(
   action: &str,
   process_name: &str,
   wanted: &str,
-  prev_actual: &str,
+  actual: &str,
 ) -> VmRuntimeFailureEffect {
   if action != "die"
     || process_name.starts_with("tmp-")
     || process_name.ends_with(".init.v")
     || wanted == ObjPsStatusKind::Stop.to_string()
     || wanted == ObjPsStatusKind::Destroy.to_string()
-    || prev_actual == ObjPsStatusKind::Updating.to_string()
+    || actual == ObjPsStatusKind::Updating.to_string()
   {
     return VmRuntimeFailureEffect::NoRuntimeFailure;
   }
   VmRuntimeFailureEffect::FailAndEmitRuntimeError
+}
+
+fn vm_runtime_has_exited(
+  event_id: &str,
+  event_time: Option<i64>,
+  runtime: &ContainerInspectResponse,
+) -> bool {
+  let Some(state) = runtime.state.as_ref() else {
+    return false;
+  };
+  let started_at = state.started_at.as_deref().and_then(|started_at| {
+    chrono::DateTime::parse_from_rfc3339(started_at)
+      .ok()
+      .and_then(|started_at| started_at.timestamp_nanos_opt())
+  });
+  !event_id.is_empty()
+    && runtime.id.as_deref() == Some(event_id)
+    && state.running == Some(false)
+    // Container identity survives a restart. Its start timestamp identifies
+    // which run the queued die event may describe, even if a newer run exited.
+    && matches!((event_time, started_at), (Some(event), Some(start)) if event >= start)
+}
+
+fn vm_runtime_failure_guard(key: &str) -> Option<VmLifecycleObservationGuard> {
+  utils::container::vm::lifecycle_lock(key).try_observe_owned()
+}
+
+async fn handle_vm_runtime_exit(
+  key: &str,
+  name: &str,
+  id: &str,
+  event_time: Option<i64>,
+  state: &SystemState,
+  _guard: VmLifecycleObservationGuard,
+) -> IoResult<()> {
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Ok(());
+  }
+  // A contended event is checked only after the operation releases its lock.
+  // The VM may have restarted, changed desired state, or been deleted by then.
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
+    Ok(vm) => vm,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  if vm_runtime_failure_effect(
+    "die",
+    name,
+    &vm.status.wanted.to_string(),
+    &vm.status.actual.to_string(),
+  ) != VmRuntimeFailureEffect::FailAndEmitRuntimeError
+  {
+    return Ok(());
+  }
+  // A delayed die event can describe a replaced runtime or an earlier run of
+  // a restarted container. Confirm that the current runtime is still exited.
+  let has_exited =
+    match utils::container::vm::inspect_runtime(&vm, state).await? {
+      Some(runtime) => vm_runtime_has_exited(id, event_time, &runtime),
+      None => false,
+    };
+  if !has_exited {
+    log::debug!(
+      "VM {key} ignored stale or unconfirmed exit: container={id} event_time={event_time:?}"
+    );
+    return Ok(());
+  }
+  if !VmDb::observe_runtime_status(
+    &vm,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    ObjPsStatusKind::Fail,
+    guard,
+    &state.inner.pool,
+  )
+  .await?
+  {
+    return Ok(());
+  }
+  state.emit_error_native_action(
+    &vm,
+    NativeEventAction::Die,
+    Some(format!("process {name} (container {id}, exit event {event_time:?}) died but should be alive")),
+  );
+  Ok(())
+}
+
+async fn handle_vm_runtime_start(
+  key: &str,
+  id: &str,
+  event_time: Option<i64>,
+  state: &SystemState,
+  _guard: VmLifecycleObservationGuard,
+) -> IoResult<()> {
+  let guard = std::sync::Arc::new(_guard);
+  let operation = OperationDb::current("Vm", key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Ok(());
+  }
+  let live = match VmDb::read_by_pk(key, &state.inner.pool).await {
+    Ok((live, _, _)) => live,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  let vm = match VmDb::transform_read_by_pk(key, &state.inner.pool).await {
+    Ok(vm) => vm,
+    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(());
+    }
+    Err(error) => return Err(error),
+  };
+  let Some(runtime) = utils::container::vm::inspect_runtime(&vm, state).await?
+  else {
+    return Ok(());
+  };
+  let started_at = runtime
+    .state
+    .as_ref()
+    .and_then(|state| state.started_at.as_deref())
+    .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+    .and_then(|value| value.timestamp_nanos_opt());
+  if runtime.id.as_deref() != Some(id)
+    || id.is_empty()
+    || runtime.state.as_ref().and_then(|state| state.running) != Some(true)
+    || !matches!((event_time, started_at), (Some(event), Some(start)) if event >= start)
+  {
+    return Ok(());
+  }
+  let generation = runtime
+    .config
+    .as_ref()
+    .and_then(|config| config.labels.as_ref())
+    .and_then(|labels| labels.get("io.nanocl.vm-spec"))
+    .and_then(|value| uuid::Uuid::parse_str(value).ok());
+  let Some(generation) = generation else {
+    return Ok(());
+  };
+  utils::container::vm::validate_generation(&vm, generation, state).await?;
+  VmDb::observe_runtime_status(
+    &vm,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    ObjPsStatusKind::Start,
+    guard,
+    &state.inner.pool,
+  )
+  .await?;
+  Ok(())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -248,16 +414,69 @@ fn current_process_name(
 
 async fn reduce_cargo_runtime_readiness(
   kind_key: &str,
+  trigger_id: &str,
   trigger: &str,
   state: &SystemState,
-) -> IoResult<bool> {
-  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
+) -> IoResult<Option<bool>> {
+  let lock = utils::container::cargo::lifecycle_lock(kind_key);
+  let guard = match lock.clone().try_lock_owned() {
+    Ok(guard) => guard,
+    Err(_) => {
+      // Recheck after the owning task without blocking the serial Docker
+      // stream or losing a crash during the final operation commit.
+      let key = kind_key.to_owned();
+      let id = trigger_id.to_owned();
+      let trigger = trigger.to_owned();
+      let state = state.clone();
+      rt::spawn(async move {
+        let guard = std::sync::Arc::new(lock.lock_owned().await);
+        if let Err(error) = reduce_cargo_runtime_readiness_owned(
+          &key, &id, &trigger, &state, guard,
+        )
+        .await
+        {
+          log::warn!("event::docker deferred Cargo readiness: {error}");
+        }
+      });
+      return Ok(None);
+    }
+  };
+  let guard = std::sync::Arc::new(guard);
+  reduce_cargo_runtime_readiness_owned(
+    kind_key, trigger_id, trigger, state, guard,
+  )
+  .await
+}
+
+async fn reduce_cargo_runtime_readiness_owned(
+  kind_key: &str,
+  trigger_id: &str,
+  trigger: &str,
+  state: &SystemState,
+  guard: std::sync::Arc<tokio::sync::OwnedMutexGuard<()>>,
+) -> IoResult<Option<bool>> {
+  let operation =
+    OperationDb::current("Cargo", kind_key, &state.inner.pool).await?;
+  if operation
+    .as_ref()
+    .is_some_and(|operation| operation.outcome.is_none())
+  {
+    return Ok(None);
+  }
+  let (live, _, status) =
+    match CargoDb::read_by_pk(kind_key, &state.inner.pool).await {
+      Ok(current) => current,
+      Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+        return Ok(None);
+      }
+      Err(error) => return Err(error),
+    };
   if status.wanted != ObjPsStatusKind::Start.to_string() {
     log::debug!(
       "ignore Cargo readiness trigger while wanted={}: key={kind_key} trigger={trigger}",
       status.wanted
     );
-    return Ok(false);
+    return Ok(None);
   }
   if reconciliation_owns_cargo_health(&status.actual, &status.prev_actual) {
     // Cargo reconciliation performs a synchronous, per-replica readiness
@@ -268,76 +487,125 @@ async fn reduce_cargo_runtime_readiness(
       "ignore Cargo readiness trigger during {}: key={kind_key} trigger={trigger}",
       status.actual
     );
-    return Ok(false);
+    return Ok(None);
   }
   let cargo =
     CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
-  let instances =
+  let mut instances =
     ProcessDb::read_by_kind_key(kind_key, None, &state.inner.pool).await?;
+  let replicas =
+    CargoReplicaDb::list_by_cargo(kind_key, &state.inner.pool).await?;
+  let mut mapped_ids = HashSet::new();
+  for replica in &replicas {
+    for mapping in
+      CargoReplicaProcessDb::list_by_replica(replica.key, &state.inner.pool)
+        .await?
+    {
+      if let Some(id) = mapping.process_key {
+        mapped_ids.insert(id);
+      }
+    }
+  }
+  instances.retain(|process| {
+    mapped_ids.contains(&process.key)
+      && cargo_observation_identity_matches(
+        live.incarnation_key,
+        process
+          .data
+          .config
+          .as_ref()
+          .and_then(|config| config.labels.as_ref()),
+      )
+  });
+  if !instances.iter().any(|process| process.key == trigger_id) {
+    return Ok(None);
+  }
   let desired_replica_keys =
-    CargoReplicaDb::list_by_cargo(kind_key, &state.inner.pool)
-      .await?
-      .into_iter()
-      .map(|replica| replica.key)
-      .collect();
+    replicas.into_iter().map(|replica| replica.key).collect();
   let ready = utils::container::cargo::all_desired_replicas_ready(
     &cargo,
     &desired_replica_keys,
     &instances,
   );
-  if !ready {
-    let health_changed = ObjPsStatusDb::update_health_status(
-      kind_key,
-      &ObjPsHealthStatusKind::Unhealthy,
-      &state.inner.pool,
-    )
-    .await?;
-    let actual_changed = status.actual != ObjPsStatusKind::Fail.to_string();
-    if actual_changed {
-      ObjPsStatusDb::update_actual_status(
-        kind_key,
-        &ObjPsStatusKind::Fail,
-        &state.inner.pool,
-      )
-      .await?;
-    }
-    if health_changed || actual_changed {
-      state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
-        .await;
-    }
-    return Ok(false);
-  }
-  let health_changed = ObjPsStatusDb::update_health_status(
-    kind_key,
-    &ObjPsHealthStatusKind::Healthy,
+  let (actual, health) = if ready {
+    (ObjPsStatusKind::Start, ObjPsHealthStatusKind::Healthy)
+  } else {
+    (ObjPsStatusKind::Fail, ObjPsHealthStatusKind::Unhealthy)
+  };
+  let actual_changed = status.actual != actual.to_string();
+  let health_changed = status.health != health.to_string();
+  if !CargoDb::observe_runtime_status(
+    &cargo,
+    live.incarnation_key,
+    operation.map(|operation| operation.key),
+    actual,
+    health,
+    guard.clone(),
     &state.inner.pool,
   )
-  .await?;
-  let actual_changed = status.actual != ObjPsStatusKind::Start.to_string();
-  if actual_changed {
-    ObjPsStatusDb::update_actual_status(
-      kind_key,
-      &ObjPsStatusKind::Start,
-      &state.inner.pool,
-    )
-    .await?;
+  .await?
+  {
+    return Ok(None);
+  }
+  if !ready {
+    state
+      .emit_normal_native_action_sync(&cargo, NativeEventAction::Unhealthy)
+      .await;
+    return Ok(Some(false));
   }
   for action in
     successful_cargo_readiness_actions(actual_changed, health_changed)
   {
     state.emit_normal_native_action_sync(&cargo, action).await;
   }
-  Ok(true)
+  Ok(Some(true))
+}
+
+// Legacy/bootstrap containers may have no operation labels, but callers must
+// first establish their exact durable mapping. An unchanged slot may retain
+// its creation revision after a completed rollout. Partial or foreign
+// incarnation identities never qualify as observations of the current Cargo.
+fn cargo_observation_identity_matches(
+  incarnation: uuid::Uuid,
+  labels: Option<&HashMap<String, String>>,
+) -> bool {
+  let Some(labels) = labels else {
+    return false;
+  };
+  use utils::container::cargo::{
+    LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC,
+  };
+  match (
+    labels.get(LABEL_INCARNATION),
+    labels.get(LABEL_SPEC),
+    labels.get(LABEL_OPERATION),
+  ) {
+    (None, None, None) => true,
+    (Some(current_incarnation), Some(current_spec), Some(operation)) => {
+      current_incarnation.parse::<uuid::Uuid>() == Ok(incarnation)
+        && current_spec.parse::<uuid::Uuid>().is_ok()
+        && operation.parse::<uuid::Uuid>().is_ok()
+    }
+    _ => false,
+  }
 }
 
 async fn handle_cargo_health_event(
   kind_key: &str,
+  id: &str,
   action: &str,
   state: &SystemState,
 ) -> IoResult<()> {
-  let _ = reduce_cargo_runtime_readiness(kind_key, action, state).await?;
+  let _ = reduce_cargo_runtime_readiness(kind_key, id, action, state).await?;
   Ok(())
+}
+
+fn normalize_job_observation_action(event: &mut EventPartial, action: &str) {
+  if action.starts_with("health_status:") {
+    event.action = NativeEventAction::Update.to_string();
+  } else {
+    action.clone_into(&mut event.action);
+  }
 }
 
 /// Take actions when a docker event is received
@@ -375,6 +643,7 @@ async fn exec_docker(
   let Some(kind_key) = kind_key else {
     return Ok(());
   };
+  let event_time = event.time_nano;
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   let name = attributes.get("name").cloned().unwrap_or_default();
@@ -402,8 +671,22 @@ async fn exec_docker(
       ),
     }),
   };
+  // Job state is owned by its durable run executor/reconciler. Docker events
+  // retain their exact container and run labels, but must never look up or
+  // update a replacement Job merely because it reused the same name.
+  if kind == EventActorKind::Job {
+    normalize_job_observation_action(&mut event, action);
+    state.spawn_emit_event(event);
+    if action == "destroy" {
+      let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;
+    } else if action != "create" {
+      refresh_process_observation(&id, &name, &kind, state).await?;
+    }
+    return Ok(());
+  }
   match action {
     "start" => {
+      event.action = NativeEventAction::Start.to_string();
       let mut is_active_cargo_runtime_event = false;
       if kind == EventActorKind::Cargo {
         let current_name =
@@ -430,19 +713,37 @@ async fn exec_docker(
             )
             && actual_status.wanted == ObjPsStatusKind::Start.to_string() =>
         {
-          let _ =
-            reduce_cargo_runtime_readiness(&kind_key, "container start", state)
-              .await?;
-        }
-        (EventActorKind::Vm, status)
-          if status != &ObjPsStatusKind::Start.to_string() =>
-        {
-          ObjPsStatusDb::update_actual_status(
+          let _ = reduce_cargo_runtime_readiness(
             &kind_key,
-            &ObjPsStatusKind::Start,
-            &state.inner.pool,
+            &id,
+            "container start",
+            state,
           )
           .await?;
+        }
+        (EventActorKind::Vm, status)
+          if status != &ObjPsStatusKind::Start.to_string()
+            && !name.starts_with("tmp-")
+            && !name.ends_with(".init.v") =>
+        {
+          if let Some(guard) = vm_runtime_failure_guard(&kind_key) {
+            handle_vm_runtime_start(&kind_key, &id, event_time, state, guard)
+              .await?;
+          } else {
+            let lock = utils::container::vm::lifecycle_lock(&kind_key);
+            let key = kind_key.clone();
+            let id = id.clone();
+            let state = state.clone();
+            rt::spawn(async move {
+              let guard = lock.observe_owned().await;
+              if let Err(error) =
+                handle_vm_runtime_start(&key, &id, event_time, &state, guard)
+                  .await
+              {
+                log::warn!("event::docker deferred VM start: {error}");
+              }
+            });
+          }
         }
         _ => {}
       }
@@ -459,14 +760,26 @@ async fn exec_docker(
           Some(&attributes),
         )
         && let Err(err) =
-          handle_cargo_health_event(&kind_key, action, state).await
+          handle_cargo_health_event(&kind_key, &id, action, state).await
       {
         log::warn!("event::docker health_status: {err}");
       }
     }
     "die" => {
       let current_name =
-        refresh_process_observation(&id, &name, &kind, state).await?;
+        match refresh_process_observation(&id, &name, &kind, state).await {
+          Ok(name) => name,
+          Err(error) => {
+            // Replacement can remove the exited container and process row
+            // before this queued event is consumed. Keep its event even when
+            // refreshing the old observation fails; the analyzer logs the error.
+            if kind == EventActorKind::Vm {
+              action.clone_into(&mut event.action);
+              state.spawn_emit_event(event);
+            }
+            return Err(error);
+          }
+        };
       observation_refreshed = true;
       if kind != EventActorKind::Cargo
         || (labels_describe_active_cargo_runtime(&name, Some(&attributes))
@@ -494,12 +807,14 @@ async fn exec_docker(
             let cargo =
               CargoDb::transform_read_by_pk(&kind_key, &state.inner.pool)
                 .await?;
-            if !reduce_cargo_runtime_readiness(
+            if reduce_cargo_runtime_readiness(
               &kind_key,
+              &id,
               "container die",
               state,
             )
             .await?
+              == Some(false)
             {
               state.emit_error_native_action(
                 &cargo,
@@ -508,27 +823,31 @@ async fn exec_docker(
               );
             }
           }
-          (EventActorKind::Vm, wanted, _)
-            if vm_runtime_failure_effect(
-              action,
-              &name,
-              wanted,
-              &actual_status.prev_actual,
-            ) == VmRuntimeFailureEffect::FailAndEmitRuntimeError =>
-          {
-            ObjPsStatusDb::update_actual_status(
-              &kind_key,
-              &ObjPsStatusKind::Fail,
-              &state.inner.pool,
-            )
-            .await?;
-            let vm =
-              VmDb::transform_read_by_pk(&kind_key, &state.inner.pool).await?;
-            state.emit_error_native_action(
-              &vm,
-              NativeEventAction::Die,
-              Some(format!("process {name} die but should be alive")),
-            );
+          (EventActorKind::Vm, _, _) => {
+            if let Some(guard) = vm_runtime_failure_guard(&kind_key) {
+              handle_vm_runtime_exit(
+                &kind_key, &name, &id, event_time, state, guard,
+              )
+              .await?;
+            } else {
+              // Recheck after the active operation instead of losing a crash
+              // during resize or blocking the serial Docker event stream.
+              let lock = utils::container::vm::lifecycle_lock(&kind_key);
+              let key = kind_key.clone();
+              let name = name.clone();
+              let id = id.clone();
+              let state = state.clone();
+              rt::spawn(async move {
+                let guard = lock.observe_owned().await;
+                if let Err(error) = handle_vm_runtime_exit(
+                  &key, &name, &id, event_time, &state, guard,
+                )
+                .await
+                {
+                  log::warn!("event::docker deferred VM exit: {error}");
+                }
+              });
+            }
           }
           _ => {}
         }
@@ -576,8 +895,7 @@ pub fn analyze(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
     loop {
-      let mut streams =
-        state.inner.docker_api.events(None::<EventsOptions<String>>);
+      let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
       log::info!("event::analyze_docker: stream connected");
       let reconnect_state = state.clone();
       rt::spawn(async move {
@@ -607,11 +925,90 @@ pub fn analyze(state: &SystemState) {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn cargo_observation_rejects_foreign_and_partial_runtime_identity() {
+    use super::cargo_observation_identity_matches;
+    use crate::utils::container::cargo::{
+      LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC,
+    };
+    let incarnation = uuid::Uuid::new_v4();
+    let spec = uuid::Uuid::new_v4();
+    let mut labels = std::collections::HashMap::from([
+      (LABEL_INCARNATION.into(), incarnation.to_string()),
+      (LABEL_SPEC.into(), spec.to_string()),
+      (LABEL_OPERATION.into(), uuid::Uuid::new_v4().to_string()),
+    ]);
+    assert!(cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    assert!(!cargo_observation_identity_matches(
+      uuid::Uuid::new_v4(),
+      Some(&labels)
+    ));
+    labels.insert(LABEL_SPEC.into(), uuid::Uuid::new_v4().to_string());
+    assert!(
+      cargo_observation_identity_matches(incarnation, Some(&labels)),
+      "exact mapped slots can retain an earlier creation revision"
+    );
+    labels.remove(LABEL_OPERATION);
+    assert!(!cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    labels.clear();
+    assert!(cargo_observation_identity_matches(
+      incarnation,
+      Some(&labels)
+    ));
+    assert!(!cargo_observation_identity_matches(incarnation, None));
+  }
+
   use std::collections::HashMap;
 
-  use bollard_next::service::EventActor as DockerEventActor;
+  use bollard_next::models::EventActor as DockerEventActor;
 
   use super::*;
+
+  #[test]
+  fn job_health_events_normalize_action_and_preserve_raw_observation() {
+    for (action, expected_action) in [
+      ("health_status: healthy", NativeEventAction::Update),
+      ("health_status: unhealthy", NativeEventAction::Update),
+      ("health_status: starting", NativeEventAction::Update),
+      ("start", NativeEventAction::Start),
+      ("die", NativeEventAction::Die),
+      ("destroy", NativeEventAction::Destroy),
+    ] {
+      let mut event = EventPartial {
+        reporting_controller: "nanocl.io/core".into(),
+        reporting_node: "test-node".into(),
+        kind: EventKind::Normal,
+        action: NativeEventAction::Destroy.to_string(),
+        reason: "state_sync".into(),
+        note: Some(format!("process exact-run-container {action}")),
+        actor: Some(EventActor {
+          key: Some("exact-run-container".into()),
+          kind: EventActorKind::Process,
+          attributes: Some(serde_json::json!({
+            "io.nanocl.j": "backup",
+            "io.nanocl.job.run": "old-run",
+          })),
+        }),
+        related: Some(EventActor {
+          key: Some("backup".into()),
+          kind: EventActorKind::Job,
+          attributes: None,
+        }),
+        metadata: None,
+      };
+      let mut expected = serde_json::to_value(&event).unwrap();
+      expected["Action"] = serde_json::json!(expected_action.to_string());
+      normalize_job_observation_action(&mut event, action);
+      assert_eq!(serde_json::to_value(&event).unwrap(), expected);
+      assert!(event.note.as_ref().unwrap().ends_with(action));
+    }
+  }
 
   fn network_event(action: &str) -> EventMessage {
     EventMessage {
@@ -626,6 +1023,92 @@ mod tests {
         ])),
       }),
       ..Default::default()
+    }
+  }
+
+  #[ntex::test]
+  async fn job_process_start_event_matches_waiting_log_subscription() {
+    use futures::FutureExt;
+    use nanocl_stubs::system::{Event, EventCondition, ObjPsStatusPartial};
+
+    let system = utils::tests::gen_default_test_system().await;
+    let key = format!("job-start-event-{}", uuid::Uuid::new_v4().simple());
+    let process_name = format!("{key}-1.j");
+    ObjPsStatusDb::create_from(
+      ObjPsStatusPartial {
+        key: key.clone(),
+        wanted: ObjPsStatusKind::Start,
+        prev_wanted: ObjPsStatusKind::Create,
+        actual: ObjPsStatusKind::Start,
+        prev_actual: ObjPsStatusKind::Starting,
+        health: ObjPsHealthStatusKind::Unknown,
+      },
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+
+    let result = std::panic::AssertUnwindSafe(async {
+      let condition = EventCondition {
+        actor_key: Some(process_name.clone()),
+        actor_kind: Some(EventActorKind::Process),
+        kind: vec![EventKind::Normal],
+        action: vec![NativeEventAction::Start],
+        ..Default::default()
+      };
+      let mut subscription = system
+        .state
+        .subscribe_raw(Some(vec![condition.clone()]))
+        .await
+        .unwrap();
+      let event = EventMessage {
+        typ: Some(EventMessageTypeEnum::CONTAINER),
+        action: Some("start".to_owned()),
+        actor: Some(DockerEventActor {
+          id: Some(format!("removed-{key}")),
+          attributes: Some(HashMap::from([
+            ("io.nanocl".to_owned(), "true".to_owned()),
+            ("io.nanocl.kind".to_owned(), "job".to_owned()),
+            ("io.nanocl.j".to_owned(), key.clone()),
+            ("name".to_owned(), process_name.clone()),
+          ])),
+        }),
+        ..Default::default()
+      };
+      // A queued start may be consumed after the short-lived container was
+      // removed. Its Process event is published before observation refresh;
+      // the log waiter must still receive Start, never the default Destroy.
+      exec_docker(&event, &system.state)
+        .await
+        .expect_err("the removed container cannot be refreshed");
+      let emitted =
+        ntex::time::timeout(std::time::Duration::from_secs(5), async {
+          while let Some(bytes) = subscription.next().await {
+            let bytes = bytes.unwrap();
+            if bytes.is_empty() {
+              continue;
+            }
+            let event: Event = serde_json::from_slice(&bytes).unwrap();
+            if event.actor.as_ref().and_then(|actor| actor.key.as_deref())
+              == Some(process_name.as_str())
+            {
+              return event;
+            }
+          }
+          panic!("Process event subscription ended without the job event");
+        })
+        .await
+        .expect("Docker Process start event was not published");
+      assert_eq!(emitted.action, NativeEventAction::Start.to_string());
+      assert!(condition == emitted);
+    })
+    .catch_unwind()
+    .await;
+    ObjPsStatusDb::del_by_pk(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    if let Err(panic) = result {
+      std::panic::resume_unwind(panic);
     }
   }
 
@@ -799,13 +1282,13 @@ mod tests {
     action: &str,
     process_name: &str,
     wanted: ObjPsStatusKind,
-    prev_actual: ObjPsStatusKind,
+    actual: ObjPsStatusKind,
   ) -> VmRuntimeFailureEffect {
     vm_runtime_failure_effect(
       action,
       process_name,
       &wanted.to_string(),
-      &prev_actual.to_string(),
+      &actual.to_string(),
     )
   }
 
@@ -860,6 +1343,111 @@ mod tests {
   }
 
   #[test]
+  fn vm_docker_event_delayed_die_does_not_fail_restarted_runtime() {
+    let mut runtime: ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "Id": "same-runtime-id",
+        "State": {"Running": true, "StartedAt": "1970-01-01T00:00:00.000000010Z"}
+      }))
+      .unwrap();
+    assert!(!vm_runtime_has_exited(
+      "same-runtime-id",
+      Some(11),
+      &runtime
+    ));
+    runtime.state.as_mut().unwrap().running = Some(false);
+    assert!(vm_runtime_has_exited("same-runtime-id", Some(11), &runtime));
+    assert!(!vm_runtime_has_exited(
+      "replaced-runtime-id",
+      Some(11),
+      &runtime
+    ));
+  }
+
+  #[ntex::test]
+  async fn vm_docker_event_lifecycle_guard_keeps_restart_authoritative() {
+    use std::{future::Future, task::Context};
+
+    for (key, running_after_operation) in [
+      ("global.event-restart-guard-test", true),
+      ("global.event-resize-crash-guard-test", false),
+    ] {
+      let lock = utils::container::vm::lifecycle_lock(key);
+      let lifecycle = lock.clone().try_lock_owned().await.unwrap();
+      let mut runtime: ContainerInspectResponse =
+        serde_json::from_value(serde_json::json!({
+          "Id": "same-runtime-id",
+          "State": {"Running": false, "StartedAt": "1970-01-01T00:00:00.000000010Z"}
+        }))
+        .unwrap();
+      assert!(vm_runtime_has_exited("same-runtime-id", Some(11), &runtime));
+      assert!(vm_runtime_failure_guard(key).is_none());
+      // Poll the deferred lock directly: the event yields while the operation
+      // owns the outcome, without timers, services, or blocking another event.
+      let mut pending = Box::pin(lock.observe_owned());
+      let mut context = Context::from_waker(futures::task::noop_waker_ref());
+      assert!(pending.as_mut().poll(&mut context).is_pending());
+
+      runtime.state.as_mut().unwrap().running = Some(running_after_operation);
+      drop(lifecycle);
+      let std::task::Poll::Ready(event_guard) =
+        pending.as_mut().poll(&mut context)
+      else {
+        panic!("deferred event must proceed after the operation finishes");
+      };
+      // A completed restart suppresses the stale die. A real crash during
+      // resize remains a failure candidate after the resize releases its lock.
+      assert_eq!(
+        vm_runtime_has_exited("same-runtime-id", Some(11), &runtime),
+        !running_after_operation
+      );
+      assert!(vm_runtime_failure_guard(key).is_none());
+      drop(event_guard);
+      assert!(vm_runtime_failure_guard(key).is_some());
+    }
+  }
+
+  #[test]
+  fn vm_docker_event_old_run_cannot_fail_restarted_exited_container() {
+    let runtime: ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "Id": "same-runtime-id",
+        "State": {"Running": false, "StartedAt": "1970-01-01T00:00:00.000000010Z"}
+      }))
+      .unwrap();
+    assert!(!vm_runtime_has_exited("same-runtime-id", Some(9), &runtime));
+    assert!(!vm_runtime_has_exited("same-runtime-id", None, &runtime));
+    assert!(vm_runtime_has_exited("same-runtime-id", Some(11), &runtime));
+    assert!(!vm_runtime_has_exited(
+      "replacement-runtime-id",
+      Some(11),
+      &runtime
+    ));
+    let mut unknown_start = runtime;
+    unknown_start.state.as_mut().unwrap().started_at = None;
+    assert!(!vm_runtime_has_exited(
+      "same-runtime-id",
+      Some(11),
+      &unknown_start
+    ));
+  }
+
+  #[test]
+  fn vm_docker_event_unknown_runtime_state_does_not_prove_exit() {
+    let mut runtime: ContainerInspectResponse =
+      serde_json::from_value(serde_json::json!({
+        "Id": "runtime-id",
+        "State": {}
+      }))
+      .unwrap();
+    assert!(!vm_runtime_has_exited("runtime-id", Some(11), &runtime));
+    runtime.state = None;
+    assert!(!vm_runtime_has_exited("runtime-id", Some(11), &runtime));
+    runtime.id = Some(String::new());
+    assert!(!vm_runtime_has_exited("", Some(11), &runtime));
+  }
+
+  #[test]
   fn vm_docker_event_runtime_die_during_intentional_stop_is_observation_only() {
     assert_eq!(
       vm_failure_effect(
@@ -898,6 +1486,15 @@ mod tests {
 
   #[test]
   fn vm_docker_event_update_replacement_die_is_observation_only() {
+    assert_eq!(
+      vm_failure_effect(
+        "die",
+        "global.ubuntu.v",
+        ObjPsStatusKind::Start,
+        ObjPsStatusKind::Start,
+      ),
+      VmRuntimeFailureEffect::FailAndEmitRuntimeError
+    );
     assert_eq!(
       vm_failure_effect(
         "die",
@@ -948,5 +1545,197 @@ mod tests {
       "demo-api.candidate.c",
       Some(&essential_app)
     ));
+  }
+
+  #[ntex::test]
+  async fn vm_docker_events_preserve_durable_pending_operations_without_tasks_or_mutexes()
+   {
+    use crate::{
+      models::{
+        DistributedMutexDb, DistributedMutexPartial, OperationOwner,
+        SystemStateInner, VmObjCreateIn,
+      },
+      objects::generic::ObjCreate,
+    };
+    use futures::FutureExt;
+    use nanocl_stubs::vm_spec::VmSpecPartial;
+
+    let system = utils::tests::gen_default_test_system().await;
+    // Pending observations must return before any Docker inspection. An
+    // unavailable socket makes a missing pending-owner check observable.
+    let state = SystemState {
+      inner: std::sync::Arc::new(SystemStateInner {
+        pool: system.state.inner.pool.clone(),
+        docker_api: bollard_next::Docker::connect_with_unix(
+          "/dev/null",
+          1,
+          bollard_next::API_DEFAULT_VERSION,
+        )
+        .unwrap(),
+        config: system.state.inner.config.clone(),
+        task_manager: Default::default(),
+        event_emitter: system.state.inner.event_emitter.clone(),
+        event_emitter_raw: Default::default(),
+        arbiter: ntex::rt::Arbiter::current(),
+      }),
+    };
+    for phase in [
+      ObjPsStatusKind::Starting,
+      ObjPsStatusKind::Updating,
+      ObjPsStatusKind::Destroying,
+    ] {
+      let vm = VmDb::fn_create_obj(
+        &VmObjCreateIn {
+          namespace: "global".to_owned(),
+          version: vars::VERSION.to_owned(),
+          spec: VmSpecPartial {
+            name: format!("pending-event-{}", uuid::Uuid::new_v4().simple()),
+            image: "/tmp/pending-event-test.img".to_owned(),
+            cloud_init: Some(false),
+            ..Default::default()
+          },
+        },
+        &state,
+      )
+      .await
+      .unwrap();
+      let key = &vm.spec.vm_key;
+      let mut mutex_key = None;
+      let result = std::panic::AssertUnwindSafe(async {
+        let mutex = DistributedMutexDb::create_from(
+          DistributedMutexPartial {
+            action: phase.to_string(),
+            resource_kind: "Vm".to_owned(),
+            resource_key: key.clone(),
+            node_key: state.inner.config.hostname.clone(),
+            acquired_by: "pending-event-test".to_owned(),
+          },
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
+        mutex_key = Some(mutex.key);
+        let (live, _, _) =
+          VmDb::read_by_pk(key, &state.inner.pool).await.unwrap();
+        let operation = OperationDb::new(
+          &OperationOwner {
+            key: mutex.key,
+            resource_kind: "Vm".into(),
+            resource_key: key.clone(),
+            incarnation_key: live.incarnation_key,
+            node_name: mutex.node_key,
+            owner_boot_id: "event-test-boot".to_owned(),
+            lock_device: 1,
+            lock_inode: 2,
+          },
+          "Vm",
+          key,
+          vm.spec.key,
+          match phase {
+            ObjPsStatusKind::Starting => "start",
+            ObjPsStatusKind::Updating => "update",
+            ObjPsStatusKind::Destroying => "delete",
+            _ => unreachable!(),
+          },
+        );
+        VmDb::accept_operation(
+          &vm,
+          None,
+          operation.clone(),
+          (),
+          &state.inner.pool,
+        )
+        .await
+        .unwrap();
+        DistributedMutexDb::del_by_pk(&operation.key, &state.inner.pool)
+          .await
+          .unwrap();
+        assert!(
+          state
+            .inner
+            .task_manager
+            .get_task(&format!("Vm@{key}"))
+            .await
+            .is_none()
+        );
+        assert!(
+          DistributedMutexDb::get_lock("Vm", key, &state.inner.pool)
+            .await
+            .is_err()
+        );
+        let before = ObjPsStatusDb::read_by_pk(key, &state.inner.pool)
+          .await
+          .unwrap();
+
+        let guard = utils::container::vm::lifecycle_lock(key)
+          .observe_owned()
+          .await;
+        handle_vm_runtime_start(
+          key,
+          "delayed-container-id",
+          Some(1),
+          &state,
+          guard,
+        )
+        .await
+        .unwrap();
+        let guard = utils::container::vm::lifecycle_lock(key)
+          .observe_owned()
+          .await;
+        handle_vm_runtime_exit(
+          key,
+          &format!("{key}.v"),
+          "delayed-container-id",
+          Some(1),
+          &state,
+          guard,
+        )
+        .await
+        .unwrap();
+
+        let after = ObjPsStatusDb::read_by_pk(key, &state.inner.pool)
+          .await
+          .unwrap();
+        assert_eq!(after.actual, before.actual);
+        assert_eq!(after.wanted, before.wanted);
+        assert_eq!(after.prev_actual, before.prev_actual);
+        assert_eq!(after.updated_at, before.updated_at);
+        assert_eq!(
+          OperationDb::current("Vm", key, &state.inner.pool)
+            .await
+            .unwrap(),
+          Some(operation)
+        );
+      })
+      .catch_unwind()
+      .await;
+      if let Some(mutex_key) = mutex_key {
+        let _ =
+          DistributedMutexDb::del_by_pk(&mutex_key, &state.inner.pool).await;
+      }
+      if let Some(operation) =
+        OperationDb::current("Vm", key, &state.inner.pool)
+          .await
+          .unwrap()
+      {
+        if operation.outcome.is_none() {
+          VmDb::finish_operation(
+            &operation,
+            ObjPsStatusKind::Stop,
+            "interrupted",
+            serde_json::json!({"TestCleanup": true}),
+            (),
+            &state.inner.pool,
+          )
+          .await
+          .unwrap();
+        }
+      }
+      VmDb::clear_by_pk(key, &state.inner.pool).await.unwrap();
+      if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+      }
+    }
+    system.state.wait_event_loop().await;
   }
 }

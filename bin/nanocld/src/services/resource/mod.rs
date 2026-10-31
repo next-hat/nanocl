@@ -18,15 +18,57 @@ pub use list_history::*;
 pub use put::*;
 pub use revert::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(create_resource);
-  config.service(delete_resource);
-  config.service(list_resource);
-  config.service(inspect_resource);
-  config.service(put_resource);
-  config.service(count_resource);
-  config.service(list_resource_history);
-  config.service(revert_resource);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/resources")
+      .name("create_resource")
+      .guard(web::guard::Post())
+      .to_with_state(create_resource),
+  );
+  config.service(
+    web::resource("/resources/{name}")
+      .name("delete_resource")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_resource),
+  );
+  config.service(
+    web::resource("/resources")
+      .name("list_resource")
+      .guard(web::guard::Get())
+      .to_with_state(list_resource),
+  );
+  config.service(
+    web::resource("/resources/{name}/inspect")
+      .name("inspect_resource")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_resource),
+  );
+  config.service(
+    web::resource("/resources/{name}")
+      .name("put_resource")
+      .guard(web::guard::Put())
+      .to_with_state(put_resource),
+  );
+  config.service(
+    web::resource("/resources/count")
+      .name("count_resource")
+      .guard(web::guard::Get())
+      .to_with_state(count_resource),
+  );
+  config.service(
+    web::resource("/resources/{name}/histories")
+      .name("list_resource_history")
+      .guard(web::guard::Get())
+      .to_with_state(list_resource_history),
+  );
+  config.service(
+    web::resource("/resources/{name}/histories/{id}/revert")
+      .name("revert_resource")
+      .guard(web::guard::Patch())
+      .to_with_state(revert_resource),
+  );
 }
 
 #[cfg(test)]

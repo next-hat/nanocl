@@ -21,7 +21,7 @@ info:
   license:
     name: MIT OR Apache-2.0
     identifier: MIT OR Apache-2.0
-  version: v0.15.0
+  version: v0.15.1
 servers:
 - url: /{Version}
   variables:
@@ -524,11 +524,11 @@ components:
           - string
           - 'null'
           description: The http path to target when using http
-        DisableLogging:
+        EnableLogging:
           type:
           - boolean
           - 'null'
-          description: Disable logging for this target
+          description: Enable Nginx file access logging for this target (disabled by default).
         Ssl:
           oneOf:
           - type: 'null'

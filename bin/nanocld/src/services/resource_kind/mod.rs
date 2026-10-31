@@ -12,14 +12,48 @@ pub use delete::*;
 pub use inspect::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
   config
-    .service(list_resource_kind)
-    .service(create_resource_kind)
-    .service(delete_resource_kind)
-    .service(inspect_resource_kind)
-    .service(count_resource_kind)
-    .service(inspect_resource_kind_version);
+    .service(
+      web::resource("/resource/kinds")
+        .name("list_resource_kind")
+        .guard(web::guard::Get())
+        .to_with_state(list_resource_kind),
+    )
+    .service(
+      web::resource("/resource/kinds")
+        .name("create_resource_kind")
+        .guard(web::guard::Post())
+        .to_with_state(create_resource_kind),
+    )
+    .service(
+      web::resource("/resource/kinds/{domain}/{name}")
+        .name("delete_resource_kind")
+        .guard(web::guard::Delete())
+        .to_with_state(delete_resource_kind),
+    )
+    .service(
+      web::resource("/resource/kinds/{domain}/{name}/inspect")
+        .name("inspect_resource_kind")
+        .guard(web::guard::Get())
+        .to_with_state(inspect_resource_kind),
+    )
+    .service(
+      web::resource("/resource/kinds/count")
+        .name("count_resource_kind")
+        .guard(web::guard::Get())
+        .to_with_state(count_resource_kind),
+    )
+    .service(
+      web::resource(
+        "/resource/kinds/{domain}/{name}/version/{version}/inspect",
+      )
+      .name("inspect_resource_kind_version")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_resource_kind_version),
+    );
 }
 
 #[cfg(test)]

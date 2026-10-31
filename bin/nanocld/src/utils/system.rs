@@ -1,33 +1,45 @@
 mod cargo_bootstrap;
 
-use std::collections::{BTreeMap, HashMap};
+use std::{
+  collections::{BTreeMap, HashMap, HashSet},
+  sync::Arc,
+};
+
+use diesel::prelude::*;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use bollard_next::{
-  container::{InspectContainerOptions, ListContainersOptions},
-  service::ContainerInspectResponse,
+  models::ContainerInspectResponse,
+  query_parameters::{InspectContainerOptions, ListContainersOptions},
 };
 use nanocl_stubs::{
+  cargo::Cargo,
   cargo_spec::CARGO_CONTAINER_POSITION_LABEL,
   generic::{GenericClause, GenericFilter},
   namespace::NamespacePartial,
   process::ProcessPartial,
   resource_key::ResourceKey,
-  system::ObjPsStatusKind,
+  system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
 };
 
 use crate::{
   models::{
-    CargoDb, CargoObjCreateIn, CargoReplicaDb, CargoReplicaProcessDb,
-    CargoReplicaProcessRole, NamespaceDb, NewCargoReplicaDb,
-    NewCargoReplicaProcessDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb,
-    ProcessUpdateDb, SpecDb, SystemState,
+    CargoDb, CargoReplicaDb, CargoReplicaProcessDb, CargoReplicaProcessRole,
+    NamespaceDb, NewCargoReplicaDb, NewCargoReplicaProcessDb, ObjPsStatusDb,
+    OperationDb, ProcessDb, ProcessUpdateDb, SpecDb, SystemState,
   },
-  objects::generic::ObjCreate,
-  repositories::generic::*,
+  repositories::{
+    cargo_operation::lock_bootstrap_cargo,
+    generic::*,
+    operation::{TransactionResult, run_query_owned, transaction},
+  },
+  schema::{
+    cargo_replica_processes, cargo_replicas, cargoes, object_process_statuses,
+    processes, specs,
+  },
   utils::container::{
-    cargo::is_rollout_process_name,
+    cargo::{self, is_rollout_process_name},
     cargo_compiler::{
       LABEL_CARGO_KEY, LABEL_CONTAINER, LABEL_ESSENTIAL, LABEL_KIND,
       LABEL_REPLICA, LABEL_REPLICA_ORDINAL, LABEL_ROLE,
@@ -41,13 +53,14 @@ use cargo_bootstrap::{
   reconstruct_cargo,
 };
 
-async fn reattach_cargo_process(
+fn reattach_cargo_process(
+  conn: &mut PgConnection,
   cargo_key: &str,
   process_key: &str,
   process_name: &str,
   labels: &HashMap<String, String>,
-  state: &SystemState,
-) -> IoResult<()> {
+  node_name: &str,
+) -> TransactionResult<()> {
   if is_rollout_process_name(process_name) {
     return Ok(());
   }
@@ -57,7 +70,7 @@ async fn reattach_cargo_process(
       &format!(
         "Cargo process {process_key} labels do not identify expected Cargo {cargo_key:?}"
       ),
-    ));
+    ).into());
   }
   let Some(replica_key) = labels.get(LABEL_REPLICA) else {
     return Ok(());
@@ -93,7 +106,8 @@ async fn reattach_cargo_process(
         &format!("Cargo process {process_key} has no Cargo role"),
       )
     })?
-    .parse::<CargoReplicaProcessRole>()?;
+    .parse::<CargoReplicaProcessRole>()
+    .map_err(IoError::from)?;
   let container_name = labels.get(LABEL_CONTAINER).ok_or_else(|| {
     IoError::other(
       "CargoRuntimeIdentity",
@@ -117,56 +131,50 @@ async fn reattach_cargo_process(
         ),
       )
     })?;
-  let replica = match CargoReplicaDb::get(replica_key, &state.inner.pool).await
+  let replica = match cargo_replicas::table
+    .find(replica_key)
+    .for_update()
+    .first::<CargoReplicaDb>(conn)
+    .optional()?
   {
-    Ok(replica) => replica,
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      CargoReplicaDb::create(
-        NewCargoReplicaDb {
-          key: replica_key,
-          cargo_key: cargo_key.to_owned(),
-          ordinal,
-          node_name: Some(state.inner.config.hostname.clone()),
-        },
-        &state.inner.pool,
-      )
-      .await?
-    }
-    Err(error) => return Err(error),
+    Some(replica) => replica,
+    None => diesel::insert_into(cargo_replicas::table)
+      .values(NewCargoReplicaDb {
+        key: replica_key,
+        cargo_key: cargo_key.to_owned(),
+        ordinal,
+        node_name: Some(node_name.to_owned()),
+      })
+      .get_result::<CargoReplicaDb>(conn)?,
   };
   if replica.cargo_key != cargo_key
     || replica.ordinal != ordinal
-    || replica.node_name.as_deref() != Some(&state.inner.config.hostname)
+    || replica.node_name.as_deref() != Some(node_name)
   {
     return Err(IoError::other(
       "CargoRuntimeIdentity",
       &format!(
         "Cargo process {process_key} does not match replica {replica_key} assignment"
       ),
-    ));
+    ).into());
   }
-  let mapping = match CargoReplicaProcessDb::find(
-    replica_key,
-    role,
-    container_name,
-    &state.inner.pool,
-  )
-  .await
+  let mapping = match cargo_replica_processes::table
+    .filter(cargo_replica_processes::replica_key.eq(replica_key))
+    .filter(cargo_replica_processes::role.eq(role))
+    .filter(cargo_replica_processes::container_name.eq(container_name))
+    .for_update()
+    .first::<CargoReplicaProcessDb>(conn)
+    .optional()?
   {
-    Ok(mapping) => mapping,
-    Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-      CargoReplicaProcessDb::create(
-        NewCargoReplicaProcessDb::new(
-          replica_key,
-          container_name,
-          role,
-          essential,
-        ),
-        &state.inner.pool,
-      )
-      .await?
-    }
-    Err(error) => return Err(error),
+    Some(mapping) => mapping,
+    None => diesel::insert_into(cargo_replica_processes::table)
+      .values(NewCargoReplicaProcessDb::new(
+        replica_key,
+        container_name,
+        role,
+        essential,
+      ))
+      .get_result::<CargoReplicaProcessDb>(conn)?,
   };
   if mapping
     .process_key
@@ -179,49 +187,55 @@ async fn reattach_cargo_process(
         "Cargo mapping {} is already attached to process {:?}, not observed process {process_key}",
         mapping.key, mapping.process_key
       ),
-    ));
+    ).into());
   }
-  CargoReplicaProcessDb::set_processes(
-    vec![(mapping.key, Some(process_key.to_owned()), essential)],
-    &state.inner.pool,
-  )
-  .await?;
+  diesel::update(cargo_replica_processes::table.find(mapping.key))
+    .set((
+      cargo_replica_processes::process_key.eq(Some(process_key)),
+      cargo_replica_processes::essential.eq(essential),
+      cargo_replica_processes::updated_at.eq(chrono::Utc::now().naive_utc()),
+    ))
+    .execute(conn)?;
   Ok(())
 }
 
-async fn sync_cargo_status(
+fn sync_cargo_status(
+  conn: &mut PgConnection,
   cargo_key: &str,
   actual: ObjPsStatusKind,
-  state: &SystemState,
-) -> IoResult<()> {
-  let status = ObjPsStatusDb::read_by_pk(cargo_key, &state.inner.pool).await?;
-  ObjPsStatusDb::update_pk(
-    cargo_key,
-    ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Start.to_string()),
-      prev_wanted: Some(status.wanted),
-      actual: Some(actual.to_string()),
-      prev_actual: Some(status.actual),
-      ..Default::default()
-    },
-    &state.inner.pool,
-  )
-  .await?;
+) -> TransactionResult<()> {
+  let status = object_process_statuses::table
+    .find(cargo_key)
+    .for_update()
+    .first::<ObjPsStatusDb>(conn)?;
+  diesel::update(object_process_statuses::table.find(cargo_key))
+    .set((
+      object_process_statuses::wanted.eq(ObjPsStatusKind::Start.to_string()),
+      object_process_statuses::prev_wanted.eq(status.wanted),
+      object_process_statuses::actual.eq(actual.to_string()),
+      object_process_statuses::prev_actual.eq(status.actual),
+      object_process_statuses::updated_at.eq(chrono::Utc::now().naive_utc()),
+    ))
+    .execute(conn)?;
   Ok(())
 }
 
-async fn persist_reconstructed_mappings(
+fn persist_reconstructed_mappings(
+  conn: &mut PgConnection,
   cargo_key: &str,
   reconstructed: &ReconstructedCargo,
-  state: &SystemState,
-) -> IoResult<()> {
+  node_name: &str,
+) -> TransactionResult<()> {
   let observed_replicas = reconstructed
     .processes
     .iter()
     .map(|process| (process.replica_ordinal, process.replica_key))
     .collect::<BTreeMap<_, _>>();
-  let mut replicas =
-    CargoReplicaDb::list_by_cargo(cargo_key, &state.inner.pool).await?;
+  let mut replicas = cargo_replicas::table
+    .filter(cargo_replicas::cargo_key.eq(cargo_key))
+    .order(cargo_replicas::ordinal.asc())
+    .for_update()
+    .load::<CargoReplicaDb>(conn)?;
   for (ordinal, replica_key) in observed_replicas {
     let by_key = replicas
       .iter()
@@ -236,16 +250,14 @@ async fn persist_reconstructed_mappings(
         by_key
       }
       (None, None) => {
-        let replica = CargoReplicaDb::create(
-          NewCargoReplicaDb {
+        let replica = diesel::insert_into(cargo_replicas::table)
+          .values(NewCargoReplicaDb {
             key: replica_key,
             cargo_key: cargo_key.to_owned(),
             ordinal,
-            node_name: Some(state.inner.config.hostname.clone()),
-          },
-          &state.inner.pool,
-        )
-        .await?;
+            node_name: Some(node_name.to_owned()),
+          })
+          .get_result::<CargoReplicaDb>(conn)?;
         replicas.push(replica.clone());
         replica
       }
@@ -255,45 +267,41 @@ async fn persist_reconstructed_mappings(
           &format!(
             "Cargo {cargo_key:?} observed replica {replica_key} at ordinal {ordinal}, which conflicts with persisted replica identity"
           ),
-        ));
+        ).into());
       }
     };
     if replica.cargo_key != cargo_key
-      || replica.node_name.as_deref()
-        != Some(state.inner.config.hostname.as_str())
+      || replica.node_name.as_deref() != Some(node_name)
     {
       return Err(IoError::other(
         "CargoBootstrap",
         &format!(
           "Cargo {cargo_key:?} observed replica {replica_key} does not match its persisted local assignment"
         ),
-      ));
+      ).into());
     }
   }
 
   for process in &reconstructed.processes {
-    let mapping = match CargoReplicaProcessDb::find(
-      process.replica_key,
-      process.role,
-      &process.container_name,
-      &state.inner.pool,
-    )
-    .await
+    let mapping = match cargo_replica_processes::table
+      .filter(cargo_replica_processes::replica_key.eq(process.replica_key))
+      .filter(cargo_replica_processes::role.eq(process.role))
+      .filter(
+        cargo_replica_processes::container_name.eq(&process.container_name),
+      )
+      .for_update()
+      .first::<CargoReplicaProcessDb>(conn)
+      .optional()?
     {
-      Ok(mapping) => mapping,
-      Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
-        CargoReplicaProcessDb::create(
-          NewCargoReplicaProcessDb::new(
-            process.replica_key,
-            &process.container_name,
-            process.role,
-            process.essential,
-          ),
-          &state.inner.pool,
-        )
-        .await?
-      }
-      Err(error) => return Err(error),
+      Some(mapping) => mapping,
+      None => diesel::insert_into(cargo_replica_processes::table)
+        .values(NewCargoReplicaProcessDb::new(
+          process.replica_key,
+          &process.container_name,
+          process.role,
+          process.essential,
+        ))
+        .get_result::<CargoReplicaProcessDb>(conn)?,
     };
     if mapping.essential != process.essential {
       return Err(IoError::other(
@@ -302,7 +310,7 @@ async fn persist_reconstructed_mappings(
           "Cargo mapping {} contradicts the observed essential marker for process {:?}",
           mapping.key, process.process_key
         ),
-      ));
+      ).into());
     }
     if mapping
       .process_key
@@ -315,24 +323,114 @@ async fn persist_reconstructed_mappings(
           "Cargo mapping {} is already attached to process {:?}, not observed process {:?}",
           mapping.key, mapping.process_key, process.process_key
         ),
-      ));
+      ).into());
     }
-    CargoReplicaProcessDb::set_processes(
-      vec![(
-        mapping.key,
-        Some(process.process_key.clone()),
-        process.essential,
-      )],
-      &state.inner.pool,
-    )
-    .await?;
+    diesel::update(cargo_replica_processes::table.find(mapping.key))
+      .set((
+        cargo_replica_processes::process_key.eq(Some(&process.process_key)),
+        cargo_replica_processes::essential.eq(process.essential),
+        cargo_replica_processes::updated_at.eq(chrono::Utc::now().naive_utc()),
+      ))
+      .execute(conn)?;
   }
   Ok(())
+}
+
+/// An initial installer generation has no accepted-operation identity. Even
+/// partial labels must not be mistaken for an adoptable bootstrap container.
+fn bootstrap_labels_are_unowned(labels: &HashMap<String, String>) -> bool {
+  [
+    cargo::LABEL_INCARNATION,
+    cargo::LABEL_SPEC,
+    cargo::LABEL_OPERATION,
+  ]
+  .iter()
+  .all(|label| !labels.contains_key(*label))
+}
+
+async fn persist_bootstrap_observations(
+  expected: &Cargo,
+  incarnation: uuid::Uuid,
+  observed: &[CargoBootstrapProcess],
+  reconstructed: Option<&ReconstructedCargo>,
+  guard: Arc<tokio::sync::OwnedMutexGuard<()>>,
+  state: &SystemState,
+) -> IoResult<()> {
+  if observed
+    .iter()
+    .any(|process| !bootstrap_labels_are_unowned(&process.labels))
+  {
+    return Err(IoError::invalid_data(
+      "CargoBootstrap",
+      "Operation-owned or partially labelled Cargo runtime cannot be adopted",
+    ));
+  }
+  let replacement = if let Some(reconstructed) = reconstructed {
+    let current = SpecDb::read_by_pk(&expected.spec.key, &state.inner.pool)
+      .await?
+      .try_to_cargo_spec()?;
+    if current != reconstructed.spec {
+      let mut spec = SpecDb::try_from_cargo_spec(
+        &expected.spec.cargo_key,
+        &format!("v{}", vars::VERSION),
+        &reconstructed.spec,
+      )?;
+      spec.incarnation_key = Some(incarnation);
+      Some(spec)
+    } else {
+      None
+    }
+  } else {
+    None
+  };
+  let expected = expected.clone();
+  let observed = observed.to_vec();
+  let reconstructed = reconstructed.cloned();
+  let node_name = state.inner.config.hostname.clone();
+  run_query_owned(&state.inner.pool, guard, move |conn| {
+    transaction(conn, |conn| {
+      lock_bootstrap_cargo(conn, &expected, incarnation)?;
+      let key = &expected.spec.cargo_key;
+      if let Some(spec) = &replacement {
+        diesel::insert_into(specs::table)
+          .values(spec)
+          .execute(conn)?;
+        diesel::update(cargoes::table.find(key))
+          .set(cargoes::spec_key.eq(spec.key))
+          .execute(conn)?;
+      }
+      if let Some(reconstructed) = &reconstructed {
+        persist_reconstructed_mappings(conn, key, reconstructed, &node_name)?;
+        sync_cargo_status(conn, key, reconstructed.actual.clone())?;
+      } else {
+        for process in &observed {
+          reattach_cargo_process(
+            conn,
+            key,
+            &process.process_key,
+            &process.process_name,
+            &process.labels,
+            &node_name,
+          )?;
+        }
+        if observed
+          .iter()
+          .any(|process| process.process_name == format!("{key}.c"))
+          && let Some(actual) = observed_actual_status(&observed)
+        {
+          sync_cargo_status(conn, key, actual)?;
+        }
+      }
+      Ok(())
+    })
+  })
+  .await
 }
 
 async fn persist_reconstructed_cargo(
   cargo_key: &str,
   reconstructed: &ReconstructedCargo,
+  guard: Arc<tokio::sync::OwnedMutexGuard<()>>,
   state: &SystemState,
 ) -> IoResult<()> {
   reconstructed.spec.validate().map_err(|error| {
@@ -345,15 +443,41 @@ async fn persist_reconstructed_cargo(
     IoError::invalid_data("CargoBootstrap", &error.to_string())
   })?;
   register_namespace(resource_key.namespace(), state).await?;
-  let object = CargoObjCreateIn {
-    namespace: resource_key.namespace().to_owned(),
-    spec: reconstructed.spec.clone(),
-    version: format!("v{}", vars::VERSION),
+  let spec = SpecDb::try_from_cargo_spec(
+    cargo_key,
+    &format!("v{}", vars::VERSION),
+    &reconstructed.spec,
+  )?;
+  let status = ObjPsStatusPartial {
+    key: cargo_key.to_owned(),
+    wanted: ObjPsStatusKind::Create,
+    prev_wanted: ObjPsStatusKind::Create,
+    actual: ObjPsStatusKind::Create,
+    prev_actual: ObjPsStatusKind::Create,
+    health: ObjPsHealthStatusKind::Unknown,
   };
-  CargoDb::fn_create_obj(&object, state).await?;
-  persist_reconstructed_mappings(cargo_key, reconstructed, state).await?;
-  sync_cargo_status(cargo_key, reconstructed.actual.clone(), state).await?;
-  Ok(())
+  let cargo = CargoDb::create_bootstrap_with_spec(
+    cargo_key,
+    &reconstructed.spec.name,
+    resource_key.namespace(),
+    spec,
+    status,
+    &state.inner.pool,
+  )
+  .await?;
+  let incarnation = CargoDb::read_by_pk(cargo_key, &state.inner.pool)
+    .await?
+    .0
+    .incarnation_key;
+  persist_bootstrap_observations(
+    &cargo,
+    incarnation,
+    &[],
+    Some(reconstructed),
+    guard,
+    state,
+  )
+  .await
 }
 
 /// Will determine if the instance is registered by nanocl
@@ -440,11 +564,33 @@ pub async fn register_namespace(
   Ok(())
 }
 
+fn stale_process_ids(initial: Vec<String>, observed: &[String]) -> Vec<String> {
+  let observed = observed.iter().map(String::as_str).collect::<HashSet<_>>();
+  initial
+    .into_iter()
+    .filter(|id| !observed.contains(id.as_str()))
+    .collect()
+}
+
 /// Rebuild observed process rows and adopt installer/bootstrap Cargoes whose
 /// desired rows do not exist yet.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_processes: starting");
-  let options = Some(ListContainersOptions::<&str> {
+  // Bound cleanup to rows that existed before Docker inventory. An admitted
+  // operation may insert new rows while the scan is in progress.
+  let node_name = state.inner.config.hostname.clone();
+  let initial_ids = run_query_owned(&state.inner.pool, (), move |conn| {
+    transaction(conn, |conn| {
+      Ok(
+        processes::table
+          .filter(processes::node_name.eq(&node_name))
+          .select(processes::key)
+          .load::<String>(conn)?,
+      )
+    })
+  })
+  .await?;
+  let options = Some(ListContainersOptions {
     all: true,
     ..Default::default()
   });
@@ -489,18 +635,33 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     ids.push(id);
   }
   for (cargo_key, observed) in observed_cargoes {
-    match CargoDb::transform_read_by_pk(&cargo_key, &state.inner.pool).await {
-      Ok(cargo) => {
-        if matches!(
-          cargo.status.actual,
-          ObjPsStatusKind::Starting
-            | ObjPsStatusKind::Updating
-            | ObjPsStatusKind::Destroying
-            | ObjPsStatusKind::Stopping
-        ) {
-          log::warn!(
-            "system::sync_processes: Cargo {cargo_key} has in-progress lifecycle state {}; startup inventory will not recover it",
-            cargo.status.actual
+    let guard = Arc::new(cargo::lifecycle_lock(&cargo_key).lock_owned().await);
+    if observed
+      .iter()
+      .any(|process| !bootstrap_labels_are_unowned(&process.labels))
+    {
+      log::debug!(
+        "system::sync_processes: Cargo {cargo_key} has operation-owned runtime; keeping observations only"
+      );
+      continue;
+    }
+    match CargoDb::read_by_pk(&cargo_key, &state.inner.pool).await {
+      Ok((live, spec, status)) => {
+        let incarnation = live.incarnation_key;
+        let cargo = CargoDb::transform((live, spec, status))?;
+        if OperationDb::current("Cargo", &cargo_key, &state.inner.pool)
+          .await?
+          .is_some()
+          || matches!(
+            cargo.status.actual,
+            ObjPsStatusKind::Starting
+              | ObjPsStatusKind::Updating
+              | ObjPsStatusKind::Destroying
+              | ObjPsStatusKind::Stopping
+          )
+        {
+          log::debug!(
+            "system::sync_processes: Cargo {cargo_key} has lifecycle ownership; keeping observations only"
           );
           continue;
         }
@@ -522,14 +683,14 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
             .iter()
             .any(|label| process.labels.contains_key(*label))
           });
-        if installer_generation && has_reconstruction_identity_labels {
+        let reconstructed = if installer_generation
+          && has_reconstruction_identity_labels
+        {
           let reconstructed = reconstruct_cargo(&cargo_key, &observed)?
             .ok_or_else(|| {
               IoError::invalid_data(
                 "CargoBootstrap",
-                &format!(
-                  "Cargo {cargo_key:?} has an installer process but no stable generation"
-                ),
+                &format!("Cargo {cargo_key:?} has an installer process but no stable generation"),
               )
             })?;
           if !reconstructed.direct_installer_generation {
@@ -540,38 +701,19 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
               ),
             ));
           }
-          let current = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
-            .await?
-            .try_to_cargo_spec()?;
-          if current != reconstructed.spec {
-            CargoDb::update_from_spec(
-              &cargo_key,
-              &reconstructed.spec,
-              &format!("v{}", vars::VERSION),
-              &state.inner.pool,
-            )
-            .await?;
-          }
-          persist_reconstructed_mappings(&cargo_key, &reconstructed, state)
-            .await?;
-          sync_cargo_status(&cargo_key, reconstructed.actual, state).await?;
+          Some(reconstructed)
         } else {
-          for process in &observed {
-            reattach_cargo_process(
-              &cargo_key,
-              &process.process_key,
-              &process.process_name,
-              &process.labels,
-              state,
-            )
-            .await?;
-          }
-          if installer_generation
-            && let Some(actual) = observed_actual_status(&observed)
-          {
-            sync_cargo_status(&cargo_key, actual, state).await?;
-          }
-        }
+          None
+        };
+        persist_bootstrap_observations(
+          &cargo,
+          incarnation,
+          &observed,
+          reconstructed.as_ref(),
+          guard,
+          state,
+        )
+        .await?;
       }
       Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
         let Some(reconstructed) = reconstruct_cargo(&cargo_key, &observed)?
@@ -587,22 +729,22 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
           "system::sync_processes: reconstructing bootstrap Cargo {cargo_key} from {source} observations across {} stable processes",
           reconstructed.processes.len()
         );
-        persist_reconstructed_cargo(&cargo_key, &reconstructed, state).await?;
+        persist_reconstructed_cargo(&cargo_key, &reconstructed, guard, state)
+          .await?;
       }
       Err(error) => return Err(error),
     }
   }
-  // delete zombie instances (not in docker anymore) from our store if any
-  let filter = GenericFilter::new()
-    .r#where(
-      "key",
-      GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
-    )
-    .r#where(
-      "node_name",
-      GenericClause::Eq(state.inner.config.hostname.clone()),
-    );
-  ProcessDb::del_by(&filter, &state.inner.pool).await?;
+  let stale_ids = stale_process_ids(initial_ids, &ids);
+  if !stale_ids.is_empty() {
+    let filter = GenericFilter::new()
+      .r#where("key", GenericClause::In(stale_ids))
+      .r#where(
+        "node_name",
+        GenericClause::Eq(state.inner.config.hostname.clone()),
+      );
+    ProcessDb::del_by(&filter, &state.inner.pool).await?;
+  }
   log::info!("system::sync_processes: done");
   Ok(())
 }
@@ -710,6 +852,45 @@ mod tests {
     .unwrap();
   }
 
+  #[test]
+  fn startup_cleanup_only_removes_missing_initial_processes() {
+    let initial = vec!["present".into(), "gone".into()];
+    let observed = vec!["present".into(), "new-during-inventory".into()];
+    assert_eq!(stale_process_ids(initial, &observed), ["gone"]);
+    assert!(stale_process_ids(Vec::new(), &observed).is_empty());
+    assert_eq!(stale_process_ids(vec!["gone".into()], &[]), ["gone"]);
+  }
+
+  #[test]
+  fn bootstrap_adoption_rejects_complete_and_partial_operation_identity() {
+    let mut labels = HashMap::from([(
+      LABEL_CARGO_KEY.to_owned(),
+      "system.installer".to_owned(),
+    )]);
+    assert!(bootstrap_labels_are_unowned(&labels));
+    for label in [
+      cargo::LABEL_INCARNATION,
+      cargo::LABEL_SPEC,
+      cargo::LABEL_OPERATION,
+    ] {
+      labels.insert(label.to_owned(), uuid::Uuid::nil().to_string());
+      assert!(!bootstrap_labels_are_unowned(&labels), "{label}");
+      labels.remove(label);
+    }
+    labels.extend([
+      (
+        cargo::LABEL_INCARNATION.to_owned(),
+        uuid::Uuid::nil().to_string(),
+      ),
+      (cargo::LABEL_SPEC.to_owned(), uuid::Uuid::nil().to_string()),
+      (
+        cargo::LABEL_OPERATION.to_owned(),
+        uuid::Uuid::nil().to_string(),
+      ),
+    ]);
+    assert!(!bootstrap_labels_are_unowned(&labels));
+  }
+
   /// DB-backed startup coverage. This is deliberately excluded from the pure
   /// reconstruction filter and is run manually with the Nanocld test store.
   #[ntex::test]
@@ -776,9 +957,14 @@ mod tests {
 
     let reconstructed =
       reconstruct_cargo(&cargo_key, &observed).unwrap().unwrap();
-    persist_reconstructed_cargo(&cargo_key, &reconstructed, &system.state)
-      .await
-      .unwrap();
+    persist_reconstructed_cargo(
+      &cargo_key,
+      &reconstructed,
+      Arc::new(cargo::lifecycle_lock(&cargo_key).lock_owned().await),
+      &system.state,
+    )
+    .await
+    .unwrap();
 
     let cargo =
       CargoDb::transform_read_by_pk(&cargo_key, &system.state.inner.pool)
@@ -828,17 +1014,21 @@ mod tests {
 
     // Simulate a later startup attachment pass. Stable mappings remain
     // coherent and the pending process cannot steal the active app mapping.
-    for process in &observed {
-      reattach_cargo_process(
-        &cargo_key,
-        &process.process_key,
-        &process.process_name,
-        &process.labels,
-        &system.state,
-      )
+    let incarnation = CargoDb::read_by_pk(&cargo_key, &system.state.inner.pool)
       .await
-      .unwrap();
-    }
+      .unwrap()
+      .0
+      .incarnation_key;
+    persist_bootstrap_observations(
+      &cargo,
+      incarnation,
+      &observed,
+      None,
+      Arc::new(cargo::lifecycle_lock(&cargo_key).lock_owned().await),
+      &system.state,
+    )
+    .await
+    .unwrap();
     let cargo =
       CargoDb::transform_read_by_pk(&cargo_key, &system.state.inner.pool)
         .await
@@ -885,9 +1075,14 @@ mod tests {
       reconstruct_cargo(&cargo_key, std::slice::from_ref(&api))
         .unwrap()
         .unwrap();
-    persist_reconstructed_cargo(&cargo_key, &reconstructed, &system.state)
-      .await
-      .unwrap();
+    persist_reconstructed_cargo(
+      &cargo_key,
+      &reconstructed,
+      Arc::new(cargo::lifecycle_lock(&cargo_key).lock_owned().await),
+      &system.state,
+    )
+    .await
+    .unwrap();
 
     let cargo =
       CargoDb::transform_read_by_pk(&cargo_key, &system.state.inner.pool)

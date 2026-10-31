@@ -6,14 +6,26 @@ mod list;
 pub use inspect::*;
 pub use list::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_network);
-  config.service(inspect_network);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/networks")
+      .name("list_network")
+      .guard(web::guard::Get())
+      .to_with_state(list_network),
+  );
+  config.service(
+    web::resource("/networks/{key}/inspect")
+      .name("inspect_network")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_network),
+  );
 }
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::service::Network as DockerNetwork;
+  use bollard_next::models::NetworkInspect as DockerNetwork;
   use nanocl_stubs::{
     generic::{GenericClause, GenericFilter, GenericListQuery},
     network::{Network, NetworkPartial},

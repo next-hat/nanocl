@@ -18,11 +18,11 @@ jobs:
     name: Clippy
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
@@ -41,14 +41,14 @@ jobs:
 
   fmt:
     name: Fmt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.99.0
           components: rustfmt
           override: true
       - uses: actions-rs/cargo@v1

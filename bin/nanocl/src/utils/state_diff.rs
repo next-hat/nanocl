@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, io::Write};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 use serde_json::Value;
 
 use crate::models::{
@@ -8,6 +8,27 @@ use crate::models::{
 };
 
 const REDACTED: &str = "[REDACTED]";
+
+pub(crate) fn validate_vm_identity(
+  desired: Option<&str>,
+  current: Option<&str>,
+) -> IoResult<()> {
+  let current = current.ok_or_else(|| {
+    IoError::invalid_input(
+      "VM specification",
+      "Existing VM has no MacAddress; recreate the cluster from Nanocl statefiles",
+    )
+  })?;
+  if let Some(desired) = desired
+    && !desired.eq_ignore_ascii_case(current)
+  {
+    return Err(IoError::invalid_input(
+      "VM specification",
+      "MacAddress is immutable; create a new VM to use another address",
+    ));
+  }
+  Ok(())
+}
 
 /// Compare the authored values before hiding sensitive information. A secret-only
 /// change must still be reported even when its displayed values are identical.
@@ -22,6 +43,33 @@ pub(crate) fn diff_item(
   orphan: bool,
   reason: Option<&str>,
 ) -> StateDiffItem {
+  // VM identity is allocated by the daemon. Omitted provisioning/console
+  // fields retain their current values under the VM PATCH contract.
+  let mut vm_before = before.filter(|_| kind == "vm").cloned();
+  let mut vm_after = after.filter(|_| kind == "vm").cloned();
+  if let (Some(before), Some(after)) = (
+    vm_before.as_mut().and_then(Value::as_object_mut),
+    vm_after.as_mut().and_then(Value::as_object_mut),
+  ) {
+    for field in ["MacAddress", "CloudInit", "Console"] {
+      if after.get(field).is_none_or(Value::is_null) {
+        before.remove(field);
+        after.remove(field);
+      }
+    }
+    if !after.contains_key("CloudInitUserData") {
+      before.remove("CloudInitUserData");
+    } else if after.get("CloudInitUserData").is_some_and(Value::is_null) {
+      after.remove("CloudInitUserData");
+    }
+    for value in [before, after] {
+      if let Some(Value::String(address)) = value.get_mut("MacAddress") {
+        address.make_ascii_lowercase();
+      }
+    }
+  }
+  let before = vm_before.as_ref().or(before);
+  let after = vm_after.as_ref().or(after);
   let action = match (before, after) {
     (None, Some(_)) => StateDiffAction::Create,
     (Some(_), None) => StateDiffAction::Remove,
@@ -126,7 +174,9 @@ fn field_context(context: &str, field: &str) -> &'static str {
     | ("secret", "Immutable")
     | ("cargo", "Replicas" | "NetworkMode" | "Hostname")
     | ("job", "Schedule" | "Ttl" | "ImagePullPolicy" | "ImagePullSecret")
-    | ("vm", "Hostname" | "Image" | "MacAddress") => "scalar",
+    | ("vm", "Hostname" | "Image" | "MacAddress" | "CloudInit" | "Console") => {
+      "scalar"
+    }
     ("cargo", "Secrets" | "Dns") | ("job", "Secrets") => "scalars",
     ("cargo", "Containers" | "InitContainers") | ("job", "Containers") => {
       "containers"
@@ -439,6 +489,123 @@ mod tests {
 
   use super::*;
 
+  #[test]
+  fn vm_state_diff_ignores_omitted_allocated_identity_and_preserved_options() {
+    let current = json!({"Name": "guest", "MacAddress": "02:00:00:00:00:01",
+      "CloudInit": false, "CloudInitUserData": "#cloud-config\nruncmd: [true]\n",
+      "Console": true});
+    let desired = json!({"Name": "guest"});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&current),
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert!(matches!(diff.action, StateDiffAction::Unchanged));
+    assert!(diff.changes.is_empty());
+    let disabled = json!({"Name": "guest", "Console": false});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&current),
+      Some(&disabled),
+      false,
+      false,
+      None,
+    );
+    assert!(matches!(diff.action, StateDiffAction::Update));
+    assert_eq!(diff.after.as_ref().unwrap()["Console"], false);
+    let uppercase = json!({"Name": "guest", "MacAddress": "02:AB:CD:EF:00:01"});
+    let lowercase = json!({"Name": "guest", "MacAddress": "02:ab:cd:ef:00:01"});
+    let diff = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      Some(&lowercase),
+      Some(&uppercase),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(diff.action, StateDiffAction::Unchanged);
+    assert!(diff.changes.is_empty());
+    validate_vm_identity(Some("02:AB:CD:EF:00:01"), Some("02:ab:cd:ef:00:01"))
+      .unwrap();
+    assert!(
+      validate_vm_identity(
+        Some("02:00:00:00:00:02"),
+        Some("02:00:00:00:00:01")
+      )
+      .is_err()
+    );
+    validate_vm_identity(None, Some("02:00:00:00:00:01")).unwrap();
+    assert!(validate_vm_identity(None, None).is_err());
+    assert!(validate_vm_identity(Some("02:00:00:00:00:01"), None).is_err());
+    let created = diff_item(
+      "vm.yml",
+      "vm",
+      "global.guest",
+      None,
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(created.action, StateDiffAction::Create);
+    assert!(created.after.unwrap().get("MacAddress").is_none());
+  }
+
+  #[test]
+  fn vm_state_diff_reports_user_data_changes_without_exposing_contents() {
+    let before = json!({"Name": "guest", "CloudInitUserData": "#cloud-config\npassword: hidden-before\n"});
+    for data in [
+      Value::Null,
+      json!(""),
+      json!("#cloud-config\npassword: hidden-after\n"),
+      json!({"hidden-module": {"password": "hidden-after"}}),
+    ] {
+      let cleared = data.is_null();
+      let after = json!({"Name": "guest", "CloudInitUserData": data});
+      let diff = diff_item(
+        "vm.yml",
+        "vm",
+        "global.guest",
+        Some(&before),
+        Some(&after),
+        false,
+        false,
+        None,
+      );
+      assert_eq!(diff.action, StateDiffAction::Update);
+      assert_eq!(diff.changes.len(), 1);
+      assert_eq!(diff.changes[0].path, "CloudInitUserData");
+      assert!(diff.changes[0].redacted);
+      assert_eq!(diff.changes[0].before, Some(json!(REDACTED)));
+      assert_eq!(diff.changes[0].after, (!cleared).then(|| json!(REDACTED)));
+      let report = StateDiff::new(vec![diff]);
+      for json in [false, true] {
+        let mut output = Vec::new();
+        report.write_to(&mut output, json).unwrap();
+        let output = String::from_utf8(output).unwrap();
+        assert!(!output.contains("hidden-"), "{output}");
+        assert!(!output.contains("#cloud-config"), "{output}");
+      }
+    }
+  }
+
+  fn without_style(output: &str) -> String {
+    // Keep text assertions independent of the test runner's terminal settings.
+    regex::Regex::new("\u{1b}\\[[0-9;]*m")
+      .unwrap()
+      .replace_all(output, "")
+      .into_owned()
+  }
+
   fn item(before: Option<&Value>, after: Option<&Value>) -> StateDiffItem {
     diff_item(
       "Statefile.yml",
@@ -647,11 +814,13 @@ mod tests {
       let mut output = Vec::new();
       report.write_to(&mut output, json).unwrap();
       let output = String::from_utf8(output).unwrap();
+      let output = if json { output } else { without_style(&output) };
       assert!(!output.contains("hidden-"), "{output}");
       assert!(!output.contains('\u{1b}'));
       assert_eq!(output.contains("registry/image?"), json);
       assert_eq!(output.contains(REDACTED), json);
       if !json {
+        assert!(output.contains("web\\n\\u{1b}[31m"), "{output}");
         assert!(!output.contains("example.com"));
         assert!(!output.contains("source "));
       }
@@ -717,7 +886,7 @@ mod tests {
         assert!(value["items"][0]["changes"][0].get("after").is_none());
         assert_eq!(value["items"][1]["changes"][0]["after"], 2);
       } else {
-        let output = String::from_utf8(first).unwrap();
+        let output = without_style(&String::from_utf8(first).unwrap());
         assert!(output.contains("--- cargo/old.global\n+++ /dev/null\n"));
         assert!(output.contains("--- /dev/null\n+++ cargo/web.global\n"));
         assert!(output.contains("-Replicas: 2\n"));
@@ -744,7 +913,7 @@ mod tests {
     )]);
     let mut output = Vec::new();
     report.write_to(&mut output, false).unwrap();
-    let output = String::from_utf8(output).unwrap();
+    let output = without_style(&String::from_utf8(output).unwrap());
     assert!(output.starts_with("--- cargo/global.web\n+++ cargo/global.web\n"));
     assert!(output.contains("-- Image: nginx:stable\n"));
     assert!(output.contains("+- Image: nginx:alpine\n"));
@@ -840,7 +1009,7 @@ mod tests {
     )]);
     let mut output = Vec::new();
     report.write_to(&mut output, false).unwrap();
-    let output = String::from_utf8(output).unwrap();
+    let output = without_style(&String::from_utf8(output).unwrap());
     assert!(output.starts_with(
       "--- resource/deploy-example.com\n+++ resource/deploy-example.com\n"
     ));

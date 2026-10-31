@@ -19,9 +19,9 @@ use crate::{
     (status = 409, description = "Metric already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/metrics")]
 pub async fn create_metric(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   _path: web::types::Path<String>,
   payload: web::types::Json<MetricPartial>,
 ) -> HttpResult<web::HttpResponse> {

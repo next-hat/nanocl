@@ -1,4 +1,5 @@
-ApiVersion: v0.16
+ApiVersion: v0.19
+# Each admitted tick is a separate run; an active run causes a conflict.
 
 Jobs:
 - Name: cron-job-example

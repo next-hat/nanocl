@@ -1,8 +1,9 @@
 ###
-# This is an example of a virtual machine deployment
-# It will take over a physical interface from the host
+# A DHCP-capable guest without cloud-init on a named Docker bridge.
+# Build the candidate runtime locally; see doc/vm-runtime.md.
+# Prepare this guest image with a DHCP client and its own login credentials.
 ###
-ApiVersion: v0.16
+ApiVersion: v0.19
 
 Namespace: global
 
@@ -10,10 +11,12 @@ Namespace: global
 # https://docs.next-hat.com/references/nanocl/objects/virtual-machine
 VirtualMachines:
 - Name: vm-test
-  Image: ./tests/ubuntu-24.04-minimal-cloudimg-amd64.img
+  Image: /var/lib/nanocl/vm/plain-dhcp.qcow2
+  CloudInit: false
+  Console: true
   HostConfig:
     Cpu: 4
     Memory: 4096
     Kvm: true
-    RuntimeNetwork: host # use host networks
-    LinkNetIface: wlp6s0 # Use physical interface from host
+    Runtime: ghcr.io/next-hat/nanocl-qemu:8.0.5.0
+    NetworkMode: vm-private

@@ -262,13 +262,15 @@ Entries:
     })
     .expect("Failed to create a nanocl client");
     // Create test server
-    let srv = ntex::web::test::server(async move || {
+    let srv = ntex::web::test::server(async move |_| {
       ntex::web::App::new()
-        .state(dnsmasq.clone())
-        .state(client.clone())
+        .with_config(services::app_config())
         .configure(services::ntex_config)
-    })
-    .await;
+        .build_with(crate::models::SystemState {
+          dnsmasq: dnsmasq.clone(),
+          client: client.clone(),
+        })
+    });
     TestClient::new(srv, vars::VERSION)
   }
 }
