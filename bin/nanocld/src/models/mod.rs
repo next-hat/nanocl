@@ -40,6 +40,14 @@ pub use distributed_mutex::*;
 mod vm;
 pub use vm::*;
 
+mod operation;
+pub(crate) use operation::*;
+mod operation_owner;
+pub(crate) use operation_owner::*;
+
+mod qmp;
+pub(crate) use qmp::*;
+
 mod resource;
 pub use resource::*;
 
@@ -51,6 +59,10 @@ pub use secret::*;
 
 mod job;
 pub use job::*;
+mod job_run;
+pub(crate) use job_run::*;
+mod job_runtime;
+pub(crate) use job_runtime::*;
 
 mod spec;
 pub use spec::*;

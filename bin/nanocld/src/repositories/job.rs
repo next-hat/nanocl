@@ -11,16 +11,18 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobPartial, JobSpec, JobSummary},
+  job::{Job, JobHistoryQuery, JobPartial, JobSpec, JobSummary},
   process::ProcessKind,
+  system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
 };
 
 use crate::{
   gen_sql_multiple, gen_sql_order_by, gen_sql_query,
   models::{
-    ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState,
+    ColumnType, JobDb, JobUpdateDb, ObjPsStatusDb, OperationTransactionError,
+    Pool, ProcessDb, ResourceIncarnationDb, SpecDb, SystemState,
   },
-  schema::jobs,
+  schema::{jobs, object_process_statuses, resource_incarnations, specs},
   utils,
 };
 
@@ -31,8 +33,8 @@ impl RepositoryBase for JobDb {
   -> std::collections::HashMap<&'a str, (ColumnType, &'a str)> {
     HashMap::from([
       ("key", (ColumnType::Text, "jobs.key")),
-      ("data", (ColumnType::Json, "jobs.data")),
-      ("metadata", (ColumnType::Json, "jobs.metadata")),
+      ("data", (ColumnType::Json, "specs.data")),
+      ("metadata", (ColumnType::Json, "specs.metadata")),
       ("created_at", (ColumnType::Timestamptz, "jobs.created_at")),
       ("updated_at", (ColumnType::Timestamptz, "jobs.updated_at")),
       (
@@ -56,7 +58,7 @@ impl RepositoryUpdate for JobDb {
 impl RepositoryDelByPk for JobDb {}
 
 impl RepositoryReadBy for JobDb {
-  type Output = (JobDb, ObjPsStatusDb);
+  type Output = (JobDb, SpecDb, ObjPsStatusDb);
 
   fn get_pk() -> &'static str {
     "key"
@@ -71,6 +73,7 @@ impl RepositoryReadBy for JobDb {
     Self::Output,
   > {
     let mut query = jobs::table
+      .inner_join(specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
@@ -95,6 +98,7 @@ impl RepositoryCountBy for JobDb {
   ) -> impl diesel::query_dsl::methods::LoadQuery<'static, diesel::PgConnection, i64>
   {
     let mut query = jobs::table
+      .inner_join(specs::table)
       .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     let columns = Self::get_columns();
@@ -105,52 +109,280 @@ impl RepositoryCountBy for JobDb {
 impl RepositoryReadByTransform for JobDb {
   type NewOutput = Job;
 
-  fn transform(item: (JobDb, ObjPsStatusDb)) -> IoResult<Self::NewOutput> {
-    let (job_db, status) = item;
-    let item = job_db.try_to_spec(&status)?;
+  fn transform(
+    item: (JobDb, SpecDb, ObjPsStatusDb),
+  ) -> IoResult<Self::NewOutput> {
+    let (job_db, spec, status) = item;
+    let item = job_db.try_to_spec(&spec, &status)?;
     Ok(item)
   }
 }
 
 impl JobDb {
-  pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
-    JobDb::del_by_pk(pk, pool).await?;
-    ObjPsStatusDb::del_by_pk(pk, pool).await?;
-    Ok(())
-  }
-
-  pub fn try_from_partial(p: &JobPartial) -> IoResult<Self> {
+  pub fn validate_partial(p: &JobPartial) -> IoResult<()> {
     utils::key::validate_kind_key(&ProcessKind::Job, &p.name)?;
     p.validate_schedule()
       .map_err(|err| IoError::invalid_input("Job schedule", &err))?;
-    let data = serde_json::to_value(p)?;
-    Ok(JobDb {
-      key: p.name.clone(),
-      status_key: p.name.clone(),
-      created_at: chrono::Utc::now().naive_utc(),
-      updated_at: chrono::Utc::now().naive_utc(),
-      metadata: p.metadata.clone(),
-      data,
-    })
+    for container in &p.containers {
+      if let Some(policy) = container
+        .host_config
+        .as_ref()
+        .and_then(|host| host.restart_policy.as_ref())
+      {
+        let name = policy
+          .name
+          .as_ref()
+          .map(ToString::to_string)
+          .unwrap_or_default();
+        if !matches!(name.as_str(), "" | "no")
+          || policy.maximum_retry_count.is_some_and(|count| count != 0)
+        {
+          return Err(IoError::invalid_input(
+            "Job restart policy",
+            "Job containers must disable Docker automatic restart; each execution is a separate run",
+          ));
+        }
+      }
+    }
+    Ok(())
   }
 
-  pub fn try_to_spec(&self, status: &ObjPsStatusDb) -> IoResult<Job> {
-    let p = serde_json::from_value::<JobPartial>(self.data.clone())?;
+  pub fn try_to_spec(
+    &self,
+    spec: &SpecDb,
+    status: &ObjPsStatusDb,
+  ) -> IoResult<Job> {
     Ok(Job {
       created_at: self.created_at,
       updated_at: self.updated_at,
       status: status.clone().try_into()?,
-      spec: JobSpec {
-        name: self.key.clone(),
-        metadata: self.metadata.clone(),
-        secrets: p.secrets.clone(),
-        schedule: p.schedule.clone(),
-        ttl: p.ttl,
-        containers: p.containers.clone(),
-        image_pull_secret: p.image_pull_secret.clone(),
-        image_pull_policy: p.image_pull_policy.clone(),
-      },
+      incarnation_key: self.incarnation_key,
+      spec_key: self.spec_key,
+      current_run_key: self.current_run_key,
+      spec: spec.try_to_job_spec()?,
     })
+  }
+
+  pub(crate) async fn create_with_spec(
+    p: &JobPartial,
+    version: &str,
+    pool: &Pool,
+  ) -> IoResult<Job> {
+    use super::operation::{run_query_owned, transaction};
+    Self::validate_partial(p)?;
+    let now = chrono::Utc::now().naive_utc();
+    let identity = ResourceIncarnationDb {
+      key: uuid::Uuid::new_v4(),
+      resource_kind: "Job".into(),
+      resource_key: p.name.clone(),
+      created_at: now,
+      deleted_at: None,
+      current_operation_key: None,
+    };
+    let spec = SpecDb {
+      key: uuid::Uuid::new_v4(),
+      created_at: now,
+      kind_name: "Job".into(),
+      kind_key: p.name.clone(),
+      version: version.to_owned(),
+      data: serde_json::to_value(p)?,
+      metadata: p.metadata.clone(),
+      incarnation_key: Some(identity.key),
+    };
+    let status = ObjPsStatusDb::from(ObjPsStatusPartial {
+      key: p.name.clone(),
+      wanted: ObjPsStatusKind::Create,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Create,
+      prev_actual: ObjPsStatusKind::Create,
+      health: ObjPsHealthStatusKind::Unknown,
+    });
+    let job = JobDb {
+      key: p.name.clone(),
+      created_at: now,
+      updated_at: now,
+      status_key: p.name.clone(),
+      spec_key: spec.key,
+      incarnation_key: identity.key,
+      current_run_key: None,
+    };
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        diesel::insert_into(resource_incarnations::table)
+          .values(&identity)
+          .execute(conn)?;
+        diesel::insert_into(specs::table)
+          .values(&spec)
+          .execute(conn)?;
+        diesel::insert_into(object_process_statuses::table)
+          .values(&status)
+          .execute(conn)?;
+        diesel::insert_into(jobs::table)
+          .values(&job)
+          .execute(conn)?;
+        Ok(job.try_to_spec(&spec, &status)?)
+      })
+    })
+    .await
+  }
+
+  /// Undo an unpublished creation only while its exact identity is untouched.
+  /// Retained configurations and any accepted execution are never rolled back.
+  pub(crate) async fn rollback_creation<G: Send + 'static>(
+    expected: &Job,
+    keepalive: G,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    use super::operation::{
+      conflict, lock_incarnation, run_query_owned, transaction,
+    };
+    let expected = expected.clone();
+    run_query_owned(pool, keepalive, move |conn| {
+      transaction(conn, |conn| {
+        let identity = lock_incarnation(conn, expected.incarnation_key)?;
+        let job = jobs::table
+          .find(&expected.spec.name)
+          .for_update()
+          .first::<JobDb>(conn)?;
+        let status = object_process_statuses::table
+          .find(&job.status_key)
+          .for_update()
+          .first::<ObjPsStatusDb>(conn)?;
+        let spec = specs::table
+          .find(job.spec_key)
+          .for_update()
+          .first::<SpecDb>(conn)?;
+        if identity.resource_kind != "Job"
+          || identity.resource_key != expected.spec.name
+          || identity.deleted_at.is_some()
+          || identity.current_operation_key.is_some()
+          || job.incarnation_key != expected.incarnation_key
+          || job.spec_key != expected.spec_key
+          || job.current_run_key.is_some()
+          || expected.current_run_key.is_some()
+          || spec.incarnation_key != Some(expected.incarnation_key)
+          || spec.kind_name != "Job"
+          || spec.kind_key != expected.spec.name
+          || status.wanted != "create"
+          || status.actual != "create"
+        {
+          return Err(conflict(
+            "Job creation changed before its rollback could be confirmed",
+          ));
+        }
+        diesel::delete(jobs::table.find(&job.key)).execute(conn)?;
+        diesel::delete(object_process_statuses::table.find(&job.status_key))
+          .execute(conn)?;
+        diesel::delete(specs::table.find(job.spec_key)).execute(conn)?;
+        diesel::delete(resource_incarnations::table.find(identity.key))
+          .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+  }
+
+  /// Retain configurations across delete/recreate, including specs never run.
+  pub(crate) async fn history(
+    name: &str,
+    query: &JobHistoryQuery,
+    pool: &Pool,
+  ) -> IoResult<Vec<JobSpec>> {
+    let (limit, offset) = query
+      .validate()
+      .map_err(|error| IoError::invalid_input("Job history", &error))?;
+    let name = name.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      specs::table
+        .filter(specs::kind_name.eq("Job"))
+        .filter(specs::kind_key.eq(name))
+        .order((specs::created_at.desc(), specs::key.desc()))
+        .limit(limit)
+        .offset(offset)
+        .load::<SpecDb>(conn)
+        .map_err(OperationTransactionError::from)?
+        .iter()
+        .map(SpecDb::try_to_job_spec)
+        .collect()
+    })
+    .await
+  }
+
+  pub(crate) async fn history_spec(
+    name: &str,
+    key: uuid::Uuid,
+    pool: &Pool,
+  ) -> IoResult<JobSpec> {
+    let name = name.to_owned();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let spec = specs::table
+        .find(key)
+        .filter(specs::kind_name.eq("Job"))
+        .filter(specs::kind_key.eq(name))
+        .first::<SpecDb>(conn)
+        .optional()
+        .map_err(OperationTransactionError::from)?
+        .ok_or_else(|| {
+          IoError::not_found(
+            "Job configuration",
+            "No retained configuration with this name and identity",
+          )
+        })?;
+      spec.try_to_job_spec()
+    })
+    .await
+  }
+
+  /// Process inventory is scoped by the current run's immutable container IDs.
+  pub(crate) async fn current_processes(
+    job: &Job,
+    pool: &Pool,
+  ) -> IoResult<Vec<nanocl_stubs::process::Process>> {
+    use super::operation::run_query_owned;
+    let Some(run) = job.current_run_key else {
+      return Ok(Vec::new());
+    };
+    let name = job.spec.name.clone();
+    run_query_owned(pool, (), move |conn| {
+      use crate::schema::{job_run_steps, processes};
+      let ids = job_run_steps::table
+        .filter(job_run_steps::run_key.eq(run))
+        .select(job_run_steps::container_id)
+        .load::<Option<String>>(conn)
+        .map_err(crate::models::OperationTransactionError::from)?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+      processes::table
+        .filter(processes::key.eq_any(ids))
+        .filter(processes::kind.eq("job"))
+        .filter(processes::kind_key.eq(&name))
+        .order(processes::created_at.asc())
+        .load::<ProcessDb>(conn)
+        .map_err(crate::models::OperationTransactionError::from)?
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect()
+    })
+    .await
+  }
+
+  /// Counts describe durable observed steps, never Docker's default exit code.
+  pub(crate) async fn current_counts(
+    job: &Job,
+    pool: &Pool,
+  ) -> IoResult<(usize, usize, usize, usize)> {
+    let Some(run) = job.current_run_key else {
+      return Ok((0, 0, 0, 0));
+    };
+    let steps = crate::models::JobRunDb::steps(run, pool).await?;
+    let failed = steps.iter().filter(|step| step.state == "Failed").count();
+    let succeeded = steps
+      .iter()
+      .filter(|step| step.state == "Succeeded")
+      .count();
+    let running = steps.iter().filter(|step| step.state == "Running").count();
+    Ok((steps.len(), failed, succeeded, running))
   }
 
   /// List all jobs
@@ -162,19 +394,19 @@ impl JobDb {
     let job_summaries = jobs
       .iter()
       .map(|job| async {
-        let instances =
-          ProcessDb::read_by_kind_key(&job.spec.name, None, &state.inner.pool)
-            .await?;
         let (
           instance_total,
           instance_failed,
           instance_success,
           instance_running,
-        ) = utils::container::generic::count_status(&instances);
+        ) = Self::current_counts(job, &state.inner.pool).await?;
         Ok::<_, HttpError>(JobSummary {
           created_at: job.created_at,
           updated_at: job.updated_at,
           status: job.status.clone(),
+          incarnation_key: job.incarnation_key,
+          spec_key: job.spec_key,
+          current_run_key: job.current_run_key,
           instance_total,
           instance_success,
           instance_running,
@@ -196,19 +428,217 @@ mod tests {
   use super::*;
 
   #[test]
+  fn job_creation_rejects_automatic_container_retries() {
+    use bollard_next::models::{
+      ContainerCreateBody, HostConfig, RestartPolicy, RestartPolicyNameEnum,
+    };
+    for name in [
+      RestartPolicyNameEnum::ALWAYS,
+      RestartPolicyNameEnum::ON_FAILURE,
+      RestartPolicyNameEnum::UNLESS_STOPPED,
+    ] {
+      let partial = JobPartial {
+        name: "retry-policy-test".into(),
+        containers: vec![ContainerCreateBody {
+          host_config: Some(HostConfig {
+            restart_policy: Some(RestartPolicy {
+              name: Some(name),
+              maximum_retry_count: None,
+            }),
+            ..Default::default()
+          }),
+          ..Default::default()
+        }],
+        ..Default::default()
+      };
+      assert!(JobDb::validate_partial(&partial).is_err());
+    }
+    let partial = JobPartial {
+      name: "no-retry-policy-test".into(),
+      containers: vec![ContainerCreateBody {
+        host_config: Some(HostConfig {
+          restart_policy: Some(RestartPolicy {
+            name: Some(RestartPolicyNameEnum::NO),
+            maximum_retry_count: Some(0),
+          }),
+          ..Default::default()
+        }),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    assert!(JobDb::validate_partial(&partial).is_ok());
+  }
+
+  #[test]
   fn job_creation_rejects_traversal_before_persistence() {
     for name in ["../../poc_escape", "../../store/certs", "/tmp/poc"] {
       let partial = JobPartial {
         name: name.to_owned(),
         ..Default::default()
       };
-      assert!(JobDb::try_from_partial(&partial).is_err());
+      assert!(JobDb::validate_partial(&partial).is_err());
     }
     let partial = JobPartial {
       name: "backup.daily".to_owned(),
       ..Default::default()
     };
-    let job = JobDb::try_from_partial(&partial).unwrap();
-    assert_eq!(job.key, partial.name);
+    assert!(JobDb::validate_partial(&partial).is_ok());
+  }
+
+  fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
+
+  #[ntex::test]
+  async fn job_creation_rollback_removes_records_and_allows_same_name_retry() {
+    use crate::repositories::operation::{run_query_owned, transaction};
+    let system =
+      utils::tests::gen_test_system(no_routes, crate::vars::VERSION).await;
+    let pool = &system.state.inner.pool;
+    let partial = JobPartial {
+      name: format!("job-create-rollback-{}", uuid::Uuid::new_v4().simple()),
+      schedule: Some("* * * * *".into()),
+      ..Default::default()
+    };
+    let created = JobDb::create_with_spec(&partial, "v0.19", pool)
+      .await
+      .unwrap();
+    JobDb::rollback_creation(&created, (), pool).await.unwrap();
+    let removed = created.clone();
+    let counts = run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        Ok((
+          jobs::table
+            .find(&removed.spec.name)
+            .count()
+            .get_result::<i64>(conn)?,
+          object_process_statuses::table
+            .find(&removed.spec.name)
+            .count()
+            .get_result::<i64>(conn)?,
+          specs::table
+            .find(removed.spec_key)
+            .count()
+            .get_result::<i64>(conn)?,
+          resource_incarnations::table
+            .find(removed.incarnation_key)
+            .count()
+            .get_result::<i64>(conn)?,
+        ))
+      })
+    })
+    .await
+    .unwrap();
+    assert_eq!(counts, (0, 0, 0, 0));
+
+    let retry = JobDb::create_with_spec(&partial, "v0.19", pool)
+      .await
+      .unwrap();
+    assert_ne!(retry.incarnation_key, created.incarnation_key);
+    assert_ne!(retry.spec_key, created.spec_key);
+    assert!(JobDb::rollback_creation(&created, (), pool).await.is_err());
+    let current = JobDb::transform_read_by_pk(&partial.name, pool)
+      .await
+      .unwrap();
+    assert_eq!(current.incarnation_key, retry.incarnation_key);
+    assert_eq!(current.spec_key, retry.spec_key);
+    JobDb::rollback_creation(&retry, (), pool).await.unwrap();
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
+  async fn job_creation_rollback_preserves_history_and_refuses_changed_state() {
+    use crate::repositories::operation::{run_query_owned, transaction};
+    let system =
+      utils::tests::gen_test_system(no_routes, crate::vars::VERSION).await;
+    let pool = &system.state.inner.pool;
+    let partial = JobPartial {
+      name: format!("job-rollback-history-{}", uuid::Uuid::new_v4().simple()),
+      schedule: Some("* * * * *".into()),
+      ..Default::default()
+    };
+    let previous = JobDb::create_with_spec(&partial, "v0.19", pool)
+      .await
+      .unwrap();
+    // Model a removed predecessor while retaining its immutable history.
+    let deleted = previous.clone();
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        diesel::delete(jobs::table.find(&deleted.spec.name)).execute(conn)?;
+        diesel::delete(object_process_statuses::table.find(&deleted.spec.name))
+          .execute(conn)?;
+        diesel::update(
+          resource_incarnations::table.find(deleted.incarnation_key),
+        )
+        .set(
+          resource_incarnations::deleted_at.eq(chrono::Utc::now().naive_utc()),
+        )
+        .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+    .unwrap();
+    let created = JobDb::create_with_spec(&partial, "v0.19", pool)
+      .await
+      .unwrap();
+    assert!(JobDb::rollback_creation(&previous, (), pool).await.is_err());
+    let mut wrong_spec = created.clone();
+    wrong_spec.spec_key = uuid::Uuid::new_v4();
+    assert!(
+      JobDb::rollback_creation(&wrong_spec, (), pool)
+        .await
+        .is_err()
+    );
+
+    let name = partial.name.clone();
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        diesel::update(object_process_statuses::table.find(&name))
+          .set(object_process_statuses::actual.eq("starting"))
+          .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+    .unwrap();
+    assert!(JobDb::rollback_creation(&created, (), pool).await.is_err());
+    let current = JobDb::transform_read_by_pk(&partial.name, pool)
+      .await
+      .unwrap();
+    assert_eq!(current.incarnation_key, created.incarnation_key);
+    assert_eq!(current.spec_key, created.spec_key);
+    assert_eq!(current.status.actual, ObjPsStatusKind::Starting);
+
+    let name = partial.name.clone();
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        diesel::update(object_process_statuses::table.find(&name))
+          .set(object_process_statuses::actual.eq("create"))
+          .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+    .unwrap();
+    JobDb::rollback_creation(&created, (), pool).await.unwrap();
+    let history =
+      JobDb::history(&partial.name, &JobHistoryQuery::default(), pool)
+        .await
+        .unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].key, previous.spec_key);
+    run_query_owned(pool, (), move |conn| {
+      transaction(conn, |conn| {
+        diesel::delete(specs::table.find(previous.spec_key)).execute(conn)?;
+        diesel::delete(
+          resource_incarnations::table.find(previous.incarnation_key),
+        )
+        .execute(conn)?;
+        Ok(())
+      })
+    })
+    .await
+    .unwrap();
+    system.state.wait_event_loop().await;
   }
 }

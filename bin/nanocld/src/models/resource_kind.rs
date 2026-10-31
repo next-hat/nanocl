@@ -81,6 +81,7 @@ impl TryFrom<&ResourceKindPartial> for SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "ResourceKind".to_owned(),
+      incarnation_key: None,
       kind_key: p.name.clone(),
       metadata: p.metadata.clone(),
       version: p.version.clone(),

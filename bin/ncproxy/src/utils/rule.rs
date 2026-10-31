@@ -172,7 +172,7 @@ fn process_is_running(process: &Process) -> bool {
       .as_ref()
       .and_then(|state| state.status.as_ref()),
     Some(
-      nanocld_client::bollard_next::service::ContainerStateStatusEnum::RUNNING
+      nanocld_client::bollard_next::models::ContainerStateStatusEnum::RUNNING
     )
   )
 }
@@ -252,7 +252,7 @@ fn essential_app_is_ready(process: &Process) -> bool {
       .as_ref()
       .and_then(|state| state.health.as_ref())
       .and_then(|health| health.status.as_ref()),
-    Some(nanocld_client::bollard_next::service::HealthStatusEnum::HEALTHY)
+    Some(nanocld_client::bollard_next::models::HealthStatusEnum::HEALTHY)
   )
 }
 
@@ -936,7 +936,7 @@ mod tests {
   use std::collections::HashMap;
 
   use nanocld_client::{
-    bollard_next::service::{
+    bollard_next::models::{
       ContainerConfig, ContainerInspectResponse, ContainerState,
       ContainerStateStatusEnum, EndpointSettings, Health, HealthConfig,
       HealthStatusEnum, HostConfig, NetworkSettings,

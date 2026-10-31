@@ -1,0 +1,18 @@
+{
+  "name": "nanocl-vm-console-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test server.test.mjs",
+    "test:api": "node api-test.mjs",
+    "smoke": "node browser-smoke.mjs"
+  },
+  "dependencies": {
+    "@novnc/novnc": "1.7.0",
+    "ws": "8.22.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

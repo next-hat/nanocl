@@ -23,9 +23,9 @@ use crate::{
     (status = 409, description = "The virtual machine already exists", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/vms")]
 pub async fn create_vm(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<String>,
   payload: web::types::Json<VmSpecPartial>,
   qs: web::types::Query<GenericNspQuery>,

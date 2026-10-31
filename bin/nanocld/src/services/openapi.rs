@@ -54,6 +54,9 @@ impl Modify for VersionModifier {
     node::list_node,
     node::count_node,
     node::start_node_cargo,
+    node::delete_node_cargo,
+    node::start_node_cargo_operation,
+    node::delete_node_cargo_operation,
     // Network
     network::list_network,
     network::inspect_network,
@@ -80,6 +83,11 @@ impl Modify for VersionModifier {
     job::inspect_job,
     job::create_job,
     job::count_job,
+    job::list_job_history,
+    job::inspect_job_history,
+    job::revert_job,
+    job::list_job_runs,
+    job::inspect_job_run,
     // Cargo
     cargo::list_cargo,
     cargo::inspect_cargo,
@@ -97,7 +105,14 @@ impl Modify for VersionModifier {
     vm::create_vm,
     vm::count_vm,
     vm::list_vm_history,
+    vm::revert_vm,
     vm::patch_vm,
+    vm::console_vm,
+    vm::stop_vm,
+    vm::restart_vm,
+    vm::vm_status,
+    vm::resize_vm,
+    vm::vm_resources,
     // Resource Kind
     resource_kind::list_resource_kind,
     resource_kind::create_resource_kind,
@@ -135,7 +150,6 @@ impl Modify for VersionModifier {
     process::create_process_exec,
     process::start_process_exec_detached,
     process::start_process_exec_attached,
-    process::start_process_by_pk,
     process::process_stats_by_name,
     // Event
     event::list_event,
@@ -143,7 +157,7 @@ impl Modify for VersionModifier {
     event::inspect_event,
     event::count_event,
   ),
-  components(schemas(Statefile, ResourceProxyRule, ResourceDnsRule)),
+  components(schemas(nanocl_stubs::node::DeleteNodeCargoOperationParams, Statefile, ResourceProxyRule, ResourceDnsRule, nanocl_stubs::job::JobHistoryQuery, nanocl_stubs::job::JobDeleteQuery)),
   tags(
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Networks", description = "Node-scoped Docker network inspection endpoints."),
@@ -171,6 +185,167 @@ mod tests {
       .expect("OpenAPI must serialize as YAML")
   }
 
+  #[test]
+  fn generated_openapi_separates_job_configurations_and_runs() {
+    let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let paths = &document["paths"];
+    let list = &paths["/jobs/{name}/runs"]["get"];
+    assert_eq!(
+      list["responses"]["200"]["content"]["application/json"]["schema"]["items"]
+        ["$ref"],
+      "#/components/schemas/JobRun"
+    );
+    for query in ["limit", "offset"] {
+      assert!(
+        list["parameters"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|parameter| {
+            parameter["name"] == query && parameter["in"] == "query"
+          })
+      );
+    }
+    assert_eq!(
+      paths["/jobs/{name}/runs/{run}"]["get"]["responses"]["200"]["content"]["application/json"]
+        ["schema"]["$ref"],
+      "#/components/schemas/JobRunInspect"
+    );
+    let history = &paths["/jobs/{name}/histories"]["get"];
+    assert_eq!(
+      history["responses"]["200"]["content"]["application/json"]["schema"]["items"]
+        ["$ref"],
+      "#/components/schemas/JobSpec"
+    );
+    assert_eq!(
+      paths["/jobs/{name}/histories/{id}"]["get"]["responses"]["200"]["content"]
+        ["application/json"]["schema"]["$ref"],
+      "#/components/schemas/JobSpec"
+    );
+    for query in ["limit", "offset"] {
+      assert!(history["parameters"].as_array().unwrap().iter().any(
+        |parameter| parameter["name"] == query && parameter["in"] == "query"
+      ));
+    }
+    assert!(paths.get("/jobs/{name}/histories/{run}").is_none());
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in [
+      "/jobs/{name}/histories",
+      "/jobs/{name}/histories/{id}",
+      "/jobs/{name}/runs",
+      "/jobs/{name}/runs/{run}",
+    ] {
+      assert_eq!(checked_in["paths"][path], paths[path], "{path}");
+    }
+    let schemas = &document["components"]["schemas"];
+    for field in ["Key", "JobKey", "Version", "CreatedAt"] {
+      assert!(schemas["JobSpec"]["properties"][field].is_object());
+      assert!(
+        schemas["JobSpec"]["required"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|required| required == field)
+      );
+      assert!(schemas["JobPartial"]["properties"].get(field).is_none());
+    }
+    for model in ["Job", "JobInspect", "JobSummary"] {
+      for field in ["IncarnationKey", "SpecKey", "CurrentRunKey"] {
+        assert!(schemas[model]["properties"][field].is_object());
+      }
+    }
+    for model in [
+      "JobRun",
+      "JobRunStep",
+      "JobRunOperation",
+      "JobRunInspect",
+      "JobHistoryQuery",
+    ] {
+      assert!(schemas[model].is_object(), "missing {model}");
+      assert_eq!(
+        checked_in["components"]["schemas"][model], schemas[model],
+        "{model}"
+      );
+      assert_local_schema_references(&document, &schemas[model]);
+    }
+    assert!(
+      schemas["JobRunStep"]["properties"]["ExitCode"]["type"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kind| kind == "null")
+    );
+    for private in ["OwnerBootId", "NodeName", "LockDevice", "LockInode"] {
+      assert!(
+        schemas["JobRunOperation"]["properties"]
+          .get(private)
+          .is_none()
+      );
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_job_and_vm_history_reverts() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for (path, model, operation) in [
+      ("/jobs/{name}/histories/{id}/revert", "Job", "revert_job"),
+      (
+        "/vms/{vm_key}/histories/{history_key}/revert",
+        "Vm",
+        "revert_vm",
+      ),
+    ] {
+      let endpoint = &generated["paths"][path]["patch"];
+      assert_eq!(endpoint["operationId"], operation);
+      assert!(endpoint.get("requestBody").is_none());
+      assert_eq!(
+        endpoint["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+        format!("#/components/schemas/{model}")
+      );
+      assert!(endpoint["responses"]["404"].is_object());
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "checked-in revert contract differs for {path}"
+      );
+    }
+    let history_path = "/vms/{key}/histories";
+    assert_eq!(
+      checked_in["paths"][history_path], generated["paths"][history_path],
+      "checked-in VM history pagination contract differs"
+    );
+    let vm = &generated["paths"]["/vms/{vm_key}/histories/{history_key}/revert"]
+      ["patch"];
+    assert!(
+      vm["responses"]["200"]["headers"]["X-Nanocl-Operation"].is_object()
+    );
+    assert_eq!(
+      vm["responses"]["409"]["description"],
+      "Another VM lifecycle operation is active"
+    );
+    assert_eq!(
+      vm["responses"]["409"]["content"]["application/json"]["schema"]["$ref"],
+      "#/components/schemas/ApiError"
+    );
+    let revision = vm["parameters"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .find(|parameter| parameter["name"] == "history_key")
+      .unwrap();
+    assert_eq!(revision["schema"]["type"], "string");
+    assert_eq!(revision["schema"]["format"], "uuid");
+    let job =
+      &generated["paths"]["/jobs/{name}/histories/{id}/revert"]["patch"];
+    assert!(
+      job["responses"]["200"]["headers"]
+        .get("X-Nanocl-Operation")
+        .is_none()
+    );
+  }
+
   fn find_schema_reference(schema: &serde_json::Value) -> Option<&str> {
     match schema {
       serde_json::Value::Array(values) => {
@@ -181,6 +356,165 @@ mod tests {
         .and_then(serde_json::Value::as_str)
         .or_else(|| object.values().find_map(find_schema_reference)),
       _ => None,
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_resize_and_limits() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/resize", "/vms/{key}/resources"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in [
+      "VmResizeOptions",
+      "VmResources",
+      "VmHostConfig",
+      "VmHostConfigUpdate",
+    ] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    assert_eq!(
+      generated["paths"]["/vms/{key}/resize"]["post"]["requestBody"]["required"],
+      true
+    );
+    assert_eq!(
+      generated["components"]["schemas"]["VmResources"]["properties"]["Persistent"]
+        ["type"],
+      "boolean"
+    );
+    for field in ["MaxCpu", "MaxMemory"] {
+      assert!(
+        generated["components"]["schemas"]["VmHostConfig"]["properties"][field]
+          .is_object()
+      );
+      assert!(
+        !generated["components"]["schemas"]["VmHostConfig"]["required"]
+          .as_array()
+          .unwrap()
+          .iter()
+          .any(|item| item == field)
+      );
+    }
+    assert_eq!(
+      find_schema_reference(
+        &generated["components"]["schemas"]["VmSpecUpdate"]["properties"]["HostConfig"]
+      ),
+      Some("#/components/schemas/VmHostConfigUpdate")
+    );
+    assert!(
+      generated["components"]["schemas"]["VmHostConfigUpdate"]["required"]
+        .as_array()
+        .is_none_or(Vec::is_empty)
+    );
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_lifecycle() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart", "/vms/{key}/status"] {
+      assert_eq!(
+        checked_in["paths"][path], generated["paths"][path],
+        "{path}"
+      );
+    }
+    for name in ["VmLifecycleOptions", "VmRuntimeStatus"] {
+      assert_eq!(
+        checked_in["components"]["schemas"][name],
+        generated["components"]["schemas"][name],
+        "{name}"
+      );
+    }
+    for path in ["/vms/{key}/stop", "/vms/{key}/restart"] {
+      let operation = &generated["paths"][path]["post"];
+      assert_eq!(
+        operation["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/VmLifecycleOptions"
+      );
+      assert_eq!(operation["requestBody"]["required"], true);
+      assert!(operation["responses"]["504"].is_object());
+      assert!(operation["responses"].get("403").is_none());
+    }
+  }
+
+  #[test]
+  fn generated_openapi_exposes_vm_cloud_init_user_data() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    let schemas = &generated["components"]["schemas"];
+    let user_data = &schemas["VmCloudInitUserData"];
+    assert_eq!(user_data["oneOf"][0]["type"], "string");
+    assert_eq!(
+      user_data["oneOf"][1]["$ref"],
+      "#/components/schemas/CloudInit26_2"
+    );
+    assert_eq!(
+      checked_in["components"]["schemas"]["VmCloudInitUserData"],
+      *user_data
+    );
+    for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+      assert_eq!(checked_in["components"]["schemas"][name], schemas[name]);
+    }
+    let cloud_init: Vec<_> = schemas
+      .as_object()
+      .unwrap()
+      .iter()
+      .filter(|(name, _)| name.starts_with("CloudInit26_2"))
+      .collect();
+    assert_eq!(cloud_init.len(), 77);
+    for (name, schema) in cloud_init {
+      assert_eq!(checked_in["components"]["schemas"][name], *schema, "{name}");
+      assert_local_schema_references(&generated, schema);
+    }
+    for document in [&generated, &checked_in] {
+      for name in ["VmSpecPartial", "VmSpecUpdate", "VmSpec"] {
+        let schema = &document["components"]["schemas"][name];
+        let property = &schema["properties"]["CloudInitUserData"];
+        assert_eq!(
+          find_schema_reference(property),
+          Some("#/components/schemas/VmCloudInitUserData")
+        );
+        assert!(!schema["required"].as_array().is_some_and(|items| {
+          items.iter().any(|item| item == "CloudInitUserData")
+        }));
+      }
+    }
+  }
+
+  fn assert_local_schema_references(
+    document: &serde_json::Value,
+    value: &serde_json::Value,
+  ) {
+    match value {
+      serde_json::Value::Array(items) => {
+        for item in items {
+          assert_local_schema_references(document, item);
+        }
+      }
+      serde_json::Value::Object(object) => {
+        if let Some(reference) = object.get("$ref") {
+          let reference = reference.as_str().unwrap();
+          // Both the docs and VS Code Statefile converter require local
+          // component references, including references nested in cloud-config.
+          assert!(reference.starts_with("#/components/schemas/"));
+          assert!(document.pointer(&reference[1..]).is_some(), "{reference}");
+        }
+        for child in object.values() {
+          assert_local_schema_references(document, child);
+        }
+      }
+      _ => {}
     }
   }
 
@@ -223,6 +557,8 @@ mod tests {
     for wrapper in ["Container", "container_config"] {
       assert!(!properties.contains_key(wrapper));
     }
+    // Use the current native Docker create model, without legacy top-level MACs.
+    assert!(!properties.contains_key("MacAddress"));
 
     let host_reference = find_schema_reference(&properties["HostConfig"])
       .expect("HostConfig must reference its strict component");
@@ -249,11 +585,40 @@ mod tests {
   }
 
   #[test]
+  fn generated_openapi_exposes_node_delete_query() {
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    assert_node_delete_query(&generated);
+  }
+
+  fn assert_node_delete_query(document: &serde_json::Value) {
+    let operation = &document["paths"]["/nodes/cargoes"]["delete"];
+    assert!(operation.is_object());
+    assert!(operation.get("requestBody").is_none());
+    let [parameter] = operation["parameters"].as_array().unwrap().as_slice()
+    else {
+      panic!("node deletion must require exactly one query parameter");
+    };
+    assert_eq!(parameter["name"], "CargoKey");
+    assert_eq!(parameter["in"], "query");
+    assert_eq!(parameter["required"], true);
+    assert_eq!(parameter["schema"]["type"], "string");
+  }
+
+  #[test]
   fn checked_in_swagger_matches_generated_openapi() {
-    let generated = generated_openapi_yaml();
+    // Schema extension maps do not guarantee YAML key order. Compare every
+    // value in the parsed document while preserving array order and types.
+    let generated = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let checked_in: serde_json::Value =
+      serde_yaml::from_str(include_str!("../../specs/swagger.yaml")).unwrap();
+    for document in [&generated, &checked_in] {
+      let paths = document["paths"].as_object().unwrap();
+      assert!(!paths.contains_key("/processes/{pk}/start"));
+      assert!(paths["/processes/{kind}/{key}/start"]["post"].is_object());
+      assert_node_delete_query(document);
+    }
     assert_eq!(
-      generated,
-      include_str!("../../specs/swagger.yaml"),
+      generated, checked_in,
       "run the ignored regenerate_checked_in_swagger test"
     );
   }

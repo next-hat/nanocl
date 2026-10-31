@@ -56,7 +56,11 @@ fn selected_object(matches: &ArgMatches, kind: CompletionKind) -> Option<&str> {
   let (operation, opts) = group_matches.subcommand()?;
   let field = match (kind, group, operation) {
     (CompletionKind::CargoContainer, "cargo", "patch")
-    | (CompletionKind::CargoHistory, "cargo", "revert") => "key",
+    | (CompletionKind::CargoHistory, "cargo", "revert" | "history")
+    | (CompletionKind::ResourceHistory, "resource", "history")
+    | (CompletionKind::VmHistory, "vm", "revert" | "history")
+    | (CompletionKind::JobHistory, "job", "history") => "key",
+    (CompletionKind::JobHistory, "job", "revert") => "name",
     (CompletionKind::ResourceHistory, "resource", "revert") => "name",
     _ => return None,
   };
@@ -236,6 +240,28 @@ mod tests {
       selected_object(&matches, CompletionKind::CargoHistory),
       Some("system.api")
     );
+    for (group, key, kind) in [
+      ("cargo", "system.api", CompletionKind::CargoHistory),
+      ("vm", "team.guest", CompletionKind::VmHistory),
+      ("job", "backup", CompletionKind::JobHistory),
+      ("resource", "route", CompletionKind::ResourceHistory),
+    ] {
+      let matches =
+        partial_matches(&words(&["nanocl", group, "history", key, "--id"]))
+          .unwrap();
+      assert_eq!(selected_object(&matches, kind), Some(key));
+    }
+    for (group, key, kind) in [
+      ("vm", "team.guest", CompletionKind::VmHistory),
+      ("job", "backup", CompletionKind::JobHistory),
+    ] {
+      let matches =
+        partial_matches(&words(&["nanocl", group, "revert", key])).unwrap();
+      assert_eq!(selected_object(&matches, kind), Some(key));
+      let matches =
+        partial_matches(&words(&["nanocl", group, "revert"])).unwrap();
+      assert_eq!(selected_object(&matches, kind), None);
+    }
     let matches = partial_matches(&words(&[
       "nanocl",
       "exec",

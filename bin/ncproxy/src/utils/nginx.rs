@@ -1,12 +1,19 @@
-use std::{fs, future::Future, process::Command, sync::Arc, time::Duration};
+use std::{fs, future::Future, process::Stdio, sync::Arc, time::Duration};
 
 use ntex::rt;
 use ntex::web;
+use tokio::{
+  io::{AsyncReadExt, AsyncWriteExt},
+  net::UnixStream,
+  process::Command,
+  time::timeout,
+};
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::stubs::proxy::{
-  LocationTarget, ProxyHttpLocation, ProxyRule, ResourceProxyRule,
+  LocationTarget, ProxyHttpLocation, ProxyRule, ProxyStreamProtocol,
+  ResourceProxyRule, StreamTarget,
 };
 
 use crate::models::{
@@ -17,11 +24,17 @@ use crate::models::{
 use super::rule::{PreparedFile, PreparedUpstream};
 
 const NGINX_PID_PATH: &str = "/run/nginx.pid";
+const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+const PROBE_TIMEOUT: Duration = Duration::from_secs(1);
+const READY_TIMEOUT: Duration = Duration::from_secs(10);
+const HEALTH_MARKER: &str = "return 200 \"ncproxy-health $pid ";
 
 fn apply_location_options(
   template: &mut LocationTemplate,
   location: &ProxyHttpLocation,
 ) {
+  template.enable_logging = matches!(&location.target,
+    LocationTarget::Upstream(target) if target.enable_logging == Some(true));
   template.client_max_body_size =
     location.client_max_body_size.as_ref().map(|value| {
       serde_json::to_string(value)
@@ -90,6 +103,7 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
     "nginx_dir": state_ref.nginx_dir,
     "state_dir": state_ref.store.dir,
+    "health_generation": new_health_generation()?,
   }))?;
   web::block(move || {
     [
@@ -121,31 +135,266 @@ fn gen_conf_path(state_dir: &str) -> String {
   format!("{state_dir}/nginx.conf")
 }
 
-fn is_nginx_running() -> bool {
-  let Ok(pid) = std::fs::read_to_string(NGINX_PID_PATH) else {
-    return false;
-  };
-  let Ok(pid) = pid.trim().parse::<i32>() else {
-    return false;
-  };
-  Command::new("kill")
-    .arg("-0")
-    .arg(pid.to_string())
-    .stdout(std::process::Stdio::null())
-    .stderr(std::process::Stdio::null())
-    .status()
-    .is_ok_and(|status| status.success())
+fn parse_pid(value: &str) -> IoResult<u32> {
+  value
+    .trim()
+    .parse::<u32>()
+    .ok()
+    .filter(|pid| *pid > 1)
+    .ok_or_else(|| IoError::invalid_data("nginx process", "invalid PID"))
 }
 
-fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
-  let output = Command::new("nginx")
+/// Return parent PID, process start time and state from Linux procfs.
+fn parse_process_stat(stat: &str) -> IoResult<(u32, u64, char)> {
+  let fields = stat
+    .rsplit_once(')')
+    .map(|(_, fields)| fields.split_whitespace().collect::<Vec<_>>())
+    .ok_or_else(|| IoError::invalid_data("nginx process", "invalid stat"))?;
+  let parsed = (|| {
+    let state = *fields.first()?;
+    if state.len() != 1 {
+      return None;
+    }
+    Some((
+      fields.get(1)?.parse().ok()?,
+      fields.get(19)?.parse().ok()?,
+      state.chars().next()?,
+    ))
+  })();
+  parsed.ok_or_else(|| IoError::invalid_data("nginx process", "invalid stat"))
+}
+
+fn read_process_stat(pid: u32) -> IoResult<Option<(u32, u64, char)>> {
+  match fs::read_to_string(format!("/proc/{pid}/stat")) {
+    Ok(stat) => parse_process_stat(&stat).map(Some),
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+    Err(err) => Err(err.into()),
+  }
+}
+
+fn process_title(cmdline: &[u8]) -> &[u8] {
+  cmdline.split(|byte| *byte == 0).next().unwrap_or_default()
+}
+
+fn is_master_title(title: &[u8], conf_path: &str) -> bool {
+  title.starts_with(b"nginx: master process ")
+    && title.ends_with(format!(" -c {conf_path}").as_bytes())
+}
+
+/// Absence is distinct from unreadable state or an unrelated PID. Only an
+/// absent/dead master permits a start; a dubious PID file must fail closed.
+fn nginx_master(conf_path: &str) -> IoResult<Option<(u32, u64)>> {
+  let pid = match fs::read_to_string(NGINX_PID_PATH) {
+    Ok(pid) => parse_pid(&pid)?,
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+    Err(err) => return Err(err.into()),
+  };
+  let Some((_, started, state)) = read_process_stat(pid)? else {
+    return Ok(None);
+  };
+  if matches!(state, 'Z' | 'X' | 'x') {
+    return Ok(None);
+  }
+  let title = fs::read(format!("/proc/{pid}/cmdline"))?;
+  let executable = fs::read_link(format!("/proc/{pid}/exe"))?;
+  if !is_master_title(process_title(&title), conf_path)
+    || !executable
+      .file_name()
+      .is_some_and(|name| name == "nginx" || name == "nginx (deleted)")
+  {
+    return Err(IoError::other(
+      "nginx process",
+      "PID file does not identify the managed nginx master",
+    ));
+  }
+  if matches!(state, 'T' | 't') {
+    return Err(IoError::other("nginx process", "master is stopped"));
+  }
+  Ok(Some((pid, started)))
+}
+
+fn child_processes(master: u32) -> IoResult<Vec<(u32, u64)>> {
+  let children =
+    fs::read_to_string(format!("/proc/{master}/task/{master}/children"))?;
+  let mut result = Vec::new();
+  for child in children.split_whitespace() {
+    let pid = parse_pid(child)?;
+    if let Some((parent, started, _)) = read_process_stat(pid)?
+      && parent == master
+    {
+      // Include children whose titles still look like the master: they may
+      // be old workers stuck during initialization.
+      result.push((pid, started));
+    }
+  }
+  Ok(result)
+}
+
+fn serving_worker(parent: u32, state: char, title: &[u8], master: u32) -> bool {
+  parent == master
+    && matches!(state, 'R' | 'S' | 'D')
+    && process_title(title) == b"nginx: worker process"
+}
+
+fn new_health_generation() -> IoResult<String> {
+  let mut bytes = [0u8; 16];
+  openssl::rand::rand_bytes(&mut bytes).map_err(|err| {
+    IoError::other("nginx health generation", &err.to_string())
+  })?;
+  Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn health_generation(conf: &str) -> IoResult<&str> {
+  let mut matches = conf.match_indices(HEALTH_MARKER);
+  let index = matches
+    .next()
+    .filter(|_| matches.next().is_none())
+    .map(|(index, _)| index + HEALTH_MARKER.len())
+    .ok_or_else(|| {
+      IoError::invalid_data(
+        "nginx health",
+        "missing or ambiguous health marker",
+      )
+    })?;
+  conf[index..]
+    .split_once("\\n\";")
+    .map(|(generation, _)| generation)
+    .filter(|generation| {
+      generation.len() == 32
+        && generation.bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
+    .ok_or_else(|| {
+      IoError::invalid_data("nginx health", "invalid health marker")
+    })
+}
+
+fn replace_health_generation(conf: &str, generation: &str) -> IoResult<String> {
+  let previous = health_generation(conf)?;
+  Ok(conf.replacen(
+    &format!("{HEALTH_MARKER}{previous}\\n\";"),
+    &format!("{HEALTH_MARKER}{generation}\\n\";"),
+    1,
+  ))
+}
+
+fn parse_health_response(response: &[u8], generation: &str) -> IoResult<u32> {
+  let response = std::str::from_utf8(response)
+    .map_err(|_| IoError::invalid_data("nginx health", "non-UTF8 response"))?;
+  let (headers, body) = response.split_once("\r\n\r\n").ok_or_else(|| {
+    IoError::invalid_data("nginx health", "incomplete HTTP response")
+  })?;
+  let status = headers.lines().next().unwrap_or_default();
+  let mut fields = body.split_whitespace();
+  let marker = fields.next();
+  let pid = fields.next();
+  let token = fields.next();
+  if !matches!(status, "HTTP/1.0 200 OK" | "HTTP/1.1 200 OK")
+    || marker != Some("ncproxy-health")
+    || token != Some(generation)
+    || fields.next().is_some()
+    || !body.ends_with('\n')
+  {
+    return Err(IoError::other(
+      "nginx health",
+      "unexpected response or configuration generation",
+    ));
+  }
+  parse_pid(pid.unwrap_or_default())
+}
+
+async fn probe_worker(
+  state_dir: &str,
+  master: (u32, u64),
+  generation: &str,
+) -> IoResult<(u32, u64)> {
+  let pid = timeout(PROBE_TIMEOUT, async {
+    let mut socket =
+      UnixStream::connect(format!("{state_dir}/nginx-health.sock")).await?;
+    socket
+      .write_all(
+        b"GET / HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      .await?;
+    let mut response = Vec::new();
+    socket.take(4097).read_to_end(&mut response).await?;
+    if response.len() > 4096 {
+      return Err(IoError::invalid_data("nginx health", "oversized response"));
+    }
+    parse_health_response(&response, generation)
+  })
+  .await
+  .map_err(|_| IoError::other("nginx health", "local request timed out"))??;
+  let stat = read_process_stat(pid)?;
+  let title = fs::read(format!("/proc/{pid}/cmdline"))?;
+  if let Some((parent, started, state)) = stat
+    && serving_worker(parent, state, &title, master.0)
+    && nginx_master(&gen_conf_path(state_dir))? == Some(master)
+  {
+    return Ok((pid, started));
+  }
+  Err(IoError::other(
+    "nginx health",
+    "response was not from a live worker of the current master",
+  ))
+}
+
+async fn wait_for_worker(
+  state_dir: &str,
+  master: (u32, u64),
+  generation: &str,
+  previous: &[(u32, u64)],
+) -> IoResult<()> {
+  timeout(READY_TIMEOUT, async {
+    loop {
+      if nginx_master(&gen_conf_path(state_dir))? != Some(master) {
+        return Err(IoError::other(
+          "nginx health",
+          "master changed while waiting",
+        ));
+      }
+      if let Ok(worker) = probe_worker(state_dir, master, generation).await
+        && !previous.contains(&worker)
+      {
+        return Ok(());
+      }
+      ntex::time::sleep(Duration::from_millis(100)).await;
+    }
+  })
+  .await
+  .map_err(|_| {
+    IoError::other(
+      "nginx health",
+      "new serving worker did not become ready within 10s",
+    )
+  })?
+}
+
+fn nginx_command(args: &[&str], conf_path: &str) -> Command {
+  // nginx -t opens/creates its PID file without writing a PID. Route that
+  // check to /dev/null so validation cannot leave an empty runtime PID file,
+  // including when the check is cancelled or fails.
+  let pid_path = if args.contains(&"-t") {
+    "/dev/null"
+  } else {
+    NGINX_PID_PATH
+  };
+  let mut command = Command::new("nginx");
+  command
     .args(args)
+    .arg("-g")
+    .arg(format!("pid {pid_path};"))
     .arg("-c")
     .arg(conf_path)
-    .output()
-    .map_err(|err| {
-      IoError::other("exec", &format!("unable to run nginx: {err}"))
-    })?;
+    .stdin(Stdio::null())
+    .kill_on_drop(true);
+  command
+}
+
+async fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
+  let output =
+    timeout(COMMAND_TIMEOUT, nginx_command(args, conf_path).output())
+      .await
+      .map_err(|_| IoError::other("exec", "nginx command timed out"))??;
   if output.status.success() {
     return Ok(());
   }
@@ -154,23 +403,17 @@ fn exec_nginx_cmd(args: &[&str], conf_path: &str) -> IoResult<()> {
   Err(IoError::other("exec", &message))
 }
 
-/// Start daemonized nginx without capturing its standard streams.
-///
-/// `Command::output` waits for every writer of its capture pipes to close.
-/// Some packaged nginx builds leave those descriptors inherited by the
-/// daemon process, which keeps this call (and the configuration lock held by
-/// its caller) blocked forever even though nginx started successfully.
-fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
-  let status = Command::new("nginx")
-    .arg("-c")
-    .arg(conf_path)
-    .stdin(std::process::Stdio::null())
-    .stdout(std::process::Stdio::null())
-    .stderr(std::process::Stdio::null())
-    .status()
-    .map_err(|err| {
-      IoError::other("exec", &format!("unable to start nginx: {err}"))
-    })?;
+/// Do not capture streams inherited by the daemon: EOF may never arrive.
+async fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
+  let status = timeout(
+    COMMAND_TIMEOUT,
+    nginx_command(&[], conf_path)
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status(),
+  )
+  .await
+  .map_err(|_| IoError::other("exec", "nginx start timed out"))??;
   if status.success() {
     return Ok(());
   }
@@ -182,15 +425,36 @@ fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
 
 pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   let conf_path = gen_conf_path(state_dir);
-  web::block(move || {
-    if is_nginx_running() {
-      return Ok(());
-    }
-    let _ = std::fs::remove_file(NGINX_PID_PATH);
-    start_nginx_cmd(&conf_path)
+  if nginx_master(&conf_path)?.is_some() {
+    return Ok(());
+  }
+  match fs::remove_file(NGINX_PID_PATH) {
+    Ok(()) => (),
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
+    Err(err) => return Err(err.into()),
+  }
+  log::warn!("nginx: master is absent or dead, starting");
+  start_nginx_cmd(&conf_path).await?;
+  let conf = fs::read_to_string(&conf_path)?;
+  let generation = health_generation(&conf)?;
+  timeout(READY_TIMEOUT, async {
+    // The daemonizing parent can exit before its child publishes the PID file
+    // and updates its process title. Only this post-launch wait retries both.
+    let master = loop {
+      if let Ok(Some(master)) = nginx_master(&conf_path) {
+        break master;
+      }
+      ntex::time::sleep(Duration::from_millis(100)).await;
+    };
+    wait_for_worker(state_dir, master, generation, &[]).await
   })
-  .await?;
-  Ok(())
+  .await
+  .map_err(|_| {
+    IoError::other(
+      "nginx start",
+      "master and worker did not become ready within 10s",
+    )
+  })?
 }
 
 pub fn spawn(state: &SystemStateRef) {
@@ -198,10 +462,21 @@ pub fn spawn(state: &SystemStateRef) {
   let config_lock = Arc::clone(&state.config_lock);
   rt::Arbiter::new().handle().spawn(async move {
     loop {
-      if !is_nginx_running() {
-        log::warn!("nginx::monitor: nginx is not running, restarting");
+      {
         let _guard = config_lock.lock().await;
-        if let Err(err) = ensure_started(&state_dir).await {
+        let health = async {
+          ensure_started(&state_dir).await?;
+          let conf_path = gen_conf_path(&state_dir);
+          let master = nginx_master(&conf_path)?.ok_or_else(|| {
+            IoError::other("nginx health", "master disappeared")
+          })?;
+          let conf = fs::read_to_string(&conf_path)?;
+          probe_worker(&state_dir, master, health_generation(&conf)?).await
+        }
+        .await;
+        if let Err(err) = health {
+          // Repeated HUPs can accumulate workers stuck during initialization.
+          // Keep a live unhealthy master intact and report the failed probe.
           log::warn!("nginx::monitor: {err}");
         }
       }
@@ -212,8 +487,7 @@ pub fn spawn(state: &SystemStateRef) {
 
 pub async fn test(state_dir: &str) -> IoResult<()> {
   log::info!("nginx::test: starting");
-  let conf_path = gen_conf_path(state_dir);
-  web::block(move || exec_nginx_cmd(&["-t"], &conf_path)).await?;
+  exec_nginx_cmd(&["-t"], &gen_conf_path(state_dir)).await?;
   log::info!("nginx::test: done");
   Ok(())
 }
@@ -222,7 +496,22 @@ pub async fn reload(state_dir: &str) -> IoResult<()> {
   log::info!("nginx::reload: starting");
   ensure_started(state_dir).await?;
   let conf_path = gen_conf_path(state_dir);
-  web::block(move || exec_nginx_cmd(&["-s", "reload"], &conf_path)).await?;
+  let master = nginx_master(&conf_path)?.ok_or_else(|| {
+    IoError::other("nginx reload", "master disappeared before reload")
+  })?;
+  let previous = child_processes(master.0)?;
+  let conf = fs::read_to_string(&conf_path)?;
+  let generation = new_health_generation()?;
+  fs::write(&conf_path, replace_health_generation(&conf, &generation)?)?;
+  exec_nginx_cmd(&["-t"], &conf_path).await?;
+  if nginx_master(&conf_path)? != Some(master) {
+    return Err(IoError::other(
+      "nginx reload",
+      "master changed before reload",
+    ));
+  }
+  exec_nginx_cmd(&["-s", "reload"], &conf_path).await?;
+  wait_for_worker(state_dir, master, &generation, &previous).await?;
   log::info!("nginx::reload: done");
   Ok(())
 }
@@ -243,12 +532,16 @@ async fn rollback_config(
   }
 }
 
-async fn config_transaction<F, Fut>(store: &Store, operation: F) -> IoResult<()>
+async fn config_transaction<F, Fut>(
+  store: &Store,
+  credential_paths: &[&str],
+  operation: F,
+) -> IoResult<()>
 where
   F: FnOnce() -> Fut,
   Fut: Future<Output = IoResult<()>>,
 {
-  let snapshot = store.snapshot_config().await?;
+  let snapshot = store.snapshot_config(credential_paths).await?;
   match operation().await {
     Ok(()) => Ok(()),
     Err(err) => rollback_config(&snapshot, err, store).await,
@@ -262,7 +555,12 @@ pub async fn add_rule(
 ) -> IoResult<()> {
   let prepared = prepare_rule(name, rule, state).await?;
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  let credential_paths = prepared
+    .files
+    .iter()
+    .map(|file| file.path.as_str())
+    .collect::<Vec<_>>();
+  config_transaction(&state.store, &credential_paths, || async {
     apply_prepared_rule(name, &prepared, state).await?;
     self::test(&state.store.dir).await
   })
@@ -281,6 +579,16 @@ async fn prepare_rule(
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
 ) -> IoResult<PreparedRule> {
+  // Validate before resolving upstreams or preparing any credential files.
+  if rule.rules.iter().any(|rule| {
+    matches!(rule, ProxyRule::Stream(stream)
+      if matches!(stream.protocol, ProxyStreamProtocol::Udp) && stream.ssl.is_some())
+  }) {
+    return Err(IoError::invalid_input(
+      "Proxy stream",
+      "TLS is not supported for UDP stream rules",
+    ));
+  }
   let mut stream_conf = String::new();
   let mut http_conf = String::new();
   let mut upstreams = Vec::new();
@@ -322,7 +630,11 @@ async fn prepare_rule(
           continue;
         }
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
+          "state_dir": state.store.dir,
+          "enable_logging": matches!(&stream_rule.target,
+            StreamTarget::Upstream(target) if target.enable_logging == Some(true)),
           "listen": listen,
+          "udp": matches!(stream_rule.protocol, ProxyStreamProtocol::Udp),
           "key": name,
           "upstream_key": upstream.key,
           "ssl": ssl,
@@ -387,6 +699,7 @@ async fn prepare_rule(
               };
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 limit_req: location.limit_req.clone(),
                 upstream_key: if ssl.is_some() {
                   format!("https://{}", prepared_upstream.key)
@@ -419,6 +732,7 @@ async fn prepare_rule(
                 super::rule::gen_unix_target(unix).await?;
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 upstream_key: format!("http://{}", prepared_upstream.key),
                 redirect: None,
                 limit_req: location.limit_req.clone(),
@@ -445,6 +759,7 @@ async fn prepare_rule(
             LocationTarget::Http(http) => {
               let mut rendered = LocationTemplate {
                 path: location.path.clone(),
+                enable_logging: false,
                 upstream_key: http.url.clone(),
                 limit_req: location.limit_req.clone(),
                 version: location.version,
@@ -470,6 +785,7 @@ async fn prepare_rule(
           }
         }
         let data = HTTP_TEMPLATE.compile(&liquid::object!({
+          "state_dir": state.store.dir,
           "key": name,
           "limit_req_zone": http_rule.limit_req_zone,
           "listen": listen,
@@ -527,7 +843,13 @@ pub(crate) async fn rebuild_rules(
     prepared_rules.push((name, prepare_rule(name, rule, state).await?));
   }
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  let credential_paths = prepared_rules
+    .iter()
+    .flat_map(|(_, prepared)| {
+      prepared.files.iter().map(|file| file.path.as_str())
+    })
+    .collect::<Vec<_>>();
+  config_transaction(&state.store, &credential_paths, || async {
     state.store.clear_config().await?;
     for (name, prepared) in &prepared_rules {
       apply_prepared_rule(name, prepared, state).await?;
@@ -539,7 +861,7 @@ pub(crate) async fn rebuild_rules(
 
 pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
-  config_transaction(&state.store, || async {
+  config_transaction(&state.store, &[], || async {
     state.store.replace_rule(name, None, None).await
   })
   .await
@@ -553,6 +875,386 @@ mod tests {
   };
 
   use super::*;
+
+  const GENERATION: &str = "0123456789abcdef0123456789abcdef";
+  const NEXT_GENERATION: &str = "abcdef0123456789abcdef0123456789";
+
+  fn test_state(dir: &str) -> SystemStateRef {
+    let (sender, _) = futures::channel::mpsc::unbounded();
+    Arc::new(crate::models::SystemState {
+      store: Store::new(dir),
+      client: nanocld_client::NanocldClient::connect_with_unix_default(),
+      event_emitter: crate::models::EventEmitter(Arc::new(sender)),
+      nginx_dir: String::new(),
+      config_lock: Arc::new(futures::lock::Mutex::new(())),
+    })
+  }
+
+  #[ntex::test]
+  async fn stream_preparation_honors_tcp_and_udp_protocols() {
+    let state = test_state("unused");
+    for (protocol, tls, listener) in [
+      ("Tcp", false, "listen 127.0.0.1:9000;"),
+      ("Udp", false, "listen 127.0.0.1:9000 udp;"),
+      ("Tcp", true, "listen 127.0.0.1:9000 ssl;"),
+    ] {
+      let ssl = tls.then(|| {
+        serde_json::json!({
+          "Certificate": "/unused/server.crt",
+          "CertificateKey": "/unused/server.key",
+        })
+      });
+      let rule: ResourceProxyRule = serde_json::from_value(serde_json::json!({
+        "Rules": [{
+          "Network": "Local",
+          "Protocol": protocol,
+          "Ssl": ssl,
+          "Port": 9000,
+          "Target": {"UnixPath": "/unused/upstream.sock"},
+        }],
+      }))
+      .unwrap();
+      let prepared = prepare_rule("stream", &rule, &state).await.unwrap();
+      let stream = prepared.stream.unwrap();
+      let listeners = stream
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| line.starts_with("listen "))
+        .collect::<Vec<_>>();
+      assert_eq!(listeners, vec![listener]);
+      assert_eq!(stream.contains("ssl_certificate "), tls);
+      assert!(prepared.files.is_empty());
+      assert!(prepared.site.is_none());
+      assert_eq!(prepared.upstreams.len(), 1);
+    }
+  }
+
+  #[ntex::test]
+  async fn stream_preparation_rejects_udp_tls() {
+    let state = test_state("unused");
+    let rule: ResourceProxyRule = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Udp",
+        "Port": 9000,
+        "Target": {"UnixPath": "/unused/upstream.sock"},
+        "Ssl": {
+          "Certificate": "/unused/server.crt",
+          "CertificateKey": "/unused/server.key",
+        },
+      }],
+    }))
+    .unwrap();
+    let error = prepare_rule("stream", &rule, &state)
+      .await
+      .err()
+      .expect("UDP with TLS must be rejected before preparing a candidate");
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("TLS is not supported for UDP"));
+  }
+
+  #[ntex::test]
+  async fn rejected_transaction_restores_all_credentials_and_removes_new_files()
+  {
+    let test_dir = TestDir::new();
+    let state = test_state(test_dir.path().to_str().unwrap());
+    std::fs::create_dir(test_dir.path().join("secrets")).unwrap();
+    let mut files = Vec::new();
+    for suffix in ["cert", "key", "ca", "pem"] {
+      let path = test_dir.path().join(format!("secrets/accepted.{suffix}"));
+      // Snapshots preserve bytes, including content that is not UTF-8.
+      std::fs::write(&path, [0xff, 0, 42]).unwrap();
+      files.push(PreparedFile {
+        path: path.to_str().unwrap().to_owned(),
+        data: "invalid candidate credentials".to_owned(),
+      });
+      files.push(PreparedFile {
+        path: test_dir
+          .path()
+          .join(format!("secrets/new.{suffix}"))
+          .to_str()
+          .unwrap()
+          .to_owned(),
+        data: "new candidate credentials".to_owned(),
+      });
+    }
+    state
+      .store
+      .write_conf_file("rule", "accepted", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let prepared = PreparedRule {
+      site: Some("rejected".to_owned()),
+      stream: None,
+      upstreams: Vec::new(),
+      files,
+    };
+    let paths = prepared
+      .files
+      .iter()
+      .map(|file| file.path.as_str())
+      .collect::<Vec<_>>();
+    let before = state.store.snapshot_config(&paths).await.unwrap();
+    let result = config_transaction(&state.store, &paths, || async {
+      apply_prepared_rule("rule", &prepared, &state).await?;
+      Err(IoError::invalid_data(
+        "candidate",
+        "TLS validation rejected",
+      ))
+    })
+    .await;
+    assert!(
+      result
+        .unwrap_err()
+        .to_string()
+        .contains("TLS validation rejected")
+    );
+    assert_eq!(state.store.snapshot_config(&paths).await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn partial_credential_write_restores_earlier_writes() {
+    let test_dir = TestDir::new();
+    let state = test_state(test_dir.path().to_str().unwrap());
+    let old_path = test_dir.path().join("accepted.cert");
+    let new_path = test_dir.path().join("new.ca");
+    let failed_path = test_dir.path().join("missing-parent/new.key");
+    std::fs::write(&old_path, "accepted certificate").unwrap();
+    let prepared = PreparedRule {
+      site: None,
+      stream: None,
+      upstreams: Vec::new(),
+      files: [old_path, new_path, failed_path]
+        .into_iter()
+        .map(|path| PreparedFile {
+          path: path.to_str().unwrap().to_owned(),
+          data: "candidate".to_owned(),
+        })
+        .collect(),
+    };
+    let paths = prepared
+      .files
+      .iter()
+      .map(|file| file.path.as_str())
+      .collect::<Vec<_>>();
+    let before = state.store.snapshot_config(&paths).await.unwrap();
+    let result = config_transaction(&state.store, &paths, || async {
+      apply_prepared_rule("rule", &prepared, &state).await
+    })
+    .await;
+    assert!(result.is_err());
+    assert_eq!(state.store.snapshot_config(&paths).await.unwrap(), before);
+  }
+
+  #[ntex::test]
+  async fn credential_rollback_continues_after_one_restore_failure() {
+    let test_dir = TestDir::new();
+    let store = Store::new(test_dir.path().to_str().unwrap());
+    let blocked = test_dir.path().join("a-blocked");
+    let old = test_dir.path().join("b-existing.cert");
+    let new = test_dir.path().join("c-new.key");
+    std::fs::write(&old, "accepted").unwrap();
+    store
+      .write_conf_file("rule", "accepted", &NginxRuleKind::Site)
+      .await
+      .unwrap();
+    let paths = [
+      blocked.to_str().unwrap(),
+      old.to_str().unwrap(),
+      new.to_str().unwrap(),
+    ];
+    let result = config_transaction(&store, &paths, || async {
+      // An inaccessible path must not prevent rollback of other files.
+      std::fs::create_dir(&blocked)?;
+      std::fs::write(&old, "candidate")?;
+      std::fs::write(&new, "candidate")?;
+      store
+        .write_conf_file("rule", "candidate", &NginxRuleKind::Site)
+        .await?;
+      Err(IoError::invalid_data("candidate", "rejected"))
+    })
+    .await;
+    assert!(result.unwrap_err().to_string().contains("rollback failed"));
+    assert_eq!(std::fs::read_to_string(&old).unwrap(), "accepted");
+    assert!(!new.exists());
+    assert_eq!(
+      store.snapshot_config(&[]).await.unwrap().sites["rule.conf"],
+      "accepted"
+    );
+  }
+
+  #[test]
+  fn http_access_logging_requires_target_opt_in() {
+    let cases = [
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80}),
+        false,
+      ),
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80, "EnableLogging": false}),
+        false,
+      ),
+      (
+        serde_json::json!({"Key": "app.global.c", "Port": 80, "EnableLogging": true}),
+        true,
+      ),
+      (serde_json::json!({"Url": "http://example.test"}), false),
+      (serde_json::json!({"UnixPath": "/run/app.sock"}), false),
+    ];
+    let locations = cases
+      .iter()
+      .enumerate()
+      .map(|(index, (target, _))| {
+        let location: ProxyHttpLocation =
+          serde_json::from_value(serde_json::json!({
+            "Path": format!("/route-{index}/"),
+            "Target": target,
+          }))
+          .unwrap();
+        let mut rendered: LocationTemplate =
+          serde_json::from_value(serde_json::json!({
+            "path": location.path,
+            "enable_logging": false,
+            "upstream_key": "http://upstream",
+            "upstream_path": "/",
+          }))
+          .unwrap();
+        apply_location_options(&mut rendered, &location);
+        rendered
+      })
+      .collect::<Vec<_>>();
+    let output = HTTP_TEMPLATE
+      .compile(&liquid::object!({
+        "key": "logging-test",
+        "listen": "127.0.0.1:80",
+        "state_dir": "/tmp/ncproxy",
+        "locations": locations,
+        "hide_upstream": false,
+      }))
+      .unwrap();
+    for (index, (_, enabled)) in cases.iter().enumerate() {
+      let marker = format!("location /route-{index}/ {{");
+      let block = output
+        .split_once(&marker)
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+      let directive = if *enabled {
+        "access_log /tmp/ncproxy/log/access.log http_basic;"
+      } else {
+        "access_log off;"
+      };
+      assert!(block.contains(directive), "{block}");
+      assert_eq!(block.matches("access_log ").count(), 1);
+    }
+  }
+
+  #[test]
+  fn supervision_rejects_invalid_pids_and_unrelated_master_titles() {
+    for invalid in ["", "-1", "0", "1", "not-a-pid", "4294967296"] {
+      assert!(parse_pid(invalid).is_err(), "{invalid}");
+    }
+    assert_eq!(parse_pid(" 42\n").unwrap(), 42);
+    let conf = "/var/lib/ncproxy/nginx.conf";
+    assert!(is_master_title(
+      b"nginx: master process nginx -c /var/lib/ncproxy/nginx.conf",
+      conf,
+    ));
+    for title in [
+      &b"nginx: worker process"[..],
+      &b"unrelated -c /var/lib/ncproxy/nginx.conf"[..],
+      &b"nginx: master process nginx -c /other/nginx.conf"[..],
+      &b"nginx: master process nginx -c /var/lib/ncproxy/nginx.conf.bak"[..],
+    ] {
+      assert!(!is_master_title(title, conf));
+    }
+  }
+
+  #[test]
+  fn supervision_parses_proc_identity_without_confusing_comm_parentheses() {
+    let stat = format!("42 (worker (init)) S 7 {} 12345", "0 ".repeat(17));
+    assert_eq!(parse_process_stat(&stat).unwrap(), (7, 12345, 'S'));
+    assert!(parse_process_stat("42 (nginx) S 7").is_err());
+    assert!(parse_process_stat("42 nginx S 7").is_err());
+  }
+
+  #[test]
+  fn supervision_rejects_initializing_exiting_and_dead_workers() {
+    assert!(serving_worker(7, 'S', b"nginx: worker process\0\0", 7));
+    assert!(!serving_worker(8, 'S', b"nginx: worker process", 7));
+    for state in ['Z', 'X', 'x', 'T', 't', '?'] {
+      assert!(!serving_worker(7, state, b"nginx: worker process", 7));
+    }
+    for title in [
+      &b"nginx: worker process is shutting down"[..],
+      &b"nginx: master process nginx -c /nginx.conf"[..],
+      &b"nginx: cache manager process"[..],
+    ] {
+      assert!(!serving_worker(7, 'S', title, 7));
+    }
+  }
+
+  #[test]
+  fn supervision_changes_only_the_unique_health_generation() {
+    let conf = format!(
+      "# keep {GENERATION}\n  {HEALTH_MARKER}{GENERATION}\\n\";\n# unchanged\n"
+    );
+    let changed = replace_health_generation(&conf, NEXT_GENERATION).unwrap();
+    assert_eq!(health_generation(&changed).unwrap(), NEXT_GENERATION);
+    assert!(changed.starts_with(&format!("# keep {GENERATION}\n")));
+    assert!(changed.ends_with("# unchanged\n"));
+    assert!(replace_health_generation("no marker", NEXT_GENERATION).is_err());
+    assert!(
+      replace_health_generation(&conf.repeat(2), NEXT_GENERATION).is_err()
+    );
+    assert!(health_generation(&format!("{HEALTH_MARKER}bad\\n\";")).is_err());
+  }
+
+  #[test]
+  fn supervision_requires_a_complete_response_from_the_requested_generation() {
+    let response = format!(
+      "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nncproxy-health 42 {GENERATION}\n"
+    );
+    assert_eq!(
+      parse_health_response(response.as_bytes(), GENERATION).unwrap(),
+      42
+    );
+    // A newly respawned PID running old configuration cannot prove reload.
+    assert!(
+      parse_health_response(response.as_bytes(), NEXT_GENERATION).is_err()
+    );
+    assert!(
+      parse_health_response(response.trim_end().as_bytes(), GENERATION)
+        .is_err()
+    );
+    assert!(
+      parse_health_response(
+        response.replace("200 OK", "503 Unavailable").as_bytes(),
+        GENERATION,
+      )
+      .is_err()
+    );
+    assert!(
+      parse_health_response(
+        response
+          .replace("ncproxy-health 42", "ncproxy-health -1")
+          .as_bytes(),
+        GENERATION,
+      )
+      .is_err()
+    );
+    assert!(
+      parse_health_response(
+        response
+          .replace("ncproxy-health", "some-other-server")
+          .as_bytes(),
+        GENERATION,
+      )
+      .is_err()
+    );
+  }
 
   static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
 
@@ -585,6 +1287,44 @@ mod tests {
     }
   }
 
+  #[test]
+  fn config_checks_isolate_the_pid_path_from_start_and_reload() {
+    const CONF: &str = "/var/lib/ncproxy/nginx.conf";
+    for (args, expected) in [
+      (&["-t"][..], vec!["-t", "-g", "pid /dev/null;", "-c", CONF]),
+      (&[][..], vec!["-g", "pid /run/nginx.pid;", "-c", CONF]),
+      (
+        &["-s", "reload"][..],
+        vec!["-s", "reload", "-g", "pid /run/nginx.pid;", "-c", CONF],
+      ),
+    ] {
+      let command = nginx_command(args, CONF);
+      let command = command.as_std();
+      assert_eq!(command.get_program(), "nginx");
+      let actual = command
+        .get_args()
+        .map(|arg| arg.to_str().unwrap())
+        .collect::<Vec<_>>();
+      assert_eq!(actual, expected);
+      if args.is_empty() {
+        let title = format!("nginx: master process nginx {}", actual.join(" "));
+        assert!(is_master_title(title.as_bytes(), CONF));
+      }
+    }
+    let rendered = CONF_TEMPLATE
+      .compile(&liquid::object!({
+        "nginx_dir": "/etc/nginx",
+        "state_dir": "/tmp/ncproxy",
+        "health_generation": GENERATION,
+      }))
+      .unwrap();
+    assert!(
+      !rendered
+        .lines()
+        .any(|line| line.trim_start().starts_with("pid "))
+    );
+  }
+
   #[ntex::test]
   async fn rejected_transaction_restores_all_previous_configs() {
     let test_dir = TestDir::new();
@@ -601,9 +1341,9 @@ mod tests {
       .write_conf_file("shared-upstream", "old upstream", &NginxRuleKind::Site)
       .await
       .unwrap();
-    let before = store.snapshot_config().await.unwrap();
+    let before = store.snapshot_config(&[]).await.unwrap();
 
-    let result = config_transaction(&store, || async {
+    let result = config_transaction(&store, &[], || async {
       store.replace_rule("rule", Some("new site"), None).await?;
       store
         .write_conf_file(
@@ -617,7 +1357,7 @@ mod tests {
     .await;
 
     assert!(result.is_err());
-    assert_eq!(store.snapshot_config().await.unwrap(), before);
+    assert_eq!(store.snapshot_config(&[]).await.unwrap(), before);
   }
 
   #[ntex::test]
@@ -633,13 +1373,13 @@ mod tests {
       .await
       .unwrap();
 
-    config_transaction(&store, || async {
+    config_transaction(&store, &[], || async {
       store.replace_rule("rule", Some("new site"), None).await
     })
     .await
     .unwrap();
 
-    let snapshot = store.snapshot_config().await.unwrap();
+    let snapshot = store.snapshot_config(&[]).await.unwrap();
     assert_eq!(snapshot.sites.get("rule.conf").unwrap(), "new site");
     assert!(!snapshot.streams.contains_key("rule.conf"));
     assert!(!test_dir.path().join("streams-enabled/rule.conf").exists());
@@ -654,7 +1394,7 @@ mod tests {
       .await
       .unwrap();
 
-    config_transaction(&store, || async {
+    config_transaction(&store, &[], || async {
       store.clear_config().await?;
       store
         .write_conf_file("live-rule", "committed", &NginxRuleKind::Site)
@@ -663,7 +1403,7 @@ mod tests {
     .await
     .unwrap();
 
-    let snapshot = store.snapshot_config().await.unwrap();
+    let snapshot = store.snapshot_config(&[]).await.unwrap();
     assert!(!snapshot.sites.contains_key("deleted-rule.conf"));
     assert_eq!(snapshot.sites.get("live-rule.conf").unwrap(), "committed");
   }

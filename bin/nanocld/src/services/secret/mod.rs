@@ -14,13 +14,45 @@ pub use inspect::*;
 pub use list::*;
 pub use patch::*;
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_secret);
-  config.service(create_secret);
-  config.service(inspect_secret);
-  config.service(delete_secret);
-  config.service(count_secret);
-  config.service(patch_secret);
+pub fn ntex_config(
+  config: &mut web::ServiceConfig<crate::models::SystemState>,
+) {
+  config.service(
+    web::resource("/secrets")
+      .name("list_secret")
+      .guard(web::guard::Get())
+      .to_with_state(list_secret),
+  );
+  config.service(
+    web::resource("/secrets")
+      .name("create_secret")
+      .guard(web::guard::Post())
+      .to_with_state(create_secret),
+  );
+  config.service(
+    web::resource("/secrets/{key}/inspect")
+      .name("inspect_secret")
+      .guard(web::guard::Get())
+      .to_with_state(inspect_secret),
+  );
+  config.service(
+    web::resource("/secrets/{key}")
+      .name("delete_secret")
+      .guard(web::guard::Delete())
+      .to_with_state(delete_secret),
+  );
+  config.service(
+    web::resource("/secrets/count")
+      .name("count_secret")
+      .guard(web::guard::Get())
+      .to_with_state(count_secret),
+  );
+  config.service(
+    web::resource("/secrets/{key}")
+      .name("patch_secret")
+      .guard(web::guard::Patch())
+      .to_with_state(patch_secret),
+  );
 }
 
 #[cfg(test)]

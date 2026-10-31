@@ -18,7 +18,7 @@ pub struct ContextArg {
 pub enum ContextCommand {
   /// List contexts
   #[clap(alias = "ls")]
-  List,
+  List(ContextListOpts),
   /// Set current context
   Use {
     /// Context name
@@ -29,6 +29,14 @@ pub enum ContextCommand {
     /// Path to context file
     path: String,
   },
+}
+
+/// Display options for locally stored contexts.
+#[derive(Default, Clone, Parser)]
+pub struct ContextListOpts {
+  /// Show context descriptions alongside endpoints
+  #[clap(long)]
+  pub wide: bool,
 }
 
 /// A context endpoint definition
@@ -105,6 +113,24 @@ impl From<Context> for ContextRow {
       description: context.meta_data.description,
       endpoint: endpoint.host.clone(),
       current: "⨯".into(),
+    }
+  }
+}
+
+/// The compact context table retains the endpoint and current selection.
+#[derive(Tabled)]
+pub struct ContextCompactRow {
+  name: String,
+  endpoint: String,
+  current: String,
+}
+
+impl From<ContextRow> for ContextCompactRow {
+  fn from(row: ContextRow) -> Self {
+    Self {
+      name: row.name,
+      endpoint: row.endpoint,
+      current: row.current,
     }
   }
 }

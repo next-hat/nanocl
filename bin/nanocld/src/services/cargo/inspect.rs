@@ -20,9 +20,9 @@ use crate::{
     (status = 200, description = "Cargo details", body = nanocl_stubs::cargo::CargoInspect),
   ),
 ))]
-#[web::get("/cargoes/{key}/inspect")]
 pub async fn inspect_cargo(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = utils::key::parse_resource_key(&path.1)?;

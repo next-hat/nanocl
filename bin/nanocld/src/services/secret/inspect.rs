@@ -20,9 +20,9 @@ use crate::{
     (status = 404, description = "Secret doesn't", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::get("/secrets/{key}/inspect")]
 pub async fn inspect_secret(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let secret =

@@ -72,6 +72,38 @@ impl RepositoryCountBy for MetricDb {
   }
 }
 
+fn capacity_node_filter(names: &[String]) -> GenericFilter {
+  GenericFilter::new()
+    .r#where("name", GenericClause::In(names.to_vec()))
+    .limit(names.len())
+}
+
+fn order_capacity_nodes(names: Vec<String>, nodes: Vec<NodeDb>) -> Vec<NodeDb> {
+  let mut by_name = nodes
+    .into_iter()
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<_, _>>();
+  names
+    .into_iter()
+    .filter_map(|name| by_name.remove(&name))
+    .collect()
+}
+
+async fn hydrate_capacity_nodes(
+  selected: Vec<MetricNodeDb>,
+  pool: &Pool,
+) -> IoResult<Vec<NodeDb>> {
+  if selected.is_empty() {
+    return Ok(Vec::new());
+  }
+  let names = selected
+    .into_iter()
+    .map(|node| node.node_name)
+    .collect::<Vec<_>>();
+  let nodes = NodeDb::read_by(&capacity_node_filter(&names), pool).await?;
+  Ok(order_capacity_nodes(names, nodes))
+}
+
 impl MetricDb {
   /// Select nodes using a balanced composite score between CPU and Memory pressure.
   /// Applies capacity filters (cpu cores, memory bytes) and utilization caps, and orders by score.
@@ -202,19 +234,7 @@ impl MetricDb {
     })
   .await
   .map_err(|err| IoError::interrupted("Select nodes for capacity balanced", &err.to_string()))??;
-    let names: Vec<String> =
-      node_names.iter().map(|x| x.node_name.clone()).collect();
-    let filter = GenericFilter::new()
-      .r#where("node_name", GenericClause::In(names.clone()));
-    let mut nodes = NodeDb::read_by(&filter, pool).await?;
-    use std::collections::HashMap;
-    let mut by_name: HashMap<String, NodeDb> =
-      nodes.drain(..).map(|n| (n.name.clone(), n)).collect();
-    let ordered = names
-      .into_iter()
-      .filter_map(|n| by_name.remove(&n))
-      .collect::<Vec<_>>();
-    Ok(ordered)
+    hydrate_capacity_nodes(node_names, pool).await
   }
   /// Select least-loaded nodes that can satisfy optional CPU (cores) and Memory (bytes) requirements.
   /// Uses latest metrics per node and performs filtering/sorting in SQL to avoid loading all nodes.
@@ -337,12 +357,187 @@ impl MetricDb {
     })
     .await
     .map_err(|err| IoError::interrupted("Select nodes for capacity", &err.to_string()))??;
-    let filter = GenericFilter::new().r#where(
-      "node_name",
-      GenericClause::In(
-        node_names.iter().map(|x| x.node_name.clone()).collect(),
-      ),
+    hydrate_capacity_nodes(node_names, pool).await
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn node(name: &str, created_at: chrono::NaiveDateTime) -> NodeDb {
+    NodeDb {
+      name: name.to_owned(),
+      created_at,
+      endpoint: "http://127.0.0.1:0".to_owned(),
+      version: crate::vars::VERSION.to_owned(),
+      metadata: None,
+    }
+  }
+
+  #[test]
+  fn capacity_hydration_uses_supported_name_and_complete_selection_limit() {
+    let names = (0..103).map(|i| format!("node-{i}")).collect::<Vec<_>>();
+    let filter = capacity_node_filter(&names);
+    assert_eq!(filter.limit, Some(103));
+    // Exercise the same Diesel macros and accepted column map as NodeDb reads.
+    let mut query = crate::schema::nodes::table.into_boxed();
+    query = gen_sql_query!(query, &filter, NodeDb::get_columns());
+    gen_sql_multiple!(query, &filter);
+    let sql = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    assert!(sql.contains("WHERE (nodes.name = ANY("), "{sql}");
+    assert!(sql.contains("LIMIT $2 OFFSET $3"), "{sql}");
+    assert!(sql.ends_with(", 103, 0]"), "{sql}");
+    let conditions = filter.r#where.unwrap().conditions;
+    assert_eq!(conditions.len(), 1);
+    assert!(NodeDb::get_columns().contains_key("name"));
+    assert!(
+      matches!(conditions.get("name"), Some(GenericClause::In(selected)) if selected == &names)
     );
-    NodeDb::read_by(&filter, pool).await
+  }
+
+  #[test]
+  fn capacity_hydration_preserves_ranking_and_never_substitutes_nodes() {
+    let now = chrono::Utc::now().naive_utc();
+    let selected = vec![
+      "older-low-load".to_owned(),
+      "missing".to_owned(),
+      "newer-high-load".to_owned(),
+    ];
+    let nodes = vec![
+      node("ineligible", now),
+      node("newer-high-load", now),
+      node("older-low-load", now - chrono::Duration::hours(1)),
+    ];
+    let ordered = order_capacity_nodes(selected, nodes);
+    assert_eq!(
+      ordered
+        .iter()
+        .map(|node| node.name.as_str())
+        .collect::<Vec<_>>(),
+      vec!["older-low-load", "newer-high-load"]
+    );
+    assert!(order_capacity_nodes(Vec::new(), ordered).is_empty());
+  }
+
+  // Database/daemon regression: compile locally, execute with CI infrastructure.
+  #[ntex::test]
+  async fn capacity_selection_hydrates_only_ranked_eligible_nodes_beyond_one_page()
+   {
+    use crate::repositories::operation::run_query_owned;
+    use crate::schema::nodes;
+
+    let system = crate::utils::tests::gen_default_test_system().await;
+    let pool = &system.state.inner.pool;
+    let group = format!("capacity-{}", uuid::Uuid::new_v4());
+    let now = chrono::Utc::now().naive_utc();
+    let mut expected = Vec::new();
+    let mut inserted = Vec::new();
+    // The lowest-load node is also oldest; an ineligible node is newest.
+    for index in 0..104 {
+      let name = format!("{group}-{index}");
+      let mut record =
+        node(&name, now - chrono::Duration::seconds(104 - index));
+      record.metadata = Some(serde_json::json!({
+        "capacity_test": if index < 103 { group.clone() } else { format!("{group}-ineligible") },
+      }));
+      NodeDb::create_from(record, pool).await.unwrap();
+      MetricDb::create_from(
+        MetricDb {
+          key: uuid::Uuid::new_v4(),
+          created_at: now,
+          expires_at: now + chrono::Duration::hours(1),
+          node_name: name.clone(),
+          kind: "nanocl.io/metrs".to_owned(),
+          note: None,
+          data: serde_json::json!({
+            "Cpus": [{"Usage": index as f64 / 200.0}],
+            "Memory": {"Total": 1000000, "Used": 1000},
+            "Disks": [{"AvailableSpace": 1000000}],
+          }),
+        },
+        pool,
+      )
+      .await
+      .unwrap();
+      inserted.push(name.clone());
+      if index < 103 {
+        expected.push(name);
+      }
+    }
+    let mut query = CapacityQuery {
+      cpu_cores_required: None,
+      mem_bytes_required: None,
+      storage_bytes_required: None,
+      cpu_utilization_cap: None,
+      mem_utilization_cap: None,
+      recency_seconds: Some(300),
+      limit: 103,
+      weights: None,
+      require_constraints_eq: vec![(
+        vec!["capacity_test".to_owned()],
+        group.clone(),
+      )],
+      require_constraints_ne: Vec::new(),
+    };
+    for balanced in [false, true] {
+      let selected = if balanced {
+        MetricDb::select_nodes_for_capacity_balanced(&query, pool).await
+      } else {
+        MetricDb::select_nodes_for_capacity(&query, pool).await
+      }
+      .unwrap();
+      assert_eq!(
+        selected
+          .into_iter()
+          .map(|node| node.name)
+          .collect::<Vec<_>>(),
+        expected
+      );
+    }
+    // A sole eligible old node must not disappear behind the newest 100 rows.
+    query.cpu_utilization_cap = Some(0.001);
+    for balanced in [false, true] {
+      let selected = if balanced {
+        MetricDb::select_nodes_for_capacity_balanced(&query, pool).await
+      } else {
+        MetricDb::select_nodes_for_capacity(&query, pool).await
+      }
+      .unwrap();
+      assert_eq!(
+        selected
+          .into_iter()
+          .map(|node| node.name)
+          .collect::<Vec<_>>(),
+        vec![expected[0].clone()]
+      );
+    }
+    query.require_constraints_eq[0].1 = format!("{group}-absent");
+    assert!(
+      MetricDb::select_nodes_for_capacity(&query, pool)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(
+      MetricDb::select_nodes_for_capacity_balanced(&query, pool)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    run_query_owned(pool, (), move |conn| {
+      diesel::delete(
+        metrics::table.filter(metrics::node_name.eq_any(&inserted)),
+      )
+      .execute(conn)
+      .map_err(MetricDb::map_err)?;
+      diesel::delete(nodes::table.filter(nodes::name.eq_any(inserted)))
+        .execute(conn)
+        .map_err(NodeDb::map_err)?;
+      Ok(())
+    })
+    .await
+    .unwrap();
+    system.state.wait_event_loop().await;
   }
 }

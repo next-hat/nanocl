@@ -145,6 +145,25 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
+  /// List a bounded page of resource revisions, newest first.
+  /// This uses the same pagination filter as other list endpoints.
+  pub async fn list_history_resource_page(
+    &self,
+    key: &str,
+    limit: usize,
+    offset: usize,
+  ) -> HttpClientResult<Vec<ResourceSpec>> {
+    let filter = GenericFilter::new().limit(limit).offset(offset);
+    let query = Self::convert_query(Some(&filter))?;
+    let res = self
+      .send_get(
+        &format!("{}/{key}/histories", Self::RESOURCE_PATH),
+        Some(query),
+      )
+      .await?;
+    Self::res_json(res).await
+  }
+
   /// Revert a resource to a previous version
   ///
   /// ## Example

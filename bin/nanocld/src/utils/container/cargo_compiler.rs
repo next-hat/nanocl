@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bollard_next::models::{EmptyObject, RestartPolicy, RestartPolicyNameEnum};
+use bollard_next::models::{RestartPolicy, RestartPolicyNameEnum};
 use nanocl_error::io::IoError;
 use nanocl_stubs::cargo_spec::{
   CARGO_CONTAINER_POSITION_LABEL, CargoNetworkMode, Config as DockerConfig,
@@ -387,7 +387,9 @@ pub(super) fn compile_container(
     host_config.port_bindings = Some(port_bindings.clone());
     let exposed_ports = config.exposed_ports.get_or_insert_default();
     for port in port_bindings.keys() {
-      exposed_ports.entry(port.clone()).or_default();
+      if !exposed_ports.contains(port) {
+        exposed_ports.push(port.clone());
+      }
     }
   }
   if input.role == CargoContainerRole::Application
@@ -452,13 +454,9 @@ pub(super) fn compile_sandbox(
     return Err(CargoCompilerError::InvalidSandboxImage);
   }
   let port_bindings = input.port_bindings.cloned();
-  let exposed_ports = input.port_bindings.map(|ports| {
-    ports
-      .keys()
-      .cloned()
-      .map(|port| (port, EmptyObject::default()))
-      .collect::<HashMap<_, _>>()
-  });
+  let exposed_ports = input
+    .port_bindings
+    .map(|ports| ports.keys().cloned().collect::<Vec<_>>());
   let labels = identity_labels(
     input.runtime,
     cargo_mode,
@@ -593,10 +591,6 @@ fn validate_shared_network_fields(
     (
       config.hostname.is_some(),
       "Container.Hostname is incompatible with a shared sandbox network namespace",
-    ),
-    (
-      config.mac_address.is_some(),
-      "Container.MacAddress is incompatible with a shared sandbox network namespace",
     ),
     (
       config.exposed_ports.is_some(),
@@ -832,7 +826,7 @@ fn replace_token_in_json(
 #[cfg(test)]
 mod tests {
   use bollard_next::models::{
-    DeviceMapping, HealthConfig, Mount, MountTypeEnum, PortBinding,
+    DeviceMapping, HealthConfig, Mount, MountType, PortBinding,
   };
   use nanocl_stubs::generic::ImagePullPolicy;
 
@@ -1144,10 +1138,7 @@ mod tests {
       retries: Some(3),
       ..Default::default()
     });
-    declared.container_config.exposed_ports = Some(HashMap::from([(
-      "9000/tcp".to_owned(),
-      EmptyObject::default(),
-    )]));
+    declared.container_config.exposed_ports = Some(vec!["9000/tcp".to_owned()]);
     declared.container_config.labels = Some(HashMap::from([(
       "example.owner".to_owned(),
       "user".to_owned(),
@@ -1161,7 +1152,7 @@ mod tests {
       mounts: Some(vec![Mount {
         target: Some("/data".to_owned()),
         source: Some("app-data".to_owned()),
-        typ: Some(MountTypeEnum::VOLUME),
+        typ: Some(MountType::VOLUME),
         read_only: Some(false),
         ..Default::default()
       }]),
@@ -1349,8 +1340,7 @@ mod tests {
 
   #[test]
   fn explicit_container_host_and_none_bypass_the_cargo_sandbox() {
-    let exposed_ports =
-      HashMap::from([("8080/tcp".to_owned(), EmptyObject::default())]);
+    let exposed_ports = vec!["8080/tcp".to_owned()];
     for override_mode in ["host", "none"] {
       let mut declared = minimal_spec();
       declared.container_config.exposed_ports = Some(exposed_ports.clone());
@@ -1395,10 +1385,6 @@ mod tests {
         "Container.Hostname is incompatible with a shared sandbox network namespace",
       ),
       (
-        "MacAddress",
-        "Container.MacAddress is incompatible with a shared sandbox network namespace",
-      ),
-      (
         "ExposedPorts",
         "Container.ExposedPorts is incompatible with a shared sandbox network namespace",
       ),
@@ -1428,15 +1414,9 @@ mod tests {
         "Hostname" => {
           declared.container_config.hostname = Some("app".to_owned())
         }
-        "MacAddress" => {
-          declared.container_config.mac_address =
-            Some("02:42:ac:11:00:02".to_owned());
-        }
         "ExposedPorts" => {
-          declared.container_config.exposed_ports = Some(HashMap::from([(
-            "8080/tcp".to_owned(),
-            EmptyObject::default(),
-          )]));
+          declared.container_config.exposed_ports =
+            Some(vec!["8080/tcp".to_owned()]);
         }
         _ => {
           let host = declared
@@ -1507,8 +1487,6 @@ mod tests {
     let cargo_mode = CargoNetworkMode::new("host").unwrap();
     let mut declared = minimal_spec();
     declared.container_config.hostname = Some("app".to_owned());
-    declared.container_config.mac_address =
-      Some("02:42:ac:11:00:02".to_owned());
     declared.container_config.host_config = Some(HostConfig {
       dns: Some(vec!["1.1.1.1".to_owned()]),
       dns_options: Some(vec!["ndots:1".to_owned()]),
@@ -1521,7 +1499,6 @@ mod tests {
       .unwrap()
       .config;
     assert_eq!(compiled.hostname, declared.container_config.hostname);
-    assert_eq!(compiled.mac_address, declared.container_config.mac_address);
     let host = compiled.host_config.unwrap();
     let declared_host = declared.container_config.host_config.unwrap();
     assert_eq!(host.dns, declared_host.dns);
@@ -1576,8 +1553,7 @@ mod tests {
 
     let cargo_mode = CargoNetworkMode::new("custom-network").unwrap();
     for override_mode in ["host", "none"] {
-      let authored_exposed_ports =
-        HashMap::from([("9000/tcp".to_owned(), EmptyObject::default())]);
+      let authored_exposed_ports = vec!["9000/tcp".to_owned()];
       let mut declared = minimal_spec();
       declared.container_config.exposed_ports =
         Some(authored_exposed_ports.clone());
@@ -1644,7 +1620,7 @@ mod tests {
   fn direct_application_owns_cargo_ports_and_unions_exposed_ports() {
     let ports = real_port_map();
     let authored_exposed_ports =
-      HashMap::from([("9000/tcp".to_owned(), EmptyObject::default())]);
+      vec!["9000/tcp".to_owned(), "8080/tcp".to_owned()];
     let mut declared = minimal_spec();
     declared.container_config.exposed_ports =
       Some(authored_exposed_ports.clone());
@@ -1666,11 +1642,12 @@ mod tests {
     );
     let exposed_ports = compiled.exposed_ports.unwrap();
     assert_eq!(exposed_ports.len(), 3);
-    assert!(exposed_ports.contains_key("8080/tcp"));
-    assert!(exposed_ports.contains_key("8443/tcp"));
-    assert_eq!(
-      exposed_ports.get("9000/tcp"),
-      authored_exposed_ports.get("9000/tcp")
+    assert!(exposed_ports.contains(&"8080/tcp".to_owned()));
+    assert!(exposed_ports.contains(&"8443/tcp".to_owned()));
+    assert!(
+      authored_exposed_ports
+        .iter()
+        .all(|port| exposed_ports.contains(port))
     );
   }
 
@@ -1696,8 +1673,8 @@ mod tests {
     );
     let exposed = config.exposed_ports.unwrap();
     assert_eq!(exposed.len(), 2);
-    assert!(exposed.contains_key("8080/tcp"));
-    assert!(exposed.contains_key("8443/tcp"));
+    assert!(exposed.contains(&"8080/tcp".to_owned()));
+    assert!(exposed.contains(&"8443/tcp".to_owned()));
     assert_eq!(
       config.host_config.unwrap().port_bindings.unwrap()["8080/tcp"]
         .as_ref()
@@ -1913,7 +1890,7 @@ mod tests {
       mounts: Some(vec![Mount {
         source: Some(format!("volume-{token}")),
         target: Some(format!("/target/{token}")),
-        typ: Some(MountTypeEnum::VOLUME),
+        typ: Some(MountType::VOLUME),
         ..Default::default()
       }]),
       storage_opt: Some(HashMap::from([(

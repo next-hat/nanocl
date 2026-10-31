@@ -21,9 +21,9 @@ use crate::{
     (status = 409, description = "Secret already exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::post("/secrets")]
 pub async fn create_secret(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
   utils::key::ensure_kind(&payload.kind)?;

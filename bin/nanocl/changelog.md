@@ -15,11 +15,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nanocl state status` to show running process counts, actual and wanted state,
   health, and recent failures for Statefile cargoes, VMs, jobs, and resources,
   with `--watch` for automatic refreshes.
+- `nanocl state stats` to show CPU and memory usage, network and block I/O,
+  and PID counts for Statefile cargoes, VMs, and jobs, including recursive
+  SubStates, streaming by default or using `--no-stream` for a single snapshot.
+- `nanocl state start` to start Statefile cargoes, VMs, and jobs, including
+  recursive SubStates, with the same per-item progress and summaries as
+  apply/remove and `--json` NDJSON output requiring `--yes`.
+- `nanocl state stop` to stop Statefile cargoes, VMs, and jobs, including
+  recursive SubStates, with the same per-item progress and summaries as
+  apply/remove and `--json` NDJSON output requiring `--yes`.
 - Shell completion for Bash, Zsh, Fish, PowerShell, and Elvish, including
   commands, options, local paths, contexts, and live daemon objects.
 
 ### Changed
 
+- Keep the full interactive Statefile preview and show a concise source,
+  group, object and image summary with `state apply -y`. Add plain-log phase
+  and waiting updates, passive Cargo rollout observations, and best-effort
+  post-apply revision, health and image-ID snapshots, including JSON records.
+- Migrate the networking stack to ntex 4.2 and require Rust 1.99.0 for builds.
+- Refresh Rust dependencies to their latest compatible stable releases.
+- Align `nanocl install` and `nanocl uninstall` with Statefile apply/remove
+  output, including per-item progress, elapsed times, operation summaries,
+  install image download progress, and `--json` NDJSON output for automation.
 - Improve `nanocl state apply` and `nanocl state remove` output with per-item
   progress and operation summaries, including image download progress during
   apply. Add `--json` NDJSON output for automation, requiring `--yes`;
@@ -27,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show a compact `nanocl ps` table with shorter image names and relative ages
   by default. Add `--wide` for node names, full image references, and exact
   creation timestamps.
+- Extend compact tables with relative ages to cargo, VM, job, namespace, node,
+  resource, secret, event, and metric list commands. Add `--wide` to restore
+  exact timestamps and additional columns, including node endpoints, VM spec
+  versions, and event/metric node names. Preserve full identifiers, status and
+  instance counts, and keys-only output with `--quiet`.
+- Show compact context lists with names, endpoints, and the current selection;
+  use `--wide` to include descriptions.
 
 ### Fixed
 

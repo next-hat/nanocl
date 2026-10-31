@@ -364,9 +364,7 @@ mod tests {
   };
 
   use super::super::{
-    readiness::{
-      requires_steady_state_readiness, restart_required_slots_ready,
-    },
+    readiness::{required_slots_ready, requires_steady_state_readiness},
     tests::{declared_container, readiness_process},
   };
   use super::*;
@@ -795,12 +793,12 @@ mod tests {
   }
 
   #[test]
-  fn cargo_restart_rechecks_the_complete_required_set_before_success() {
-    let (cargo, replicas, mappings, processes) = restart_fixture(1);
+  fn cargo_start_and_restart_recheck_all_replicas_before_success() {
+    let (cargo, replicas, mappings, processes) = restart_fixture(2);
     let mut plan =
       plan_cargo_restart(&cargo, &replicas, &mappings, &processes, "node-a")
         .unwrap();
-    assert!(restart_required_slots_ready(&plan.slots));
+    assert!(required_slots_ready(&plan.slots));
 
     let metrics = plan
       .slots
@@ -819,12 +817,15 @@ mod tests {
       .as_mut()
       .unwrap()
       .running = Some(false);
-    assert!(restart_required_slots_ready(&plan.slots));
+    assert!(required_slots_ready(&plan.slots));
 
     let worker = plan
       .slots
       .iter()
-      .find(|slot| slot.container_name == "worker")
+      .find(|slot| {
+        slot.container_name == "worker"
+          && slot.mapping.replica_key == replicas[0].key
+      })
       .map(|slot| slot.process.key.clone())
       .unwrap();
     let set_running = |plan: &mut CargoRestartPlan, running| {
@@ -840,8 +841,21 @@ mod tests {
         .unwrap()
         .running = Some(running);
     };
+    // A replica can exit after it was ready while another replica starts.
     set_running(&mut plan, false);
-    assert!(!restart_required_slots_ready(&plan.slots));
+    // Fixture order differs from the sorted runtime plan; match by identity.
+    let second_replica = plan
+      .slots
+      .iter()
+      .filter(|slot| slot.mapping.replica_key == replicas[1].key)
+      .collect::<Vec<_>>();
+    assert!(!second_replica.is_empty());
+    assert!(
+      second_replica
+        .iter()
+        .all(|slot| required_slots_ready(std::slice::from_ref(*slot)))
+    );
+    assert!(!required_slots_ready(&plan.slots));
 
     set_running(&mut plan, true);
     let sandbox = plan
@@ -850,6 +864,6 @@ mod tests {
       .find(|slot| slot.role == CargoReplicaProcessRole::Sandbox)
       .unwrap();
     sandbox.process.data.state.as_mut().unwrap().running = Some(false);
-    assert!(!restart_required_slots_ready(&plan.slots));
+    assert!(!required_slots_ready(&plan.slots));
   }
 }

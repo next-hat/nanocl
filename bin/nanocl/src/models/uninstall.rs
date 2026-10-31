@@ -12,4 +12,7 @@ pub struct UninstallOpts {
   /// Specify if the docker host is docker desktop detected if docker context is desktop-linux
   #[clap(long = "docker-desktop")]
   pub(crate) is_docker_desktop: bool,
+  /// Stream newline-delimited JSON to stdout
+  #[clap(long)]
+  pub(crate) json: bool,
 }

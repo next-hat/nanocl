@@ -10,7 +10,7 @@ use crate::{
   utils::nginx,
 };
 
-use super::{event, metric};
+use super::event;
 
 pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   #[cfg(any(feature = "dev", feature = "test"))]
@@ -39,6 +39,5 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   }
   nginx::spawn(&state);
   event::spawn(&state);
-  metric::spawn(&state);
   Ok(state)
 }

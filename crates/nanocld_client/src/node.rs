@@ -1,6 +1,9 @@
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::node::{DeleteNodeCargoParams, Node, StartNodeCargoParams};
+use nanocl_stubs::node::{
+  DeleteNodeCargoOperationParams, DeleteNodeCargoParams, Node,
+  StartNodeCargoOperationParams, StartNodeCargoParams,
+};
 
 use super::http_client::NanocldClient;
 
@@ -24,7 +27,29 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Start cargo instances on a node
+  /// Execute an accepted Cargo start on an operation-aware node. Never fall
+  /// back to the legacy endpoint, which cannot validate operation ownership.
+  pub async fn start_node_cargo_operation(
+    &self,
+    params: &StartNodeCargoOperationParams,
+  ) -> HttpClientResult<()> {
+    let path = format!("{}/cargoes/operations/start", Self::NODE_PATH);
+    self.send_post(&path, Some(params), None::<String>).await?;
+    Ok(())
+  }
+
+  /// Delete only the accepted Cargo incarnation on an operation-aware node.
+  pub async fn delete_node_cargo_operation(
+    &self,
+    params: &DeleteNodeCargoOperationParams,
+  ) -> HttpClientResult<()> {
+    let path = format!("{}/cargoes/operations", Self::NODE_PATH);
+    self.send_delete(&path, Some(params)).await?;
+    Ok(())
+  }
+
+  /// Legacy unfenced node request. Operation-aware daemons reject this route;
+  /// use `start_node_cargo_operation` for coordinator-accepted execution.
   ///
   /// ## Arguments
   ///
@@ -56,7 +81,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// Delete cargo instances on a node
+  /// Legacy unfenced node request. Operation-aware daemons reject this route;
+  /// use `delete_node_cargo_operation` for coordinator-accepted deletion.
   ///
   /// ## Arguments
   ///
@@ -94,29 +120,35 @@ mod tests {
 
   use nanocl_stubs::node::CargoReplicaTask;
 
-  use crate::ConnectOpts;
+  use crate::{ConnectOpts, NANOCLD_DEFAULT_VERSION};
 
   use super::*;
 
   async fn record_start_node_cargo(
-    recorder: web::types::State<Arc<Mutex<Option<Value>>>>,
+    req: web::HttpRequest,
     body: web::types::Json<Value>,
   ) -> web::HttpResponse {
+    let recorder = req.app_state::<Arc<Mutex<Option<Value>>>>().unwrap();
     *recorder.lock().unwrap() = Some(body.into_inner());
-    web::HttpResponse::Ok().finish()
+    web::HttpResponse::Ok().into()
   }
 
   #[ntex::test]
   async fn start_node_cargo_posts_the_exact_replica_vector_as_json() {
     let recorded = Arc::new(Mutex::new(None::<Value>));
     let server_recorded = recorded.clone();
-    let server = web::test::server(async move || {
-      web::App::new().state(server_recorded.clone()).service(
-        web::resource("/v0.18.0/nodes/cargoes/start")
+    let server = web::test::server(async move |_| {
+      web::App::new()
+        .with_config(
+          web::WebAppConfig::new().set_state(server_recorded.clone()),
+        )
+        .service(
+          web::resource(format!(
+            "/v{NANOCLD_DEFAULT_VERSION}/nodes/cargoes/start"
+          ))
           .route(web::post().to(record_start_node_cargo)),
-      )
-    })
-    .await;
+        )
+    });
     let client = NanocldClient::connect_to(&ConnectOpts {
       url: format!("http://localhost:{}", server.addr().port()),
       ..Default::default()

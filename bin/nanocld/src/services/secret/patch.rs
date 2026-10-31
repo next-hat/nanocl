@@ -22,9 +22,9 @@ use crate::{
     (status = 404, description = "Secret does't exist", body = crate::services::openapi::ApiError),
   ),
 ))]
-#[web::patch("/secrets/{key}")]
 pub async fn patch_secret(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {

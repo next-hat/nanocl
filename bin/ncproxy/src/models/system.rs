@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+  Arc,
+  atomic::{AtomicU64, Ordering},
+};
 
 use futures::{SinkExt, StreamExt, channel::mpsc, lock::Mutex};
 use ntex::rt;
@@ -31,7 +34,8 @@ pub enum SystemEventKind {
 struct SystemEventInner {
   state_dir: String,
   config_lock: Arc<Mutex<()>>,
-  task: ntex::rt::JoinHandle<IoResult<()>>,
+  task: Option<ntex::rt::JoinHandle<IoResult<()>>>,
+  requested: Arc<AtomicU64>,
 }
 
 pub struct SystemEvent(SystemEventInner);
@@ -41,29 +45,39 @@ impl SystemEvent {
     Self(SystemEventInner {
       state_dir: state_dir.to_owned(),
       config_lock,
-      task: rt::spawn(async move { Ok::<_, IoError>(()) }),
+      task: None,
+      requested: Arc::new(AtomicU64::new(0)),
     })
   }
 
   pub fn handle(&mut self, _e: SystemEventKind) {
-    if !self.0.task.is_finished() {
-      log::info!("system: canceling reload task");
-      let task = std::mem::replace(
-        &mut self.0.task,
-        rt::spawn(async move { Ok::<_, IoError>(()) }),
-      );
-      task.cancel();
+    self.0.requested.fetch_add(1, Ordering::Relaxed);
+    if self.0.task.as_ref().is_some_and(|task| !task.is_finished()) {
+      return;
     }
     let state_dir = self.0.state_dir.clone();
     let config_lock = Arc::clone(&self.0.config_lock);
-    self.0.task = rt::spawn(async move {
-      ntex::time::sleep(std::time::Duration::from_millis(750)).await;
-      let _guard = config_lock.lock().await;
-      if let Err(err) = utils::nginx::reload(&state_dir).await {
-        log::warn!("system: {err}");
+    let requested = Arc::clone(&self.0.requested);
+    self.0.task = Some(rt::spawn(async move {
+      loop {
+        let revision = requested.load(Ordering::Relaxed);
+        ntex::time::sleep(std::time::Duration::from_millis(750)).await;
+        if requested.load(Ordering::Relaxed) != revision {
+          continue;
+        }
+        {
+          let _guard = config_lock.lock().await;
+          // Once work starts, keep its lock until the bounded reload ends.
+          // Later events request a follow-up instead of cancelling a reload.
+          if let Err(err) = utils::nginx::reload(&state_dir).await {
+            log::warn!("system: {err}");
+          }
+        }
+        if requested.load(Ordering::Relaxed) == revision {
+          return Ok::<_, IoError>(());
+        }
       }
-      Ok::<_, IoError>(())
-    });
+    }));
   }
 }
 
@@ -95,5 +109,29 @@ impl EventEmitter {
 
   pub async fn emit_reload(&self) {
     self.emit(SystemEventKind::Reload).await;
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[ntex::test]
+  async fn reload_events_preserve_an_active_task_and_record_follow_up() {
+    let mut event = SystemEvent::new("unused", Arc::new(Mutex::new(())));
+    assert!(event.0.task.is_none());
+    let (release, wait) = futures::channel::oneshot::channel::<()>();
+    let (finished, completion) = futures::channel::oneshot::channel::<()>();
+    event.0.task = Some(rt::spawn(async move {
+      wait.await.unwrap();
+      finished.send(()).unwrap();
+      Ok(())
+    }));
+    event.handle(SystemEventKind::Reload);
+    event.handle(SystemEventKind::Reload);
+    assert_eq!(event.0.requested.load(Ordering::Relaxed), 2);
+    release.send(()).unwrap();
+    // Cancelling the active task would drop its sender and fail this await.
+    completion.await.unwrap();
   }
 }

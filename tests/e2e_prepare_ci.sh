@@ -216,6 +216,41 @@ if [ "$dns_ready" -ne 1 ]; then
   exit 1
 fi
 
+# Capacity placement requires a persisted sample, not only listening sockets.
+# metrsd publishes periodically and does not replay a sample on subscription.
+metrics_ready=0
+metrics_since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+metrics_filter="$(printf '{"where":{"kind":{"eq":"nanocl.io/metrs"},"node_name":{"eq":"%s"},"created_at":{"ge":"%s"}}}' "$(hostname)" "$metrics_since")"
+metrics_count_pattern='^[[:space:]]*\{[[:space:]]*"Count"[[:space:]]*:[[:space:]]*([0-9]+)[[:space:]]*\}[[:space:]]*$'
+p=0
+while [ "$p" -lt 60 ]; do
+  metrics_response="$(curl --fail --silent --max-time 5 \
+    --unix-socket /run/nanocl/nanocl.sock --get \
+    --data-urlencode "filter=$metrics_filter" \
+    http://localhost/v0.0/metrics/count 2>/dev/null || true)"
+  if [[ "$metrics_response" =~ $metrics_count_pattern ]] \
+    && [ "${BASH_REMATCH[1]}" -gt 0 ]; then
+    echo "readiness: local capacity metrics persisted (ready)"
+    metrics_ready=1
+    break
+  fi
+
+  if [ $((p % 10)) -eq 0 ]; then
+    echo "readiness: waiting for a fresh local capacity metric"
+  fi
+  if ! system_app_id nmetrics >/dev/null; then
+    echo "system.nmetrics application container exited unexpectedly" >&2
+    exit 1
+  fi
+  p=$((p + 1))
+  sleep 1
+done
+
+if [ "$metrics_ready" -ne 1 ]; then
+  echo "No fresh local capacity metric was persisted before E2E" >&2
+  exit 1
+fi
+
 # GitHub Actions starts each `run` block from its long-lived runner process,
 # whose supplementary groups are not refreshed by usermod. Preserve the
 # intended nanocl-group check above, then grant only the runner user access for

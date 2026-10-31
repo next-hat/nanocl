@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: ["nightly"]
   workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      runner:
+        description: Host image for the compatibility probe
+        type: string
+        default: ubuntu-24.04
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/nightly' }}
 
 env:
@@ -18,22 +24,62 @@ jobs:
   ubuntu_test:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    # Keep normal CI stable until the 26.04 migration is validated.
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 90
 
     steps:
       # Clone project
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          # The explicit rust-cache step below separates host images.
+          cache: false
+      # NanoCL mounts the runner socket, so upgrade that daemon before Buildx.
+      - name: Set up Docker Engine
+        env:
+          DOCKER_ENGINE_VERSION: "29.9.2"
+        run: |
+          # Configure the signed apt source explicitly on hosted runners.
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          . /etc/os-release
+          sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}
+          Components: stable
+          Architectures: $(dpkg --print-architecture)
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          package_version="$(apt-cache madison docker-ce | awk -v version="$DOCKER_ENGINE_VERSION" 'index($3, "5:" version "-") == 1 && !found {print $3; found = 1}')"
+          test -n "$package_version" || { echo "Docker Engine $DOCKER_ENGINE_VERSION is unavailable in the runner's apt repository" >&2; exit 1; }
+          sudo apt-get install --yes --no-install-recommends \
+            "docker-ce=$package_version" "docker-ce-cli=$package_version" containerd.io
+          sudo systemctl restart docker
+          test "$(docker --host unix:///var/run/docker.sock version --format '{{.Server.Version}}')" = "$DOCKER_ENGINE_VERSION"
+          curl --fail --silent --show-error --output /dev/null --unix-socket /var/run/docker.sock http://localhost/v1.53/info
       # Install buildx
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v4
+      - name: Runner diagnostics
+        run: |
+          cat /etc/os-release
+          uname -r
+          printf 'Runner image: %s (%s)\n' "$ImageOS" "$ImageVersion"
+          docker version
+          docker buildx version
+          docker compose version
+          ls -ld /run/nanocl /dev/kvm 2>/dev/null || true
       # Set buildx cache
       - name: Cache register
         uses: actions/cache@v6
         with:
           path: ~/buildx-cache
-          key: buildx-cache
+          key: buildx-${{ inputs.runner || 'ubuntu-24.04' }}-tests-${{ hashFiles('scripts/dev.Dockerfile', 'bin/**/Dockerfile') }}
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
       # Debug ci with ngrok and ssh
@@ -66,7 +112,7 @@ jobs:
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ hashFiles('./Cargo.lock') }}
+          key: ${{ inputs.runner || 'ubuntu-24.04' }}-${{ hashFiles('./Cargo.lock') }}
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
@@ -78,7 +124,7 @@ jobs:
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v24.3.8
           docker pull ghcr.io/next-hat/metrsd:0.5.4
-          docker pull ghcr.io/next-hat/nanocl-qemu:8.0.2.0
+          docker pull ghcr.io/next-hat/nanocl-qemu:8.0.5.0-nightly
           docker pull ghcr.io/next-hat/nanocl-get-started:latest
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ghcr.io/next-hat/nanocl-dev:dev -f ./scripts/dev.Dockerfile .
           docker compose -f ./tests/docker-compose.yaml up -d
@@ -95,6 +141,7 @@ jobs:
         run: cargo make covgenci
       # Upload it to codecov
       - name: Codecov
+        if: ${{ inputs.runner != 'ubuntu-26.04' }}
         uses: codecov/codecov-action@v7.1.1
         with:
           token: ${{ secrets.CODECOV }}

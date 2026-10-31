@@ -4,32 +4,36 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_utils::ntex::middlewares;
 use nanocld_client::NanocldClient;
 
-use crate::dnsmasq::Dnsmasq;
 use crate::services;
+use crate::{dnsmasq::Dnsmasq, models::SystemState};
 
 pub fn generate(
   host: &str,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<ntex::server::Server> {
-  let dnsmasq = dnsmasq.clone();
-  let client = client.clone();
-  let mut server = web::HttpServer::new(async move || {
-    web::App::new()
-      .state(dnsmasq.clone())
-      .state(client.clone())
-      .middleware(middlewares::SerializeError)
-      .configure(services::ntex_config)
-      .default_service(web::route().to(services::unhandled))
-  });
+  let state = SystemState {
+    dnsmasq: dnsmasq.clone(),
+    client: client.clone(),
+  };
+  let mut server = web::server_with_config(
+    async move || Ok::<_, std::io::Error>(state.clone()),
+    async |_| {
+      web::App::<SystemState>::new()
+        .with_config(services::app_config())
+        .middleware(middlewares::SerializeError)
+        .configure(services::ntex_config)
+        .default_service(web::route().to(services::unhandled))
+    },
+  );
   match host {
     host if host.starts_with("unix://") => {
       let path = host.trim_start_matches("unix://");
-      server = server.bind_uds(path)?;
+      server = server.bind_uds(path, ntex::SharedCfg::default())?;
     }
     host if host.starts_with("tcp://") => {
       let host = host.trim_start_matches("tcp://");
-      server = server.bind(host)?;
+      server = server.bind(host, ntex::SharedCfg::default())?;
     }
     _ => {
       return Err(IoError::invalid_data(
@@ -40,7 +44,7 @@ pub fn generate(
   }
   #[cfg(feature = "dev")]
   {
-    server = server.bind("0.0.0.0:8787")?;
+    server = server.bind("0.0.0.0:8787", ntex::SharedCfg::default())?;
     log::debug!("server::gen: dev mode http://0.0.0.0:8787");
     log::debug!("server::gen: swagger http://0.0.0.0:8787/explorer/");
   }

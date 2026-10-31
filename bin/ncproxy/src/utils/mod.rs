@@ -5,10 +5,19 @@ pub mod server;
 
 #[cfg(test)]
 pub(crate) mod tests {
-  use std::sync::Arc;
+  use std::{
+    path::PathBuf,
+    sync::{
+      Arc,
+      atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+  };
 
-  use bollard_next::container::Config;
-  use nanocl_error::io::{FromIo, IoResult};
+  use futures::StreamExt;
+
+  use bollard_next::models::ContainerCreateBody as Config;
+  use nanocl_error::io::{FromIo, IoError, IoResult};
   pub use nanocl_utils::ntex::test_client::*;
 
   use nanocld_client::{
@@ -18,10 +27,28 @@ pub(crate) mod tests {
       cargo_spec::{CargoSpec, ContainerSpec},
       generic::ImagePullPolicy,
       proxy::ResourceProxyRule,
+      system::{EventActorKind, EventKind, NativeEventAction},
     },
   };
 
-  use crate::{services, vars};
+  use crate::{
+    models::{EventEmitter, Store, SystemEventKind, SystemState},
+    services, vars,
+  };
+
+  static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
+
+  pub struct TestConfig {
+    pub state_dir: PathBuf,
+    // Keep handler reload notifications local without starting a supervisor.
+    _reload_events: futures::channel::mpsc::UnboundedReceiver<SystemEventKind>,
+  }
+
+  impl Drop for TestConfig {
+    fn drop(&mut self) {
+      let _ = std::fs::remove_dir_all(&self.state_dir);
+    }
+  }
 
   pub fn before() {
     // Set test env to true to setup test logger
@@ -56,8 +83,8 @@ pub(crate) mod tests {
       };
       client.create_cargo(&cargo, None).await?;
     }
-    client.start_process("cargo", CARGO_KEY).await?;
-    Ok(())
+    complete_test_cargo_action(&client, CARGO_KEY, NativeEventAction::Start)
+      .await
   }
 
   pub async fn clean_test_cargo() -> IoResult<()> {
@@ -69,10 +96,81 @@ pub(crate) mod tests {
     if client.inspect_cargo(CARGO_KEY).await.is_err() {
       return Ok(());
     }
-    client
-      .delete_cargo(CARGO_KEY, Some(&CargoDeleteQuery { force: Some(true) }))
-      .await?;
-    Ok(())
+    complete_test_cargo_action(&client, CARGO_KEY, NativeEventAction::Destroy)
+      .await
+  }
+
+  // Accepted lifecycle requests still hold their lease. Subscribe first and
+  // wait for the exact operation before another test reuses the shared Cargo.
+  async fn complete_test_cargo_action(
+    client: &NanocldClient,
+    key: &str,
+    action: NativeEventAction,
+  ) -> IoResult<()> {
+    ntex::time::timeout(Duration::from_secs(360), async {
+      // Name-only conditions can close on a preceding operation's event.
+      let mut events = client.watch_events(None).await?;
+      let operation = match action {
+        NativeEventAction::Start => {
+          client.start_process_operation("cargo", key).await?
+        }
+        NativeEventAction::Destroy => Some(
+          client
+            .delete_process_operation(
+              "cargo",
+              key,
+              Some(CargoDeleteQuery { force: Some(true) }),
+            )
+            .await?,
+        ),
+        _ => unreachable!("only test Cargo start and deletion are supported"),
+      };
+      let Some(operation) = operation else {
+        // An authoritative unchanged start has no completion event.
+        return Ok(());
+      };
+      let operation = operation.to_string();
+      while let Some(event) = events.next().await {
+        let event = event?;
+        if !event.actor.as_ref().is_some_and(|actor| {
+          actor.key.as_deref() == Some(key)
+            && actor.kind == EventActorKind::Cargo
+        }) || event
+          .metadata
+          .as_ref()
+          .and_then(|metadata| metadata.get("Operation"))
+          .and_then(serde_json::Value::as_str)
+          != Some(operation.as_str())
+        {
+          continue;
+        }
+        if event.kind == EventKind::Error || event.reason == "operation_pending"
+        {
+          return Err(IoError::interrupted(
+            "Test Cargo",
+            event
+              .note
+              .as_deref()
+              .unwrap_or("Cargo operation did not complete"),
+          ));
+        }
+        if event.kind == EventKind::Normal && event.action == action.to_string()
+        {
+          return Ok(());
+        }
+      }
+      Err(IoError::interrupted(
+        "Test Cargo",
+        "Event stream ended before Cargo completion",
+      ))
+    })
+    .await
+    .map_err(|_| {
+      IoError::interrupted(
+        "Test Cargo",
+        "Timed out waiting for Cargo completion",
+      )
+    })?
   }
 
   pub fn read_rule(path: &str) -> IoResult<ResourceProxyRule> {
@@ -84,21 +182,38 @@ pub(crate) mod tests {
     Ok(rule)
   }
 
-  pub async fn gen_default_test_client() -> TestClient {
+  pub async fn gen_default_test_client() -> (TestClient, TestConfig) {
     before();
-    let home = std::env::var("HOME").unwrap();
-    let options = crate::cli::Cli {
-      state_dir: format!("{home}/.nanocl_dev/state/proxy"),
-      nginx_dir: "/etc/nginx".to_owned(),
+    let id = NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed);
+    let state_dir = std::env::temp_dir()
+      .join(format!("ncproxy-http-test-{}-{id}", std::process::id()));
+    std::fs::create_dir(&state_dir).unwrap();
+    let (sender, reload_events) = futures::channel::mpsc::unbounded();
+    let config = TestConfig {
+      state_dir,
+      _reload_events: reload_events,
     };
-    let system_state = crate::subsystem::init(&options).await.unwrap();
+    // Direct handler rules are not persisted Resources. A daemon event loop
+    // would reconcile them away, and CI's live proxy owns its own directory.
+    let system_state = Arc::new(SystemState {
+      client: NanocldClient::connect_to(&ConnectOpts {
+        url: "http://nanocl.internal:8585".into(),
+        ..Default::default()
+      })
+      .unwrap(),
+      event_emitter: EventEmitter(Arc::new(sender)),
+      store: Store::new(config.state_dir.to_str().unwrap()),
+      nginx_dir: "/etc/nginx".to_owned(),
+      config_lock: Arc::new(futures::lock::Mutex::new(())),
+    });
+    super::nginx::ensure_conf(&system_state).await.unwrap();
     // Create test server
-    let srv = ntex::web::test::server(async move || {
+    let srv = ntex::web::test::server(async move |_| {
       ntex::web::App::new()
-        .state(Arc::clone(&system_state))
+        .with_config(services::app_config())
         .configure(services::ntex_config)
-    })
-    .await;
-    TestClient::new(srv, vars::VERSION)
+        .build_with(ntex::web::AppState::new(Arc::clone(&system_state)))
+    });
+    (TestClient::new(srv, vars::VERSION), config)
   }
 }

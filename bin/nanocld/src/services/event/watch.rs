@@ -15,9 +15,9 @@ use crate::models::SystemState;
     (status = 200, description = "Event stream", body = String, content_type = "text/event-stream"),
   ),
 ))]
-#[web::post("/events/watch")]
 pub async fn watch_event(
-  state: web::types::State<SystemState>,
+  state: &SystemState,
+  _request_state: (),
   condition: Option<web::types::Json<Vec<EventCondition>>>,
 ) -> HttpResult<web::HttpResponse> {
   let stream = state

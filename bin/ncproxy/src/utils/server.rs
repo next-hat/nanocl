@@ -10,18 +10,24 @@ use crate::{models::SystemStateRef, services};
 
 pub fn generate(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
   let state = Arc::clone(state);
-  let mut server = web::HttpServer::new(async move || {
-    web::App::new()
-      .state(Arc::clone(&state))
-      .middleware(middlewares::SerializeError)
-      .configure(services::ntex_config)
-      .default_service(web::route().to(services::unhandled))
-  });
+  let mut server = web::server_with_config(
+    async move || {
+      Ok::<_, std::io::Error>(web::AppState::new(Arc::clone(&state)))
+    },
+    async |_| {
+      web::App::<web::AppState<SystemStateRef>>::new()
+        .with_config(services::app_config())
+        .middleware(middlewares::SerializeError)
+        .configure(services::ntex_config)
+        .default_service(web::route().to(services::unhandled))
+    },
+  );
   std::fs::create_dir_all("/run/nanocl")?;
-  server = server.bind_uds("/run/nanocl/proxy.sock")?;
+  server =
+    server.bind_uds("/run/nanocl/proxy.sock", ntex::SharedCfg::default())?;
   #[cfg(feature = "dev")]
   {
-    server = server.bind("0.0.0.0:8686")?;
+    server = server.bind("0.0.0.0:8686", ntex::SharedCfg::default())?;
     log::debug!("server::gen: dev mode http://0.0.0.0:8686");
     log::debug!("server::gen: swagger http://0.0.0.0:8686/explorer/");
   }

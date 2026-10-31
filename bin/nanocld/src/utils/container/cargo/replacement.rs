@@ -1,3 +1,4 @@
+use bollard_next::models::ContainerInspectResponse;
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::cargo::Cargo;
 
@@ -59,15 +60,135 @@ pub(super) fn requires_stop_before_replacement(cargo: &Cargo) -> bool {
   requires_removal_before_replacement(cargo) || uses_host_network(cargo)
 }
 
+pub(super) fn confirm_init_stopped(
+  inspected: &ContainerInspectResponse,
+) -> IoResult<()> {
+  if inspected.state.as_ref().and_then(|state| state.running) != Some(false) {
+    return Err(IoError::interrupted(
+      "StopCargoProcess",
+      "Docker has not confirmed the old init container stopped",
+    ));
+  }
+  Ok(())
+}
+
+#[cfg(test)]
+pub(super) mod stop_fault {
+  use std::{
+    collections::HashSet,
+    sync::{LazyLock, Mutex},
+  };
+
+  use bollard_next::models::ContainerInspectResponse;
+
+  static FAULTS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+  pub(crate) struct InitStopFaultGuard(String);
+
+  impl Drop for InitStopFaultGuard {
+    fn drop(&mut self) {
+      FAULTS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .remove(&self.0);
+    }
+  }
+
+  pub(crate) fn forget_next_init_stop(key: &str) -> InitStopFaultGuard {
+    assert!(FAULTS.lock().unwrap().insert(key.to_owned()));
+    InitStopFaultGuard(key.to_owned())
+  }
+
+  pub(crate) fn observe(
+    key: &str,
+    mut inspected: ContainerInspectResponse,
+  ) -> ContainerInspectResponse {
+    if FAULTS.lock().unwrap().remove(key) {
+      inspected.state.get_or_insert_with(Default::default).running = None;
+    }
+    inspected
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::collections::HashMap;
 
-  use bollard_next::models::PortBinding;
+  use bollard_next::models::{ContainerState, HostConfig, PortBinding};
   use nanocl_stubs::{cargo::Cargo, cargo_spec::CargoNetworkMode};
 
-  use super::super::tests::readiness_cargo;
+  use super::super::tests::{readiness_cargo, topology_cargo};
   use super::*;
+
+  #[test]
+  fn replacement_init_stop_requires_explicit_stopped_evidence() {
+    let mut inspected = ContainerInspectResponse::default();
+    let error = confirm_init_stopped(&inspected).unwrap_err();
+    assert_eq!(error.context(), Some("StopCargoProcess"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+    for running in [None, Some(true), Some(false)] {
+      inspected.state = Some(ContainerState {
+        running,
+        ..Default::default()
+      });
+      assert_eq!(
+        confirm_init_stopped(&inspected).is_ok(),
+        running == Some(false)
+      );
+    }
+  }
+
+  #[test]
+  fn init_stop_fault_is_scoped_one_shot_and_cleared_on_drop() {
+    let key = format!("global.init-stop-fault-{}", uuid::Uuid::new_v4());
+    let stopped = ContainerInspectResponse {
+      state: Some(ContainerState {
+        running: Some(false),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let guard = stop_fault::forget_next_init_stop(&key);
+    assert!(
+      confirm_init_stopped(&stop_fault::observe(
+        "global.other",
+        stopped.clone()
+      ))
+      .is_ok()
+    );
+    assert!(
+      confirm_init_stopped(&stop_fault::observe(&key, stopped.clone()))
+        .is_err()
+    );
+    assert!(
+      confirm_init_stopped(&stop_fault::observe(&key, stopped.clone())).is_ok()
+    );
+    drop(guard);
+    let guard = stop_fault::forget_next_init_stop(&key);
+    drop(guard);
+    assert!(confirm_init_stopped(&stop_fault::observe(&key, stopped)).is_ok());
+  }
+
+  #[test]
+  fn init_host_network_requires_stop_without_removal() {
+    let mut cargo = topology_cargo(1, 1, None);
+    cargo.spec.init_containers[0].container_config.host_config =
+      Some(HostConfig {
+        network_mode: Some("host".to_owned()),
+        ..Default::default()
+      });
+    assert!(requires_stop_before_replacement(&cargo));
+    assert!(!requires_removal_before_replacement(&cargo));
+    cargo.spec.init_containers[0]
+      .container_config
+      .host_config
+      .as_mut()
+      .unwrap()
+      .network_mode = None;
+    assert!(!requires_stop_before_replacement(&cargo));
+    assert!(!requires_removal_before_replacement(&cargo));
+  }
 
   #[test]
   fn cargo_port_bindings_require_stop_before_replacement() {

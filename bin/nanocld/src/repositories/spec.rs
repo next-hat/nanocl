@@ -7,6 +7,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::{
   cargo_spec::{CargoSpec, CargoSpecRevision},
   generic::{GenericClause, GenericFilter},
+  job::{JobPartial, JobSpec},
   vm_spec::{VmSpec, VmSpecPartial},
 };
 
@@ -82,8 +83,13 @@ impl RepositoryReadBy for SpecDb {
 }
 
 impl SpecDb {
-  pub async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
+  pub async fn del_by_kind_key(
+    kind: &str,
+    key: &str,
+    pool: &Pool,
+  ) -> IoResult<()> {
     let filter = GenericFilter::new()
+      .r#where("kind_name", GenericClause::Eq(kind.to_owned()))
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
     SpecDb::del_by(&filter, pool).await
   }
@@ -100,10 +106,12 @@ impl SpecDb {
   }
 
   pub async fn read_by_kind_key(
+    kind: &str,
     key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<SpecDb>> {
     let filter = GenericFilter::new()
+      .r#where("kind_name", GenericClause::Eq(kind.to_owned()))
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
     SpecDb::read_by(&filter, pool).await
   }
@@ -117,6 +125,7 @@ impl SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "Cargo".to_owned(),
+      incarnation_key: None,
       kind_key: key.to_owned(),
       version: version.to_owned(),
       data: serde_json::to_value(item)?,
@@ -133,6 +142,7 @@ impl SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "Vm".to_owned(),
+      incarnation_key: None,
       kind_key: key.to_owned(),
       version: version.to_owned(),
       data: serde_json::to_value(item)?,
@@ -183,11 +193,32 @@ impl SpecDb {
       host_config: vm_spec_partial.host_config.unwrap_or_default(),
       ssh_key: vm_spec_partial.ssh_key,
       init_container: vm_spec_partial.init_container,
+      cloud_init: vm_spec_partial.cloud_init,
+      cloud_init_user_data: vm_spec_partial.cloud_init_user_data,
+      console: vm_spec_partial.console,
       user: vm_spec_partial.user,
       mac_address: vm_spec_partial.mac_address,
       labels: vm_spec_partial.labels,
     };
     Ok(spec)
+  }
+
+  pub fn try_to_job_spec(&self) -> IoResult<JobSpec> {
+    let partial = serde_json::from_value::<JobPartial>(self.data.clone())?;
+    Ok(JobSpec {
+      key: self.key,
+      job_key: self.kind_key.clone(),
+      version: self.version.clone(),
+      created_at: self.created_at,
+      name: partial.name,
+      metadata: self.metadata.clone(),
+      secrets: partial.secrets,
+      schedule: partial.schedule,
+      ttl: partial.ttl,
+      containers: partial.containers,
+      image_pull_secret: partial.image_pull_secret,
+      image_pull_policy: partial.image_pull_policy,
+    })
   }
 }
 
@@ -203,6 +234,67 @@ mod tests {
   };
 
   use super::*;
+
+  #[test]
+  fn job_revision_reconstruction_preserves_declaration_and_metadata() {
+    let desired = JobPartial {
+      name: "scheduled-job".into(),
+      metadata: Some(serde_json::json!({"owner": "platform"})),
+      secrets: Some(vec!["database-credentials".into()]),
+      schedule: Some("@daily".into()),
+      ttl: Some(60),
+      image_pull_secret: Some("registry-credentials".into()),
+      image_pull_policy: Some(ImagePullPolicy::Always),
+      containers: vec![Config {
+        image: Some("busybox".into()),
+        cmd: Some(vec!["true".into()]),
+        ..Default::default()
+      }],
+    };
+    let stored = SpecDb {
+      key: uuid::Uuid::from_u128(1),
+      created_at: chrono::DateTime::UNIX_EPOCH.naive_utc(),
+      kind_name: "Job".into(),
+      kind_key: desired.name.clone(),
+      version: "v0.19".into(),
+      data: serde_json::to_value(&desired).unwrap(),
+      metadata: desired.metadata.clone(),
+      incarnation_key: Some(uuid::Uuid::from_u128(2)),
+    };
+    let revision = stored.try_to_job_spec().unwrap();
+    assert_eq!(revision.key, stored.key);
+    assert_eq!(revision.job_key, stored.kind_key);
+    assert_eq!(revision.version, stored.version);
+    assert_eq!(revision.created_at, stored.created_at);
+    assert_eq!(JobPartial::from(revision), desired);
+  }
+
+  #[test]
+  fn vm_cloud_init_user_data_survives_spec_persistence() {
+    for data in [
+      None,
+      Some(serde_json::json!("")),
+      Some(serde_json::json!("#cloud-config\nruncmd:\n- echo café\n")),
+      Some(serde_json::json!({"packages": ["curl"]})),
+    ] {
+      let desired = VmSpecPartial {
+        name: "custom".to_owned(),
+        image: "/vm.qcow2".to_owned(),
+        cloud_init: Some(false),
+        cloud_init_user_data: data
+          .map(|value| serde_json::from_value(value).unwrap()),
+        ..Default::default()
+      };
+      let stored =
+        SpecDb::try_from_vm_partial("team.custom", "v0.19.0", &desired)
+          .unwrap();
+      let restored = stored.try_to_vm_spec().unwrap();
+      assert_eq!(stored.data, serde_json::to_value(&desired).unwrap());
+      assert_eq!(restored.cloud_init, Some(false));
+      assert_eq!(restored.cloud_init_user_data, desired.cloud_init_user_data);
+      assert_eq!(restored.vm_key, "team.custom");
+    }
+  }
 
   fn container(name: &str, image: &str) -> ContainerSpec {
     ContainerSpec {

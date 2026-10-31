@@ -3,23 +3,21 @@ use std::collections::HashMap;
 use futures::{SinkExt, StreamExt, channel::mpsc, stream::FuturesUnordered};
 use ntex::rt;
 
-use nanocl_error::io::{IoError, IoResult};
-use nanocld_client::{
-  NanocldClient,
-  stubs::{
-    cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
-    generic::{GenericFilter, GenericListQueryNsp},
-    process::{ProcessLogQuery, ProcessStatsQuery},
-    system::{EventActorKind, NativeEventAction},
-  },
+use nanocl_error::io::{FromIo, IoError, IoResult};
+use nanocld_client::stubs::{
+  cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
+  generic::{GenericFilter, GenericListQueryNsp},
+  process::{ProcessLogQuery, ProcessStatsQuery},
+  system::{EventActorKind, NativeEventAction},
 };
 
 use crate::{
   config::CliConfig,
   models::{
-    CargoArg, CargoCommand, CargoCreateOpts, CargoHistoryOpts, CargoLogsOpts,
+    CargoArg, CargoCommand, CargoCompactRow, CargoCreateOpts, CargoLogsOpts,
     CargoPatchOpts, CargoRestartOpts, CargoRevertOpts, CargoRow, CargoRunOpts,
-    CargoStatsOpts, GenericRemoveForceOpts, GenericRemoveOpts, ProcessStatsRow,
+    CargoStatsOpts, GenericHistoryOpts, GenericRemoveForceOpts,
+    GenericRemoveOpts, ProcessStatsRow, SpecHistoryRow,
   },
   utils::{self, cargo::build_cargo_patch},
 };
@@ -27,6 +25,7 @@ use crate::{
 use super::{
   GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
   GenericCommandStart, GenericCommandStop,
+  history::{print_revision_history, validate_options},
 };
 
 impl GenericCommand for CargoArg {
@@ -37,6 +36,7 @@ impl GenericCommand for CargoArg {
 
 impl GenericCommandLs for CargoArg {
   type Item = CargoRow;
+  type CompactItem = CargoCompactRow;
   type Args = CargoArg;
   type ApiItem = CargoSummary;
 
@@ -76,21 +76,6 @@ impl GenericCommandInspect for CargoArg {
   type ApiItem = CargoInspect;
 }
 
-async fn wait_cargo_state(
-  key: &str,
-  action: NativeEventAction,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let waiter = utils::process::wait_process_state(
-    key,
-    EventActorKind::Cargo,
-    [action].to_vec(),
-    client,
-  )
-  .await?;
-  Ok(waiter)
-}
-
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
@@ -114,12 +99,14 @@ async fn exec_cargo_restart(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for key in &opts.keys {
-    let waiter =
-      wait_cargo_state(key, NativeEventAction::Restart, client).await?;
-    client.restart_process("cargo", key).await?;
-    waiter.await.map_err(|err| {
-      IoError::interrupted("wait_cargo_state", &err.to_string())
-    })??;
+    utils::process::wait_process_operation(
+      key,
+      EventActorKind::Cargo,
+      NativeEventAction::Restart,
+      client,
+      client.restart_process_operation("cargo", key),
+    )
+    .await?;
   }
   Ok(())
 }
@@ -133,12 +120,14 @@ async fn exec_cargo_patch(
   let client = &cli_conf.client;
   let cargo = client.inspect_cargo(&opts.key).await?;
   let patch = build_cargo_patch(opts, &cargo.spec.containers)?;
-  let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
-  client.patch_cargo(&opts.key, &patch).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Cargo,
+    NativeEventAction::Update,
+    client,
+    client.patch_cargo_operation(&opts.key, &patch),
+  )
+  .await?;
   Ok(())
 }
 
@@ -146,12 +135,21 @@ async fn exec_cargo_patch(
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
   _args: &CargoArg,
-  opts: &CargoHistoryOpts,
+  opts: &GenericHistoryOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let histories = client.list_history_cargo(&opts.key).await?;
-  utils::print::print_yml(histories)?;
-  Ok(())
+  validate_options(opts)?;
+  let mut histories = client.list_history_cargo(&opts.key).await?;
+  histories.sort_by_key(|revision| {
+    std::cmp::Reverse((revision.created_at, revision.key))
+  });
+  print_revision_history(
+    opts,
+    &cli_conf.user_config.display_format,
+    histories,
+    |revision| revision.key,
+    SpecHistoryRow::from,
+  )
 }
 
 /// Execute the `nanocl cargo logs` command to list the logs of a cargo
@@ -244,13 +242,33 @@ async fn exec_cargo_revert(
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let waiter =
-    wait_cargo_state(&opts.key, NativeEventAction::Update, client).await?;
-  let cargo = client.revert_cargo(&opts.key, &opts.history_id).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
-  utils::print::print_yml(cargo)?;
+  let mut cargo = None;
+  utils::process::wait_process_operation(
+    &opts.key,
+    EventActorKind::Cargo,
+    NativeEventAction::Update,
+    client,
+    async {
+      let (response, operation) = client
+        .revert_cargo_operation(&opts.key, &opts.history_id)
+        .await?;
+      cargo = Some(response);
+      Ok(operation)
+    },
+  )
+  .await?;
+  let cargo = cargo.ok_or_else(|| {
+    IoError::invalid_data("Cargo revert", "Accepted response is unavailable")
+  })?;
+  utils::print::display_format(&cli_conf.user_config.display_format, cargo)
+    .map_err(|error| {
+      error.map_err_context(|| {
+        format!(
+          "Cargo revert succeeded; displaying its response as {} failed. Inspect the cargo with --display json or --display yaml instead of repeating the revert",
+          cli_conf.user_config.display_format,
+        )
+      })
+    })?;
   Ok(())
 }
 
@@ -264,13 +282,14 @@ async fn exec_cargo_run(
   let cargo = client
     .create_cargo(&opts.clone().into(), opts.namespace.as_deref())
     .await?;
-  let waiter =
-    wait_cargo_state(&cargo.spec.cargo_key, NativeEventAction::Start, client)
-      .await?;
-  client.start_process("cargo", &cargo.spec.cargo_key).await?;
-  waiter.await.map_err(|err| {
-    IoError::interrupted("wait_cargo_state", &err.to_string())
-  })??;
+  utils::process::wait_process_operation(
+    &cargo.spec.cargo_key,
+    EventActorKind::Cargo,
+    NativeEventAction::Start,
+    client,
+    client.start_process_operation("cargo", &cargo.spec.cargo_key),
+  )
+  .await?;
   Ok(())
 }
 
@@ -314,6 +333,51 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::models::GenericListOpts;
+
+  #[test]
+  fn cargo_list_renders_compact_wide_and_quiet_output() {
+    let row = || CargoRow {
+      key: "system.same".to_owned(),
+      status: "running/running (healthy)".to_owned(),
+      instances: "1/1".to_owned(),
+      created_at: "2026-09-01 12:00:00".to_owned(),
+      updated_at: "2026-09-02 12:00:00".to_owned(),
+      age: "2d".to_owned(),
+    };
+    let mut opts: GenericListOpts = GenericListOpts::default();
+    let compact = CargoArg::render_list(&opts, vec![row()]);
+    assert!(compact.contains("AGE"));
+    assert!(compact.contains("2d"));
+    assert!(compact.contains("system.same"));
+    assert!(compact.contains("running/running (healthy)"));
+    assert!(!compact.contains("CREATED AT"));
+    assert!(!compact.contains("UPDATED AT"));
+    assert!(!compact.contains("2026-09"));
+    let empty = CargoArg::render_list(&opts, Vec::new());
+    assert!(empty.contains("AGE"));
+    assert!(!empty.contains("CREATED AT"));
+
+    opts.wide = true;
+    let wide = CargoArg::render_list(&opts, vec![row()]);
+    assert!(wide.contains("CREATED AT"));
+    assert!(wide.contains("UPDATED AT"));
+    assert!(wide.contains("2026-09-01 12:00:00"));
+    assert!(wide.contains("2026-09-02 12:00:00"));
+    assert!(!wide.contains("AGE"));
+    let empty = CargoArg::render_list(&opts, Vec::new());
+    assert!(empty.contains("CREATED AT"));
+    assert!(empty.contains("UPDATED AT"));
+
+    opts.quiet = true;
+    assert_eq!(CargoArg::render_list(&opts, vec![row()]), "system.same");
+    assert!(CargoArg::render_list(&opts, Vec::new()).is_empty());
+    opts.wide = false;
+    assert_eq!(
+      CargoArg::render_list(&opts, vec![row(), row()]),
+      "system.same\nsystem.same"
+    );
+  }
 
   #[test]
   fn quiet_output_uses_canonical_key() {
@@ -323,6 +387,7 @@ mod tests {
       instances: String::new(),
       created_at: String::new(),
       updated_at: String::new(),
+      age: String::new(),
     };
     assert_eq!(<CargoArg as GenericCommandLs>::get_key(&row), "system.same");
   }
