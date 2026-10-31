@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- VM status and resource inspection, graceful stop and restart with a timeout
+  and explicit force option, and live CPU, memory, and disk growth. Guest disk
+  partitions and filesystems may require expansion inside the VM.
+- Paginated configuration history and revision inspection for Cargoes, VMs,
+  Jobs, and Resources, and `nanocl job runs` for retained execution and step
+  outcomes.
+- `nanocl job revert` and `nanocl vm revert` to restore a configuration
+  revision. Job revert restores the schedule without immediately running it;
+  it stops an active run and can leave the Job removed if recreation fails.
+  VM revert restores the specification, not guest disk contents.
 - `nanocl state diff` to preview Statefile changes before applying them, with
   secret redaction, a unified YAML diff or JSON output, optional paging, and
   previews for reloads and orphan removal.
@@ -29,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Namespace backup files now use `namespaces/<encoded-name>.yml` beneath the
+  backup directory. Update automation that expects them at the backup root.
+- List and `ps` commands reject the previously ignored `--filters` option.
+- Job configuration revisions are shown by `job history`; execution history
+  is available separately through `job runs`. Structured inspection and revert
+  output follows the configured display format.
 - Keep the full interactive Statefile preview and show a concise source,
   group, object and image summary with `state apply -y`. Add plain-log phase
   and waiting updates, passive Cargo rollout observations, and best-effort
@@ -55,6 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Start stopped VMs when applying a matching Statefile and correlate lifecycle
+  completion and errors with the accepted operation.
+- Export all pages of backup collections and prevent conflicting backup paths.
+  Concurrent changes are not captured as a consistent snapshot.
+- Report invalid selected-context configuration before contacting the daemon
+  while keeping local context repair and Docker-only installation available.
 - Display resolved process IP addresses for shared container networks, with
   `<shared>` as a fallback when the address is unavailable.
 

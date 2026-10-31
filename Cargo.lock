@@ -2162,7 +2162,7 @@ checksum = "6e3d189da485332e96ba8a5ef646a311871abd7915bf06ac848a9117f19cf6e4"
 
 [[package]]
 name = "ncdns"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2183,7 +2183,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -2207,7 +2207,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "futures-util",
  "log",
