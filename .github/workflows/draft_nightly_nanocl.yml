@@ -112,7 +112,11 @@ jobs:
           brew link --force libpq
       - name: Package
         run: |
-          export RUSTFLAGS="-C target-feature=+crt-static -L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="$(xcrun --sdk macosx --find clang)"
+          echo "macOS SDK: $SDKROOT"
+          "$CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER" --version
+          export RUSTFLAGS="-C target-feature=+crt-static"
           export PQ_LIB_DIR="$(brew --prefix libpq)/lib"
           cargo build --release --target aarch64-apple-darwin --features vendored --features release --bin $BINARY_NAME
           mkdir -p release/mac
