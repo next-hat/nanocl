@@ -746,6 +746,14 @@ fn remote_missing_reference(
         .chain(&cargo.spec.containers)
         .flat_map(|container| container.secrets.iter()),
     )
+    .chain(
+      cargo
+        .spec
+        .init_containers
+        .iter()
+        .chain(&cargo.spec.containers)
+        .filter_map(|container| container.image_pull_secret.as_ref()),
+    )
     .find(|reference| reference.as_str() == report.name)
     .cloned()
 }
@@ -1285,13 +1293,15 @@ mod tests {
     cargo.spec.secrets = vec!["global.ref\n\u{1b}".into()];
     cargo.spec.init_containers = vec![
       serde_json::from_value(serde_json::json!({
-        "Name": "init", "Image": "example", "Secrets": ["init.ref"]
+        "Name": "init", "Image": "example", "Secrets": ["init.ref"],
+        "ImagePullSecret": "init.pull"
       }))
       .unwrap(),
     ];
     cargo.spec.containers = vec![
       serde_json::from_value(serde_json::json!({
-        "Name": "app", "Image": "example", "Secrets": ["app.ref"]
+        "Name": "app", "Image": "example", "Secrets": ["app.ref"],
+        "ImagePullSecret": "app.pull"
       }))
       .unwrap(),
     ];
@@ -1308,7 +1318,7 @@ mod tests {
     // Exercise the real node error builder through the same HTTP error envelope
     // consumed by the client before validating it against the accepted spec.
     let node_error = crate::services::node_start_error(
-      crate::utils::secret::missing_secret_reference("app.ref"),
+      crate::utils::secret::missing_secret_reference("app.pull"),
       operation.key,
       operation.incarnation_key,
       operation.spec_key,
@@ -1321,9 +1331,15 @@ mod tests {
     );
     assert_eq!(
       remote_missing_reference(&client_error, &cargo, &operation).as_deref(),
-      Some("app.ref")
+      Some("app.pull")
     );
-    for name in ["global.ref\n\u{1b}", "init.ref", "app.ref"] {
+    for name in [
+      "global.ref\n\u{1b}",
+      "init.ref",
+      "app.ref",
+      "init.pull",
+      "app.pull",
+    ] {
       let err =
         error(ntex::http::StatusCode::NOT_FOUND, report(name).to_string());
       assert_eq!(

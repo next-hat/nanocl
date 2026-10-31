@@ -11,8 +11,26 @@ use nanocl_stubs::{
 use crate::{
   models::{SecretDb, SystemState},
   repositories::generic::*,
+  utils::secret::missing_secret_reference,
   vars,
 };
+
+fn map_pull_secret_error(name: &str, error: IoError) -> IoError {
+  if error.context() == Some("SecretDb")
+    && error.inner.kind() == std::io::ErrorKind::NotFound
+    && matches!(
+      error
+        .inner
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<diesel::result::Error>()),
+      Some(diesel::result::Error::NotFound)
+    )
+  {
+    missing_secret_reference(name)
+  } else {
+    error
+  }
+}
 
 /// Get the docker credentials to authenticate with the registry from the secret
 ///
@@ -22,13 +40,51 @@ async fn get_credentials(
 ) -> IoResult<Option<DockerCredentials>> {
   Ok(match secret {
     Some(secret) => {
-      let secret = SecretDb::read_by_pk(&secret, &state.inner.pool).await?;
+      let secret = SecretDb::read_by_pk(&secret, &state.inner.pool)
+        .await
+        .map_err(|error| map_pull_secret_error(&secret, error))?;
       serde_json::from_value::<DockerCredentials>(secret.data)
         .map(Some)
         .map_err(|err| err.map_err_context(|| "GetCredentials"))?
     }
     None => None,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::utils::secret::{
+    missing_reference_diagnostic, missing_reference_name,
+  };
+
+  #[test]
+  fn pull_secret_lookup_maps_only_missing_database_rows() {
+    let name = "registry\n\u{1b}[31m\"key";
+    let missing =
+      *diesel::result::Error::NotFound.map_err_context(|| "SecretDb");
+    let mapped = map_pull_secret_error(name, missing);
+    assert_eq!(missing_reference_name(&mapped), Some(name));
+    assert_eq!(
+      missing_reference_diagnostic(&mapped).as_deref(),
+      Some(r#"Secret "registry\n\u{1b}[31m\"key" does not exist"#)
+    );
+
+    for error in [
+      IoError::not_found("Pool", "pool lookup failed"),
+      IoError::not_found("SecretDb", "unrelated missing file"),
+      IoError::invalid_data("SecretDb", "database failure"),
+    ] {
+      let context = error.context().map(str::to_owned);
+      let kind = error.inner.kind();
+      let message = error.inner.to_string();
+      let mapped = map_pull_secret_error(name, error);
+      assert_eq!(mapped.context(), context.as_deref());
+      assert_eq!(mapped.inner.kind(), kind);
+      assert_eq!(mapped.inner.to_string(), message);
+      assert!(missing_reference_diagnostic(&mapped).is_none());
+    }
+  }
 }
 
 /// Emit an event for the download status
