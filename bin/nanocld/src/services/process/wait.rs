@@ -128,12 +128,20 @@ fn job_wait_frames(run: JobRunInspect) -> Vec<JobWaitFrame> {
   frames
 }
 
+fn job_wait_poll_diagnostic(key: &str, err: &HttpError) -> String {
+  format!(
+    "Job wait polling failed: job={key:?} error={:?}",
+    err.to_string()
+  )
+}
+
 async fn wait_job(
   key: &str,
   state: &SystemState,
 ) -> HttpResult<web::HttpResponse> {
   let job = JobDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let key = key.to_owned();
+  let log_key = key.clone();
   let state = state.clone();
   let stream = futures::stream::once(async move {
     let mut run_key = job.current_run_key;
@@ -166,21 +174,24 @@ async fn wait_job(
     }
   });
   let stream = stream
-    .map(|result| {
+    .map(move |result| {
       let frames = match result {
         Ok(run) => job_wait_frames(run),
-        Err(err) => vec![JobWaitFrame::Error {
-          message: match err.msg.as_str() {
-            "Job incarnation changed while waiting" => {
-              "Job incarnation changed while waiting"
+        Err(err) => {
+          log::error!("{}", job_wait_poll_diagnostic(&log_key, &err));
+          vec![JobWaitFrame::Error {
+            message: match err.msg.as_str() {
+              "Job incarnation changed while waiting" => {
+                "Job incarnation changed while waiting"
+              }
+              "Job was replaced before a run was accepted" => {
+                "Job was replaced before a run was accepted"
+              }
+              _ => "Unable to inspect the pinned Job run",
             }
-            "Job was replaced before a run was accepted" => {
-              "Job was replaced before a run was accepted"
-            }
-            _ => "Unable to inspect the pinned Job run",
-          }
-          .into(),
-        }],
+            .into(),
+          }]
+        }
       };
       futures::stream::iter(frames.into_iter().map(Ok::<_, HttpError>))
     })
@@ -297,6 +308,19 @@ mod tests {
         ..
       }
     ));
+  }
+
+  #[test]
+  fn job_wait_poll_diagnostic_contains_escaped_error_details() {
+    let err =
+      HttpError::bad_gateway("Database context: sensitive detail\nsecond line");
+    let diagnostic = job_wait_poll_diagnostic("job\nname", &err);
+    assert!(diagnostic.contains("job=\"job\\nname\""));
+    assert!(diagnostic.contains("502 Bad Gateway"));
+    assert!(
+      diagnostic.contains("Database context: sensitive detail\\nsecond line")
+    );
+    assert!(!diagnostic.contains('\n'));
   }
 }
 
