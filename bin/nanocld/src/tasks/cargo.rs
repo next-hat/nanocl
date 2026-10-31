@@ -817,6 +817,43 @@ fn uncertain_runtime_error(error: &IoError) -> bool {
   )
 }
 
+fn operation_note(
+  operation: uuid::Uuid,
+  resource_key: &str,
+  action: &str,
+  settled: bool,
+  failed: bool,
+  missing_reference: Option<&str>,
+) -> String {
+  if !settled {
+    format!(
+      "Cargo operation {operation} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying"
+    )
+  } else if !failed {
+    format!("Cargo {resource_key}")
+  } else if let Some(detail) = missing_reference {
+    format!("Cargo operation {operation} ({action}) failed: {detail}")
+  } else {
+    format!(
+      "Cargo operation {operation} ({action}) failed; inspect its runtime and operation before retrying"
+    )
+  }
+}
+
+fn operation_failure_diagnostic(
+  error: &IoError,
+  missing_reference: Option<&str>,
+) -> String {
+  // Init exit diagnostics contain only the confirmed numeric exit code.
+  if error.context() == Some("CargoInitContainerExit") {
+    error.inner.to_string()
+  } else if let Some(detail) = missing_reference {
+    detail.to_owned()
+  } else {
+    "Accepted Cargo operation failed; inspect the observed runtime before retrying".to_owned()
+  }
+}
+
 async fn execute(
   accepted: AcceptedCargoOperation,
   state: CargoRuntimeContext,
@@ -871,6 +908,7 @@ async fn execute(
     )
   });
   let mut settled = false;
+  let mut missing_reference = None;
   match result {
     Ok(()) => {
       let finished = if action == "delete" {
@@ -915,6 +953,7 @@ async fn execute(
       }
     }
     Err(error) => {
+      missing_reference = utils::secret::missing_reference_diagnostic(&error);
       let owns_failure = CargoDb::validate_operation(
         &accepted.operation,
         state.lease.clone(),
@@ -953,13 +992,8 @@ async fn execute(
             ..Default::default()
           }
         };
-        // Init exit diagnostics contain only the confirmed numeric exit code,
-        // not arbitrary Docker error text or container output.
-        let failure = if error.context() == Some("CargoInitContainerExit") {
-          error.inner.to_string()
-        } else {
-          "Accepted Cargo operation failed; inspect the observed runtime before retrying".to_owned()
-        };
+        let failure =
+          operation_failure_diagnostic(&error, missing_reference.as_deref());
         let diagnostic =
           serde_json::json!({"Phase": action, "Failure": failure});
         match CargoDb::finish_operation(
@@ -1007,19 +1041,14 @@ async fn execute(
       reported.is_err(),
       start_has_healthcheck,
     );
-    let note = if !settled {
-      format!(
-        "Cargo operation {} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying",
-        accepted.operation.key
-      )
-    } else if reported.is_ok() {
-      format!("Cargo {}", accepted.operation.resource_key)
-    } else {
-      format!(
-        "Cargo operation {} ({action}) failed; inspect its runtime and operation before retrying",
-        accepted.operation.key
-      )
-    };
+    let note = operation_note(
+      accepted.operation.key,
+      &accepted.operation.resource_key,
+      action,
+      settled,
+      reported.is_err(),
+      missing_reference.as_deref(),
+    );
     for event_action in actions {
       // Do not publish Healthy when recording or delivering Start failed.
       if let Err(error) = event_state
@@ -1195,6 +1224,67 @@ mod tests {
       assert!(!unchanged_status_matches(&cargo, "restart"));
       assert!(!unchanged_status_matches(&cargo, "delete"));
     }
+  }
+
+  #[test]
+  fn cargo_failure_diagnostics_expose_only_settled_missing_references() {
+    let operation = uuid::Uuid::from_u128(1);
+    let missing = IoError::not_found(
+      "MissingSecretReference",
+      "Secret \"cert.registry\" does not exist",
+    );
+    let detail = utils::secret::missing_reference_diagnostic(&missing);
+    let diagnostic = operation_failure_diagnostic(&missing, detail.as_deref());
+    assert_eq!(diagnostic, "Secret \"cert.registry\" does not exist");
+    assert!(
+      operation_note(
+        operation,
+        "global.registry",
+        "update",
+        true,
+        true,
+        detail.as_deref()
+      )
+      .contains(&diagnostic)
+    );
+    let pending = operation_note(
+      operation,
+      "global.registry",
+      "update",
+      false,
+      true,
+      detail.as_deref(),
+    );
+    assert!(pending.contains("outcome is unknown"));
+    assert!(!pending.contains(&diagnostic));
+
+    for error in [
+      IoError::invalid_data("Secret", "secret value=private"),
+      IoError::other("Docker", "secret value=private"),
+    ] {
+      let detail = utils::secret::missing_reference_diagnostic(&error);
+      assert!(detail.is_none());
+      assert!(
+        !operation_failure_diagnostic(&error, detail.as_deref())
+          .contains("private")
+      );
+      assert!(
+        !operation_note(
+          operation,
+          "global.registry",
+          "update",
+          true,
+          true,
+          detail.as_deref()
+        )
+        .contains("private")
+      );
+    }
+    let init_error = IoError::other("CargoInitContainerExit", "exit code 2");
+    assert_eq!(
+      operation_failure_diagnostic(&init_error, None),
+      "exit code 2"
+    );
   }
 
   #[test]
