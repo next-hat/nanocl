@@ -304,6 +304,20 @@ where
   first_error.map_or(Ok(()), Err)
 }
 
+#[cfg(not(target_os = "windows"))]
+fn finish_vm_attach(
+  result: IoResult<()>,
+  restore: IoResult<()>,
+) -> IoResult<()> {
+  match (result, restore) {
+    (Ok(()), result) | (result, Ok(())) => result,
+    (Err(error), Err(restore_error)) => Err(IoError::other(
+      "VM attach".to_owned(),
+      format!("{error}; terminal restoration also failed: {restore_error}"),
+    )),
+  }
+}
+
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
 #[cfg(not(target_os = "windows"))]
@@ -366,42 +380,57 @@ pub async fn exec_vm_attach(cli_conf: &CliConfig, key: &str) -> IoResult<()> {
   // run ws dispatcher
   let sink = conn.sink();
   let mut rx = conn.seal().receiver();
-  while let Some(frame) = rx.next().await {
-    match frame {
-      Ok(ws::Frame::Binary(text)) => {
-        let output =
-          serde_json::from_slice::<OutputLog>(&text).map_err(|err| {
-            err.map_err_context(|| "Unable to serialize output")
-          })?;
-        match &output.kind {
-          OutputKind::StdOut => {
-            stdout.write_all(output.data.as_bytes())?;
-            stdout.flush()?;
+  let result: IoResult<()> = async {
+    while let Some(frame) = rx.next().await {
+      match frame {
+        Ok(ws::Frame::Binary(text)) => {
+          let output =
+            serde_json::from_slice::<OutputLog>(&text).map_err(|err| {
+              err.map_err_context(|| "Unable to deserialize VM console output")
+            })?;
+          match &output.kind {
+            OutputKind::StdOut => {
+              stdout.write_all(output.data.as_bytes())?;
+              stdout.flush()?;
+            }
+            OutputKind::StdErr => {
+              stderr.write_all(output.data.as_bytes())?;
+              stderr.flush()?;
+            }
+            OutputKind::Console => {
+              stdout.write_all(output.data.as_bytes())?;
+              stdout.flush()?;
+            }
+            _ => {}
           }
-          OutputKind::StdErr => {
-            stderr.write_all(output.data.as_bytes())?;
-            stdout.flush()?;
-          }
-          OutputKind::Console => {
-            stdout.write_all(output.data.as_bytes())?;
-            stdout.flush()?;
-          }
-          _ => {}
         }
+        Ok(ws::Frame::Ping(msg)) => {
+          sink
+            .send(ws::Message::Pong(msg))
+            .await
+            .map_err(std::io::Error::other)?;
+        }
+        Err(error) => {
+          return Err(IoError::other(
+            "Unable to receive VM console output".to_owned(),
+            format!("{error}: {error:?}"),
+          ));
+        }
+        _ => (),
       }
-      Ok(ws::Frame::Ping(msg)) => {
-        sink
-          .send(ws::Message::Pong(msg))
-          .await
-          .map_err(std::io::Error::other)?;
-      }
-      Err(_) => break,
-      _ => (),
     }
+    Ok(())
   }
+  .await;
   // Restore the original terminal settings
-  tcsetattr(std::io::stdin().as_raw_fd(), TCSANOW, &original_termios)?;
-  Ok(())
+  let restore =
+    tcsetattr(std::io::stdin().as_raw_fd(), TCSANOW, &original_termios)
+      .map_err(|error| {
+        error
+          .map_err_context(|| "Unable to restore terminal")
+          .into()
+      });
+  finish_vm_attach(result, restore)
 }
 
 /// Function executed when running `nanocl vm`
@@ -461,6 +490,25 @@ mod tests {
     vm_process_name,
   };
   use nanocl_error::io::IoError;
+
+  #[cfg(not(target_os = "windows"))]
+  #[test]
+  fn vm_attach_preserves_receive_and_terminal_restoration_errors() {
+    use super::finish_vm_attach;
+
+    assert!(finish_vm_attach(Ok(()), Ok(())).is_ok());
+    let receive = || IoError::other("VM console", "connection reset");
+    let restore = || IoError::other("Terminal", "permission denied");
+    let error = finish_vm_attach(Err(receive()), Ok(())).unwrap_err();
+    assert_eq!(error.to_string(), receive().to_string());
+    let error = finish_vm_attach(Ok(()), Err(restore())).unwrap_err();
+    assert_eq!(error.to_string(), restore().to_string());
+    let error = finish_vm_attach(Err(receive()), Err(restore())).unwrap_err();
+    let message = error.to_string();
+    assert!(message.to_ascii_lowercase().contains("connection reset"));
+    assert!(message.contains("terminal restoration also failed"));
+    assert!(message.to_ascii_lowercase().contains("permission denied"));
+  }
 
   #[test]
   fn vm_lifecycle_attempts_all_keys_and_returns_first_failure() {
