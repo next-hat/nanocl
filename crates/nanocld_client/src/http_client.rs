@@ -463,10 +463,30 @@ impl NanocldClient {
   where
     R: serde::de::DeserializeOwned + Send + 'static,
   {
+    Self::res_stream_inner(res, false).await
+  }
+
+  pub(crate) async fn res_stream_strict<R>(
+    res: ntex::client::ClientResponse,
+  ) -> Receiver<Result<R, HttpError>>
+  where
+    R: serde::de::DeserializeOwned + Send + 'static,
+  {
+    Self::res_stream_inner(res, true).await
+  }
+
+  async fn res_stream_inner<R>(
+    res: ntex::client::ClientResponse,
+    strict: bool,
+  ) -> Receiver<Result<R, HttpError>>
+  where
+    R: serde::de::DeserializeOwned + Send + 'static,
+  {
     let mut stream = res.into_stream();
     let (tx, rx) = ntex::channel::mpsc::channel();
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
+      let mut failed = false;
       'stream: while let Some(item) = std::future::poll_fn(|cx| {
         // A quiet HTTP stream may never yield another event. Register receiver
         // cancellation independently so dropping a waiter releases its reader.
@@ -480,6 +500,7 @@ impl NanocldClient {
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {
+            failed = true;
             let _ = tx.send(Err(HttpError::internal_server_error(format!(
               "Unable to read stream: {e}"
             ))));
@@ -498,6 +519,7 @@ impl NanocldClient {
           let t = match serde_json::from_slice::<R>(&payload[start..=end]) {
             Ok(t) => t,
             Err(e) => {
+              failed = true;
               let _ = tx.send(Err(HttpError::internal_server_error(format!(
                 "Unable to parse stream: {e}"
               ))));
@@ -510,6 +532,11 @@ impl NanocldClient {
           }
         }
         payload.drain(..start);
+      }
+      if strict && !failed && !payload.is_empty() {
+        let _ = tx.send(Err(HttpError::internal_server_error(
+          "Stream ended with an incomplete record",
+        )));
       }
       tx.close();
     });
@@ -829,6 +856,16 @@ mod tests {
     assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
     let error = stream.next().await.unwrap().unwrap_err();
     assert!(error.to_string().contains("Unable to parse stream:"));
+    assert!(stream.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn strict_stream_rejects_a_partial_record_after_a_complete_record() {
+    let res = response_with_chunks(&[b"{\"value\":1}\n{\"value\":"]);
+    let mut stream = NanocldClient::res_stream_strict::<Value>(res).await;
+    assert_eq!(stream.next().await.unwrap().unwrap(), json!({"value": 1}));
+    let error = stream.next().await.unwrap().unwrap_err();
+    assert!(error.to_string().contains("incomplete record"));
     assert!(stream.next().await.is_none());
   }
 }

@@ -65,11 +65,12 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
         None,
         |pg| async move {
           let key = format!("system.{}.c", &cargo.name);
-          if docker
-            .inspect_container(&key, None::<InspectContainerOptions>)
-            .await
-            .is_err()
-          {
+          if !super::install::docker_resource_exists(
+            docker
+              .inspect_container(&key, None::<InspectContainerOptions>)
+              .await,
+            &format!("Unable to inspect container {}", &cargo.name),
+          )? {
             return Ok("Unchanged");
           }
           utils::progress::set_state_message(&pg, summary, "Removing", output)?;

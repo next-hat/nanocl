@@ -59,6 +59,33 @@ fn docker_error_kind(error: &bollard_next::errors::Error) -> String {
   }
 }
 
+fn preparation_failure(stage: &str, error: &IoError) -> String {
+  let detail = if stage == "image" {
+    super::image::pull_failure_diagnostic(error)
+  } else if stage == "configuration" {
+    utils::secret::missing_reference_diagnostic(error).or_else(|| {
+      (error.context() == Some("Secret")
+        && error.inner.kind() == std::io::ErrorKind::InvalidData)
+        .then(|| "Secret configuration is invalid".to_owned())
+    })
+  } else {
+    error
+      .inner
+      .get_ref()
+      .and_then(|source| source.downcast_ref::<bollard_next::errors::Error>())
+      .map(docker_error_kind)
+  };
+  let message = match stage {
+    "image" => "Job image preparation failed",
+    "configuration" => "Job secret or runtime configuration preparation failed",
+    _ => "Job network preflight failed",
+  };
+  match detail {
+    Some(detail) => format!("{message}: {detail}"),
+    None => message.to_owned(),
+  }
+}
+
 fn create_rejected(error: &bollard_next::errors::Error) -> bool {
   matches!(
     error,
@@ -521,15 +548,14 @@ pub(crate) async fn execute(
 ) -> IoResult<()> {
   let run = &accepted.run;
   let job = &accepted.job;
-  if super::network::ensure_networks(network_modes(job), state)
-    .await
-    .is_err()
+  if let Err(error) =
+    super::network::ensure_networks(network_modes(job), state).await
   {
     let _serialized = lifecycle_lock(&run.job_name).lock_owned().await;
     return fail_execution(
       run,
       None,
-      "Job network preflight failed".into(),
+      preparation_failure("network", &error),
       owner,
       state,
     )
@@ -556,12 +582,12 @@ pub(crate) async fn execute(
     .await;
     match prepared {
       Ok(()) => (),
-      Err(_) => {
+      Err(error) => {
         let _serialized = lifecycle_lock(&run.job_name).lock_owned().await;
         return fail_execution(
           run,
           Some(index),
-          "Job image preparation failed".into(),
+          preparation_failure("image", &error),
           owner,
           state,
         )
@@ -576,11 +602,11 @@ pub(crate) async fn execute(
       let config = match runtime_config(job, run, index, container, state).await
       {
         Ok(config) => config,
-        Err(_) => {
+        Err(error) => {
           return fail_execution(
             run,
             Some(index),
-            "Job secret or runtime configuration preparation failed".into(),
+            preparation_failure("configuration", &error),
             owner,
             state,
           )
@@ -945,6 +971,32 @@ pub(crate) async fn control(
 mod tests {
   use super::*;
   use bollard_next::models::ContainerState;
+  use nanocl_error::io::FromIo;
+
+  #[test]
+  fn job_preparation_failure_reports_safe_specific_causes() {
+    let missing = utils::secret::missing_secret_reference("registry.test");
+    let image = preparation_failure("image", &missing);
+    let config = preparation_failure("configuration", &missing);
+    assert!(image.contains("registry.test"));
+    assert!(config.contains("registry.test"));
+
+    let docker_error = bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 503,
+      message: "secret-value-must-not-persist".into(),
+    };
+    let network = preparation_failure(
+      "network",
+      &docker_error.map_err_context(|| "network"),
+    );
+    assert!(network.contains("Docker HTTP 503"));
+    assert!(!network.contains("secret-value"));
+
+    let other = IoError::other("other", "secret-value-must-not-persist");
+    for stage in ["network", "image", "configuration"] {
+      assert!(!preparation_failure(stage, &other).contains("secret-value"));
+    }
+  }
 
   fn container_on(network: &str) -> Config {
     Config {

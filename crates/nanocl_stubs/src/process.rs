@@ -495,6 +495,24 @@ pub struct ProcessWaitQuery {
   pub condition: Option<WaitCondition>,
 }
 
+/// Frames in the Job wait stream.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "snake_case"))]
+pub enum JobWaitFrame {
+  Step {
+    response: ProcessWaitResponse,
+  },
+  Terminal {
+    run_key: uuid::Uuid,
+    state: crate::job::JobRunState,
+    reason: Option<String>,
+  },
+  Error {
+    message: String,
+  },
+}
+
 /// Stream of wait response of a process
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -574,6 +592,24 @@ mod tests {
     ProcessExecInputControl, ProcessExecOutputControl, ProcessKillOptions,
     ProcessLogQuery, ProcessStats,
   };
+
+  #[test]
+  fn job_wait_terminal_frame_roundtrips() {
+    use super::JobWaitFrame;
+    use crate::job::JobRunState;
+    let run_key = uuid::Uuid::from_u128(7);
+    let frame = JobWaitFrame::Terminal {
+      run_key,
+      state: JobRunState::Failed,
+      reason: Some("image pull denied".into()),
+    };
+    let value = serde_json::to_value(frame).unwrap();
+    assert_eq!(value["type"], "terminal");
+    let decoded: JobWaitFrame = serde_json::from_value(value).unwrap();
+    assert!(
+      matches!(decoded, JobWaitFrame::Terminal {run_key: actual, state: JobRunState::Failed, reason: Some(reason)} if actual == run_key && reason == "image pull denied")
+    );
+  }
 
   #[test]
   fn process_log_timestamps_preserve_signed_64_bit_values() {
