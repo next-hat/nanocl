@@ -1,4 +1,11 @@
-use std::{fs, future::Future, process::Stdio, sync::Arc, time::Duration};
+use std::{
+  fs,
+  future::Future,
+  os::unix::fs::{FileTypeExt, MetadataExt},
+  process::Stdio,
+  sync::Arc,
+  time::Duration,
+};
 
 use ntex::rt;
 use ntex::web;
@@ -423,6 +430,59 @@ async fn start_nginx_cmd(conf_path: &str) -> IoResult<()> {
   ))
 }
 
+/// Remove only a disconnected health socket, preserving live or unrelated paths.
+async fn remove_stale_health_socket(state_dir: &str) -> IoResult<()> {
+  let path = format!("{state_dir}/nginx-health.sock");
+  let metadata = match fs::symlink_metadata(&path) {
+    Ok(metadata) => metadata,
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+  };
+  if !metadata.file_type().is_socket() {
+    return Err(IoError::other(
+      "nginx health socket",
+      "health socket path is not a socket",
+    ));
+  }
+  match timeout(PROBE_TIMEOUT, UnixStream::connect(&path)).await {
+    Ok(Ok(_)) => {
+      return Err(IoError::other(
+        "nginx health socket",
+        "health socket is still accepting connections",
+      ));
+    }
+    Ok(Err(err)) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Ok(Err(err)) if err.kind() == std::io::ErrorKind::ConnectionRefused => (),
+    Ok(Err(err)) => return Err(err.into()),
+    Err(_) => {
+      return Err(IoError::other(
+        "nginx health socket",
+        "health socket connection timed out",
+      ));
+    }
+  }
+  // Do not delete a replacement installed while the liveness probe ran.
+  let current = match fs::symlink_metadata(&path) {
+    Ok(metadata) => metadata,
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(err.into()),
+  };
+  if !current.file_type().is_socket()
+    || current.dev() != metadata.dev()
+    || current.ino() != metadata.ino()
+  {
+    return Err(IoError::other(
+      "nginx health socket",
+      "health socket path changed during cleanup",
+    ));
+  }
+  match fs::remove_file(&path) {
+    Ok(()) => Ok(()),
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+    Err(err) => Err(err.into()),
+  }
+}
+
 pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
   let conf_path = gen_conf_path(state_dir);
   if nginx_master(&conf_path)?.is_some() {
@@ -433,6 +493,7 @@ pub async fn ensure_started(state_dir: &str) -> IoResult<()> {
     Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
     Err(err) => return Err(err.into()),
   }
+  remove_stale_health_socket(state_dir).await?;
   log::warn!("nginx: master is absent or dead, starting");
   start_nginx_cmd(&conf_path).await?;
   let conf = fs::read_to_string(&conf_path)?;
@@ -1285,6 +1346,38 @@ mod tests {
     fn drop(&mut self) {
       let _ = std::fs::remove_dir_all(&self.0);
     }
+  }
+
+  #[ntex::test]
+  async fn stale_health_socket_cleanup_preserves_live_and_unrelated_paths() {
+    let test_dir = TestDir::new();
+    let state_dir = test_dir.path().to_str().unwrap();
+    let path = test_dir.path().join("nginx-health.sock");
+
+    // No socket is a normal first start.
+    remove_stale_health_socket(state_dir).await.unwrap();
+
+    // A listener must never be unlinked merely because its PID file is absent.
+    let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+    assert!(remove_stale_health_socket(state_dir).await.is_err());
+    assert!(path.exists());
+    drop(listener);
+
+    // Closing a Unix listener leaves the filesystem entry behind.
+    remove_stale_health_socket(state_dir).await.unwrap();
+    assert!(!path.exists());
+
+    std::fs::write(&path, b"keep").unwrap();
+    assert!(remove_stale_health_socket(state_dir).await.is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"keep");
+    std::fs::remove_file(&path).unwrap();
+
+    let target = test_dir.path().join("target");
+    std::fs::write(&target, b"keep").unwrap();
+    std::os::unix::fs::symlink(&target, &path).unwrap();
+    assert!(remove_stale_health_socket(state_dir).await.is_err());
+    assert!(std::fs::symlink_metadata(&path).unwrap().is_symlink());
+    assert_eq!(std::fs::read(&target).unwrap(), b"keep");
   }
 
   #[test]
