@@ -746,6 +746,14 @@ fn remote_missing_reference(
         .chain(&cargo.spec.containers)
         .flat_map(|container| container.secrets.iter()),
     )
+    .chain(
+      cargo
+        .spec
+        .init_containers
+        .iter()
+        .chain(&cargo.spec.containers)
+        .filter_map(|container| container.image_pull_secret.as_ref()),
+    )
     .find(|reference| reference.as_str() == report.name)
     .cloned()
 }
@@ -874,7 +882,7 @@ fn operation_note(
   action: &str,
   settled: bool,
   failed: bool,
-  missing_reference: Option<&str>,
+  failure_detail: Option<&str>,
   remote_reference: Option<&str>,
 ) -> String {
   if !settled {
@@ -888,7 +896,7 @@ fn operation_note(
     note
   } else if !failed {
     format!("Cargo {resource_key}")
-  } else if let Some(detail) = missing_reference {
+  } else if let Some(detail) = failure_detail {
     format!("Cargo operation {operation} ({action}) failed: {detail}")
   } else {
     format!(
@@ -901,14 +909,30 @@ fn operation_failure_diagnostic(
   error: &IoError,
   missing_reference: Option<&str>,
 ) -> String {
-  // Init exit diagnostics contain only the confirmed numeric exit code.
-  if error.context() == Some("CargoInitContainerExit") {
-    error.inner.to_string()
-  } else if let Some(detail) = missing_reference {
-    detail.to_owned()
-  } else {
-    "Accepted Cargo operation failed; inspect the observed runtime before retrying".to_owned()
+  if let Some(detail) = missing_reference {
+    return detail.to_owned();
   }
+  if error.context() == Some("CargoInitContainerExit") {
+    let message = error.inner.to_string();
+    if let Some(code) = message
+      .strip_prefix("Init container exited with code ")
+      .and_then(|code| code.parse::<i64>().ok())
+      .filter(|code| *code > 0)
+    {
+      return format!("Init container exited with code {code}");
+    }
+  }
+  if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
+  {
+    return detail;
+  }
+  match error.context() {
+    Some("CargoCompiler") => "Unable to compile the Cargo container configuration",
+    Some("CargoRuntime") => "Unable to prepare the Cargo runtime configuration",
+    Some("CreateTlsSecrets") => "Unable to prepare TLS secrets for the Cargo",
+    _ => "Accepted Cargo operation failed; inspect the observed runtime before retrying",
+  }
+  .to_owned()
 }
 
 async fn execute(
@@ -965,7 +989,7 @@ async fn execute(
     )
   });
   let mut settled = false;
-  let mut missing_reference = None;
+  let mut failure_detail = None;
   let mut remote_reference = None;
   match result {
     Ok(()) => {
@@ -1011,7 +1035,8 @@ async fn execute(
       }
     }
     Err(error) => {
-      missing_reference = utils::secret::missing_reference_diagnostic(&error);
+      let missing_reference =
+        utils::secret::missing_reference_diagnostic(&error);
       let owns_failure = CargoDb::validate_operation(
         &accepted.operation,
         state.lease.clone(),
@@ -1058,6 +1083,7 @@ async fn execute(
         };
         let failure =
           operation_failure_diagnostic(&error, missing_reference.as_deref());
+        failure_detail = Some(failure.clone());
         let diagnostic =
           serde_json::json!({"Phase": action, "Failure": failure});
         match CargoDb::finish_operation(
@@ -1111,7 +1137,7 @@ async fn execute(
       action,
       settled,
       reported.is_err(),
-      missing_reference.as_deref(),
+      failure_detail.as_deref(),
       remote_reference.as_deref(),
     );
     for event_action in actions {
@@ -1285,13 +1311,15 @@ mod tests {
     cargo.spec.secrets = vec!["global.ref\n\u{1b}".into()];
     cargo.spec.init_containers = vec![
       serde_json::from_value(serde_json::json!({
-        "Name": "init", "Image": "example", "Secrets": ["init.ref"]
+        "Name": "init", "Image": "example", "Secrets": ["init.ref"],
+        "ImagePullSecret": "init.pull"
       }))
       .unwrap(),
     ];
     cargo.spec.containers = vec![
       serde_json::from_value(serde_json::json!({
-        "Name": "app", "Image": "example", "Secrets": ["app.ref"]
+        "Name": "app", "Image": "example", "Secrets": ["app.ref"],
+        "ImagePullSecret": "app.pull"
       }))
       .unwrap(),
     ];
@@ -1308,7 +1336,7 @@ mod tests {
     // Exercise the real node error builder through the same HTTP error envelope
     // consumed by the client before validating it against the accepted spec.
     let node_error = crate::services::node_start_error(
-      crate::utils::secret::missing_secret_reference("app.ref"),
+      crate::utils::secret::missing_secret_reference("app.pull"),
       operation.key,
       operation.incarnation_key,
       operation.spec_key,
@@ -1321,9 +1349,15 @@ mod tests {
     );
     assert_eq!(
       remote_missing_reference(&client_error, &cargo, &operation).as_deref(),
-      Some("app.ref")
+      Some("app.pull")
     );
-    for name in ["global.ref\n\u{1b}", "init.ref", "app.ref"] {
+    for name in [
+      "global.ref\n\u{1b}",
+      "init.ref",
+      "app.ref",
+      "init.pull",
+      "app.pull",
+    ] {
       let err =
         error(ntex::http::StatusCode::NOT_FOUND, report(name).to_string());
       assert_eq!(
@@ -1516,11 +1550,99 @@ mod tests {
         .contains("private")
       );
     }
-    let init_error = IoError::other("CargoInitContainerExit", "exit code 2");
+    let init_error = IoError::other(
+      "CargoInitContainerExit",
+      "Init container exited with code 2",
+    );
     assert_eq!(
       operation_failure_diagnostic(&init_error, None),
-      "exit code 2"
+      "Init container exited with code 2"
     );
+  }
+
+  #[test]
+  fn cargo_failure_diagnostics_classify_image_pull_without_exposing_payloads() {
+    use bollard_next::errors::Error as DockerError;
+    let pull_error = |error| {
+      IoError::with_context(
+        "DownloadImage",
+        std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+      )
+    };
+    let cases = [
+      (
+        pull_error(DockerError::DockerResponseServerError {
+          status_code: 403,
+          message: "private token".to_owned(),
+        }),
+        "Docker API returned HTTP status 403 while pulling an image",
+      ),
+      (
+        pull_error(DockerError::DockerStreamError {
+          error: "private token".to_owned(),
+        }),
+        "Docker reported an image download failure; inspect Docker logs for details",
+      ),
+      (
+        pull_error(DockerError::DockerStreamError {
+          error: "unauthorized: private token".to_owned(),
+        }),
+        "registry authentication or access appears to have been denied",
+      ),
+      (
+        pull_error(DockerError::DockerStreamError {
+          error: "manifest unknown: private token".to_owned(),
+        }),
+        "the registry reported a missing image manifest",
+      ),
+      (
+        pull_error(DockerError::RequestTimeoutError),
+        "Docker image pull request timed out",
+      ),
+      (
+        IoError::other("DownloadImage", "private token"),
+        "Unable to download an image through Docker; inspect Docker logs for details",
+      ),
+      (
+        IoError::other("GetCredentials", "private token"),
+        "Unable to read image-pull credentials from the configured secret",
+      ),
+      (
+        IoError::other("unknown private token", "private token"),
+        "Accepted Cargo operation failed; inspect the observed runtime before retrying",
+      ),
+      (
+        IoError::other("CargoInitContainerExit", "private token"),
+        "Accepted Cargo operation failed; inspect the observed runtime before retrying",
+      ),
+    ];
+    for (error, expected) in cases {
+      let diagnostic = operation_failure_diagnostic(&error, None);
+      assert_eq!(diagnostic, expected);
+      assert!(!diagnostic.contains("private token"));
+      let operation = uuid::Uuid::from_u128(1);
+      let settled = operation_note(
+        operation,
+        "cargo",
+        "start",
+        true,
+        true,
+        Some(&diagnostic),
+        None,
+      );
+      assert!(settled.contains(expected));
+      let pending = operation_note(
+        operation,
+        "cargo",
+        "start",
+        false,
+        true,
+        Some(&diagnostic),
+        None,
+      );
+      assert!(pending.contains("outcome is unknown"));
+      assert!(!pending.contains(expected));
+    }
   }
 
   #[test]

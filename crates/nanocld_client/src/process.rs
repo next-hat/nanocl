@@ -12,9 +12,9 @@ use nanocl_error::{
 use nanocl_stubs::{
   generic::GenericFilter,
   process::{
-    Process, ProcessExecCreateOptions, ProcessExecCreated, ProcessKillOptions,
-    ProcessLogQuery, ProcessOutputLog, ProcessStats, ProcessStatsQuery,
-    ProcessWaitQuery, ProcessWaitResponse,
+    JobWaitFrame, Process, ProcessExecCreateOptions, ProcessExecCreated,
+    ProcessKillOptions, ProcessLogQuery, ProcessOutputLog, ProcessStats,
+    ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
   },
 };
 
@@ -464,7 +464,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let stream = client.wait_process("job", "my_job", None).await.unwrap();
+  /// let stream = client.wait_process("cargo", "global.my-cargo", None).await.unwrap();
   /// ```
   ///
   pub async fn wait_process(
@@ -473,10 +473,28 @@ impl NanocldClient {
     name: &str,
     query: Option<&ProcessWaitQuery>,
   ) -> HttpClientResult<Receiver<HttpResult<ProcessWaitResponse>>> {
+    if kind == "job" {
+      return Err(
+        IoError::invalid_input("Process wait", "Use wait_job for Job runs")
+          .into(),
+      );
+    }
     let res = self
       .send_get(&format!("{}/{kind}/{name}/wait", Self::PROCESS_PATH), query)
       .await?;
     Ok(Self::res_stream(res).await)
+  }
+
+  /// Wait for a pinned Job run. The stream ends with a terminal outcome frame.
+  pub async fn wait_job(
+    &self,
+    name: &str,
+    query: Option<&ProcessWaitQuery>,
+  ) -> HttpClientResult<Receiver<HttpResult<JobWaitFrame>>> {
+    let res = self
+      .send_get(&format!("{}/job/{name}/wait", Self::PROCESS_PATH), query)
+      .await?;
+    Ok(Self::res_stream_strict(res).await)
   }
 
   /// The stats are streamed as a [Receiver](Receiver) of [stats](Stats)

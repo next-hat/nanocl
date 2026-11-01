@@ -4,7 +4,10 @@ use futures::{StreamExt, stream::FuturesUnordered};
 use indicatif::{MultiProgress, ProgressBar};
 use serde_json::Value;
 
-use nanocl_error::io::{FromIo, IoError, IoResult};
+use nanocl_error::{
+  http_client::{HttpClientError, HttpClientResult},
+  io::{FromIo, IoError, IoResult},
+};
 use nanocld_client::stubs::{
   cargo_spec::{CargoSpec, Config},
   generic::{GenericClause, GenericFilter, GenericFilterNsp},
@@ -46,6 +49,17 @@ fn insert_nanocl_group(
     None => serde_json::json!({
       "io.nanocl.group": group,
     }),
+  }
+}
+
+/// Only a daemon 404 means an object is absent; other failures must stop apply.
+fn optional_read<T>(result: HttpClientResult<T>) -> IoResult<Option<T>> {
+  match result {
+    Ok(value) => Ok(Some(value)),
+    Err(HttpClientError::HttpError(err)) if err.status.as_u16() == 404 => {
+      Ok(None)
+    }
+    Err(err) => Err(err.into()),
   }
 }
 
@@ -245,12 +259,12 @@ async fn state_apply(
           let metadata = insert_nanocl_group(&secret.metadata, nanocl_group);
           secret.metadata = Some(metadata);
           utils::progress::set_state_message(&pg, summary, "Applying", output)?;
-          match client.inspect_secret(&secret.name).await {
-            Err(_) => {
+          match optional_read(client.inspect_secret(&secret.name).await)? {
+            None => {
               client.create_secret(&secret).await?;
               Ok("Created")
             }
-            Ok(inspect) => {
+            Some(inspect) => {
               let cmp: SecretPartial = inspect.into();
               if cmp != secret {
                 let update: SecretUpdate = secret.clone().into();
@@ -281,7 +295,9 @@ async fn state_apply(
         |pg| async move {
           let metadata = insert_nanocl_group(&job.metadata, nanocl_group);
           job.metadata = Some(metadata);
-          if let Ok(previous) = client.inspect_job(&job.name).await {
+          if let Some(previous) =
+            optional_read(client.inspect_job(&job.name).await)?
+          {
             utils::progress::set_state_message(
               &pg, summary, "Clearing", output,
             )?;
@@ -328,8 +344,8 @@ async fn state_apply(
           async move {
             let metadata = insert_nanocl_group(&cargo.metadata, nanocl_group);
             cargo.metadata = Some(metadata);
-            match client.inspect_cargo(key).await {
-              Err(_) => {
+            match optional_read(client.inspect_cargo(key).await)? {
+              None => {
                 utils::progress::set_state_message(
                   &pg, summary, "Creating", output,
                 )?;
@@ -342,7 +358,7 @@ async fn state_apply(
                   client.start_process_operation("cargo", key),
                 ).await?;
               }
-              Ok(inspect) => {
+              Some(inspect) => {
                 let cmp = cargo_spec_from_revision(&inspect.spec);
                 if !cargo_specs_match(&cmp, &cargo) || opts.reload {
                   utils::progress::set_state_message(
@@ -403,8 +419,8 @@ async fn state_apply(
           async move {
             let metadata = insert_nanocl_group(&vm.metadata, nanocl_group);
             vm.metadata = Some(metadata);
-            match client.inspect_vm(key).await {
-              Err(_) => {
+            match optional_read(client.inspect_vm(key).await)? {
+              None => {
                 utils::progress::set_state_message(
                   &pg, summary, "Creating", output,
                 )?;
@@ -424,7 +440,7 @@ async fn state_apply(
                 )
                 .await?;
               }
-              Ok(inspect) => {
+              Some(inspect) => {
                 let cmp: VmSpecPartial = inspect.spec.into();
                 if !vm_specs_match(&cmp, &vm)? || opts.reload {
                   let update: VmSpecUpdate = vm.clone().into();
@@ -477,12 +493,12 @@ async fn state_apply(
           let metadata = insert_nanocl_group(&resource.metadata, nanocl_group);
           resource.metadata = Some(metadata);
           utils::progress::set_state_message(&pg, summary, "Applying", output)?;
-          match client.inspect_resource(&resource.name).await {
-            Err(_) => {
+          match optional_read(client.inspect_resource(&resource.name).await)? {
+            None => {
               client.create_resource(&resource).await?;
               Ok("Created")
             }
-            Ok(inspect) => {
+            Some(inspect) => {
               let cmp: ResourcePartial = inspect.into();
               if (cmp != resource) || opts.reload {
                 let update: ResourceUpdate = resource.clone().into();
@@ -716,6 +732,32 @@ mod tests {
   use ntex::{util::Bytes, web};
 
   use super::*;
+
+  #[test]
+  fn apply_optional_read_only_treats_http_404_as_missing() {
+    use nanocl_error::http::HttpError;
+
+    assert_eq!(optional_read(Ok(7)).unwrap(), Some(7));
+    assert_eq!(
+      optional_read::<()>(Err(HttpError::not_found("missing").into())).unwrap(),
+      None
+    );
+    for status in [401, 403, 500] {
+      let error = HttpError::new(
+        ntex::http::StatusCode::from_u16(status).unwrap(),
+        "daemon read failed",
+      );
+      let error = optional_read::<()>(Err(error.into())).unwrap_err();
+      assert!(error.to_string().contains(&status.to_string()));
+      assert!(error.to_string().contains("daemon read failed"));
+    }
+    let error = IoError::without_context(io::Error::new(
+      io::ErrorKind::NotFound,
+      "socket path missing",
+    ));
+    let error = optional_read::<()>(Err(error.into())).unwrap_err();
+    assert_eq!(error.inner.to_string(), "socket path missing");
+  }
 
   fn cargo_comparison_fixture() -> CargoSpec {
     use nanocld_client::stubs::cargo_spec::ContainerSpec;

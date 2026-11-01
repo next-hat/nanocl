@@ -6,9 +6,10 @@ use bollard_next::{
 };
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
-  job::{JobRunInspect, JobRunState},
+  job::JobRunInspect,
   process::{
-    ProcessKind, ProcessWaitQuery, ProcessWaitResponse, WaitCondition,
+    JobWaitFrame, ProcessKind, ProcessWaitQuery, ProcessWaitResponse,
+    WaitCondition,
   },
 };
 
@@ -101,17 +102,13 @@ pub async fn wait_processes(
   )
 }
 
-/// Only observed exit codes are returned. A run interrupted before creation
-/// fails the stream rather than inventing a container exit code.
-fn job_wait_outcome(
-  run: JobRunInspect,
-) -> Vec<HttpResult<ProcessWaitResponse>> {
-  let mut results = run
+fn job_wait_frames(run: JobRunInspect) -> Vec<JobWaitFrame> {
+  let mut frames = run
     .steps
     .into_iter()
     .filter_map(|step| {
-      step.exit_code.map(|status_code| {
-        Ok(ProcessWaitResponse {
+      step.exit_code.map(|status_code| JobWaitFrame::Step {
+        response: ProcessWaitResponse {
           process_name: step
             .container_id
             .unwrap_or_else(|| format!("step-{}", step.step_index)),
@@ -119,16 +116,23 @@ fn job_wait_outcome(
           error: step.error.map(|message| ContainerWaitExitError {
             message: Some(message),
           }),
-        })
+        },
       })
     })
     .collect::<Vec<_>>();
-  if run.run.state != JobRunState::Succeeded {
-    results.push(Err(HttpError::conflict(run.run.reason.unwrap_or_else(
-      || format!("Job run {} ended as {:?}", run.run.key, run.run.state),
-    ))));
-  }
-  results
+  frames.push(JobWaitFrame::Terminal {
+    run_key: run.run.key,
+    state: run.run.state,
+    reason: run.run.reason,
+  });
+  frames
+}
+
+fn job_wait_poll_diagnostic(key: &str, err: &HttpError) -> String {
+  format!(
+    "Job wait polling failed: job={key:?} error={:?}",
+    err.to_string()
+  )
 }
 
 async fn wait_job(
@@ -137,6 +141,7 @@ async fn wait_job(
 ) -> HttpResult<web::HttpResponse> {
   let job = JobDb::transform_read_by_pk(key, &state.inner.pool).await?;
   let key = key.to_owned();
+  let log_key = key.clone();
   let state = state.clone();
   let stream = futures::stream::once(async move {
     let mut run_key = job.current_run_key;
@@ -151,7 +156,7 @@ async fn wait_job(
         if run.finished_at.is_some() {
           let run =
             JobDb::inspect_run(&key, run_key, &state.inner.pool).await?;
-          return Ok::<_, HttpError>(job_wait_outcome(run));
+          return Ok::<_, HttpError>(run);
         }
       } else {
         // A subscription before the first start pins the incarnation and then
@@ -167,17 +172,37 @@ async fn wait_job(
       }
       ntex::time::sleep(std::time::Duration::from_millis(200)).await;
     }
-  })
-  .map_ok(futures::stream::iter)
-  .try_flatten()
-  .boxed_local();
+  });
+  let stream = stream
+    .map(move |result| {
+      let frames = match result {
+        Ok(run) => job_wait_frames(run),
+        Err(err) => {
+          log::error!("{}", job_wait_poll_diagnostic(&log_key, &err));
+          vec![JobWaitFrame::Error {
+            message: match err.msg.as_str() {
+              "Job incarnation changed while waiting" => {
+                "Job incarnation changed while waiting"
+              }
+              "Job was replaced before a run was accepted" => {
+                "Job was replaced before a run was accepted"
+              }
+              _ => "Unable to inspect the pinned Job run",
+            }
+            .into(),
+          }]
+        }
+      };
+      futures::stream::iter(frames.into_iter().map(Ok::<_, HttpError>))
+    })
+    .flatten()
+    .boxed_local();
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(utils::stream::transform_stream::<
-        ProcessWaitResponse,
-        ProcessWaitResponse,
-      >(stream)),
+      .streaming(
+        utils::stream::transform_stream::<JobWaitFrame, JobWaitFrame>(stream),
+      ),
   )
 }
 
@@ -185,7 +210,7 @@ async fn wait_job(
 mod tests {
   use super::*;
   use nanocl_stubs::job::{
-    JobRun, JobRunOperation, JobRunStep, JobSpec, JobStepState,
+    JobRun, JobRunOperation, JobRunState, JobRunStep, JobSpec, JobStepState,
   };
 
   fn history(state: JobRunState, codes: &[Option<i64>]) -> JobRunInspect {
@@ -244,28 +269,58 @@ mod tests {
   #[test]
   fn job_wait_preserves_step_order_and_actual_exit_codes() {
     let results =
-      job_wait_outcome(history(JobRunState::Succeeded, &[Some(0), Some(0)]));
-    assert_eq!(results.len(), 2);
-    assert_eq!(results[0].as_ref().unwrap().process_name, "immutable-0");
-    assert_eq!(results[1].as_ref().unwrap().process_name, "immutable-1");
+      job_wait_frames(history(JobRunState::Failed, &[Some(17), None, Some(0)]));
+    assert_eq!(results.len(), 3);
     assert!(
-      results
-        .iter()
-        .all(|result| result.as_ref().unwrap().status_code == 0)
+      matches!(&results[0], JobWaitFrame::Step {response} if response.process_name == "immutable-0" && response.status_code == 17)
     );
-    let failed =
-      job_wait_outcome(history(JobRunState::Failed, &[Some(17), None]));
-    assert_eq!(failed.len(), 2);
-    assert_eq!(failed[0].as_ref().unwrap().status_code, 17);
-    assert!(failed[1].is_err());
+    assert!(
+      matches!(&results[1], JobWaitFrame::Step {response} if response.process_name == "immutable-2" && response.status_code == 0)
+    );
+    assert!(matches!(
+      &results[2],
+      JobWaitFrame::Terminal {
+        state: JobRunState::Failed,
+        ..
+      }
+    ));
   }
 
   #[test]
-  fn job_wait_does_not_manufacture_exit_codes_for_unobserved_steps() {
-    let interrupted =
-      job_wait_outcome(history(JobRunState::Interrupted, &[None, None]));
-    assert_eq!(interrupted.len(), 1);
-    assert!(interrupted[0].is_err());
+  fn job_wait_reports_pinned_terminal_without_fabricated_exit() {
+    for state in [JobRunState::Failed, JobRunState::Interrupted] {
+      let run = history(state, &[None]);
+      let run_key = run.run.key;
+      let frames = job_wait_frames(run);
+      assert_eq!(frames.len(), 1);
+      assert!(matches!(&frames[0], JobWaitFrame::Terminal {
+        run_key: actual, state: actual_state, reason: Some(reason),
+      } if *actual == run_key && *actual_state == state && reason == "recorded outcome"));
+    }
+    let frames = job_wait_frames(history(JobRunState::Succeeded, &[Some(0)]));
+    assert!(
+      matches!(&frames[0], JobWaitFrame::Step { response } if response.status_code == 0)
+    );
+    assert!(matches!(
+      &frames[1],
+      JobWaitFrame::Terminal {
+        state: JobRunState::Succeeded,
+        ..
+      }
+    ));
+  }
+
+  #[test]
+  fn job_wait_poll_diagnostic_contains_escaped_error_details() {
+    let err =
+      HttpError::bad_gateway("Database context: sensitive detail\nsecond line");
+    let diagnostic = job_wait_poll_diagnostic("job\nname", &err);
+    assert!(diagnostic.contains("job=\"job\\nname\""));
+    assert!(diagnostic.contains("502 Bad Gateway"));
+    assert!(
+      diagnostic.contains("Database context: sensitive detail\\nsecond line")
+    );
+    assert!(!diagnostic.contains('\n'));
   }
 }
 
