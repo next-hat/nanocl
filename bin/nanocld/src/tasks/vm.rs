@@ -376,15 +376,23 @@ where
       if settled && !completed {
         match VmDb::complete_operation(
           &accepted_operation,
-          if result.is_ok() { "completed" } else { "failed" },
-          result.as_ref().err().map(|_| serde_json::json!({
-            "Failure": "VM execution failed; inspect the corresponding VM error event",
-            "Operation": operation,
-            "Stage": "runtime-execution"
-          })),
+          if result.is_ok() {
+            "completed"
+          } else {
+            "failed"
+          },
+          result.as_ref().err().map(|error| {
+            serde_json::json!({
+              "Failure": vm_failure_diagnostic(error),
+              "Operation": operation,
+              "Stage": "runtime-execution"
+            })
+          }),
           lease.clone(),
           &task_state.inner.pool,
-        ).await {
+        )
+        .await
+        {
           Ok(committed) => completed = committed,
           Err(error) => log::error!(
             "VM operation completion persistence failed: {key} operation={operation}: {error}"
@@ -528,9 +536,39 @@ fn completion_notification(
   }
   let (kind, note) = match result {
     Ok(()) => (EventKind::Normal, format!("Vm {key}")),
-    Err(error) => (EventKind::Error, error.to_string()),
+    Err(error) => (EventKind::Error, vm_failure_diagnostic(error)),
   };
   (action, kind, "state_sync", note)
+}
+
+fn vm_failure_diagnostic(error: &IoError) -> String {
+  if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
+  {
+    return format!("VM execution failed: {detail}");
+  }
+  if let Some(bollard_next::errors::Error::DockerResponseServerError {
+    status_code,
+    ..
+  }) = error
+    .inner
+    .get_ref()
+    .and_then(|source| source.downcast_ref::<bollard_next::errors::Error>())
+  {
+    return format!("VM execution failed: Docker HTTP {status_code}");
+  }
+  let detail = match error.inner.kind() {
+    std::io::ErrorKind::PermissionDenied => Some("permission denied"),
+    std::io::ErrorKind::TimedOut => Some("timed out"),
+    std::io::ErrorKind::ConnectionRefused => Some("connection refused"),
+    std::io::ErrorKind::ConnectionReset => Some("connection reset"),
+    _ => None,
+  };
+  match detail {
+    Some(detail) => format!("VM execution failed: {detail}"),
+    None => {
+      "VM execution failed; inspect the VM runtime and daemon logs".to_owned()
+    }
+  }
 }
 
 fn require_committed_result(
@@ -688,6 +726,33 @@ mod tests {
   }
 
   #[test]
+  fn vm_persisted_failure_reports_safe_specific_causes() {
+    use nanocl_error::io::FromIo;
+
+    let missing = utils::secret::missing_secret_reference("registry.test");
+    assert!(vm_failure_diagnostic(&missing).contains("registry.test"));
+    let docker = bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 503,
+      message: "secret-value-must-not-persist".into(),
+    };
+    let diagnostic = vm_failure_diagnostic(&docker.map_err_context(|| "VM"));
+    assert!(diagnostic.contains("Docker HTTP 503"));
+    assert!(!diagnostic.contains("secret-value"));
+    let timed_out = IoError::with_context(
+      "VM",
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "secret-value-must-not-persist",
+      ),
+    );
+    let diagnostic = vm_failure_diagnostic(&timed_out);
+    assert!(diagnostic.contains("timed out"));
+    assert!(!diagnostic.contains("secret-value"));
+    let other = IoError::other("VM", "secret-value-must-not-persist");
+    assert!(!vm_failure_diagnostic(&other).contains("secret-value"));
+  }
+
+  #[test]
   fn vm_completion_notifications_distinguish_pending_operations() {
     for action in [
       NativeEventAction::Start,
@@ -725,7 +790,7 @@ mod tests {
           note,
           match &result {
             Ok(()) => "Vm global.vm".to_owned(),
-            Err(error) => error.to_string(),
+            Err(error) => vm_failure_diagnostic(error),
           }
         );
       }
