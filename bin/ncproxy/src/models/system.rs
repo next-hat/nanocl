@@ -22,6 +22,8 @@ pub struct SystemState {
   pub nginx_dir: String,
   /// Serializes every nginx configuration mutation and validation cycle.
   pub config_lock: Arc<Mutex<()>>,
+  /// Holds both controller admission locks until the process shuts down.
+  pub _controller_locks: Option<Arc<(std::fs::File, std::fs::File)>>,
 }
 
 pub type SystemStateRef = Arc<SystemState>;

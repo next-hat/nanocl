@@ -30,6 +30,13 @@ async fn main() -> std::io::Result<()> {
     }
   }
   logger::enable_logger("ncproxy");
+  if cli.recover_nginx_fences {
+    if let Err(err) = utils::nginx::recover_fences(&cli.state_dir) {
+      err.print_and_exit();
+    }
+    log::info!("nginx startup fences recovered");
+    return Ok(());
+  }
   log::info!(
     "ncproxy_{}_v{}-{}:{}",
     vars::ARCH,

@@ -205,6 +205,7 @@ pub(crate) mod tests {
       store: Store::new(config.state_dir.to_str().unwrap()),
       nginx_dir: "/etc/nginx".to_owned(),
       config_lock: Arc::new(futures::lock::Mutex::new(())),
+      _controller_locks: None,
     });
     super::nginx::ensure_conf(&system_state).await.unwrap();
     // Create test server

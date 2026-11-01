@@ -13,6 +13,7 @@ use crate::{
 use super::event;
 
 pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
+  let controller_locks = nginx::controller_locks(&cli.state_dir)?;
   #[cfg(any(feature = "dev", feature = "test"))]
   let client = {
     use nanocld_client::ConnectOpts;
@@ -32,11 +33,11 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
     store: Store::new(&cli.state_dir),
     nginx_dir: cli.nginx_dir.clone(),
     config_lock,
+    _controller_locks: Some(controller_locks),
   });
-  // Do not block startup on nanocld availability; the event loop handles retries.
-  if let Err(err) = crate::utils::nginx::ensure_conf(&state).await {
-    log::warn!("init: unable to ensure nginx conf at startup: {err}");
-  }
+  // Admission and the first configuration/start happen before any background
+  // task can mutate files or race an uncertain predecessor.
+  nginx::initialize(&state).await?;
   nginx::spawn(&state);
   event::spawn(&state);
   Ok(state)
