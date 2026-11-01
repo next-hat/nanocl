@@ -443,12 +443,32 @@ mod tests {
       .await
       .unwrap();
     assert_eq!(job.spec.name, "my_test_job");
-    let mut stream = client
-      .wait_process("job", &job.spec.name, None)
-      .await
-      .unwrap();
+    let mut stream = client.wait_job(&job.spec.name, None).await.unwrap();
     client.start_process("job", &job.spec.name).await.unwrap();
-    while let Some(Ok(_)) = stream.next().await {}
+    let mut terminal_seen = false;
+    while let Some(frame) = stream.next().await {
+      assert!(!terminal_seen, "frame after Job terminal outcome");
+      match frame.expect("Job wait stream failed") {
+        nanocl_stubs::process::JobWaitFrame::Step { response } => {
+          assert_eq!(response.status_code, 0, "Job step failed");
+          assert!(response.error.is_none(), "Job step returned a wait error");
+        }
+        nanocl_stubs::process::JobWaitFrame::Terminal {
+          state, reason, ..
+        } => {
+          assert_eq!(
+            state,
+            nanocl_stubs::job::JobRunState::Succeeded,
+            "Job failed: {reason:?}"
+          );
+          terminal_seen = true;
+        }
+        nanocl_stubs::process::JobWaitFrame::Error { message } => {
+          panic!("Job wait failed: {message}");
+        }
+      }
+    }
+    assert!(terminal_seen, "Job wait ended without a terminal outcome");
     let job = client.inspect_job(&job.spec.name).await.unwrap();
     client.delete_job(&job.spec.name).await.unwrap();
   }
