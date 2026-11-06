@@ -47,6 +47,8 @@ const GLOBAL_PENDING: &str = "ncproxy-nginx.pending";
 const STATE_CONTROLLER_LOCK: &str = ".ncproxy-controller.lock";
 const STATE_START_FENCE: &str = ".ncproxy-nginx.fence";
 const STATE_PENDING: &str = ".ncproxy-nginx.pending";
+const GLOBAL_CONFIG_PENDING: &str = "ncproxy-config.pending";
+const STATE_CONFIG_PENDING: &str = ".ncproxy-config.pending";
 const FENCE_READY: &[u8] = b"ncproxy-fence-v1 ready\n";
 
 fn apply_location_options(
@@ -130,6 +132,7 @@ async fn ensure_conf_locked(state: &SystemStateRef) -> IoResult<()> {
     "state_dir": state_ref.store.dir,
     "health_generation": new_health_generation()?,
   }))?;
+  begin_config_operation(&state.store)?;
   web::block(move || {
     [
       "sites-available",
@@ -153,6 +156,8 @@ async fn ensure_conf_locked(state: &SystemStateRef) -> IoResult<()> {
   );
   std::fs::write(conf_path, default_conf)?;
   self::test(&state.store).await?;
+  sync_config(&state.store, &[])?;
+  finish_config_operation(&state.store)?;
   Ok(())
 }
 
@@ -237,10 +242,25 @@ fn require_no_pending(store: &Store) -> IoResult<()> {
 }
 
 fn require_no_pending_in(state_dir: &str, run_dir: &str) -> IoResult<()> {
-  for path in [
+  require_no_process_pending_in(state_dir, run_dir)?;
+  require_absent(&[
+    format!("{run_dir}/{GLOBAL_CONFIG_PENDING}"),
+    format!("{state_dir}/{STATE_CONFIG_PENDING}"),
+  ])
+}
+
+fn require_no_process_pending_in(
+  state_dir: &str,
+  run_dir: &str,
+) -> IoResult<()> {
+  require_absent(&[
     format!("{run_dir}/{GLOBAL_PENDING}"),
     format!("{state_dir}/{STATE_PENDING}"),
-  ] {
+  ])
+}
+
+fn require_absent(paths: &[String]) -> IoResult<()> {
+  for path in paths {
     match fs::symlink_metadata(path) {
       Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
       Err(err) => return Err(err.into()),
@@ -323,6 +343,17 @@ fn recover_fences_in(state_dir: &str, run_dir: &str) -> IoResult<()> {
   ensure_recovery_pending(&format!("{state_dir}/{STATE_PENDING}"), state_dir)?;
   write_fence(&mut local, FENCE_READY, state_dir)?;
   write_fence(&mut global, FENCE_READY, run_dir)?;
+  // Recovery is explicitly authorized only after all nginx processes stop.
+  for (dir, name) in [
+    (run_dir, GLOBAL_CONFIG_PENDING),
+    (state_dir, STATE_CONFIG_PENDING),
+  ] {
+    ensure_recovery_pending(&format!("{dir}/{name}"), dir)?;
+  }
+  finish_config_operation(&Store {
+    dir: state_dir.to_owned(),
+    run_dir: run_dir.to_owned(),
+  })?;
   finish_nginx_operation_in(state_dir, run_dir)
 }
 
@@ -331,7 +362,7 @@ fn begin_nginx_operation(store: &Store) -> IoResult<()> {
 }
 
 fn begin_nginx_operation_in(state_dir: &str, run_dir: &str) -> IoResult<()> {
-  require_no_pending_in(state_dir, run_dir)?;
+  require_no_process_pending_in(state_dir, run_dir)?;
   // Create and sync the global marker first, so a crash during the local
   // marker creation cannot admit a controller using another state directory.
   create_pending(&format!("{run_dir}/{GLOBAL_PENDING}"), run_dir)?;
@@ -347,6 +378,64 @@ fn finish_nginx_operation_in(state_dir: &str, run_dir: &str) -> IoResult<()> {
   File::open(state_dir)?.sync_all()?;
   fs::remove_file(format!("{run_dir}/{GLOBAL_PENDING}"))?;
   File::open(run_dir)?.sync_all()?;
+  Ok(())
+}
+
+// Configuration and subprocess markers have separate lifetimes: nginx -t
+// must never clear the transaction protecting earlier file mutations.
+fn begin_config_operation(store: &Store) -> IoResult<()> {
+  require_no_pending(store)?;
+  create_pending(
+    &format!("{}/{GLOBAL_CONFIG_PENDING}", store.run_dir),
+    &store.run_dir,
+  )?;
+  create_pending(&format!("{}/{STATE_CONFIG_PENDING}", store.dir), &store.dir)
+}
+
+fn finish_config_operation(store: &Store) -> IoResult<()> {
+  fs::remove_file(format!("{}/{STATE_CONFIG_PENDING}", store.dir))?;
+  File::open(&store.dir)?.sync_all()?;
+  fs::remove_file(format!("{}/{GLOBAL_CONFIG_PENDING}", store.run_dir))?;
+  File::open(&store.run_dir)?.sync_all()?;
+  Ok(())
+}
+
+fn sync_config(store: &Store, credentials: &[&str]) -> IoResult<()> {
+  for name in [
+    "sites-available",
+    "sites-enabled",
+    "streams-available",
+    "streams-enabled",
+  ] {
+    let path = format!("{}/{name}", store.dir);
+    for entry in fs::read_dir(&path)? {
+      let entry = entry?;
+      if entry.file_type()?.is_file() {
+        File::open(entry.path())?.sync_all()?;
+      }
+    }
+    File::open(path)?.sync_all()?;
+  }
+  for path in credentials
+    .iter()
+    .map(|p| p.to_string())
+    .chain([gen_conf_path(&store.dir)])
+  {
+    match File::open(&path) {
+      Ok(file) => file.sync_all()?,
+      Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
+      Err(err) => return Err(err.into()),
+    }
+    // A rejected candidate can reference a parent that never existed.
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+      match File::open(parent) {
+        Ok(dir) => dir.sync_all()?,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
+        Err(err) => return Err(err.into()),
+      }
+    }
+  }
+  File::open(&store.dir)?.sync_all()?;
   Ok(())
 }
 
@@ -757,7 +846,10 @@ fn check_nginx_output(output: std::process::Output) -> IoResult<()> {
 }
 
 /// Do not capture streams inherited by the daemon: EOF may never arrive.
-async fn start_nginx_cmd(store: &Store, fences: &(File, File)) -> IoResult<()> {
+async fn start_nginx_cmd(
+  store: &Store,
+  fences: &(File, File),
+) -> IoResult<std::process::ExitStatus> {
   let mut command = nginx_command(&[], store);
   let fds = [fences.0.as_raw_fd(), fences.1.as_raw_fd()];
   // The parent retains close-on-exec. Only the child clears it, so nginx's
@@ -781,13 +873,7 @@ async fn start_nginx_cmd(store: &Store, fences: &(File, File)) -> IoResult<()> {
   )
   .await
   .map_err(|_| IoError::other("exec", "nginx start timed out"))??;
-  if status.success() {
-    return Ok(());
-  }
-  Err(IoError::other(
-    "exec",
-    &format!("nginx failed to start with status {status}"),
-  ))
+  Ok(status)
 }
 
 fn confirm_health_socket_absent(path: &str) -> IoResult<()> {
@@ -889,10 +975,18 @@ async fn start_with_fences(
   // A crash or cancellation at any point after this leaves a persistent
   // ambiguous state. Never infer safety from a free lock in that case.
   begin_nginx_operation(store)?;
-  start_nginx_cmd(store, &fences).await?;
+  let status = start_nginx_cmd(store, &fences).await?;
+  if !status.success() {
+    settle_failed_start(store, fences)?;
+    return Err(IoError::other(
+      "nginx start",
+      &format!("nginx failed to start with status {status}"),
+    ));
+  }
   let conf = fs::read_to_string(&conf_path)?;
   let generation = health_generation(&conf)?;
-  timeout(READY_TIMEOUT, async {
+  let mut observed_master = None;
+  let ready = timeout(READY_TIMEOUT, async {
     // The daemonizing parent can exit before its child publishes the PID file
     // and updates its process title. Only this post-launch wait retries both.
     let master = loop {
@@ -901,6 +995,7 @@ async fn start_with_fences(
       }
       ntex::time::sleep(Duration::from_millis(100)).await;
     };
+    observed_master = Some(master);
     if !master_holds_fence(master, &fences.0)?
       || !master_holds_fence(master, &fences.1)?
       || nginx_master(store)? != Some(master)
@@ -928,8 +1023,32 @@ async fn start_with_fences(
       "nginx start",
       "master and worker did not become ready within 10s",
     )
-  })??;
+  })
+  .and_then(|result| result);
+  if let Err(err) = ready {
+    if let Some(master) = observed_master
+      && managed_master_holds_fences(store, master)?
+    {
+      finish_nginx_operation(store)?;
+    }
+    return Err(err);
+  }
   finish_nginx_operation(store)?;
+  Ok(())
+}
+
+// Drop, never unlock, our inherited open-file descriptions. A separately
+// opened fence can be acquired only when no launcher/child retains its lock.
+fn settle_failed_start(store: &Store, fences: (File, File)) -> IoResult<()> {
+  drop(fences);
+  let global = open_lock(&format!("{}/{GLOBAL_START_FENCE}", store.run_dir))?;
+  let local = open_lock(&format!("{}/{STATE_START_FENCE}", store.dir))?;
+  if lock_exclusive(&global)?
+    && lock_exclusive(&local)?
+    && nginx_master(store)?.is_none()
+  {
+    finish_nginx_operation(store)?;
+  }
   Ok(())
 }
 
@@ -983,8 +1102,12 @@ pub async fn reload(store: &Store) -> IoResult<()> {
   let previous = child_processes(master.0)?;
   let conf = fs::read_to_string(&conf_path)?;
   let generation = new_health_generation()?;
-  fs::write(&conf_path, replace_health_generation(&conf, &generation)?)?;
+  let updated = replace_health_generation(&conf, &generation)?;
+  begin_config_operation(store)?;
+  fs::write(&conf_path, updated)?;
   self::test(store).await?;
+  sync_config(store, &[])?;
+  finish_config_operation(store)?;
   if nginx_master(store)? != Some(master) {
     return Err(IoError::other(
       "nginx reload",
@@ -1055,7 +1178,16 @@ async fn rollback_config(
   store: &Store,
 ) -> IoResult<()> {
   match store.restore_config(snapshot).await {
-    Ok(()) => Err(original_error),
+    Ok(()) => {
+      let paths = snapshot
+        .credentials
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+      sync_config(store, &paths)?;
+      finish_config_operation(store)?;
+      Err(original_error)
+    }
     Err(rollback_error) => Err(IoError::other(
       "nginx configuration rollback",
       &format!(
@@ -1075,10 +1207,14 @@ where
   Fut: Future<Output = IoResult<()>>,
 {
   let snapshot = store.snapshot_config(credential_paths).await?;
+  begin_config_operation(store)?;
   match operation().await {
-    Ok(()) => Ok(()),
+    Ok(()) => {
+      sync_config(store, credential_paths)?;
+      finish_config_operation(store)
+    }
     Err(err) => {
-      if require_no_pending(store).is_err() {
+      if require_no_process_pending_in(&store.dir, &store.run_dir).is_err() {
         return Err(IoError::other(
           "nginx configuration",
           &format!(
@@ -1973,6 +2109,202 @@ mod tests {
       drop(operation);
       assert!(require_no_pending(&store).is_err());
     }
+  }
+
+  #[ntex::test]
+  async fn configuration_pending_covers_writes_validation_and_cancellation() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let (written, wait) = futures::channel::oneshot::channel();
+    let mut transaction = Box::pin(config_transaction(&store, &[], || async {
+      assert!(require_no_pending(&store).is_err());
+      store
+        .write_conf_file("partial", "candidate", &NginxRuleKind::Site)
+        .await?;
+      // A completed subprocess must not clear the outer transaction.
+      begin_nginx_operation(&store)?;
+      finish_nginx_operation(&store)?;
+      assert!(require_no_pending(&store).is_err());
+      written.send(()).unwrap();
+      futures::future::pending::<IoResult<()>>().await
+    }));
+    match futures::future::select(wait, transaction.as_mut()).await {
+      futures::future::Either::Left((Ok(()), _)) => (),
+      _ => panic!("transaction ended before its candidate was written"),
+    }
+    drop(transaction);
+    assert!(require_no_pending(&store).is_err());
+    assert!(admit_fences(&store).is_err());
+  }
+
+  #[ntex::test]
+  async fn configuration_rollback_clears_only_completed_transactions() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let result = config_transaction(&store, &[], || async {
+      store
+        .write_conf_file("candidate", "bad", &NginxRuleKind::Site)
+        .await?;
+      Err(IoError::other("candidate", "rejected"))
+    })
+    .await;
+    assert!(result.is_err());
+    require_no_pending(&store).unwrap();
+    assert!(store.snapshot_config(&[]).await.unwrap().sites.is_empty());
+    let result = config_transaction(&store, &[], || async {
+      begin_nginx_operation(&store)?;
+      Err(IoError::other("exec", "timeout"))
+    })
+    .await;
+    assert!(result.unwrap_err().to_string().contains("rollback skipped"));
+    assert!(require_no_pending(&store).is_err());
+    assert!(dir.path().join(STATE_CONFIG_PENDING).exists());
+  }
+
+  #[test]
+  fn failed_start_clears_pending_only_without_inherited_fences() {
+    for inherited in [false, true] {
+      let dir = TestDir::new();
+      let store = Store::isolated(dir.path().to_str().unwrap());
+      let fences = admit_fences(&store).unwrap().unwrap();
+      let child = inherited.then(|| fences.0.try_clone().unwrap());
+      begin_nginx_operation(&store).unwrap();
+      settle_failed_start(&store, fences).unwrap();
+      assert_eq!(require_no_pending(&store).is_err(), inherited);
+      drop(child);
+    }
+  }
+
+  #[test]
+  fn admission_rejects_partial_locks_and_unidentified_holders() {
+    for hold_global in [false, true] {
+      let dir = TestDir::new();
+      let store = Store::isolated(dir.path().to_str().unwrap());
+      let (global, local) = admit_fences(&store).unwrap().unwrap();
+      let held = if hold_global {
+        drop(local);
+        global
+      } else {
+        drop(global);
+        local
+      };
+      assert!(
+        admit_fences(&store)
+          .unwrap_err()
+          .to_string()
+          .contains("different owners")
+      );
+      drop(held);
+      assert!(admit_fences(&store).unwrap().is_some());
+    }
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let fences = admit_fences(&store).unwrap().unwrap();
+    assert!(
+      admit_fences(&store)
+        .unwrap_err()
+        .to_string()
+        .contains("ownership is ambiguous")
+    );
+    fs::write(dir.path().join(STATE_START_FENCE), "incomplete").unwrap();
+    assert!(
+      admit_fences(&store)
+        .unwrap_err()
+        .to_string()
+        .contains("incomplete or invalid")
+    );
+    drop(fences);
+    fs::write(dir.path().join(GLOBAL_START_FENCE), "incomplete").unwrap();
+    let error = admit_fences(&store).unwrap_err();
+    assert!(
+      error.inner.to_string().contains("global startup state"),
+      "{error}"
+    );
+  }
+
+  #[test]
+  fn locks_reject_symlinks_hardlinks_and_shared_write_permissions() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let dir = TestDir::new();
+    let path = dir.path().join("lock");
+    let link = dir.path().join("link");
+    let file = open_lock(path.to_str().unwrap()).unwrap();
+    symlink(&path, &link).unwrap();
+    assert!(open_lock(link.to_str().unwrap()).is_err());
+    fs::remove_file(&link).unwrap();
+    fs::hard_link(&path, &link).unwrap();
+    assert!(open_lock(path.to_str().unwrap()).is_err());
+    fs::remove_file(link).unwrap();
+    file
+      .set_permissions(fs::Permissions::from_mode(0o660))
+      .unwrap();
+    assert!(open_lock(path.to_str().unwrap()).is_err());
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o777)).unwrap();
+    let path = dir.path().to_str().unwrap();
+    assert!(controller_locks_in(path, path).is_err());
+  }
+
+  #[test]
+  fn recovery_preserves_unsafe_configuration_markers_until_corrected() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let path = dir.path().to_str().unwrap();
+    begin_config_operation(&store).unwrap();
+    let marker = dir.path().join(STATE_CONFIG_PENDING);
+    fs::remove_file(&marker).unwrap();
+    std::os::unix::fs::symlink("missing", &marker).unwrap();
+    assert!(recover_fences_in(path, path).is_err());
+    assert!(fs::symlink_metadata(&marker).unwrap().is_symlink());
+    assert!(require_no_pending(&store).is_err());
+    fs::remove_file(marker).unwrap();
+    recover_fences_in(path, path).unwrap();
+    require_no_pending(&store).unwrap();
+    assert!(admit_fences(&store).unwrap().is_some());
+  }
+
+  #[ntex::test]
+  async fn failed_configuration_sync_keeps_startup_blocked() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let result = config_transaction(&store, &[], || async {
+      fs::remove_dir(dir.path().join("sites-enabled"))?;
+      fs::write(dir.path().join("sites-enabled"), "broken directory")?;
+      Ok(())
+    })
+    .await;
+    assert!(result.is_err());
+    assert!(require_no_pending(&store).is_err());
+    assert!(admit_fences(&store).is_err());
+  }
+
+  #[ntex::test]
+  async fn startup_preflight_preserves_unrelated_paths_without_launching() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let fences = admit_fences(&store).unwrap().unwrap();
+    fs::create_dir(nginx_pid_path(&store)).unwrap();
+    assert!(start_with_fences(&store, fences).await.is_err());
+    assert!(std::path::Path::new(&nginx_pid_path(&store)).is_dir());
+    fs::remove_dir(nginx_pid_path(&store)).unwrap();
+    let socket = dir.path().join("nginx-health.sock");
+    fs::write(&socket, "keep").unwrap();
+    assert!(ensure_started(&store).await.is_err());
+    assert_eq!(fs::read_to_string(socket).unwrap(), "keep");
+    require_no_pending(&store).unwrap();
+  }
+
+  #[ntex::test]
+  async fn readiness_rejects_a_disappeared_master_without_probing() {
+    let dir = TestDir::new();
+    let store = Store::isolated(dir.path().to_str().unwrap());
+    let error = wait_for_worker(&store, (42, 1), GENERATION, &[])
+      .await
+      .unwrap_err();
+    assert!(
+      error.inner.to_string().contains("master changed"),
+      "{error}"
+    );
+    assert!(!managed_master_holds_fences(&store, (42, 1)).unwrap());
   }
 
   #[test]

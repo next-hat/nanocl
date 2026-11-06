@@ -76,7 +76,17 @@ operator resolves that ambiguity. A completed configuration-validation failure
 clears its markers. A completed reload-command failure or worker-readiness
 failure also clears them when the same managed nginx master still holds both
 startup fences. Command timeouts, cancellation, and unverifiable master or
-fence ownership retain the markers.
+fence ownership retain the markers. Reaped startup failures clear their markers
+only after the controller drops its inherited descriptors, independently
+reacquires both fences, and verifies that no managed master exists. A startup
+readiness failure can also settle when the same master still holds both fences.
+
+Separate configuration markers cover rule and credential mutations, validation,
+and rollback. They are removed only after the completed configuration has been
+synchronized to disk; interrupted writes and incomplete rollback block startup.
+These markers are `ncproxy-config.pending` in the runtime directory and
+`.ncproxy-config.pending` in the state directory. Explicit stopped-process
+recovery clears them after the operator has restored a complete configuration.
 Startup/configuration errors now prevent ncproxy from starting, rather than
 continuing with background retries.
 
