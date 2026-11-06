@@ -52,7 +52,7 @@ pub struct StateDiffOpts {
   /// Show planned actions and counts instead of the full configuration diff
   #[clap(long, conflicts_with = "json")]
   pub summary: bool,
-  /// Keep the diff open in a pager (default in interactive terminals)
+  /// Keep output open in a pager (interactive default for full diffs only)
   #[clap(long, conflicts_with_all = ["no_pager", "json"])]
   pub pager: bool,
   /// Print directly to the terminal without a pager

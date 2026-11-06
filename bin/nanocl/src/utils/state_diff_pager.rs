@@ -75,7 +75,11 @@ fn should_page(
   terminal: bool,
   term: Option<&OsStr>,
 ) -> bool {
-  !opts.json && !opts.no_pager && terminal && term != Some(OsStr::new("dumb"))
+  !opts.json
+    && !opts.no_pager
+    && (!opts.summary || opts.pager)
+    && terminal
+    && term != Some(OsStr::new("dumb"))
 }
 
 fn pager_command() -> Command {
@@ -103,7 +107,7 @@ mod tests {
 
   #[test]
   fn paging_requires_interactive_text_and_respects_direct_output() {
-    for flags in [vec![], vec!["--pager"], vec!["--summary"]] {
+    for flags in [vec![], vec!["--pager"], vec!["--summary", "--pager"]] {
       let opts =
         StateDiffOpts::try_parse_from(["diff"].into_iter().chain(flags))
           .unwrap();
@@ -112,9 +116,17 @@ mod tests {
       assert!(!should_page(&opts, false, Some(OsStr::new("xterm"))));
       assert!(!should_page(&opts, true, Some(OsStr::new("dumb"))));
     }
-    for flag in ["--json", "--no-pager"] {
-      let opts = StateDiffOpts::try_parse_from(["diff", flag]).unwrap();
+    for flags in [
+      vec!["--json"],
+      vec!["--no-pager"],
+      vec!["--summary"],
+      vec!["--summary", "--no-pager"],
+    ] {
+      let opts =
+        StateDiffOpts::try_parse_from(["diff"].into_iter().chain(flags))
+          .unwrap();
       assert!(!should_page(&opts, true, Some(OsStr::new("xterm"))));
+      assert!(!should_page(&opts, true, None));
     }
   }
 
@@ -122,9 +134,16 @@ mod tests {
   fn summary_selects_action_output_without_changing_default_or_json() {
     let diff = StateDiff::new(Vec::new());
     let summary = StateDiffOpts::try_parse_from(["diff", "--summary"]).unwrap();
+    assert!(!should_page(&summary, true, Some(OsStr::new("xterm"))));
     let mut output = Vec::new();
     write_output(&diff, &summary, &mut output, 80).unwrap();
     assert_eq!(output, b"No changes.\n");
+    let paged =
+      StateDiffOpts::try_parse_from(["diff", "--summary", "--pager"]).unwrap();
+    assert!(should_page(&paged, true, Some(OsStr::new("xterm"))));
+    let mut paged_output = Vec::new();
+    write_output(&diff, &paged, &mut paged_output, 80).unwrap();
+    assert_eq!(paged_output, output);
     let default = StateDiffOpts::try_parse_from(["diff"]).unwrap();
     output.clear();
     write_output(&diff, &default, &mut output, 80).unwrap();

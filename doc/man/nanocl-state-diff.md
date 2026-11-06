@@ -34,10 +34,11 @@ confirmation.
 Summary rows follow apply order and wrap to fit the terminal without shortening
 object names. Reasons appear below the affected object, including why an orphan
 is kept or removed. When no actions change the state, the summary explicitly
-reports `No changes.`.
+reports `No changes.`. Summaries print directly by default; add --pager to keep
+a summary open in `less`.
 
-With terminal input and output and `TERM` other than `dumb`, text opens in
-`less` and stays open until you press `q`, even for a short diff. Scroll with
+With terminal input and output and `TERM` other than `dumb`, the full diff opens
+in `less` and stays open until you press `q`, even for a short diff. Scroll with
 arrow keys or PageUp/PageDown, search with `/`, and quit with `q`. Redirected or
 piped output and JSON always print directly. If `less` is unavailable, text
 prints directly. Empty default diffs stay silent; summaries report the plan
@@ -70,12 +71,12 @@ Cannot be combined with --pager or --summary.
 **--summary**\
 Print a compact list of planned create, update, remove, and unchanged actions
 with totals. Include forced updates, changes to sensitive fields, and retained
-or removed orphans without printing configuration values. Cannot be combined
-with --json.
+or removed orphans without printing configuration values. Print directly unless
+--pager is also supplied. Cannot be combined with --json.
 
 **--pager**\
-Explicitly select the default behavior: keep even a short diff open in `less`
-until you press `q`. Requires terminal input and output and `TERM` other than
+Keep even a short diff or summary open in `less` until you press `q`. This is the
+default for full diffs. Requires terminal input and output and `TERM` other than
 `dumb`; redirected or piped output still prints directly. Cannot be combined
 with --no-pager or --json.
 
@@ -94,7 +95,8 @@ Additional arguments to pass to the Statefile template
 nanocl state diff -s Statefile.yml
 nanocl state diff -s Statefile.yml --remove-orphans
 nanocl state diff -s Statefile.yml --json
-nanocl state diff -s Statefile.yml --summary --no-pager
+nanocl state diff -s Statefile.yml --summary
+nanocl state diff -s Statefile.yml --summary --pager
 nanocl state diff -s Statefile.yml --pager
 nanocl state diff -s Statefile.yml --no-pager
 nanocl state diff -s Statefile.yml > preview.diff

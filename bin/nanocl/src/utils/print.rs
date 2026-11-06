@@ -81,33 +81,46 @@ pub(crate) fn wrap_lines(text: &str, width: usize, indent: usize) -> String {
     // combining marks, flags, and ZWJ emoji intact. Their summed widths are a
     // conservative budget for cross-grapheme ligatures in overflowing text;
     // these may wrap earlier, while every character remains in the output.
-    let graphemes = paragraph
-      .grapheme_indices(true)
-      .map(|(index, grapheme)| {
-        (
+    let mut units = Vec::new();
+    for (index, grapheme) in paragraph.grapheme_indices(true) {
+      let grapheme_width = measure_text_width(grapheme);
+      if grapheme_width <= available {
+        units.push((
           index + grapheme.len(),
-          measure_text_width(grapheme),
+          grapheme_width,
           grapheme.chars().next().is_some_and(char::is_whitespace),
-        )
-      })
-      .collect::<Vec<_>>();
+        ));
+      } else {
+        // Some Indic conjunct chains form one arbitrarily wide grapheme.
+        // Split only oversized clusters, caching each scalar's width once,
+        // so these still fit without reintroducing growing-prefix scans.
+        for (offset, ch) in grapheme.char_indices() {
+          let end = offset + ch.len_utf8();
+          units.push((
+            index + end,
+            measure_text_width(&grapheme[offset..end]),
+            ch.is_whitespace(),
+          ));
+        }
+      }
+    }
     let mut start = 0;
-    while start < graphemes.len() {
+    while start < units.len() {
       let mut end = start;
       let mut line_width = 0usize;
       let mut word_break = None;
       let mut has_word = false;
-      for (index, &(_, grapheme_width, whitespace)) in
-        graphemes.iter().enumerate().skip(start)
+      for (index, &(_, unit_width, whitespace)) in
+        units.iter().enumerate().skip(start)
       {
-        if line_width.saturating_add(grapheme_width) > available {
+        if line_width.saturating_add(unit_width) > available {
           if whitespace {
             word_break = Some(end);
           }
           break;
         }
         end = index + 1;
-        line_width += grapheme_width;
+        line_width += unit_width;
         if whitespace && has_word {
           word_break = Some(end);
         } else if !whitespace {
@@ -118,19 +131,15 @@ pub(crate) fn wrap_lines(text: &str, width: usize, indent: usize) -> String {
       // separator in the preceding line, within the measured width.
       let end = if end == start {
         // Always make progress even if a terminal reports less space than a
-        // single displayed grapheme needs.
+        // single displayed scalar needs.
         start + 1
-      } else if end == graphemes.len() {
+      } else if end == units.len() {
         end
       } else {
         word_break.unwrap_or(end)
       };
-      let byte_start = if start == 0 {
-        0
-      } else {
-        graphemes[start - 1].0
-      };
-      let byte_end = graphemes[end - 1].0;
+      let byte_start = if start == 0 { 0 } else { units[start - 1].0 };
+      let byte_end = units[end - 1].0;
       lines.push(format!("{prefix}{}", &paragraph[byte_start..byte_end]));
       start = end;
     }
@@ -371,6 +380,28 @@ mod tests {
     assert_eq!(output.lines().collect::<Vec<_>>(), clusters);
     assert!(output.lines().all(|line| measure_text_width(line) <= 2));
     assert_eq!(output.lines().collect::<String>(), text);
+  }
+
+  #[test]
+  fn detail_wrapping_bounds_oversized_indic_graphemes() {
+    use unicode_segmentation::UnicodeSegmentation;
+
+    for count in [32, 4096] {
+      let text = "क्".repeat(count);
+      assert_eq!(text.graphemes(true).count(), 1);
+      assert_eq!(measure_text_width(&text), count);
+      for width in [8, 20, 40] {
+        let output = wrap_lines(&text, width, 2);
+        assert!(output.lines().all(|line| measure_text_width(line) <= width));
+        assert_eq!(
+          output
+            .lines()
+            .map(|line| line.strip_prefix("  ").unwrap())
+            .collect::<String>(),
+          text,
+        );
+      }
+    }
   }
 
   #[test]
