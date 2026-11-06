@@ -121,10 +121,10 @@ fn apply_location_options(
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
   let _fences = admit_fences(&state.store)?;
-  ensure_conf_locked(state).await
+  ensure_conf_locked(state).await?
 }
 
-async fn ensure_conf_locked(state: &SystemStateRef) -> IoResult<()> {
+async fn ensure_conf_locked(state: &SystemStateRef) -> IoResult<IoResult<()>> {
   let state_ref = Arc::clone(state);
   let conf_path = format!("{}/nginx.conf", state_ref.store.dir);
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
@@ -352,10 +352,14 @@ fn recover_fences_in(state_dir: &str, run_dir: &str) -> IoResult<()> {
   ] {
     ensure_recovery_pending(&format!("{dir}/{name}"), dir)?;
   }
-  finish_config_operation(&Store {
+  let store = Store {
     dir: state_dir.to_owned(),
     run_dir: run_dir.to_owned(),
-  })?;
+  };
+  // Restored configuration must reach disk before recovery removes the
+  // durable evidence that a previous transaction was interrupted.
+  sync_config_in(&store, &[], true)?;
+  finish_config_operation(&store)?;
   finish_nginx_operation_in(state_dir, run_dir)
 }
 
@@ -403,14 +407,33 @@ fn finish_config_operation(store: &Store) -> IoResult<()> {
 }
 
 fn sync_config(store: &Store, credentials: &[&str]) -> IoResult<()> {
+  sync_config_in(store, credentials, false)
+}
+
+fn sync_config_in(
+  store: &Store,
+  credentials: &[&str],
+  allow_missing_dirs: bool,
+) -> IoResult<()> {
   for name in [
     "sites-available",
     "sites-enabled",
     "streams-available",
     "streams-enabled",
+    "secrets",
   ] {
     let path = format!("{}/{name}", store.dir);
-    for entry in fs::read_dir(&path)? {
+    let entries = match fs::read_dir(&path) {
+      Ok(entries) => entries,
+      Err(err)
+        if err.kind() == std::io::ErrorKind::NotFound
+          && (allow_missing_dirs || name == "secrets") =>
+      {
+        continue;
+      }
+      Err(err) => return Err(err.into()),
+    };
+    for entry in entries {
       let entry = entry?;
       if entry.file_type()?.is_file() {
         File::open(entry.path())?.sync_all()?;
@@ -954,11 +977,27 @@ pub async fn ensure_started(store: &Store) -> IoResult<()> {
 pub async fn initialize(state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
   let fences = admit_fences(&state.store)?;
-  ensure_conf_locked(state).await?;
+  if !initial_configuration_ready(ensure_conf_locked(state).await)? {
+    return Ok(());
+  }
   if let Some(fences) = fences {
     start_with_fences(&state.store, fences).await?;
   }
   Ok(())
+}
+
+fn initial_configuration_ready(
+  validation: IoResult<IoResult<()>>,
+) -> IoResult<bool> {
+  match validation? {
+    Ok(()) => Ok(true),
+    Err(err) => {
+      log::warn!(
+        "nginx::initialize: configuration rejected; awaiting rule reconciliation: {err}"
+      );
+      Ok(false)
+    }
+  }
 }
 
 async fn start_with_fences(
@@ -1112,7 +1151,7 @@ async fn finish_config_validation<C>(
   store: &Store,
   previous: Option<&str>,
   command: C,
-) -> IoResult<()>
+) -> IoResult<IoResult<()>>
 where
   C: Future<Output = IoResult<std::process::Output>>,
 {
@@ -1126,7 +1165,7 @@ where
   }
   sync_config(store, &[])?;
   finish_config_operation(store)?;
-  result
+  Ok(result)
 }
 
 pub async fn reload(store: &Store) -> IoResult<()> {
@@ -1147,7 +1186,7 @@ pub async fn reload(store: &Store) -> IoResult<()> {
     Some(&conf),
     exec_nginx_output(&["-t"], store),
   )
-  .await?;
+  .await??;
   if nginx_master(store)? != Some(master) {
     return Err(IoError::other(
       "nginx reload",
@@ -2093,8 +2132,10 @@ mod tests {
         let result = finish_config_validation(&store, previous, async {
           Ok(reload_output(accepted))
         })
-        .await;
+        .await
+        .unwrap();
         assert_eq!(result.is_ok(), accepted);
+        assert_eq!(initial_configuration_ready(Ok(result)).unwrap(), accepted);
         assert_eq!(
           fs::read_to_string(conf).unwrap(),
           if accepted {
@@ -2139,6 +2180,67 @@ mod tests {
       assert!(dir.path().join(STATE_PENDING).exists());
       assert!(admit_fences(&store).is_err());
     }
+  }
+
+  #[test]
+  fn initial_configuration_does_not_tolerate_uncertain_validation() {
+    let error = initial_configuration_ready(Err(IoError::other(
+      "nginx validation",
+      "unknown validator outcome",
+    )))
+    .unwrap_err();
+    assert!(error.to_string().contains("validator outcome"));
+  }
+
+  #[test]
+  fn recovery_requires_restored_files_to_sync_before_clearing_markers() {
+    let dir = TestDir::new();
+    let path = dir.path().to_str().unwrap();
+    let store = Store::isolated(path);
+    begin_config_operation(&store).unwrap();
+    fs::write(gen_conf_path(path), "restored configuration").unwrap();
+    fs::create_dir(dir.path().join("secrets")).unwrap();
+    let credential = dir.path().join("secrets/restored.key");
+    fs::write(&credential, "restored credential").unwrap();
+    let enabled = dir.path().join("sites-enabled");
+    fs::remove_dir(&enabled).unwrap();
+    fs::write(&enabled, "not a directory").unwrap();
+    assert!(recover_fences_in(path, path).is_err());
+    assert!(dir.path().join(STATE_CONFIG_PENDING).exists());
+    assert!(dir.path().join(GLOBAL_CONFIG_PENDING).exists());
+    assert!(dir.path().join(STATE_PENDING).exists());
+    assert!(admit_fences(&store).is_err());
+    fs::remove_file(&enabled).unwrap();
+    fs::create_dir(&enabled).unwrap();
+    recover_fences_in(path, path).unwrap();
+    require_no_pending(&store).unwrap();
+    assert_eq!(
+      fs::read_to_string(credential).unwrap(),
+      "restored credential"
+    );
+    assert_eq!(
+      fs::read_to_string(gen_conf_path(path)).unwrap(),
+      "restored configuration"
+    );
+    assert!(admit_fences(&store).unwrap().is_some());
+  }
+
+  #[test]
+  fn recovery_accepts_an_empty_state_directory() {
+    let dir = TestDir::new();
+    for name in [
+      "sites-available",
+      "sites-enabled",
+      "streams-available",
+      "streams-enabled",
+    ] {
+      fs::remove_dir(dir.path().join(name)).unwrap();
+    }
+    let path = dir.path().to_str().unwrap();
+    recover_fences_in(path, path).unwrap();
+    let store = Store::isolated(path);
+    require_no_pending(&store).unwrap();
+    assert!(admit_fences(&store).unwrap().is_some());
   }
 
   #[ntex::test]

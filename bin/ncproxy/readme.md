@@ -86,9 +86,10 @@ and rollback. They are removed only after the completed configuration has been
 synchronized to disk; interrupted writes and incomplete rollback block startup.
 These markers are `ncproxy-config.pending` in the runtime directory and
 `.ncproxy-config.pending` in the state directory. Explicit stopped-process
-recovery clears them after the operator has restored a complete configuration.
-Startup/configuration errors now prevent ncproxy from starting, rather than
-continuing with background retries.
+recovery synchronizes the restored configuration and credentials before clearing
+them. Fence, pending-state, I/O, and uncertain validation errors prevent startup.
+A completed configuration rejection lets ncproxy continue to rule reconciliation
+so stale on-disk rules can be rebuilt from nanocld state before nginx starts.
 
 For migration or recovery, first stop ncproxy and **all** nginx instances and
 launchers that can use the same state directory or `/run/nginx.pid`, including
