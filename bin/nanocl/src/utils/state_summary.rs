@@ -52,7 +52,7 @@ pub fn summarize_state(
 
 /// Produce a compact plain-text preview from the same safe JSON model.
 pub fn format_state_summary(summary: &StateSummary) -> String {
-  format_state_summary_at_width(summary, super::print::terminal_width())
+  format_state_summary_at_width(summary, super::print::stderr_width())
 }
 
 fn format_state_summary_at_width(
@@ -183,7 +183,7 @@ mod tests {
     assert_eq!(summary.counts, StateSummaryCounts::default());
     assert!(summary.cargoes.is_empty());
     assert_eq!(
-      format_state_summary(&summary),
+      format_state_summary_at_width(&summary, 80),
       "Statefile \"./Statefile.yml\"\n  Namespace: \"global\"\n  Group: \"./Statefile.yml\" (derived)\n  Objects: 0 cargoes, 0 VMs, 0 jobs, 0 resources, 0 secrets"
     );
   }
@@ -301,7 +301,9 @@ mod tests {
       panic!("web must retain its one declared application container");
     };
     assert_eq!(app.image.as_deref(), Some("web:v1"));
-    assert!(!format_state_summary(&summary).contains("nested.yml"));
+    assert!(
+      !format_state_summary_at_width(&summary, 80).contains("nested.yml")
+    );
   }
 
   #[test]
@@ -329,7 +331,7 @@ mod tests {
     );
     let summary = summarize_state(&state, &state.location);
     for output in [
-      format_state_summary(&summary),
+      format_state_summary_at_width(&summary, 80),
       serde_json::to_string(&summary).expect("serialize summary"),
     ] {
       for secret in [
@@ -403,7 +405,7 @@ mod tests {
     assert!(!disabled.essential);
     assert_eq!(configured.healthcheck, "configured");
     assert_eq!(inherited.healthcheck, "image_default");
-    let output = format_state_summary(&summary);
+    let output = format_state_summary_at_width(&summary, 80);
     assert!(output.contains(
       "init \"migrate\": image=\"web:v1\"; health=image default; must complete"
     ));

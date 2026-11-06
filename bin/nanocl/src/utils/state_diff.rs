@@ -574,9 +574,161 @@ fn push_change(
 mod tests {
   use std::io;
 
+  use nanocld_client::stubs::cargo_spec::{CargoSpec, Config, ContainerSpec};
   use serde_json::json;
 
   use super::*;
+
+  fn cargo_comparison_fixture() -> CargoSpec {
+    let container = |name: &str| ContainerSpec {
+      name: name.into(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some("alpine:latest".into()),
+        exposed_ports: Some(vec!["9000/tcp".into(), "8080/tcp".into()]),
+        volumes: Some(vec!["/logs".into(), "/data".into()]),
+        env: Some(vec!["A=1".into(), "B=2".into()]),
+        cmd: Some(vec!["first".into(), "second".into()]),
+        ..Default::default()
+      },
+    };
+    CargoSpec {
+      name: "app".into(),
+      init_containers: vec![container("prepare"), container("migrate")],
+      containers: vec![container("api"), container("worker")],
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn cargo_state_diff_ignores_native_map_key_order_without_mutating_inputs() {
+    let current = cargo_comparison_fixture();
+    let mut desired = current.clone();
+    for container in desired
+      .init_containers
+      .iter_mut()
+      .chain(&mut desired.containers)
+    {
+      container
+        .container_config
+        .exposed_ports
+        .as_mut()
+        .unwrap()
+        .reverse();
+      container
+        .container_config
+        .volumes
+        .as_mut()
+        .unwrap()
+        .reverse();
+    }
+    let before = serde_json::to_value(&current).unwrap();
+    let after = serde_json::to_value(&desired).unwrap();
+    assert_ne!(current, desired);
+    // Native Config vectors serialize as Docker maps. JSON comparisons already
+    // ignore their insertion order, matching apply's native comparison.
+    assert_eq!(before, after);
+    for field in ["InitContainers", "Containers"] {
+      assert!(before[field][0]["ExposedPorts"].is_object());
+      assert!(before[field][0]["Volumes"].is_object());
+    }
+    for reload in [false, true] {
+      let diff = diff_item(
+        "Statefile.yml",
+        "cargo",
+        "global.app",
+        Some(&before),
+        Some(&after),
+        reload,
+        false,
+        reload.then_some("apply --reload forces an update"),
+      );
+      assert_eq!(
+        diff.action,
+        if reload {
+          StateDiffAction::Update
+        } else {
+          StateDiffAction::Unchanged
+        }
+      );
+      assert!(diff.changes.is_empty());
+      let report = StateDiff::new(vec![diff]);
+      assert_eq!(report.summary.updated, usize::from(reload));
+      assert_eq!(report.summary.unchanged, usize::from(!reload));
+      let mut text = Vec::new();
+      report.write_to(&mut text, false).unwrap();
+      assert!(text.is_empty());
+      let mut summary = Vec::new();
+      report.write_summary_to(&mut summary, 80).unwrap();
+      let summary = String::from_utf8(summary).unwrap();
+      assert_eq!(summary.contains("No changes."), !reload);
+    }
+    assert_eq!(before, serde_json::to_value(&current).unwrap());
+    assert_eq!(after, serde_json::to_value(&desired).unwrap());
+  }
+
+  #[test]
+  fn cargo_state_diff_preserves_real_map_key_and_ordered_field_changes() {
+    let current = cargo_comparison_fixture();
+    let before = serde_json::to_value(&current).unwrap();
+    for init in [false, true] {
+      for field in ["ExposedPorts", "Volumes", "Env", "Cmd", "Containers"] {
+        let mut desired = current.clone();
+        let containers = if init {
+          &mut desired.init_containers
+        } else {
+          &mut desired.containers
+        };
+        let config = &mut containers.first_mut().unwrap().container_config;
+        match field {
+          "ExposedPorts" => {
+            config.exposed_ports.as_mut().unwrap().pop();
+          }
+          "Volumes" => {
+            config.volumes.as_mut().unwrap().pop();
+          }
+          "Env" => config.env.as_mut().unwrap().reverse(),
+          "Cmd" => config.cmd.as_mut().unwrap().reverse(),
+          _ => containers.reverse(),
+        }
+        let after = serde_json::to_value(&desired).unwrap();
+        let diff = diff_item(
+          "Statefile.yml",
+          "cargo",
+          "global.app",
+          Some(&before),
+          Some(&after),
+          false,
+          false,
+          None,
+        );
+        assert_eq!(diff.action, StateDiffAction::Update, "init={init} {field}");
+        assert!(!diff.changes.is_empty(), "init={init} {field}");
+        assert_eq!(after, serde_json::to_value(&desired).unwrap());
+      }
+    }
+    // Similarly named fields in metadata are user data, not Docker map keys.
+    let mut desired = before.clone();
+    desired["Metadata"] =
+      json!({"Containers": [{"Volumes": ["/data", "/logs"]}]});
+    let mut current = desired.clone();
+    current["Metadata"]["Containers"][0]["Volumes"] = json!(["/logs", "/data"]);
+    let diff = diff_item(
+      "Statefile.yml",
+      "cargo",
+      "global.app",
+      Some(&current),
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(diff.action, StateDiffAction::Update);
+    assert!(!diff.changes.is_empty());
+  }
 
   #[test]
   fn vm_state_diff_ignores_omitted_allocated_identity_and_preserved_options() {

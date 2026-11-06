@@ -110,7 +110,7 @@ fn targets(
 fn empty_row(kind: &EventActorKind, key: &str) -> StateStatusRow {
   StateStatusRow {
     kind: kind.to_string().to_lowercase(),
-    name: normalize_text(key),
+    name: sanitize_identity(key),
     running: "-".into(),
     status: "missing".into(),
     health: "unknown".into(),
@@ -434,18 +434,20 @@ async fn collect_row(
   row
 }
 
-/// Normalize terminal controls without shortening object identities.
-fn normalize_text(value: &str) -> String {
-  let normalized = value
+/// Remove terminal controls without changing ordinary identity whitespace.
+fn sanitize_identity(value: &str) -> String {
+  value
     .chars()
     .map(|c| if c.is_control() { ' ' } else { c })
-    .collect::<String>();
-  normalized.split_whitespace().collect::<Vec<_>>().join(" ")
+    .collect()
 }
 
 /// Keep diagnostic text bounded during watch refreshes.
 fn display_text(value: &str) -> String {
-  let normalized = normalize_text(value);
+  let normalized = sanitize_identity(value)
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ");
   let mut chars = normalized.chars();
   let mut output: String = chars.by_ref().take(200).collect();
   if chars.next().is_some() {
@@ -1134,6 +1136,45 @@ mod tests {
     let end = output[start..].find("  State:").unwrap() + start;
     let identity = output[start..end].split_whitespace().collect::<String>();
     assert_eq!(identity, format!("cargo/{name}"));
+  }
+
+  #[test]
+  fn status_render_keeps_distinct_whitespace_in_resource_names() {
+    let names = ["route  blue", "route blue"];
+    let rows = names
+      .iter()
+      .map(|name| empty_row(&EventActorKind::Resource, name))
+      .collect::<Vec<_>>();
+    for (row, name) in rows.iter().zip(names) {
+      assert_eq!(row.name, name);
+    }
+    for wide in [false, true] {
+      for width in [24, 80, 100] {
+        let output = render(&rows, time(920), false, wide, width);
+        for name in names {
+          assert_eq!(output.matches(name).count(), 1, "{output}");
+        }
+        if !wide {
+          assert!(output.lines().all(|line| measure_text_width(line) <= width));
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn status_render_preserves_full_wrapped_identity_whitespace() {
+    let name = format!("  {}  ", "route  数据库 ".repeat(8));
+    let row = empty_row(&EventActorKind::Resource, &name);
+    assert_eq!(row.name, name);
+    let wide = render(std::slice::from_ref(&row), time(920), false, true, 80);
+    assert!(wide.contains(&name));
+    let output = render(&[row], time(920), false, false, 24);
+    let start = output.find("resource/").unwrap();
+    let end = output[start..].find("\n  State:").unwrap() + start;
+    let identity = output[start..end].replace('\n', "");
+    assert_eq!(identity, format!("resource/{name}"));
+    assert!(output.lines().all(|line| measure_text_width(line) <= 24));
+    assert_eq!(sanitize_identity("route  blue\n\t"), "route  blue  ");
   }
 
   #[test]

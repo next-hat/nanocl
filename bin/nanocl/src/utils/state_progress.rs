@@ -474,7 +474,7 @@ pub async fn with_image_progress<T>(
                 plain_rollout_line(&resource, phase, &event, item.elapsed());
               let line = super::print::wrap_lines(
                 &line,
-                super::print::terminal_width(),
+                super::print::stderr_width(),
                 2,
               );
               if progress.is_hidden() {

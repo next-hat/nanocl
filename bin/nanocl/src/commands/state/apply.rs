@@ -188,6 +188,7 @@ async fn report_cargo_receipt(
       progress,
       output,
       wide,
+      utils::print::terminal_width(),
       &mut io::stdout().lock(),
     );
   } else {
@@ -197,6 +198,7 @@ async fn report_cargo_receipt(
       progress,
       None,
       wide,
+      utils::print::stderr_width(),
       &mut io::stderr(),
     );
   }
@@ -208,6 +210,7 @@ fn write_cargo_receipt(
   progress: &MultiProgress,
   output: Option<&StateOutput>,
   wide: bool,
+  width: usize,
   writer: &mut impl Write,
 ) {
   // Receipts are optional observations. Their output must not interrupt later
@@ -233,7 +236,7 @@ fn write_cargo_receipt(
     let line = if wide {
       line
     } else {
-      wrap_cargo_receipt(&line, utils::print::terminal_width())
+      wrap_cargo_receipt(&line, width)
     };
     if progress.is_hidden() {
       let _ = writeln!(writer, "{line}");
@@ -924,6 +927,7 @@ mod tests {
             &progress,
             output,
             false,
+            80,
             &mut writer,
           );
           assert!(writer.writes > 0);
@@ -965,6 +969,7 @@ mod tests {
       &progress,
       Some(&output),
       false,
+      80,
       &mut bytes,
     );
     let record: Value = serde_json::from_slice(&bytes).unwrap();
@@ -979,6 +984,7 @@ mod tests {
       &progress,
       None,
       false,
+      80,
       &mut bytes,
     );
     assert_eq!(
@@ -1022,6 +1028,7 @@ mod tests {
         &progress,
         Some(&output),
         wide,
+        80,
         &mut bytes,
       );
       serde_json::from_slice::<Value>(&bytes).unwrap()

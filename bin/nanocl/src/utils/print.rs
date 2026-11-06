@@ -12,20 +12,29 @@ use nanocld_client::stubs::process::{OutputKind, ProcessOutputLog};
 
 use crate::models::DisplayFormat;
 
-/// Use the terminal's current width, or a predictable width for redirected output.
+/// Measure stdout only, so redirected output is independent of stderr's TTY.
 pub(crate) fn terminal_width() -> usize {
-  dialoguer::console::Term::stdout()
-    .size_checked()
-    .or_else(|| dialoguer::console::Term::stderr().size_checked())
-    .map(|(_, columns)| usize::from(columns))
+  stream_width(dialoguer::console::Term::stdout())
+}
+
+/// Human apply summaries, receipts, and progress are written to stderr.
+pub(crate) fn stderr_width() -> usize {
+  stream_width(dialoguer::console::Term::stderr())
+}
+
+fn stream_width(terminal: dialoguer::console::Term) -> usize {
+  resolve_width(
+    terminal
+      .size_checked()
+      .map(|(_, columns)| usize::from(columns)),
+    std::env::var("COLUMNS").ok().as_deref(),
+  )
+}
+
+fn resolve_width(terminal: Option<usize>, columns: Option<&str>) -> usize {
+  terminal
     .filter(|width| *width > 0)
-    .or_else(|| {
-      std::env::var("COLUMNS")
-        .ok()?
-        .parse::<usize>()
-        .ok()
-        .filter(|width| *width > 0)
-    })
+    .or_else(|| columns?.parse::<usize>().ok().filter(|width| *width > 0))
     .unwrap_or(80)
     .clamp(2, 1000)
 }
@@ -55,7 +64,7 @@ pub(crate) fn wrap_lines(text: &str, width: usize, indent: usize) -> String {
   for paragraph in text.split('\n') {
     // Callers supply the indentation separately. Remove it only once, before
     // wrapping, rather than stripping whitespace from every continuation.
-    let mut remaining = paragraph.trim();
+    let mut remaining = paragraph.trim_start();
     if remaining.is_empty() {
       lines.push(String::new());
       continue;
@@ -219,7 +228,19 @@ pub(crate) async fn logs_process_streams(
 mod tests {
   use dialoguer::console::measure_text_width;
 
-  use super::wrap_lines;
+  use super::{resolve_width, wrap_lines};
+
+  #[test]
+  fn redirected_output_uses_configured_width_or_predictable_default() {
+    assert_eq!(resolve_width(None, Some("40")), 40);
+    assert_eq!(resolve_width(None, None), 80);
+    assert_eq!(resolve_width(None, Some("invalid")), 80);
+    assert_eq!(resolve_width(None, Some("0")), 80);
+    assert_eq!(resolve_width(Some(120), Some("40")), 120);
+    assert_eq!(resolve_width(Some(0), Some("40")), 40);
+    assert_eq!(resolve_width(None, Some("1")), 2);
+    assert_eq!(resolve_width(None, Some("5000")), 1000);
+  }
 
   #[test]
   fn detail_wrapping_preserves_long_unicode_identifiers() {
@@ -251,6 +272,7 @@ mod tests {
     for text in [
       "Statefile \"./my  config.yml\"".to_owned(),
       format!("prefix{}suffix", " ".repeat(30)),
+      "resource/  route  blue  ".to_owned(),
     ] {
       for width in [8, 20, 40, 80] {
         let output = wrap_lines(&format!("  {text}"), width, 2);
