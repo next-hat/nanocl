@@ -278,7 +278,9 @@ async fn r#loop(state: &SystemStateRef) {
           log::warn!("event::loop: {err}");
           continue;
         }
-        let _ = utils::nginx::ensure_conf(state).await;
+        if let Err(err) = utils::nginx::ensure_conf(state).await {
+          log::warn!("event::loop: configuration validation failed: {err}");
+        }
         if let Err(err) = utils::resource::rebuild_all_rules(state).await {
           log::warn!("event::loop: initial reconciliation failed: {err}");
         }

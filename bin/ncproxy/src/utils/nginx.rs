@@ -155,10 +155,12 @@ async fn ensure_conf_locked(state: &SystemStateRef) -> IoResult<()> {
     "NginxManager: writing default conf to {conf_path}:\n{default_conf}"
   );
   std::fs::write(conf_path, default_conf)?;
-  self::test(&state.store).await?;
-  sync_config(&state.store, &[])?;
-  finish_config_operation(&state.store)?;
-  Ok(())
+  finish_config_validation(
+    &state.store,
+    None,
+    exec_nginx_output(&["-t"], &state.store),
+  )
+  .await
 }
 
 fn gen_conf_path(state_dir: &str) -> String {
@@ -1026,10 +1028,12 @@ async fn start_with_fences(
   })
   .and_then(|result| result);
   if let Err(err) = ready {
-    if let Some(master) = observed_master
-      && managed_master_holds_fences(store, master)?
-    {
-      finish_nginx_operation(store)?;
+    if let Some(master) = observed_master {
+      return finish_verified_operation(
+        store,
+        Err(err),
+        managed_master_holds_fences(store, master),
+      );
     }
     return Err(err);
   }
@@ -1082,14 +1086,47 @@ pub fn spawn(state: &SystemStateRef) {
 
 pub async fn test(store: &Store) -> IoResult<()> {
   log::info!("nginx::test: starting");
+  validation_result(store, exec_nginx_output(&["-t"], store)).await??;
+  log::info!("nginx::test: done");
+  Ok(())
+}
+
+// The outer error means validation did not settle. Only the inner result
+// establishes that the validator exited and configuration can be restored.
+async fn validation_result<C>(
+  store: &Store,
+  command: C,
+) -> IoResult<IoResult<()>>
+where
+  C: Future<Output = IoResult<std::process::Output>>,
+{
   begin_nginx_operation(store)?;
-  let output = exec_nginx_output(&["-t"], store).await?;
+  let output = command.await?;
   // A normal nonzero exit was reaped, so rollback is safe. Timeouts,
   // cancellation and I/O errors leave the pending markers in place.
   finish_nginx_operation(store)?;
-  check_nginx_output(output)?;
-  log::info!("nginx::test: done");
-  Ok(())
+  Ok(check_nginx_output(output))
+}
+
+async fn finish_config_validation<C>(
+  store: &Store,
+  previous: Option<&str>,
+  command: C,
+) -> IoResult<()>
+where
+  C: Future<Output = IoResult<std::process::Output>>,
+{
+  let result = validation_result(store, command).await?;
+  // Reload restores the previous generation. Initial configuration keeps
+  // the completely written default so rejected rules can be corrected.
+  if result.is_err()
+    && let Some(previous) = previous
+  {
+    fs::write(gen_conf_path(&store.dir), previous)?;
+  }
+  sync_config(store, &[])?;
+  finish_config_operation(store)?;
+  result
 }
 
 pub async fn reload(store: &Store) -> IoResult<()> {
@@ -1105,9 +1142,12 @@ pub async fn reload(store: &Store) -> IoResult<()> {
   let updated = replace_health_generation(&conf, &generation)?;
   begin_config_operation(store)?;
   fs::write(&conf_path, updated)?;
-  self::test(store).await?;
-  sync_config(store, &[])?;
-  finish_config_operation(store)?;
+  finish_config_validation(
+    store,
+    Some(&conf),
+    exec_nginx_output(&["-t"], store),
+  )
+  .await?;
   if nginx_master(store)? != Some(master) {
     return Err(IoError::other(
       "nginx reload",
@@ -1162,13 +1202,31 @@ where
   };
   // A known command failure or readiness failure must not permanently block
   // this controller, provided the same managed master still holds its fences.
-  if !verify_master()? {
-    return Err(IoError::other(
-      "nginx reload",
-      "master changed or lost startup locks before reload completed",
-    ));
+  finish_verified_operation(store, result, verify_master())
+}
+
+fn finish_verified_operation(
+  store: &Store,
+  result: IoResult<()>,
+  verified: IoResult<bool>,
+) -> IoResult<()> {
+  let settlement = match verified {
+    Ok(true) => finish_nginx_operation(store),
+    Ok(false) => Err(IoError::other(
+      "nginx operation",
+      "master changed or lost startup locks before operation completed",
+    )),
+    Err(err) => Err(err),
+  };
+  if let Err(settlement) = settlement {
+    return Err(match result {
+      Err(original) => IoError::other(
+        "nginx operation",
+        &format!("{original}; could not settle operation: {settlement}"),
+      ),
+      Ok(()) => settlement,
+    });
   }
-  finish_nginx_operation(store)?;
   result
 }
 
@@ -2019,6 +2077,121 @@ mod tests {
       status: std::process::ExitStatus::from_raw(if success { 0 } else { 256 }),
       stdout: Vec::new(),
       stderr: b"reload rejected".to_vec(),
+    }
+  }
+
+  #[ntex::test]
+  async fn completed_main_config_validation_releases_admission() {
+    for previous in [None, Some("previous generation")] {
+      for accepted in [false, true] {
+        let dir = TestDir::new();
+        let store = Store::isolated(dir.path().to_str().unwrap());
+        drop(admit_fences(&store).unwrap());
+        begin_config_operation(&store).unwrap();
+        let conf = gen_conf_path(&store.dir);
+        fs::write(&conf, "candidate").unwrap();
+        let result = finish_config_validation(&store, previous, async {
+          Ok(reload_output(accepted))
+        })
+        .await;
+        assert_eq!(result.is_ok(), accepted);
+        assert_eq!(
+          fs::read_to_string(conf).unwrap(),
+          if accepted {
+            "candidate"
+          } else {
+            previous.unwrap_or("candidate")
+          }
+        );
+        require_no_pending(&store).unwrap();
+        assert!(admit_fences(&store).unwrap().is_some());
+      }
+    }
+  }
+
+  #[ntex::test]
+  async fn uncertain_main_config_validation_keeps_both_markers() {
+    for cancelled in [false, true] {
+      let dir = TestDir::new();
+      let store = Store::isolated(dir.path().to_str().unwrap());
+      begin_config_operation(&store).unwrap();
+      let conf = gen_conf_path(&store.dir);
+      fs::write(&conf, "candidate").unwrap();
+      if cancelled {
+        let mut operation = Box::pin(finish_config_validation(
+          &store,
+          Some("old"),
+          futures::future::pending::<IoResult<std::process::Output>>(),
+        ));
+        assert!(futures::poll!(operation.as_mut()).is_pending());
+        drop(operation);
+      } else {
+        assert!(
+          finish_config_validation(&store, Some("old"), async {
+            Err(IoError::other("exec", "validation timed out"))
+          })
+          .await
+          .is_err()
+        );
+      }
+      assert_eq!(fs::read_to_string(conf).unwrap(), "candidate");
+      assert!(dir.path().join(STATE_CONFIG_PENDING).exists());
+      assert!(dir.path().join(STATE_PENDING).exists());
+      assert!(admit_fences(&store).is_err());
+    }
+  }
+
+  #[ntex::test]
+  async fn failed_main_config_restore_or_sync_keeps_config_pending() {
+    for restore in [false, true] {
+      let dir = TestDir::new();
+      let store = Store::isolated(dir.path().to_str().unwrap());
+      begin_config_operation(&store).unwrap();
+      if restore {
+        fs::create_dir(gen_conf_path(&store.dir)).unwrap();
+      } else {
+        fs::remove_dir(dir.path().join("sites-enabled")).unwrap();
+      }
+      assert!(
+        finish_config_validation(&store, Some("old"), async {
+          Ok(reload_output(false))
+        })
+        .await
+        .is_err()
+      );
+      assert!(dir.path().join(STATE_CONFIG_PENDING).exists());
+      assert!(!dir.path().join(STATE_PENDING).exists());
+      assert!(admit_fences(&store).is_err());
+    }
+  }
+
+  #[test]
+  fn unsettled_operations_preserve_original_and_verification_errors() {
+    for verification_error in [false, true] {
+      let dir = TestDir::new();
+      let store = Store::isolated(dir.path().to_str().unwrap());
+      begin_nginx_operation(&store).unwrap();
+      let error = finish_verified_operation(
+        &store,
+        Err(IoError::other("nginx", "original failure detail")),
+        if verification_error {
+          Err(IoError::other("procfs", "verification detail"))
+        } else {
+          Ok(false)
+        },
+      )
+      .unwrap_err()
+      .to_string();
+      assert!(error.contains("failure detail"), "{error}");
+      assert!(
+        error.to_lowercase().contains(if verification_error {
+          "verification detail"
+        } else {
+          "startup locks"
+        }),
+        "{error}"
+      );
+      assert!(require_no_pending(&store).is_err());
     }
   }
 
