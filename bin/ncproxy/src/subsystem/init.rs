@@ -25,12 +25,13 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   #[cfg(not(any(feature = "dev", feature = "test")))]
   let client = NanocldClient::connect_with_unix_default();
   let config_lock = Arc::new(futures::lock::Mutex::new(()));
+  let store = Store::new(&cli.state_dir);
   let event_emitter: EventEmitter =
-    EventEmitter::new(&cli.state_dir, Arc::clone(&config_lock));
+    EventEmitter::new(&store, Arc::clone(&config_lock));
   let state = Arc::new(SystemState {
     client,
     event_emitter,
-    store: Store::new(&cli.state_dir),
+    store,
     nginx_dir: cli.nginx_dir.clone(),
     config_lock,
     _controller_locks: Some(controller_locks),

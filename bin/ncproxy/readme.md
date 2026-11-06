@@ -62,15 +62,21 @@ ncproxy uses advisory locks in `/run` and its state directory to serialize
 controllers and nginx starts. nginx must inherit both startup-lock file
 descriptors; ncproxy verifies that the master holds them before treating it as
 managed. These files must not be removed or replaced while either process is
-running. The state directory must be owned by ncproxy's user and must not be
-writable by group or other users. The `/run` and state-directory paths must
+running. ncproxy does not require the state directory or fence and pending
+files to have the same owner as its process; normal filesystem access
+permissions apply. The state directory must not be writable by group or other
+users. The `/run` and state-directory paths must
 have trusted, stable ancestry. This protocol cannot fence older versions or
 other programs that ignore the locks.
 
 An existing installation needs a one-time migration because an older nginx
-could still be starting without a PID or listening socket. A launch, reload or
-configuration validation that fails or is interrupted can leave a pending
-marker; ncproxy fails closed until an operator resolves that ambiguity.
+could still be starting without a PID or listening socket. An interrupted or
+uncertain operation leaves a pending marker; ncproxy fails closed until an
+operator resolves that ambiguity. A completed configuration-validation failure
+clears its markers. A completed reload-command failure or worker-readiness
+failure also clears them when the same managed nginx master still holds both
+startup fences. Command timeouts, cancellation, and unverifiable master or
+fence ownership retain the markers.
 Startup/configuration errors now prevent ncproxy from starting, rather than
 continuing with background retries.
 
@@ -95,8 +101,8 @@ If `/run/nginx.pid` is empty, malformed, or points to an unrelated process,
 recovery stops. Investigate the PID file and process ownership first; remove a
 stale PID file only after verifying that all relevant nginx processes and
 launchers are stopped, then retry the command.
-Fence files must be regular, singly linked files owned by ncproxy with mode
-0600. The global fence and pending paths are `/run/ncproxy-nginx.fence` and
+Fence files must be regular, singly linked files with mode 0600.
+The global fence and pending paths are `/run/ncproxy-nginx.fence` and
 `/run/ncproxy-nginx.pending`; the state counterparts are
 `<state-dir>/.ncproxy-nginx.fence` and `<state-dir>/.ncproxy-nginx.pending`.
 The controller files are `/run/ncproxy-controller.lock` and

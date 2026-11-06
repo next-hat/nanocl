@@ -64,12 +64,23 @@ impl FromStr for NginxRuleKind {
 #[derive(Clone)]
 pub struct Store {
   pub dir: String,
+  /// Shared nginx PID, fence and pending-marker directory.
+  pub run_dir: String,
 }
 
 impl Store {
   pub fn new(dir: &str) -> Self {
     Self {
       dir: dir.to_owned(),
+      run_dir: "/run".to_owned(),
+    }
+  }
+
+  #[cfg(test)]
+  pub fn isolated(dir: &str) -> Self {
+    Self {
+      dir: dir.to_owned(),
+      run_dir: dir.to_owned(),
     }
   }
 
