@@ -45,6 +45,7 @@ fn resolve_width(terminal: Option<usize>, columns: Option<&str>) -> usize {
 /// quoted paths and other identities do not change when they are displayed.
 pub(crate) fn wrap_lines(text: &str, width: usize, indent: usize) -> String {
   use dialoguer::console::{measure_text_width, strip_ansi_codes};
+  use unicode_segmentation::UnicodeSegmentation;
 
   let width = width.max(2);
   let indent = indent.min(width - 2);
@@ -64,43 +65,74 @@ pub(crate) fn wrap_lines(text: &str, width: usize, indent: usize) -> String {
   for paragraph in text.split('\n') {
     // Callers supply the indentation separately. Remove it only once, before
     // wrapping, rather than stripping whitespace from every continuation.
-    let mut remaining = paragraph.trim_start();
-    if remaining.is_empty() {
+    let paragraph = paragraph.trim_start();
+    if paragraph.is_empty() {
       lines.push(String::new());
       continue;
     }
-    while !remaining.is_empty() {
-      let mut end = 0;
+    // Measure the complete paragraph only once. This preserves exact widths
+    // for text that fits, including ligatures spanning grapheme boundaries.
+    if measure_text_width(paragraph) <= available {
+      lines.push(format!("{prefix}{paragraph}"));
+      continue;
+    }
+    // Cache each extended grapheme's width once: measuring growing prefixes
+    // is quadratic for long zero-width combining sequences. Graphemes keep
+    // combining marks, flags, and ZWJ emoji intact. Their summed widths are a
+    // conservative budget for cross-grapheme ligatures in overflowing text;
+    // these may wrap earlier, while every character remains in the output.
+    let graphemes = paragraph
+      .grapheme_indices(true)
+      .map(|(index, grapheme)| {
+        (
+          index + grapheme.len(),
+          measure_text_width(grapheme),
+          grapheme.chars().next().is_some_and(char::is_whitespace),
+        )
+      })
+      .collect::<Vec<_>>();
+    let mut start = 0;
+    while start < graphemes.len() {
+      let mut end = start;
+      let mut line_width = 0usize;
       let mut word_break = None;
       let mut has_word = false;
-      for (index, ch) in remaining.char_indices() {
-        let next = index + ch.len_utf8();
-        if measure_text_width(&remaining[..next]) > available {
-          if ch.is_whitespace() {
+      for (index, &(_, grapheme_width, whitespace)) in
+        graphemes.iter().enumerate().skip(start)
+      {
+        if line_width.saturating_add(grapheme_width) > available {
+          if whitespace {
             word_break = Some(end);
           }
           break;
         }
-        end = next;
-        if ch.is_whitespace() && has_word {
+        end = index + 1;
+        line_width += grapheme_width;
+        if whitespace && has_word {
           word_break = Some(end);
-        } else if !ch.is_whitespace() {
+        } else if !whitespace {
           has_word = true;
         }
       }
       // Break after a separator when a word would overflow. Keep that
       // separator in the preceding line, within the measured width.
-      let end = if end == 0 {
+      let end = if end == start {
         // Always make progress even if a terminal reports less space than a
-        // single displayed character needs.
-        remaining.chars().next().unwrap().len_utf8()
-      } else if end == remaining.len() {
+        // single displayed grapheme needs.
+        start + 1
+      } else if end == graphemes.len() {
         end
       } else {
         word_break.unwrap_or(end)
       };
-      lines.push(format!("{prefix}{}", &remaining[..end]));
-      remaining = &remaining[end..];
+      let byte_start = if start == 0 {
+        0
+      } else {
+        graphemes[start - 1].0
+      };
+      let byte_end = graphemes[end - 1].0;
+      lines.push(format!("{prefix}{}", &paragraph[byte_start..byte_end]));
+      start = end;
     }
   }
   lines.join("\n")
@@ -306,5 +338,46 @@ mod tests {
         .collect::<String>(),
       "12345678 abcdefgh"
     );
+  }
+
+  #[test]
+  fn detail_wrapping_handles_long_unbroken_and_combining_sequences() {
+    let combining = format!("e{}", "\u{301}".repeat(32_768));
+    for text in [
+      "x".repeat(65_536),
+      combining.clone(),
+      format!("prefix/{combining}/{}", "z".repeat(256)),
+    ] {
+      let output = wrap_lines(&text, 20, 2);
+      assert!(output.lines().all(|line| measure_text_width(line) <= 20));
+      assert_eq!(
+        output
+          .lines()
+          .map(|line| line.strip_prefix("  ").unwrap())
+          .collect::<String>(),
+        text,
+      );
+      if text.contains('\u{301}') {
+        assert!(output.contains(&combining));
+      }
+    }
+  }
+
+  #[test]
+  fn detail_wrapping_preserves_emoji_clusters_at_two_columns() {
+    let clusters = ["👩‍💻", "🇫🇷", "1\u{fe0f}\u{20e3}", "👩🏽‍🚀", "e\u{301}"];
+    let text = clusters.join("");
+    let output = wrap_lines(&text, 2, 0);
+    assert_eq!(output.lines().collect::<Vec<_>>(), clusters);
+    assert!(output.lines().all(|line| measure_text_width(line) <= 2));
+    assert_eq!(output.lines().collect::<String>(), text);
+  }
+
+  #[test]
+  fn detail_wrapping_retains_full_string_width_for_fitting_ligatures() {
+    // Lam-Alef spans two graphemes but occupies one display column.
+    let text = "لا".repeat(2);
+    assert_eq!(measure_text_width(&text), 2);
+    assert_eq!(wrap_lines(&text, 2, 0), text);
   }
 }
