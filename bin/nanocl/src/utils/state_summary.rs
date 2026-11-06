@@ -52,6 +52,13 @@ pub fn summarize_state(
 
 /// Produce a compact plain-text preview from the same safe JSON model.
 pub fn format_state_summary(summary: &StateSummary) -> String {
+  format_state_summary_at_width(summary, super::print::terminal_width())
+}
+
+fn format_state_summary_at_width(
+  summary: &StateSummary,
+  width: usize,
+) -> String {
   let counts = &summary.counts;
   let mut lines = vec![
     format!("Statefile {:?}", summary.source),
@@ -96,7 +103,14 @@ pub fn format_state_summary(summary: &StateSummary) -> String {
       ));
     }
   }
-  lines.join("\n")
+  lines
+    .iter()
+    .map(|line| {
+      let indent = line.len() - line.trim_start().len();
+      super::print::wrap_lines(line, width, indent)
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
 }
 
 fn summarize_container(
@@ -172,6 +186,74 @@ mod tests {
       format_state_summary(&summary),
       "Statefile \"./Statefile.yml\"\n  Namespace: \"global\"\n  Group: \"./Statefile.yml\" (derived)\n  Objects: 0 cargoes, 0 VMs, 0 jobs, 0 resources, 0 secrets"
     );
+  }
+
+  #[test]
+  fn long_summary_references_wrap_without_losing_identifiers() {
+    let image = format!("registry.example/{}:latest", "long-path/".repeat(14));
+    let state = state(
+      json!({
+        "ApiVersion": "v0.19",
+        "Cargoes": [{"Name": "web", "Containers": [{"Name": "api", "Image": image}]}]
+      }),
+      "/deploy/Statefile.yml",
+    );
+    let summary = summarize_state(&state, &state.location);
+    for width in [40, 80, 100] {
+      let output = format_state_summary_at_width(&summary, width);
+      assert!(
+        output.lines().all(|line| {
+          dialoguer::console::measure_text_width(line) <= width
+        })
+      );
+      assert!(
+        output
+          .split_whitespace()
+          .collect::<String>()
+          .contains(&image)
+      );
+      assert!(output.contains("    "));
+    }
+  }
+
+  #[test]
+  fn summary_preserves_spaces_in_source_and_group_at_all_widths() {
+    let source = "./deployment  files/Statefile.yml";
+    let group = "nightly  production  release";
+    let state = state(json!({"ApiVersion": "v0.19", "Group": group}), source);
+    let summary = summarize_state(&state, group);
+    for width in [20, 40, 80] {
+      let output = format_state_summary_at_width(&summary, width);
+      assert!(
+        output.lines().all(|line| {
+          dialoguer::console::measure_text_width(line) <= width
+        })
+      );
+      let source_lines = output.split("\n  Namespace:").next().unwrap();
+      assert_eq!(
+        source_lines.lines().collect::<String>(),
+        format!("Statefile {source:?}")
+      );
+      let group_lines = output
+        .split_once("\n  Group:")
+        .unwrap()
+        .1
+        .split("\n  Objects:")
+        .next()
+        .unwrap();
+      let restored_group = group_lines
+        .lines()
+        .enumerate()
+        .map(|(index, line)| {
+          if index == 0 {
+            line
+          } else {
+            line.strip_prefix("  ").unwrap()
+          }
+        })
+        .collect::<String>();
+      assert_eq!(restored_group, format!(" {group:?} (explicit)"));
+    }
   }
 
   #[test]

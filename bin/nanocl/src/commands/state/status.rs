@@ -8,6 +8,7 @@ use std::{
 
 use bollard_next::models::HealthStatusEnum;
 use chrono::{NaiveDateTime, Utc};
+use dialoguer::console::measure_text_width;
 use futures::{StreamExt, stream};
 use nanocl_error::{
   http_client::{HttpClientError, HttpClientResult},
@@ -35,7 +36,10 @@ use tabled::{
 use crate::{
   config::CliConfig,
   models::{StateRef, StateStatusOpts, StateStatusRow},
-  utils::process::resource_key,
+  utils::{
+    print::{terminal_width, wrap_lines},
+    process::resource_key,
+  },
 };
 
 use super::{
@@ -106,12 +110,34 @@ fn targets(
 fn empty_row(kind: &EventActorKind, key: &str) -> StateStatusRow {
   StateStatusRow {
     kind: kind.to_string().to_lowercase(),
-    name: display_text(key),
+    name: normalize_text(key),
     running: "-".into(),
     status: "missing".into(),
     health: "unknown".into(),
     failure: "-".into(),
     read_failed: false,
+    state: "missing".into(),
+    wanted: None,
+    results: None,
+    recent_failure: None,
+    read_error: None,
+  }
+}
+
+fn state_label(status: &ObjPsStatusKind) -> &'static str {
+  match status {
+    ObjPsStatusKind::Create => "created",
+    ObjPsStatusKind::Starting => "starting",
+    ObjPsStatusKind::Start => "running",
+    ObjPsStatusKind::Updating => "updating",
+    ObjPsStatusKind::Update => "updated",
+    ObjPsStatusKind::Destroying => "removing",
+    ObjPsStatusKind::Destroy => "removed",
+    ObjPsStatusKind::Stopping => "stopping",
+    ObjPsStatusKind::Stop => "stopped",
+    ObjPsStatusKind::Fail => "failed",
+    ObjPsStatusKind::Finish => "completed",
+    ObjPsStatusKind::Unknown => "unknown",
   }
 }
 
@@ -132,6 +158,9 @@ fn set_runtime(
     .count();
   row.running = format!("{running}/{}", instances.len());
   row.status = format!("{}/{}", status.actual, status.wanted);
+  row.state = state_label(&status.actual).into();
+  row.wanted = (status.actual != status.wanted)
+    .then(|| state_label(&status.wanted).to_owned());
   row.health = status.health.to_string();
 }
 
@@ -267,14 +296,32 @@ fn recent_failure(
 
 fn set_job(row: &mut StateStatusRow, job: &JobInspect) {
   set_runtime(row, &job.status, &job.instances);
+  row.results = None;
+  // A run ending successfully or with failure is a job outcome, not a pending
+  // transition back to its creation/start request.
+  if matches!(
+    job.status.actual,
+    ObjPsStatusKind::Finish | ObjPsStatusKind::Fail
+  ) && matches!(
+    job.status.wanted,
+    ObjPsStatusKind::Create | ObjPsStatusKind::Start
+  ) {
+    row.wanted = None;
+  }
   if job.spec.schedule.is_some()
     && job.status.actual == ObjPsStatusKind::Create
     && job.instances.is_empty()
   {
     row.status = "scheduled".into();
+    row.state = "scheduled".into();
+    row.wanted = None;
   } else if job.instance_success > 0 || job.instance_failed > 0 {
     row.status.push_str(&format!(
       " ({} succeeded, {} failed)",
+      job.instance_success, job.instance_failed
+    ));
+    row.results = Some(format!(
+      "{} succeeded, {} failed",
       job.instance_success, job.instance_failed
     ));
   }
@@ -317,6 +364,7 @@ async fn inspect_target(
       match optional_read(client.inspect_resource(key).await)? {
         Some(resource) => {
           row.status = "present".into();
+          row.state = "present".into();
           row.health = "not reported".into();
           return Ok((since.max(resource.created_at), None));
         }
@@ -345,12 +393,14 @@ async fn collect_row(
     Ok(Ok(value)) => value,
     result => {
       row.status = "unavailable".into();
+      row.state = "unavailable".into();
       row.read_failed = true;
       row.failure = match result {
         Ok(Err(error)) => error,
         Err(_) => "daemon read timed out".into(),
         _ => unreachable!(),
       };
+      row.read_error = Some(row.failure.clone());
       return row;
     }
   };
@@ -367,15 +417,14 @@ async fn collect_row(
         _ => unreachable!(),
       };
       row.failure = format!("event history unavailable: {error}");
+      row.read_error = Some(row.failure.clone());
       observed
     }
   };
   if let Some((time, reason)) = failure {
-    let reason = format!(
-      "{} UTC {}",
-      time.format("%Y-%m-%d %H:%M:%S"),
-      display_text(&reason)
-    );
+    let reason = display_text(&reason);
+    row.recent_failure = Some((time, reason.clone()));
+    let reason = format!("{} UTC {}", time.format("%Y-%m-%d %H:%M:%S"), reason);
     row.failure = if row.read_failed {
       format!("{reason}; {}", row.failure)
     } else {
@@ -385,14 +434,18 @@ async fn collect_row(
   row
 }
 
-/// Keep each field bounded and prevent control characters from changing the
-/// terminal during watch refreshes.
-fn display_text(value: &str) -> String {
+/// Normalize terminal controls without shortening object identities.
+fn normalize_text(value: &str) -> String {
   let normalized = value
     .chars()
     .map(|c| if c.is_control() { ' ' } else { c })
     .collect::<String>();
-  let normalized = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+  normalized.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Keep diagnostic text bounded during watch refreshes.
+fn display_text(value: &str) -> String {
+  let normalized = normalize_text(value);
   let mut chars = normalized.chars();
   let mut output: String = chars.by_ref().take(200).collect();
   if chars.next().is_some() {
@@ -401,7 +454,11 @@ fn display_text(value: &str) -> String {
   output
 }
 
-fn render(rows: &[StateStatusRow], now: NaiveDateTime, watch: bool) -> String {
+fn render_wide(
+  rows: &[StateStatusRow],
+  now: NaiveDateTime,
+  watch: bool,
+) -> String {
   let mut output = format!(
     "Application status — {} UTC",
     now.format("%Y-%m-%d %H:%M:%S")
@@ -427,6 +484,179 @@ fn render(rows: &[StateStatusRow], now: NaiveDateTime, watch: bool) -> String {
     .to_string();
   output.push_str(&table);
   output.push_str("\nRunning: running/observed processes. Status: actual/wanted. Health: last reported.\nRecent failure: latest event or observed process failure in the last 24h.\n");
+  output
+}
+
+fn failure_age(time: NaiveDateTime, now: NaiveDateTime) -> String {
+  let seconds = (now - time).num_seconds().max(0);
+  if seconds < 60 {
+    format!("{seconds}s")
+  } else if seconds < 3600 {
+    format!("{}m", seconds / 60)
+  } else {
+    format!("{}h", seconds / 3600)
+  }
+}
+
+fn append_wrapped(
+  output: &mut String,
+  text: &str,
+  width: usize,
+  indent: usize,
+) {
+  output.push_str(&wrap_lines(text, width, indent));
+  output.push('\n');
+}
+
+fn append_details(
+  output: &mut String,
+  row: &StateStatusRow,
+  now: NaiveDateTime,
+  width: usize,
+) {
+  if let Some(wanted) = &row.wanted {
+    append_wrapped(output, &format!("Wanted: {wanted}"), width, 2);
+  }
+  if let Some(results) = &row.results {
+    append_wrapped(output, &format!("Results: {results}"), width, 2);
+  }
+  if let Some((time, reason)) = &row.recent_failure {
+    append_wrapped(
+      output,
+      &format!("Last failure {} ago: {reason}", failure_age(*time, now)),
+      width,
+      2,
+    );
+  }
+  if let Some(error) = &row.read_error {
+    append_wrapped(output, error, width, 2);
+  }
+}
+
+fn padded(value: &str, width: usize) -> String {
+  format!(
+    "{value}{}",
+    " ".repeat(width.saturating_sub(measure_text_width(value)))
+  )
+}
+
+fn render(
+  rows: &[StateStatusRow],
+  now: NaiveDateTime,
+  watch: bool,
+  wide: bool,
+  width: usize,
+) -> String {
+  if wide {
+    return render_wide(rows, now, watch);
+  }
+  let width = width.max(1);
+  let mut output = String::new();
+  append_wrapped(
+    &mut output,
+    &format!("State status  {} UTC", now.format("%Y-%m-%d %H:%M:%S")),
+    width,
+    0,
+  );
+  if watch {
+    append_wrapped(&mut output, "Refresh 2s; Ctrl-C to stop", width, 0);
+  }
+  if rows.is_empty() {
+    append_wrapped(
+      &mut output,
+      "No cargoes, VMs, jobs, or resources declared.",
+      width,
+      0,
+    );
+    return output;
+  }
+
+  let objects = rows
+    .iter()
+    .map(|row| format!("{}/{}", row.kind, row.name))
+    .collect::<Vec<_>>();
+  let state_width = rows
+    .iter()
+    .map(|row| measure_text_width(&row.state))
+    .max()
+    .unwrap_or(0)
+    .max(5);
+  let proc_width = rows
+    .iter()
+    .map(|row| measure_text_width(&row.running))
+    .max()
+    .unwrap_or(0)
+    .max(4);
+  let health_width = rows
+    .iter()
+    .map(|row| measure_text_width(&row.health))
+    .max()
+    .unwrap_or(0)
+    .max(6);
+  let available_object_width =
+    width.saturating_sub(state_width + proc_width + health_width + 6);
+  let object_width = available_object_width.min(
+    objects
+      .iter()
+      .map(|object| measure_text_width(object))
+      .max()
+      .unwrap_or(0)
+      .max(12),
+  );
+  // Keep the state columns aligned whenever there is useful room for an
+  // identity. On narrow terminals, stack labelled fields under the full name.
+  if available_object_width >= 20 {
+    output.push_str(&format!(
+      "{}  {}  {}  HEALTH\n",
+      padded("OBJECT", object_width),
+      padded("STATE", state_width),
+      padded("PROC", proc_width),
+    ));
+    for (row, object) in rows.iter().zip(&objects) {
+      let wrapped = wrap_lines(object, object_width, 0);
+      for (index, line) in wrapped.lines().enumerate() {
+        if index == 0 {
+          output.push_str(&format!(
+            "{}  {}  {}  {}\n",
+            padded(line, object_width),
+            padded(&row.state, state_width),
+            padded(&row.running, proc_width),
+            row.health,
+          ));
+        } else {
+          output.push_str(line);
+          output.push('\n');
+        }
+      }
+      append_details(&mut output, row, now, width);
+    }
+  } else {
+    for (row, object) in rows.iter().zip(&objects) {
+      append_wrapped(&mut output, object, width, 0);
+      append_wrapped(
+        &mut output,
+        &format!(
+          "State: {}  Proc: {}  Health: {}",
+          row.state, row.running, row.health,
+        ),
+        width,
+        2,
+      );
+      append_details(&mut output, row, now, width);
+    }
+  }
+  append_wrapped(
+    &mut output,
+    "Proc: running/observed processes, including init, sandbox and sidecars.",
+    width,
+    0,
+  );
+  append_wrapped(
+    &mut output,
+    "Health: last reported. Last failure: latest in 24h.",
+    width,
+    0,
+  );
   output
 }
 
@@ -461,7 +691,7 @@ pub(super) async fn exec_state_status(
     .buffered(8)
     .collect::<Vec<_>>()
     .await;
-    let output = render(&rows, now, opts.watch);
+    let output = render(&rows, now, opts.watch, opts.wide, terminal_width());
     {
       let mut stdout = io::stdout().lock();
       if opts.watch && terminal {
@@ -690,6 +920,8 @@ mod tests {
     );
     assert_eq!(row.running, "1/3");
     assert_eq!(row.status, "stop/stop");
+    assert_eq!(row.state, "stopped");
+    assert_eq!(row.wanted, None);
     assert_eq!(row.health, "unhealthy");
   }
 
@@ -721,22 +953,31 @@ mod tests {
     let mut row = empty_row(&EventActorKind::Job, "migrate");
     set_job(&mut row, &job);
     assert_eq!(row.status, "scheduled");
+    assert_eq!(row.state, "scheduled");
+    assert_eq!(row.wanted, None);
     assert_eq!(row.running, "0/0");
     assert_eq!(row.health, "unknown");
     job.status.actual = ObjPsStatusKind::Finish;
     job.instance_success = 2;
     set_job(&mut row, &job);
     assert_eq!(row.status, "finish/create (2 succeeded, 0 failed)");
+    assert_eq!(row.state, "completed");
+    assert_eq!(row.results.as_deref(), Some("2 succeeded, 0 failed"));
+    assert_eq!(row.wanted, None);
     job.status.actual = ObjPsStatusKind::Fail;
     job.instance_failed = 1;
     set_job(&mut row, &job);
     assert_eq!(row.status, "fail/create (2 succeeded, 1 failed)");
+    assert_eq!(row.state, "failed");
+    assert_eq!(row.results.as_deref(), Some("2 succeeded, 1 failed"));
+    assert_eq!(row.wanted, None);
     job.spec.schedule = None;
     job.status.actual = ObjPsStatusKind::Create;
     job.instance_success = 0;
     job.instance_failed = 0;
     set_job(&mut row, &job);
     assert_eq!(row.status, "create/create");
+    assert_eq!(row.results, None);
   }
 
   #[test]
@@ -790,14 +1031,14 @@ mod tests {
   #[test]
   fn status_render_keeps_missing_and_unreported_health_explicit() {
     assert!(
-      render(&[], time(10), false)
+      render(&[], time(10), false, true, 80)
         .contains("No cargoes, VMs, jobs, or resources declared.")
     );
     let missing = empty_row(&EventActorKind::Cargo, "global.app");
     let mut resource = empty_row(&EventActorKind::Resource, "route");
     resource.status = "present".into();
     resource.health = "not reported".into();
-    let output = render(&[missing, resource], time(10), true);
+    let output = render(&[missing, resource], time(10), true, true, 80);
     for expected in [
       "global.app",
       "missing",
@@ -812,6 +1053,143 @@ mod tests {
       assert!(output.contains(expected), "missing {expected}");
     }
     assert!(!output.contains('\x1b'));
+  }
+
+  #[test]
+  fn status_compact_render_fits_terminal_and_keeps_failure_details_near_object()
+  {
+    let mut cargo = empty_row(&EventActorKind::Cargo, "production.worker");
+    set_runtime(
+      &mut cargo,
+      &ObjPsStatus {
+        actual: ObjPsStatusKind::Fail,
+        wanted: ObjPsStatusKind::Start,
+        health: ObjPsHealthStatusKind::Unhealthy,
+        ..Default::default()
+      },
+      &[instance(Some(false))],
+    );
+    cargo.recent_failure = Some((
+      time(800),
+      "production.worker-r0.c: unhealthy (health check exited with code 127)"
+        .into(),
+    ));
+    let mut job = empty_row(&EventActorKind::Job, "migrate");
+    job.state = "completed".into();
+    job.running = "0/2".into();
+    job.results = Some("2 succeeded, 0 failed".into());
+    let mut resource = empty_row(&EventActorKind::Resource, "web-route");
+    resource.state = "present".into();
+    resource.health = "not reported".into();
+    let rows = [cargo, job, resource];
+    for width in [24, 80, 100] {
+      let output = render(&rows, time(920), true, false, width);
+      for line in output.lines() {
+        assert!(
+          measure_text_width(line) <= width,
+          "line exceeds {width} columns: {line:?}"
+        );
+      }
+      let words = output.split_whitespace().collect::<Vec<_>>().join(" ");
+      if width >= 80 {
+        assert!(words.contains("OBJECT STATE PROC HEALTH"));
+      } else {
+        assert!(output.contains("State:"));
+      }
+      for expected in [
+        "failed",
+        "Wanted: running",
+        "Last failure 2m ago:",
+        "health check exited with code 127",
+        "completed",
+        "Results: 2 succeeded, 0 failed",
+        "not reported",
+        "running/observed processes, including init, sandbox and sidecars",
+      ] {
+        assert!(words.contains(expected), "missing {expected}: {output}");
+      }
+      assert!(
+        output.find("Last failure").unwrap() < output.find("job/").unwrap()
+      );
+      assert!(!output.contains("fail/start"));
+    }
+  }
+
+  #[test]
+  fn status_compact_render_preserves_long_unicode_identity() {
+    let name = format!("production.{}.last", "数据库".repeat(80));
+    let row = empty_row(&EventActorKind::Cargo, &name);
+    assert_eq!(row.name, name);
+    for width in [24, 80, 100] {
+      let output =
+        render(std::slice::from_ref(&row), time(920), false, false, width);
+      assert!(output.lines().all(|line| measure_text_width(line) <= width));
+      for character in ['数', '据', '库'] {
+        assert_eq!(output.chars().filter(|c| *c == character).count(), 80);
+      }
+      assert!(!output.contains("..."));
+    }
+    let output = render(&[row], time(920), false, false, 24);
+    let start = output.find("cargo/production.").unwrap();
+    let end = output[start..].find("  State:").unwrap() + start;
+    let identity = output[start..end].split_whitespace().collect::<String>();
+    assert_eq!(identity, format!("cargo/{name}"));
+  }
+
+  #[test]
+  fn status_compact_render_distinguishes_history_errors_and_current_state() {
+    let mut running = empty_row(&EventActorKind::Cargo, "global.web");
+    set_runtime(
+      &mut running,
+      &ObjPsStatus {
+        actual: ObjPsStatusKind::Start,
+        wanted: ObjPsStatusKind::Start,
+        health: ObjPsHealthStatusKind::Healthy,
+        ..Default::default()
+      },
+      &[instance(Some(true))],
+    );
+    running.read_failed = true;
+    running.read_error =
+      Some("event history unavailable: daemon read timed out".into());
+    running.recent_failure =
+      Some((time(800), "app: exited with code 127".into()));
+    let missing = empty_row(&EventActorKind::Vm, "global.missing");
+    let mut unavailable = empty_row(&EventActorKind::Job, "unavailable");
+    unavailable.state = "unavailable".into();
+    unavailable.read_failed = true;
+    unavailable.read_error = Some("daemon read failed (HTTP 503)".into());
+    let output = render(
+      &[running, missing, unavailable],
+      time(920),
+      false,
+      false,
+      80,
+    );
+    for expected in [
+      "running",
+      "healthy",
+      "Last failure 2m ago: app: exited with code 127",
+      "event history unavailable: daemon read timed out",
+      "missing",
+      "unknown",
+      "unavailable",
+      "daemon read failed (HTTP 503)",
+    ] {
+      assert!(output.contains(expected), "missing {expected}: {output}");
+    }
+    assert!(!output.contains("Wanted:"));
+  }
+
+  #[test]
+  fn status_wide_render_retains_actual_wanted_and_absolute_failure_time() {
+    let mut row = empty_row(&EventActorKind::Job, "migrate");
+    row.status = "finish/create (2 succeeded, 0 failed)".into();
+    row.failure = "1970-01-01 00:13:20 UTC app: exited with code 127".into();
+    let output = render(&[row], time(920), false, true, 24);
+    assert!(output.contains("finish/create (2 succeeded, 0 failed)"));
+    assert!(output.contains("1970-01-01 00:13:20 UTC"));
+    assert!(output.contains("RECENT FAILURE"));
   }
 
   #[test]

@@ -14,4 +14,14 @@ pub struct StateStatusRow {
   pub failure: String,
   #[tabled(skip)]
   pub read_failed: bool,
+  #[tabled(skip)]
+  pub state: String,
+  #[tabled(skip)]
+  pub wanted: Option<String>,
+  #[tabled(skip)]
+  pub results: Option<String>,
+  #[tabled(skip)]
+  pub recent_failure: Option<(chrono::NaiveDateTime, String)>,
+  #[tabled(skip)]
+  pub read_error: Option<String>,
 }

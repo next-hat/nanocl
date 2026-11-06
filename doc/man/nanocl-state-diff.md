@@ -12,7 +12,7 @@ diff - Preview changes from a Statefile without applying them
 ## SYNOPSIS
 
 **diff** \[**-s**\|**--source** *SOURCE*\] \[**-r**\|**--reload**\]
-\[**--remove-orphans**\] \[**--json**\]
+\[**--remove-orphans**\] \[**--json**\|**--summary**\]
 \[**--pager**\|**--no-pager**\] \[**-h**\|**--help**\] \[**--** *ARGS*\]
 
 ## DESCRIPTION
@@ -24,16 +24,24 @@ and added lines have a `+` prefix. The diff compares normalized configuration,
 so hunk line numbers do not refer to the source Statefile.
 
 Sensitive fields are omitted without placeholders or notices. Unchanged
-configuration and changes affecting only sensitive fields produce no text
-output. Use --json for all actions, including unchanged elements, orphans,
-reloads, and sensitive changes. Set `NO_COLOR=1` to disable terminal colors.
-This command does not apply changes or require confirmation.
+configuration and changes affecting only sensitive fields produce no default
+diff output. Use --summary for a compact list of planned actions and totals,
+including unchanged elements, orphans, reloads, and sensitive changes without
+their values. Use --json for the complete structured plan. Set `NO_COLOR=1` to
+disable terminal colors. This command does not apply changes or require
+confirmation.
+
+Summary rows follow apply order and wrap to fit the terminal without shortening
+object names. Reasons appear below the affected object, including why an orphan
+is kept or removed. When no actions change the state, the summary explicitly
+reports `No changes.`.
 
 With terminal input and output and `TERM` other than `dumb`, text opens in
 `less` and stays open until you press `q`, even for a short diff. Scroll with
 arrow keys or PageUp/PageDown, search with `/`, and quit with `q`. Redirected or
 piped output and JSON always print directly. If `less` is unavailable, text
-prints directly. Empty diffs stay silent.
+prints directly. Empty default diffs stay silent; summaries report the plan
+even when no configuration changes are visible.
 
 See [Preview Statefile changes](../state-diff.md) for comparison rules, JSON
 output, and examples.
@@ -45,8 +53,8 @@ Path or URL to the Statefile. Uses the same default source lookup as state apply
 
 **-r**, **--reload**\
 Preview updates to existing cargoes, virtual machines, and resources even when
-their configuration is unchanged, matching state apply --reload. Use --json to
-see updates without visible configuration changes.
+their configuration is unchanged, matching state apply --reload. Use --summary
+or --json to see updates without visible configuration changes.
 
 **--remove-orphans**\
 Preview removal of orphaned secrets, cargoes, virtual machines, and resources
@@ -57,7 +65,13 @@ always kept.
 **--json**\
 Print one JSON document directly, containing all items and a summary. Sensitive
 changes retain their paths with `"[REDACTED]"` values and `redacted: true`.
-Cannot be combined with --pager.
+Cannot be combined with --pager or --summary.
+
+**--summary**\
+Print a compact list of planned create, update, remove, and unchanged actions
+with totals. Include forced updates, changes to sensitive fields, and retained
+or removed orphans without printing configuration values. Cannot be combined
+with --json.
 
 **--pager**\
 Explicitly select the default behavior: keep even a short diff open in `less`
@@ -80,6 +94,7 @@ Additional arguments to pass to the Statefile template
 nanocl state diff -s Statefile.yml
 nanocl state diff -s Statefile.yml --remove-orphans
 nanocl state diff -s Statefile.yml --json
+nanocl state diff -s Statefile.yml --summary --no-pager
 nanocl state diff -s Statefile.yml --pager
 nanocl state diff -s Statefile.yml --no-pager
 nanocl state diff -s Statefile.yml > preview.diff
