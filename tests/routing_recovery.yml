@@ -1,0 +1,40 @@
+ApiVersion: v0.18
+
+Namespace: global
+
+Cargoes:
+- Name: e2e-routing-backend
+  NetworkMode: e2e-routing-recovery
+  Containers:
+  - Name: backend
+    Image: alpine:latest
+    Cmd:
+    - sh
+    - -c
+    - |
+      while true; do
+        printf 'HTTP/1.1 200 OK\r\nContent-Length: 20\r\nConnection: close\r\n\r\nrouting-recovery-ok\n' |
+          nc -l -p 9000
+      done
+
+Resources:
+- Name: e2e-routing-proxy
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: routing-recovery.nanocl.test
+      Network: All
+      Port: 18080
+      Locations:
+      - Path: /
+        Target:
+          Key: global.e2e-routing-backend.c
+          Port: 9000
+
+- Name: e2e-routing-dns
+  Kind: ncdns.io/rule
+  Data:
+    Network: e2e-routing-recovery
+    Entries:
+    - Name: routing-recovery.nanocl.test
+      IpAddress: e2e-routing-recovery

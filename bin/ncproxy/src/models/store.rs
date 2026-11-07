@@ -64,12 +64,23 @@ impl FromStr for NginxRuleKind {
 #[derive(Clone)]
 pub struct Store {
   pub dir: String,
+  /// Shared nginx PID, fence and pending-marker directory.
+  pub run_dir: String,
 }
 
 impl Store {
   pub fn new(dir: &str) -> Self {
     Self {
       dir: dir.to_owned(),
+      run_dir: "/run".to_owned(),
+    }
+  }
+
+  #[cfg(test)]
+  pub fn isolated(dir: &str) -> Self {
+    Self {
+      dir: dir.to_owned(),
+      run_dir: dir.to_owned(),
     }
   }
 
@@ -260,6 +271,7 @@ impl Store {
     })
   }
 
+  #[cfg(test)]
   pub async fn clear_config(&self) -> IoResult<()> {
     for name in ["sites", "streams"] {
       self
@@ -270,6 +282,39 @@ impl Store {
         .await?;
     }
     Ok(())
+  }
+
+  /// Snapshot equality alone does not detect a missing or incorrect enabled
+  /// link. Verify the links before treating a generated candidate as unchanged.
+  pub(crate) async fn config_links_match(
+    &self,
+    snapshot: &StoreConfigSnapshot,
+  ) -> IoResult<bool> {
+    for (kind, files) in
+      [("sites", &snapshot.sites), ("streams", &snapshot.streams)]
+    {
+      let mut entries =
+        tokio::fs::read_dir(format!("{}/{kind}-enabled", self.dir)).await?;
+      let mut count = 0;
+      while let Some(entry) = entries.next_entry().await? {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !files.contains_key(&name) || !entry.file_type().await?.is_symlink()
+        {
+          return Ok(false);
+        }
+        let expected = format!("{}/{kind}-available/{name}", self.dir);
+        if tokio::fs::read_link(entry.path()).await?
+          != std::path::Path::new(&expected)
+        {
+          return Ok(false);
+        }
+        count += 1;
+      }
+      if count != files.len() {
+        return Ok(false);
+      }
+    }
+    Ok(true)
   }
 
   pub async fn restore_config(

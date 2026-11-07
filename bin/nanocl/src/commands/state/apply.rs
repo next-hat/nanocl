@@ -168,6 +168,7 @@ async fn report_cargo_receipt(
   token: &str,
   progress: &MultiProgress,
   output: Option<&StateOutput>,
+  wide: bool,
 ) {
   let inspect = tokio::time::timeout(
     std::time::Duration::from_secs(5),
@@ -186,6 +187,8 @@ async fn report_cargo_receipt(
       receipt.as_ref(),
       progress,
       output,
+      wide,
+      utils::print::terminal_width(),
       &mut io::stdout().lock(),
     );
   } else {
@@ -194,6 +197,8 @@ async fn report_cargo_receipt(
       receipt.as_ref(),
       progress,
       None,
+      wide,
+      utils::print::stderr_width(),
       &mut io::stderr(),
     );
   }
@@ -204,6 +209,8 @@ fn write_cargo_receipt(
   receipt: Option<&StateCargoReceipt>,
   progress: &MultiProgress,
   output: Option<&StateOutput>,
+  wide: bool,
+  width: usize,
   writer: &mut impl Write,
 ) {
   // Receipts are optional observations. Their output must not interrupt later
@@ -223,15 +230,31 @@ fn write_cargo_receipt(
     );
   } else {
     let line = receipt.map_or_else(
-      || format!("  {token}  Current snapshot unavailable; use nanocl state status to inspect"),
-      utils::state_receipt::format_cargo_receipt,
+      || format!("  {token}  snapshot unavailable\n    Inspect with nanocl state status"),
+      |receipt| utils::state_receipt::format_cargo_receipt(receipt, wide),
     );
+    let line = if wide {
+      line
+    } else {
+      wrap_cargo_receipt(&line, width)
+    };
     if progress.is_hidden() {
       let _ = writeln!(writer, "{line}");
     } else {
       let _ = progress.println(line);
     }
   }
+}
+
+fn wrap_cargo_receipt(text: &str, width: usize) -> String {
+  text
+    .lines()
+    .map(|line| {
+      let indent = line.chars().take_while(|ch| *ch == ' ').count();
+      utils::print::wrap_lines(line, width, indent)
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
 }
 
 async fn state_apply(
@@ -399,7 +422,8 @@ async fn state_apply(
         },
       )
       .await?;
-      report_cargo_receipt(client, &key, &token, progress, output).await;
+      report_cargo_receipt(client, &key, &token, progress, output, opts.wide)
+        .await;
     }
   }
 
@@ -902,6 +926,8 @@ mod tests {
             receipt,
             &progress,
             output,
+            false,
+            80,
             &mut writer,
           );
           assert!(writer.writes > 0);
@@ -942,6 +968,8 @@ mod tests {
       None,
       &progress,
       Some(&output),
+      false,
+      80,
       &mut bytes,
     );
     let record: Value = serde_json::from_slice(&bytes).unwrap();
@@ -950,11 +978,64 @@ mod tests {
     assert_eq!(record["status"], "unavailable");
     assert!(record.get("success").is_none());
     bytes.clear();
-    write_cargo_receipt("cargo/global.web", None, &progress, None, &mut bytes);
+    write_cargo_receipt(
+      "cargo/global.web",
+      None,
+      &progress,
+      None,
+      false,
+      80,
+      &mut bytes,
+    );
     assert_eq!(
       String::from_utf8(bytes).unwrap(),
-      "  cargo/global.web  Current snapshot unavailable; use nanocl state status to inspect\n"
+      "  cargo/global.web  snapshot unavailable\n    Inspect with nanocl state status\n"
     );
+  }
+
+  #[test]
+  fn compact_receipt_wrapping_preserves_parent_and_process_indentation() {
+    let wrapped = wrap_cargo_receipt(
+      "  cargo/global.web  app processes 1/1 running/observed\n    r0-api-abcdef@node-a  running  health disabled",
+      40,
+    );
+    assert!(wrapped.starts_with("  cargo/global.web"));
+    assert!(wrapped.contains("\n    r0-api-abcdef@node-a"));
+    assert!(wrapped.lines().all(|line| line.len() <= 40));
+    assert!(wrapped.contains("running/observed"));
+  }
+
+  #[test]
+  fn wide_receipts_do_not_change_json_records() {
+    let progress =
+      MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+    let output = StateOutput {
+      operation: "apply",
+      statefile: None,
+    };
+    let receipt = StateCargoReceipt {
+      resource: "cargo/global.web".to_owned(),
+      revision: "revision-full-id".to_owned(),
+      running: 0,
+      total: 0,
+      processes: Vec::new(),
+    };
+    let records = [false, true].map(|wide| {
+      let mut bytes = Vec::new();
+      write_cargo_receipt(
+        "cargo/global.web",
+        Some(&receipt),
+        &progress,
+        Some(&output),
+        wide,
+        80,
+        &mut bytes,
+      );
+      serde_json::from_slice::<Value>(&bytes).unwrap()
+    });
+    assert_eq!(records[0], records[1]);
+    assert_eq!(records[0]["receipt"]["revision"], "revision-full-id");
+    assert!(records[0].get("success").is_none());
   }
 
   struct VmApplyRequests {

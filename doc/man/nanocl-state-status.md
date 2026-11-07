@@ -12,15 +12,27 @@ status - Show running instances, health, and recent failures from a Statefile
 ## SYNOPSIS
 
 **status** \[**-s**\|**--source** *SOURCE*\] \[**--watch**\]
-\[**-h**\|**--help**\] \[**--** *ARGS*\]
+\[**--wide**\] \[**-h**\|**--help**\] \[**--** *ARGS*\]
 
 ## DESCRIPTION
 
 Show the cargoes, virtual machines, jobs, and resources declared in a Statefile
-together in a timestamped text table. Running counts show running processes out
-of observed processes, not desired replicas. Cargo counts include init,
-sandbox, and sidecar processes. Status shows actual and wanted state, with
-scheduled jobs and present resources identified separately.
+together in a timestamped overview. The default columns are OBJECT, STATE, PROC,
+and HEALTH. Output fits the terminal width, wrapping full object names without
+shortening their identities. Narrow terminals use labelled fields beneath each
+object. Job results, desired-state differences, recent failures, and read errors
+appear beneath the affected object.
+
+PROC shows running processes out of observed processes, not desired replicas or
+readiness. Cargo counts include init, sandbox, and sidecar processes. States use
+labels such as running, stopped, completed, and failed. Scheduled jobs and
+present resources are identified separately. Desired state appears when it
+differs, except for completed or failed job runs whose creation/start request
+has already ended.
+
+With --wide, show the detailed table with separate kind and name columns,
+actual/wanted state, job results, and full UTC failure timestamps. This table
+may exceed the terminal width.
 
 Health reflects the daemon's last report, including unknown or not reported
 values. A resource's existence alone does not mean it is healthy. Recent
@@ -30,6 +42,8 @@ the element's kind and key, or an observed process failure, within the last
 synchronization failure reasons are unavailable if the daemon did not record
 an event. Generic failure notifications use the available process exit or
 health-check reason when it is more informative.
+The compact overview shows failure age separately from current state and
+health, so a recovered object can still have a recent failure.
 
 Missing elements remain in the table. Unavailable status or failure history is
 distinguished from a successful read with no failure found. Without --watch,
@@ -56,6 +70,10 @@ Path or URL to the Statefile. Uses the same default source lookup as state apply
 **--watch**\
 Refresh status every two seconds until Ctrl-C.
 
+**--wide**\
+Show detailed columns and full UTC failure timestamps without fitting the table
+to the terminal width.
+
 **-h**, **--help**\
 Print help
 
@@ -67,5 +85,6 @@ Additional arguments to pass to the Statefile template
 ```sh
 nanocl state status -s Statefile.yml
 nanocl state status -s Statefile.yml --watch
+nanocl state status -s Statefile.yml --wide
 nanocl state status -s Statefile.yml --watch -- --name example
 ```
