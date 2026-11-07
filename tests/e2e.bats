@@ -145,10 +145,18 @@ setup_file() {
 wait_unix_health() {
   local socket="$1"
   local url="$2"
+  local curl_command=(curl)
+  case "$socket" in
+    /run/nanocl/proxy.sock|/run/nanocl/dns.sock)
+      # Recreated controller sockets are private to root, like their nanocld
+      # caller. The runner's preparation-time ACL may no longer grant write.
+      curl_command=(sudo -n curl)
+      ;;
+  esac
   local health_error=""
   local deadline=$((SECONDS + 120))
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if health_error="$(curl --silent --show-error --fail --max-time 2 \
+    if health_error="$("${curl_command[@]}" --silent --show-error --fail --max-time 2 \
       --output /dev/null --unix-socket "$socket" "$url" 2>&1)"; then
       return 0
     fi
