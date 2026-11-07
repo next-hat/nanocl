@@ -51,6 +51,7 @@ const STATE_PENDING: &str = ".ncproxy-nginx.pending";
 const GLOBAL_CONFIG_PENDING: &str = "ncproxy-config.pending";
 const STATE_CONFIG_PENDING: &str = ".ncproxy-config.pending";
 const FENCE_READY: &[u8] = b"ncproxy-fence-v1 ready\n";
+const UPSTREAM_DEPENDENCIES: &str = "# ncproxy-upstreams: ";
 
 fn apply_location_options(
   template: &mut LocationTemplate,
@@ -1387,6 +1388,30 @@ pub(crate) struct PreparedRule {
   resolution_error: Option<IoError>,
 }
 
+fn annotate_rule_dependencies(prepared: &mut PreparedRule) -> IoResult<()> {
+  let mut sites = BTreeSet::new();
+  let mut streams = BTreeSet::new();
+  for (upstream, kind) in &prepared.upstreams {
+    match kind {
+      NginxRuleKind::Site => sites.insert(&upstream.key),
+      NginxRuleKind::Stream => streams.insert(&upstream.key),
+    };
+  }
+  for (config, dependencies) in
+    [(&mut prepared.site, sites), (&mut prepared.stream, streams)]
+  {
+    if let Some(config) = config {
+      // These dependencies were actually prepared, unlike omitted declaration
+      // targets or literal URL hosts. The header shares the config transaction.
+      *config = format!(
+        "{UPSTREAM_DEPENDENCIES}{}\n{config}",
+        serde_json::to_string(&dependencies)?
+      );
+    }
+  }
+  Ok(())
+}
+
 fn record_resolution_error(error: IoError, failure: &mut Option<IoError>) {
   use std::io::ErrorKind;
 
@@ -1658,13 +1683,15 @@ async fn prepare_rule(
       }
     }
   }
-  Ok(PreparedRule {
+  let mut prepared = PreparedRule {
     site: (!http_conf.is_empty()).then_some(http_conf),
     stream: (!stream_conf.is_empty()).then_some(stream_conf),
     upstreams,
     files,
     resolution_error,
-  })
+  };
+  annotate_rule_dependencies(&mut prepared)?;
+  Ok(prepared)
 }
 
 async fn apply_prepared_rule(
@@ -1690,10 +1717,7 @@ async fn apply_prepared_rule(
 async fn prepare_rebuild<'a>(
   rules: &'a [(String, ResourceProxyRule)],
   state: &SystemStateRef,
-) -> IoResult<(
-  Vec<(&'a str, PreparedRule, &'a ResourceProxyRule)>,
-  Option<IoError>,
-)> {
+) -> IoResult<(Vec<(&'a str, PreparedRule)>, Option<IoError>)> {
   let mut prepared_rules = Vec::with_capacity(rules.len());
   let mut resolution_error = None;
   for (name, rule) in rules {
@@ -1718,15 +1742,13 @@ async fn prepare_rebuild<'a>(
     if let Some(err) = &prepared.resolution_error {
       resolution_error.get_or_insert_with(|| err.clone());
     }
-    prepared_rules.push((name.as_str(), prepared, rule));
+    prepared_rules.push((name.as_str(), prepared));
   }
   Ok((prepared_rules, resolution_error))
 }
 
 fn retain_rule_files(
   name: &str,
-  rule: &ResourceProxyRule,
-  kind: NginxRuleKind,
   previous: &BTreeMap<String, String>,
   candidate: &mut BTreeMap<String, String>,
 ) {
@@ -1734,62 +1756,23 @@ fn retain_rule_files(
     return;
   };
   candidate.insert(format!("{name}.conf"), config.clone());
-  let mut owned = BTreeSet::new();
-  for rule in &rule.rules {
-    match (kind, rule) {
-      (NginxRuleKind::Site, ProxyRule::Http(http)) => {
-        for location in &http.locations {
-          match &location.target {
-            LocationTarget::Upstream(target) => {
-              if let Ok(key) = super::rule::upstream_key(target) {
-                owned.insert(key);
-              }
-            }
-            LocationTarget::Unix(target) => {
-              owned.insert(super::rule::unix_upstream_key(target));
-            }
-            LocationTarget::Http(_) => {}
-          }
-        }
-      }
-      (NginxRuleKind::Stream, ProxyRule::Stream(stream)) => {
-        match &stream.target {
-          StreamTarget::Upstream(target) => {
-            if let Ok(key) = super::rule::upstream_key(target) {
-              owned.insert(key);
-            }
-          }
-          StreamTarget::Unix(target) => {
-            owned.insert(super::rule::unix_upstream_key(target));
-          }
-          StreamTarget::Uri(_) => {}
-        }
-      }
-      _ => {}
-    }
-  }
-  // A proxy_pass host alone does not establish ownership: a literal HTTP URL
-  // can match another declaration's generated upstream name. Keep only owned
-  // Cargo/VM/Unix dependencies also referenced by the committed configuration.
-  for line in config.lines() {
-    let mut words = line.split_whitespace();
-    if words.next() != Some("proxy_pass") {
-      continue;
-    }
-    let Some(target) = words.next() else { continue };
-    let target = target.trim_end_matches(';');
-    let target = target
-      .strip_prefix("http://")
-      .or_else(|| target.strip_prefix("https://"))
-      .unwrap_or(target);
-    let key = target.split('/').next().unwrap_or_default();
-    if !owned.contains(key) {
-      continue;
-    }
+  // Never infer ownership from proxy_pass hosts: literal URLs can collide
+  // with generated upstream names, even ones omitted from this rule.
+  let Some(metadata) = config
+    .lines()
+    .next()
+    .and_then(|line| line.strip_prefix(UPSTREAM_DEPENDENCIES))
+  else {
+    return;
+  };
+  let Ok(dependencies) = serde_json::from_str::<Vec<String>>(metadata) else {
+    return;
+  };
+  for key in dependencies {
     if let Some(upstream) = previous.get(&format!("{key}.conf")) {
       let mut declaration = upstream.split_whitespace();
       if declaration.next() == Some("upstream")
-        && declaration.next() == Some(key)
+        && declaration.next() == Some(key.as_str())
       {
         candidate.insert(format!("{key}.conf"), upstream.clone());
       }
@@ -1798,7 +1781,7 @@ fn retain_rule_files(
 }
 
 fn materialize_rebuild(
-  prepared: &[(&str, PreparedRule, &ResourceProxyRule)],
+  prepared: &[(&str, PreparedRule)],
   previous: &StoreConfigSnapshot,
 ) -> StoreConfigSnapshot {
   let mut candidate = StoreConfigSnapshot {
@@ -1810,25 +1793,13 @@ fn materialize_rebuild(
       && (previous.sites.contains_key(&format!("{name}.conf"))
         || previous.streams.contains_key(&format!("{name}.conf")))
   };
-  for (name, rule, declaration) in prepared {
+  for (name, rule) in prepared {
     if retain(name, rule) {
-      retain_rule_files(
-        name,
-        declaration,
-        NginxRuleKind::Site,
-        &previous.sites,
-        &mut candidate.sites,
-      );
-      retain_rule_files(
-        name,
-        declaration,
-        NginxRuleKind::Stream,
-        &previous.streams,
-        &mut candidate.streams,
-      );
+      retain_rule_files(name, &previous.sites, &mut candidate.sites);
+      retain_rule_files(name, &previous.streams, &mut candidate.streams);
     }
   }
-  for (name, rule, _) in prepared {
+  for (name, rule) in prepared {
     if retain(name, rule) {
       continue;
     }
@@ -1899,7 +1870,7 @@ pub(crate) async fn rebuild_rules(
   let _fences = admit_fences(&state.store)?;
   let credential_paths = prepared_rules
     .iter()
-    .flat_map(|(_, prepared, _)| {
+    .flat_map(|(_, prepared)| {
       prepared.files.iter().map(|file| file.path.as_str())
     })
     .collect::<Vec<_>>();
@@ -2134,6 +2105,11 @@ mod tests {
     assert_eq!(prepared.len(), 1);
     assert_eq!(prepared[0].0, "available");
     assert!(prepared[0].1.stream.as_ref().unwrap().contains("9001"));
+    assert!(
+      prepared[0].1.stream.as_ref().unwrap().starts_with(
+        "# ncproxy-upstreams: [\"unix--unused-available.sock\"]\n"
+      )
+    );
     assert!(failure.is_none());
     let committed = std::cell::Cell::new(false);
     let (sender, mut reloads) = futures::channel::mpsc::unbounded();
@@ -2158,21 +2134,11 @@ mod tests {
 
   #[test]
   fn recovery_retains_transient_routes_and_prunes_deleted_dependencies() {
-    let declaration = serde_json::from_value(serde_json::json!({
-      "Rules": [{
-        "Network": "Local",
-        "Locations": [{
-          "Path": "/",
-          "Target": { "Key": "global.live.c", "Port": 80 }
-        }]
-      }]
-    }))
-    .unwrap();
     let previous = StoreConfigSnapshot {
       sites: BTreeMap::from([
         (
           "live.conf".into(),
-          "proxy_pass http://global.live-80-cargo/path;".into(),
+          "# ncproxy-upstreams: [\"global.live-80-cargo\"]\nproxy_pass http://global.live-80-cargo/path;".into(),
         ),
         (
           "global.live-80-cargo.conf".into(),
@@ -2204,7 +2170,6 @@ mod tests {
             "temporarily unavailable",
           )),
         },
-        &declaration,
       )];
       let candidate = materialize_rebuild(&prepared, &previous);
       assert_eq!(
@@ -2222,20 +2187,11 @@ mod tests {
 
   #[test]
   fn materialization_updates_shared_upstreams_and_credential_bytes() {
-    let declaration = serde_json::from_value(serde_json::json!({
-      "Rules": [{
-        "Network": "Local",
-        "Protocol": "Tcp",
-        "Port": 5432,
-        "Target": { "Key": "private.apps.shared.v", "Port": 5432 }
-      }]
-    }))
-    .unwrap();
     let previous = StoreConfigSnapshot {
       streams: BTreeMap::from([
         (
           "retained.conf".into(),
-          "proxy_pass private.apps.shared-5432-vm;".into(),
+          "# ncproxy-upstreams: [\"private.apps.shared-5432-vm\"]\nproxy_pass private.apps.shared-5432-vm;".into(),
         ),
         (
           "private.apps.shared-5432-vm.conf".into(),
@@ -2258,7 +2214,6 @@ mod tests {
           files: Vec::new(),
           resolution_error: Some(IoError::other("Lookup", "unavailable")),
         },
-        &declaration,
       ),
       (
         "available",
@@ -2280,7 +2235,6 @@ mod tests {
           }],
           resolution_error: None,
         },
-        &declaration,
       ),
     ];
     let candidate = materialize_rebuild(&prepared, &previous);
@@ -2304,30 +2258,34 @@ mod tests {
 
   #[test]
   fn recovery_prunes_literal_http_collisions_with_deleted_upstreams() {
-    let declaration = serde_json::from_value(serde_json::json!({
-      "Rules": [{
-        "Network": "Local",
-        "Locations": [
-          { "Path": "/external", "Target": { "Url": "http://global.deleted-80-cargo" } },
-          { "Path": "/unix", "Target": { "UnixPath": "/run/backend.sock" } },
-          { "Path": "/unavailable", "Target": { "Key": "global.unavailable.c", "Port": 80 } }
-        ]
-      }]
-    }))
-    .unwrap();
+    // Model an accepted partial preparation: the literal URL and Unix location
+    // rendered, while a typed target with that SAME URL host was unavailable.
+    // Only the Unix dependency was actually prepared for this configuration.
+    let mut committed = PreparedRule {
+      site: Some("proxy_pass http://global.deleted-80-cargo/;\nproxy_pass http://unix--run-backend.sock/;".into()),
+      stream: None,
+      upstreams: vec![(
+        PreparedUpstream {
+          key: "unix--run-backend.sock".into(),
+          content: "upstream unix--run-backend.sock { server unix:/run/backend.sock; }".into(),
+        },
+        NginxRuleKind::Site,
+      )],
+      files: Vec::new(),
+      resolution_error: None,
+    };
+    annotate_rule_dependencies(&mut committed).unwrap();
     let previous = StoreConfigSnapshot {
       sites: BTreeMap::from([
-        (
-          "retained.conf".into(),
-          "proxy_pass http://global.deleted-80-cargo/;\nproxy_pass http://unix--run-backend.sock/;".into(),
-        ),
+        ("retained.conf".into(), committed.site.unwrap()),
         (
           "global.deleted-80-cargo.conf".into(),
           "upstream global.deleted-80-cargo { server deleted; }".into(),
         ),
         (
           "unix--run-backend.sock.conf".into(),
-          "upstream unix--run-backend.sock { server unix:/run/backend.sock; }".into(),
+          "upstream unix--run-backend.sock { server unix:/run/backend.sock; }"
+            .into(),
         ),
         (
           "global.unavailable-80-cargo.conf".into(),
@@ -2345,7 +2303,6 @@ mod tests {
         files: Vec::new(),
         resolution_error: Some(IoError::other("Lookup", "unavailable")),
       },
-      &declaration,
     )];
     let candidate = materialize_rebuild(&prepared, &previous);
     assert_eq!(
@@ -2364,6 +2321,64 @@ mod tests {
         .sites
         .contains_key("global.unavailable-80-cargo.conf")
     );
+  }
+
+  #[test]
+  fn prepared_dependency_annotations_are_deterministic_and_kind_scoped() {
+    let upstream = |key: &str, kind| {
+      (
+        PreparedUpstream {
+          key: key.into(),
+          content: String::new(),
+        },
+        kind,
+      )
+    };
+    let mut prepared = PreparedRule {
+      site: Some("HTTP config".into()),
+      stream: Some("stream config".into()),
+      upstreams: vec![
+        upstream("z", NginxRuleKind::Site),
+        upstream("stream", NginxRuleKind::Stream),
+        upstream("a", NginxRuleKind::Site),
+        upstream("z", NginxRuleKind::Site),
+      ],
+      files: Vec::new(),
+      resolution_error: None,
+    };
+    annotate_rule_dependencies(&mut prepared).unwrap();
+    assert_eq!(
+      prepared.site.as_deref(),
+      Some("# ncproxy-upstreams: [\"a\",\"z\"]\nHTTP config")
+    );
+    assert_eq!(
+      prepared.stream.as_deref(),
+      Some("# ncproxy-upstreams: [\"stream\"]\nstream config")
+    );
+  }
+
+  #[test]
+  fn retention_never_guesses_dependencies_without_valid_annotation() {
+    for config in [
+      "proxy_pass http://collision/;",
+      "# ncproxy-upstreams: invalid\nproxy_pass http://collision/;",
+      "# unrelated\n# ncproxy-upstreams: [\"collision\"]\nproxy_pass http://collision/;",
+    ] {
+      let previous = BTreeMap::from([
+        ("retained.conf".into(), config.into()),
+        (
+          "collision.conf".into(),
+          "upstream collision { server deleted; }".into(),
+        ),
+      ]);
+      let mut candidate = BTreeMap::new();
+      retain_rule_files("retained", &previous, &mut candidate);
+      assert_eq!(
+        candidate.get("retained.conf"),
+        previous.get("retained.conf")
+      );
+      assert!(!candidate.contains_key("collision.conf"));
+    }
   }
 
   #[ntex::test]
