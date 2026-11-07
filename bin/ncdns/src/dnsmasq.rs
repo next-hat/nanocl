@@ -768,17 +768,13 @@ impl Dnsmasq {
     Ok(())
   }
 
-  /// Remove generated fragments absent from the complete accepted declaration
-  /// inventory. The caller holds the controller lock shared with callbacks.
-  pub(crate) async fn remove_stale_rules(
-    &self,
-    retained: &BTreeSet<String>,
-  ) -> IoResult<()> {
+  /// Snapshot generated fragment keys. The caller rechecks accepted declarations
+  /// before removing each key, since callbacks may run after this scan.
+  pub(crate) async fn rule_keys(&self) -> IoResult<BTreeSet<String>> {
     let _guard = self.update_lock.lock().await;
     let manager = self.clone();
-    let retained = retained.clone();
-    web::block(move || {
-      let mut stale = BTreeSet::new();
+    let keys = web::block(move || {
+      let mut keys = BTreeSet::new();
       for paths in manager.configured_instances()? {
         for fragment in Self::rule_fragments(&paths)? {
           let Some(key) = fragment.file_stem().and_then(OsStr::to_str) else {
@@ -787,18 +783,13 @@ impl Dnsmasq {
               "invalid resource fragment filename",
             ));
           };
-          if !retained.contains(key) {
-            stale.insert(key.to_owned());
-          }
+          keys.insert(key.to_owned());
         }
       }
-      for key in stale {
-        manager.remove_rule_blocking(&key)?;
-      }
-      Ok::<_, IoError>(())
+      Ok::<_, IoError>(keys)
     })
     .await?;
-    Ok(())
+    Ok(keys)
   }
 
   /// Create the manager directory and stop the pre-0.18 singleton instance,

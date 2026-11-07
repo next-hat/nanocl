@@ -921,7 +921,13 @@ pub fn analyze(state: &SystemState) {
       log::info!("event::analyze_docker: stream connected");
       let refresh = refresh_observation_loop(
         || async {
-          utils::container::network::reconcile_networks(&state).await?;
+          // Network failures have their own periodic retry above. They must
+          // not suppress fresh process observations or their completion event.
+          if let Err(err) =
+            utils::container::network::reconcile_networks(&state).await
+          {
+            log::warn!("event::network: reconciliation failed: {err}");
+          }
           utils::system::refresh_process_observations(&state).await?;
           utils::system::emit_process_sync(&state);
           Ok(())

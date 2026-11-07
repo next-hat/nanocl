@@ -26,7 +26,8 @@ pub struct SystemState {
   pub nginx_dir: String,
   /// Serializes every nginx configuration mutation and validation cycle.
   pub config_lock: Arc<Mutex<()>>,
-  /// Serializes accepted callbacks with declaration bootstrap and recovery.
+  /// Briefly held for declaration snapshots/publication. Config writers acquire
+  /// config_lock first; this guard must never span network or nginx operations.
   pub(crate) accepted_rules: Arc<Mutex<AcceptedRules>>,
   /// Holds both controller admission locks until the process shuts down.
   pub _controller_locks: Option<Arc<(std::fs::File, std::fs::File)>>,

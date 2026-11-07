@@ -174,19 +174,28 @@ pub(crate) async fn refresh_rule(
   rule: &ResourceProxyRule,
   state: &SystemStateRef,
 ) -> IoResult<()> {
-  let accepted = state.accepted_rules.lock().await;
-  if let Some(rule) = accepted.resolve(name, rule) {
-    super::nginx::add_rule(name, &rule, state).await?;
+  loop {
+    let (generation, current) = {
+      let accepted = state.accepted_rules.lock().await;
+      (accepted.generation, accepted.resolve(name, rule))
+    };
+    let Some(current) = current else {
+      return Ok(());
+    };
+    if super::nginx::add_rule_if_current(name, &current, generation, state)
+      .await?
+    {
+      return Ok(());
+    }
   }
-  Ok(())
 }
 
 /// Bootstrap persisted declarations once, then resolve the declarations this
 /// controller has accepted. Callbacks precede database publication, so a fresh
 /// database snapshot on reconnect could undo an already accepted update.
 pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
-  let mut accepted = state.accepted_rules.lock().await;
-  if !accepted.initialized {
+  let needs_bootstrap = !state.accepted_rules.lock().await.initialized;
+  if needs_bootstrap {
     let resources = list_all(&state.client).await?;
     let rules = resources
       .into_iter()
@@ -196,9 +205,13 @@ pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
         Ok::<_, IoError>((resource.name, rule))
       })
       .collect::<IoResult<Vec<_>>>()?;
-    accepted.initialize(rules);
+    state.accepted_rules.lock().await.initialize(rules);
   }
-  super::nginx::rebuild_rules(&accepted.snapshot(), state).await
+  let (generation, rules) = {
+    let accepted = state.accepted_rules.lock().await;
+    (accepted.generation, accepted.snapshot())
+  };
+  super::nginx::rebuild_rules(&rules, generation, state).await
 }
 
 #[cfg(test)]

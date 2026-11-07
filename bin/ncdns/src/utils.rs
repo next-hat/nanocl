@@ -60,7 +60,7 @@ fn network_gateway(network: &Network) -> IoResult<String> {
     .map(str::to_owned)
     .ok_or_else(|| {
       IoError::invalid_data(
-        "Network",
+        "Network gateway",
         &format!("Network {} has no IPAM gateway", network.name),
       )
     })
@@ -90,11 +90,20 @@ async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
   let ipam_config = ipam.config.unwrap_or_default();
   let Some(network) = ipam_config.first() else {
     return Err(IoError::invalid_data(
-      "Network",
+      "Network gateway",
       "No network found for nanoclbr0",
     ));
   };
-  Ok(network.gateway.clone().unwrap_or_default())
+  network
+    .gateway
+    .clone()
+    .filter(|gateway| !gateway.is_empty())
+    .ok_or_else(|| {
+      IoError::invalid_data(
+        "Network gateway",
+        "Network nanoclbr0 has no IPAM gateway",
+      )
+    })
 }
 
 /// Resolve a DNS listener or entry selector into a concrete local address.
@@ -184,7 +193,7 @@ pub mod tests {
   use nanocld_client::{ConnectOpts, NanocldClient};
   use ntex::rt;
 
-  use super::build_scope;
+  use super::{build_scope, network_gateway};
   use crate::{dnsmasq, services, vars};
 
   #[test]
@@ -232,6 +241,35 @@ Entries:
       rule.entries[0].ip_address,
       NetworkKind::Named("private-db".to_owned())
     );
+  }
+
+  #[test]
+  fn missing_network_gateway_has_a_specific_semantic_error() {
+    let mut network: super::Network =
+      serde_json::from_value(serde_json::json!({
+        "Key": "node.private",
+        "CreatedAt": "2026-01-01T00:00:00",
+        "UpdatedAt": "2026-01-01T00:00:00",
+        "Name": "private",
+        "NodeName": "node",
+        "Data": {}
+      }))
+      .unwrap();
+    for data in [
+      serde_json::json!({}),
+      serde_json::json!({"IPAM": {"Config": [{}]}}),
+      serde_json::json!({"IPAM": {"Config": [{"Gateway": ""}]}}),
+    ] {
+      network.data = serde_json::from_value(data).unwrap();
+      let error = network_gateway(&network).unwrap_err();
+      assert_eq!(error.context.as_deref(), Some("Network gateway"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    }
+    network.data = serde_json::from_value(serde_json::json!({
+      "IPAM": {"Config": [{"Gateway": "10.0.0.1"}]}
+    }))
+    .unwrap();
+    assert_eq!(network_gateway(&network).unwrap(), "10.0.0.1");
   }
 
   // Before a test

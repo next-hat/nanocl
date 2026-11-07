@@ -1,9 +1,12 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, future::Future, time::Duration};
 
-use futures::StreamExt;
+use futures::{
+  Stream, StreamExt,
+  future::{Either, LocalBoxFuture, pending, select},
+};
 use ntex::rt;
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_utils::versioning;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::resource_kind::{
@@ -20,6 +23,7 @@ use nanocld_client::stubs::{
 use crate::{models::SystemState, utils, vars};
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
+const MAX_RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formatted_version = versioning::format_version(vars::VERSION);
@@ -83,30 +87,67 @@ async fn recover_rules(state: &SystemState) -> IoResult<()> {
     let rules = load_rules(&state.client).await?;
     state.rules.lock().await.bootstrap(rules);
   }
-  // Keep callbacks ordered through resolution and application, not just the
-  // final filesystem update. Reconnects reuse accepted declarations locally.
-  let rules = state.rules.lock().await;
+  // Daemon requests must not hold the callback lock. Recheck each generation
+  // before applying so a completed PUT/DELETE always wins over this snapshot.
+  let snapshot = state.rules.lock().await.declarations.clone();
   let mut failure = None;
-  for (key, rule) in &rules.declarations {
-    let result = async {
-      let scope = utils::resolve_rule(rule, &state.client).await?;
-      state.dnsmasq.apply_rule(key, scope).await
+  for (key, (generation, rule)) in snapshot {
+    let resolved = utils::resolve_rule(&rule, &state.client).await;
+    let rules = state.rules.lock().await;
+    if !rules.is_current(&key, generation) {
+      continue;
     }
-    .await;
-    if let Err(error) = result {
+    let scope = match resolved {
+      Ok(scope) => scope,
+      Err(error) => {
+        log::warn!("event::recovery: rule {key}: {error}");
+        if resolution_needs_retry(&error) {
+          failure.get_or_insert(error);
+        }
+        continue;
+      }
+    };
+    if let Err(error) = state.dnsmasq.apply_rule(&key, scope).await {
       log::warn!("event::recovery: rule {key}: {error}");
-      failure = Some(error);
+      failure.get_or_insert(error);
     }
   }
-  let keys = rules.declarations.keys().cloned().collect();
-  if let Err(error) = state.dnsmasq.remove_stale_rules(&keys).await {
-    log::warn!("event::recovery: stale rules: {error}");
-    failure = Some(error);
+  // Scan without the callback lock, then hold it only for one removal. A PUT
+  // accepted during resolution or the scan must not be pruned as stale.
+  for key in state.dnsmasq.rule_keys().await? {
+    let rules = state.rules.lock().await;
+    if rules.declarations.contains_key(&key) {
+      continue;
+    }
+    if let Err(error) = state.dnsmasq.remove_rule(&key).await {
+      log::warn!("event::recovery: stale rule {key}: {error}");
+      failure.get_or_insert(error);
+    }
   }
   match failure {
     Some(error) => Err(error),
     None => Ok(()),
   }
+}
+
+fn resolution_needs_retry(error: &IoError) -> bool {
+  use std::io::ErrorKind;
+
+  if let Some(http) = error
+    .inner
+    .get_ref()
+    .and_then(|cause| cause.downcast_ref::<nanocl_error::http::HttpError>())
+  {
+    // HttpError conversion uses InvalidData for server errors as well.
+    return http.status.is_server_error()
+      || http.status == ntex::http::StatusCode::REQUEST_TIMEOUT
+      || http.status == ntex::http::StatusCode::TOO_MANY_REQUESTS;
+  }
+  !matches!(
+    (error.inner.kind(), error.context.as_deref()),
+    (ErrorKind::NotFound | ErrorKind::InvalidInput, _)
+      | (ErrorKind::InvalidData, Some("Network gateway"))
+  )
 }
 
 fn is_state_sync(event: &Event) -> bool {
@@ -116,6 +157,51 @@ fn is_state_sync(event: &Event) -> bool {
     && event.actor.as_ref().is_some_and(|actor| {
       actor.kind == EventActorKind::Process && actor.key.is_none()
     })
+}
+
+/// Retry operational failures without abandoning the subscribed event stream.
+/// The timer remains local to this subscription and is cancelled on EOF/error.
+async fn consume_events<S, E, R, RF>(
+  mut stream: S,
+  mut recover: R,
+  retry_delay: Duration,
+  max_retry_delay: Duration,
+) where
+  S: Stream<Item = Result<Event, E>> + Unpin,
+  E: std::fmt::Display,
+  R: FnMut() -> RF,
+  RF: Future<Output = IoResult<()>>,
+{
+  let mut retry: LocalBoxFuture<'static, ()> = Box::pin(async {});
+  let mut next_delay = retry_delay;
+  loop {
+    // Retain the timer when ordinary events arrive and poll it first, so a busy
+    // stream cannot postpone recovery indefinitely.
+    match select(&mut retry, stream.next()).await {
+      Either::Left(_) => {}
+      Either::Right((Some(Ok(event)), _)) if is_state_sync(&event) => {}
+      Either::Right((Some(Ok(_)), _)) => continue,
+      Either::Right((Some(Err(error)), _)) => {
+        log::warn!("event::loop: {error}");
+        break;
+      }
+      Either::Right((None, _)) => break,
+    }
+    match recover().await {
+      Ok(()) => {
+        retry = Box::pin(pending());
+        next_delay = retry_delay;
+      }
+      Err(error) => {
+        log::warn!(
+          "event::loop: DNS recovery failed: {error}; retrying in {} seconds",
+          next_delay.as_secs()
+        );
+        retry = Box::pin(ntex::time::sleep(next_delay));
+        next_delay = next_delay.saturating_mul(2).min(max_retry_delay);
+      }
+    }
+  }
 }
 
 async fn ensure_loop(state: &SystemState) {
@@ -131,28 +217,15 @@ async fn ensure_loop(state: &SystemState) {
       Err(err) => {
         log::warn!("event::loop: {err}");
       }
-      Ok(mut stream) => {
+      Ok(stream) => {
         log::info!("event::loop: subscribed to nanocld events");
-        if let Err(error) = recover_rules(state).await {
-          log::warn!("event::loop: DNS recovery failed: {error}");
-          ntex::time::sleep(RETRY_DELAY).await;
-          continue;
-        }
-        while let Some(event) = stream.next().await {
-          match event {
-            Ok(event) if is_state_sync(&event) => {
-              if let Err(error) = recover_rules(state).await {
-                log::warn!("event::loop: DNS recovery failed: {error}");
-                break;
-              }
-            }
-            Ok(_) => {}
-            Err(error) => {
-              log::warn!("event::loop: {error}");
-              break;
-            }
-          }
-        }
+        consume_events(
+          stream,
+          || recover_rules(state),
+          RETRY_DELAY,
+          MAX_RECOVERY_RETRY_DELAY,
+        )
+        .await;
       }
     }
     log::warn!("event::loop: retrying in {} seconds", RETRY_DELAY.as_secs());
@@ -175,9 +248,8 @@ pub(crate) fn spawn(state: &SystemState) {
 mod tests {
   use super::*;
 
-  #[test]
-  fn only_completed_generic_process_sync_triggers_recovery() {
-    let mut event: Event = serde_json::from_value(serde_json::json!({
+  fn state_sync_event() -> Event {
+    serde_json::from_value(serde_json::json!({
       "Key": "00000000-0000-0000-0000-000000000000",
       "CreatedAt": "2026-01-01T00:00:00",
       "ExpiresAt": "2026-01-01T00:00:00",
@@ -188,7 +260,12 @@ mod tests {
       "Reason": "state_sync",
       "Actor": {"Kind": EventActorKind::Process}
     }))
-    .unwrap();
+    .unwrap()
+  }
+
+  #[test]
+  fn only_completed_generic_process_sync_triggers_recovery() {
+    let mut event = state_sync_event();
     assert!(is_state_sync(&event));
     event.kind = EventKind::Error;
     assert!(!is_state_sync(&event));
@@ -201,5 +278,102 @@ mod tests {
     event.reason = "state_sync".into();
     event.action = NativeEventAction::Start.to_string();
     assert!(!is_state_sync(&event));
+  }
+
+  #[test]
+  fn resolution_retry_distinguishes_missing_selectors_and_operational_errors() {
+    use nanocl_error::{http::HttpError, http_client::HttpClientError};
+    use ntex::http::StatusCode;
+
+    // Preserve the exact conversion path used by named-network resolution.
+    let missing: IoError =
+      HttpClientError::HttpError(HttpError::not_found("deleted network"))
+        .map_err_context(|| "Unable to inspect network private on node local")
+        .into();
+    for error in [
+      missing,
+      HttpError::bad_request("invalid selector").into(),
+      IoError::not_found("Network", "deleted"),
+      IoError::invalid_input("Network", "All is unsupported"),
+      IoError::invalid_data("Network gateway", "no IPAM gateway"),
+    ] {
+      assert!(!resolution_needs_retry(&error), "{error}");
+    }
+
+    for error in [
+      HttpError::new(StatusCode::SERVICE_UNAVAILABLE, "restart").into(),
+      HttpError::new(StatusCode::REQUEST_TIMEOUT, "retry").into(),
+      HttpError::new(StatusCode::TOO_MANY_REQUESTS, "retry").into(),
+      IoError::invalid_data("Network", "invalid resolved address"),
+      IoError::invalid_data("Unable to inspect network", "malformed response"),
+      IoError::without_context(std::io::Error::new(
+        std::io::ErrorKind::ConnectionReset,
+        "daemon restarted",
+      )),
+    ] {
+      assert!(resolution_needs_retry(&error), "{error}");
+    }
+  }
+
+  #[ntex::test]
+  async fn failed_recovery_consumes_events_until_stream_error() {
+    let mut ordinary = state_sync_event();
+    ordinary.reason = "another_update".into();
+    let events = vec![
+      Ok(ordinary.clone()),
+      Ok(state_sync_event()),
+      Ok(ordinary),
+      Err(IoError::other("Stream", "disconnected")),
+      Ok(state_sync_event()),
+    ];
+    let consumed = std::cell::Cell::new(0);
+    let recoveries = std::cell::Cell::new(0);
+    consume_events(
+      futures::stream::iter(events).inspect(|_| {
+        consumed.set(consumed.get() + 1);
+      }),
+      || {
+        recoveries.set(recoveries.get() + 1);
+        futures::future::ready(Err(IoError::other("Recovery", "unavailable")))
+      },
+      Duration::from_secs(3600),
+      Duration::from_secs(3600),
+    )
+    .await;
+    assert_eq!(recoveries.get(), 2);
+    assert_eq!(consumed.get(), 4);
+  }
+
+  #[ntex::test]
+  async fn recovery_timer_retries_without_another_stream_event() {
+    let (release, released) = futures::channel::oneshot::channel();
+    let release = std::cell::RefCell::new(Some(release));
+    let recoveries = std::cell::Cell::new(0);
+    let stream = Box::pin(futures::stream::once(async {
+      released.await.unwrap();
+      let mut event = state_sync_event();
+      event.reason = "another_update".into();
+      Ok::<_, IoError>(event)
+    }));
+    ntex::time::timeout(
+      Duration::from_secs(1),
+      consume_events(
+        stream,
+        || {
+          recoveries.set(recoveries.get() + 1);
+          futures::future::ready(if recoveries.get() == 1 {
+            Err(IoError::other("Recovery", "temporarily unavailable"))
+          } else {
+            release.borrow_mut().take().unwrap().send(()).unwrap();
+            Ok(())
+          })
+        },
+        Duration::from_millis(1),
+        Duration::from_millis(4),
+      ),
+    )
+    .await
+    .unwrap();
+    assert_eq!(recoveries.get(), 2);
   }
 }

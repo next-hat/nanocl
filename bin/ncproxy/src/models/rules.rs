@@ -7,6 +7,7 @@ use nanocld_client::stubs::proxy::ResourceProxyRule;
 #[derive(Default)]
 pub(crate) struct AcceptedRules {
   pub(crate) initialized: bool,
+  pub(crate) generation: u64,
   rules: BTreeMap<String, ResourceProxyRule>,
   removed_before_init: BTreeSet<String>,
 }
@@ -15,6 +16,7 @@ impl AcceptedRules {
   pub(crate) fn apply(&mut self, name: String, rule: ResourceProxyRule) {
     self.removed_before_init.remove(&name);
     self.rules.insert(name, rule);
+    self.generation = self.generation.wrapping_add(1);
   }
 
   pub(crate) fn remove(&mut self, name: &str) {
@@ -22,6 +24,7 @@ impl AcceptedRules {
     if !self.initialized {
       self.removed_before_init.insert(name.to_owned());
     }
+    self.generation = self.generation.wrapping_add(1);
   }
 
   pub(crate) fn initialize(&mut self, rules: Vec<(String, ResourceProxyRule)>) {
@@ -35,6 +38,7 @@ impl AcceptedRules {
     }
     self.removed_before_init.clear();
     self.initialized = true;
+    self.generation = self.generation.wrapping_add(1);
   }
 
   pub(crate) fn snapshot(&self) -> Vec<(String, ResourceProxyRule)> {
@@ -138,5 +142,21 @@ mod tests {
     // A publication-failure compensation callback is accepted normally.
     rules.apply("restored".into(), rule(8080));
     assert_snapshot(&rules, vec![("restored".into(), rule(8080))]);
+  }
+
+  #[test]
+  fn callbacks_and_compensation_invalidate_prior_recovery_snapshots() {
+    let mut rules = AcceptedRules::default();
+    rules.initialize(vec![("rule".into(), rule(8080))]);
+    let initial = rules.generation;
+    rules.apply("rule".into(), rule(8081));
+    assert_ne!(rules.generation, initial);
+    let updated = rules.generation;
+    rules.apply("rule".into(), rule(8080));
+    assert_ne!(rules.generation, updated);
+    let compensated = rules.generation;
+    rules.remove("rule");
+    assert_ne!(rules.generation, compensated);
+    assert!(rules.snapshot().is_empty());
   }
 }
