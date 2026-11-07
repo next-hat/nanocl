@@ -22,6 +22,9 @@ pub struct StateApplyOpts {
   /// Stream newline-delimited JSON to stdout (requires --yes)
   #[clap(long, requires = "skip_confirm", conflicts_with = "follow")]
   pub json: bool,
+  /// Show full process, revision, and image identifiers in apply receipts
+  #[clap(long, conflicts_with = "json")]
+  pub wide: bool,
   /// Perform an apply even if state didn't changed
   #[clap(long, short = 'r')]
   pub reload: bool,
@@ -46,7 +49,10 @@ pub struct StateDiffOpts {
   /// Output a single JSON document with secret values hidden
   #[clap(long)]
   pub json: bool,
-  /// Keep the diff open in a pager (default in interactive terminals)
+  /// Show planned actions and counts instead of the full configuration diff
+  #[clap(long, conflicts_with = "json")]
+  pub summary: bool,
+  /// Keep output open in a pager (interactive default for full diffs only)
   #[clap(long, conflicts_with_all = ["no_pager", "json"])]
   pub pager: bool,
   /// Print directly to the terminal without a pager
@@ -72,6 +78,9 @@ pub struct StateStatusOpts {
   /// Refresh status every two seconds until Ctrl-C
   #[clap(long)]
   pub watch: bool,
+  /// Show the full status table with exact failure timestamps
+  #[clap(long)]
+  pub wide: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
@@ -86,6 +95,9 @@ pub struct StateStatsOpts {
   /// Disable streaming stats and print a single snapshot
   #[clap(long)]
   pub no_stream: bool,
+  /// Include memory limits, network and block I/O, and PIDs
+  #[clap(long)]
+  pub wide: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
@@ -499,5 +511,47 @@ mod tests {
       ])
       .is_err()
     );
+  }
+
+  #[test]
+  fn state_compact_output_options_preserve_modes_and_reject_json_conflicts() {
+    for command in ["apply", "status", "stats"] {
+      let cli =
+        Cli::try_parse_from(["nanocl", "state", command, "--wide"]).unwrap();
+      let Command::State(state) = cli.command else {
+        panic!("expected state command")
+      };
+      match state.command {
+        StateCommand::Apply(opts) => assert!(opts.wide),
+        StateCommand::Status(opts) => assert!(opts.wide),
+        StateCommand::Stats(opts) => assert!(opts.wide),
+        _ => panic!("expected compact-capable state command"),
+      }
+    }
+    let cli = Cli::try_parse_from([
+      "nanocl",
+      "state",
+      "diff",
+      "--summary",
+      "--no-pager",
+      "--reload",
+    ])
+    .unwrap();
+    let Command::State(state) = cli.command else {
+      panic!("expected state command")
+    };
+    let StateCommand::Diff(opts) = state.command else {
+      panic!("expected diff")
+    };
+    assert!(opts.summary && opts.no_pager && opts.reload);
+    for args in [
+      vec!["nanocl", "state", "apply", "-y", "--wide", "--json"],
+      vec!["nanocl", "state", "diff", "--summary", "--json"],
+    ] {
+      assert_eq!(
+        Cli::try_parse_from(args).err().unwrap().kind(),
+        clap::error::ErrorKind::ArgumentConflict,
+      );
+    }
   }
 }

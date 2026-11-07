@@ -241,6 +241,35 @@ pub struct ProcessStatsRow {
   pids: String,
 }
 
+/// Resource usage at a glance; the full row retains limits and I/O details.
+#[derive(Tabled)]
+pub struct ProcessStatsCompactRow {
+  #[tabled(rename = "PROCESS")]
+  pub process: String,
+  #[tabled(rename = "CPU")]
+  pub cpu: String,
+  #[tabled(rename = "MEM")]
+  pub memory: String,
+  #[tabled(rename = "MEM%")]
+  pub memory_percent: String,
+}
+
+impl From<ProcessStatsRow> for ProcessStatsCompactRow {
+  fn from(row: ProcessStatsRow) -> Self {
+    Self {
+      process: row.key,
+      cpu: row.cpu_usage,
+      memory: row
+        .mem_usage_limit
+        .split(" / ")
+        .next()
+        .unwrap_or_default()
+        .to_owned(),
+      memory_percent: row.mem,
+    }
+  }
+}
+
 impl From<ProcessStats> for ProcessStatsRow {
   fn from(process_stats: ProcessStats) -> Self {
     let stats = process_stats.stats;
@@ -355,8 +384,8 @@ mod tests {
   use tabled::Tabled;
 
   use super::{
-    Process, ProcessCompactRow, ProcessRow, ProcessStats, ProcessStatsRow,
-    format_age,
+    Process, ProcessCompactRow, ProcessRow, ProcessStats,
+    ProcessStatsCompactRow, ProcessStatsRow, format_age,
   };
   use crate::models::{Cli, Command};
 
@@ -383,6 +412,11 @@ mod tests {
       assert_eq!(row.net_io, "3.0MB / 3.0MB");
       assert_eq!(row.block_io, "3.0MB / 4.0GB");
       assert_eq!(row.pids, "4");
+      let compact = ProcessStatsCompactRow::from(row);
+      assert_eq!(compact.process, "app");
+      assert_eq!(compact.cpu, "100.00%");
+      assert_eq!(compact.memory, "512.0MiB");
+      assert_eq!(compact.memory_percent, "50.00%");
     }
   }
 

@@ -97,7 +97,7 @@ fn network_gateway(network: &Network) -> IoResult<String> {
     .map(str::to_owned)
     .ok_or_else(|| {
       IoError::invalid_data(
-        "Network",
+        "Network gateway",
         &format!("Network {} has no IPAM gateway", network.name),
       )
     })
@@ -127,7 +127,7 @@ async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
   let ipam_config = ipam.config.unwrap_or_default();
   let Some(network) = ipam_config.first() else {
     return Err(IoError::invalid_data(
-      "Network",
+      "Network gateway",
       "No network found for nanoclbr0",
     ));
   };
@@ -137,7 +137,7 @@ async fn get_bridge_addr(client: &NanocldClient) -> IoResult<String> {
 fn format_listen_addr(ip: &str, port: u16) -> IoResult<String> {
   let ip = ip.parse::<IpAddr>().map_err(|err| {
     IoError::invalid_data(
-      "Network",
+      "Network listener",
       &format!("Invalid listener address {ip}: {err}"),
     )
   })?;

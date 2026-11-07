@@ -571,6 +571,17 @@ impl Dnsmasq {
     }
   }
 
+  fn rule_is_unchanged(
+    target: &InstanceSnapshot,
+    old: Option<&InstancePaths>,
+    rule_config: &str,
+    instance_config: &str,
+  ) -> bool {
+    old.is_some_and(|old| old.dir == target.paths.dir)
+      && target.rule.as_deref() == Some(rule_config)
+      && target.config.as_deref() == Some(instance_config)
+  }
+
   fn apply_rule_blocking(
     &self,
     key: &str,
@@ -592,6 +603,16 @@ impl Dnsmasq {
       self.render_instance_config(scope.listen_address, &target)?;
     let root_changed =
       target_snapshot.config.as_deref() != Some(instance_config.as_str());
+    if Self::rule_is_unchanged(
+      &target_snapshot,
+      old.as_ref(),
+      &rule_config,
+      &instance_config,
+    ) {
+      // Recovery replays persisted rules; unchanged instances only need to be
+      // started if their process stopped, without interrupting healthy DNS.
+      return Self::start_instance(&target);
+    }
 
     let stage_result = (|| -> IoResult<()> {
       fs::create_dir_all(&target.rules).map_err(|err| {
@@ -747,6 +768,30 @@ impl Dnsmasq {
     Ok(())
   }
 
+  /// Snapshot generated fragment keys. The caller rechecks accepted declarations
+  /// before removing each key, since callbacks may run after this scan.
+  pub(crate) async fn rule_keys(&self) -> IoResult<BTreeSet<String>> {
+    let _guard = self.update_lock.lock().await;
+    let manager = self.clone();
+    let keys = web::block(move || {
+      let mut keys = BTreeSet::new();
+      for paths in manager.configured_instances()? {
+        for fragment in Self::rule_fragments(&paths)? {
+          let Some(key) = fragment.file_stem().and_then(OsStr::to_str) else {
+            return Err(IoError::invalid_data(
+              "dnsmasq rule",
+              "invalid resource fragment filename",
+            ));
+          };
+          keys.insert(key.to_owned());
+        }
+      }
+      Ok::<_, IoError>(keys)
+    })
+    .await?;
+    Ok(keys)
+  }
+
   /// Create the manager directory and stop the pre-0.18 singleton instance,
   /// which otherwise keeps its old nanoclbr0 bind alive across upgrades.
   pub(crate) fn ensure(&self) -> IoResult<Self> {
@@ -825,6 +870,104 @@ mod tests {
     Dnsmasq::stage_rule(paths, &filename, content).unwrap();
     Dnsmasq::commit_rule(paths, &filename).unwrap();
     filename
+  }
+
+  fn rule_snapshot(
+    manager: &Dnsmasq,
+    scope: &DnsmasqScope,
+  ) -> InstanceSnapshot {
+    let paths = manager.paths_for(scope.listen_address);
+    InstanceSnapshot {
+      config: Some(
+        manager
+          .render_instance_config(scope.listen_address, &paths)
+          .unwrap(),
+      ),
+      rule: Some(Dnsmasq::render_rule_config(scope).unwrap()),
+      paths,
+      was_running: true,
+      dir_existed: true,
+    }
+  }
+
+  #[test]
+  fn recovery_reuses_unchanged_rules_for_running_and_stopped_instances() {
+    let manager = Dnsmasq::new("/unused/ncdns");
+    let mut scope = DnsmasqScope::new("10.0.0.1".parse().unwrap());
+    scope.add_entry("api.internal".to_owned(), "10.0.0.2".parse().unwrap());
+    let mut snapshot = rule_snapshot(&manager, &scope);
+    let rule = snapshot.rule.clone().unwrap();
+    let config = snapshot.config.clone().unwrap();
+
+    for was_running in [true, false] {
+      snapshot.was_running = was_running;
+      assert!(Dnsmasq::rule_is_unchanged(
+        &snapshot,
+        Some(&snapshot.paths),
+        &rule,
+        &config,
+      ));
+    }
+  }
+
+  #[test]
+  fn recovery_reconfigures_changed_addresses_and_upstream_dns() {
+    let manager = Dnsmasq::new("/unused/ncdns");
+    let mut scope = DnsmasqScope::new("10.0.0.1".parse().unwrap());
+    scope.add_entry("api.internal".to_owned(), "10.0.0.2".parse().unwrap());
+    let snapshot = rule_snapshot(&manager, &scope);
+    let rule = snapshot.rule.as_deref().unwrap();
+    let config = snapshot.config.as_deref().unwrap();
+
+    scope.entries.clear();
+    scope.add_entry("api.internal".to_owned(), "10.0.0.3".parse().unwrap());
+    let changed_rule = Dnsmasq::render_rule_config(&scope).unwrap();
+    assert!(!Dnsmasq::rule_is_unchanged(
+      &snapshot,
+      Some(&snapshot.paths),
+      &changed_rule,
+      config,
+    ));
+
+    let changed_config = manager
+      .with_dns(vec!["1.1.1.1".to_owned()])
+      .render_instance_config(scope.listen_address, &snapshot.paths)
+      .unwrap();
+    assert!(!Dnsmasq::rule_is_unchanged(
+      &snapshot,
+      Some(&snapshot.paths),
+      rule,
+      &changed_config,
+    ));
+  }
+
+  #[test]
+  fn recovery_reuse_requires_complete_configuration_at_the_same_listener() {
+    let manager = Dnsmasq::new("/unused/ncdns");
+    let scope = DnsmasqScope::new("10.0.0.1".parse().unwrap());
+    let mut snapshot = rule_snapshot(&manager, &scope);
+    let rule = snapshot.rule.clone().unwrap();
+    let config = snapshot.config.clone().unwrap();
+    let other = manager.paths_for("10.0.1.1".parse().unwrap());
+
+    for old in [None, Some(&other)] {
+      assert!(!Dnsmasq::rule_is_unchanged(&snapshot, old, &rule, &config));
+    }
+    snapshot.rule = None;
+    assert!(!Dnsmasq::rule_is_unchanged(
+      &snapshot,
+      Some(&snapshot.paths),
+      &rule,
+      &config,
+    ));
+    snapshot.rule = Some(rule.clone());
+    snapshot.config = None;
+    assert!(!Dnsmasq::rule_is_unchanged(
+      &snapshot,
+      Some(&snapshot.paths),
+      &rule,
+      &config,
+    ));
   }
 
   #[test]

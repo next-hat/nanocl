@@ -2,7 +2,7 @@
 
 Use `--json -y` with `nanocl state apply`, `remove`, `start`, or `stop` to
 write newline-delimited JSON to stdout. Apply cannot combine this mode with
-`--follow`. Human-readable progress is suppressed. Each record is flushed
+`--follow` or `--wide`. Human-readable progress is suppressed. Each record is flushed
 individually; consumers should process records as a stream and ignore unknown
 record types and fields.
 
