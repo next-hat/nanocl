@@ -636,6 +636,28 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [ "$output" = "routing-recovery-ok" ]
   assert_dns_address "$backend" routing-recovery.nanocl.test 198.51.100.1 198.51.100.1 90
+
+  # Change only the endpoint while the daemon and its event stream stay alive.
+  # Network connect/disconnect does not refresh the process observation, so the
+  # periodic inventory must repair this address without a Cargo start event.
+  local daemon_started_at
+  daemon_started_at="$(docker inspect --format '{{.State.StartedAt}}' "$E2E_RECOVERY_DAEMON")"
+  run docker network disconnect e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run docker network connect --ip 198.51.100.3 e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run docker inspect --format \
+    '{{(index .NetworkSettings.Networks "e2e-routing-recovery").IPAddress}}' "$backend"
+  [ "$status" -eq 0 ]
+  [ "$output" = "198.51.100.3" ]
+  run timeout 370s curl --silent --fail --retry 360 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 360 --connect-timeout 2 --max-time 5 \
+    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
+  [ "$status" -eq 0 ]
+  [ "$output" = "routing-recovery-ok" ]
+  run docker inspect --format '{{.State.StartedAt}}' "$E2E_RECOVERY_DAEMON"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$daemon_started_at" ]
   run docker inspect --format '{{.State.StartedAt}}' "$backend"
   [ "$status" -eq 0 ]
   [ "$output" = "$new_started_at" ]

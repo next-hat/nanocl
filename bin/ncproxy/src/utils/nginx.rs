@@ -1659,7 +1659,14 @@ async fn prepare_rebuild<'a>(
   let mut prepared_rules = Vec::with_capacity(rules.len());
   let mut resolution_error = None;
   for (name, rule) in rules {
-    let mut prepared = prepare_rule(name, rule, state).await?;
+    let mut prepared = match prepare_rule(name, rule, state).await {
+      Ok(prepared) => prepared,
+      Err(err) => {
+        log::warn!("nginx::recovery: unable to prepare rule {name}: {err}");
+        resolution_error.get_or_insert(err);
+        continue;
+      }
+    };
     if let Some(err) = prepared.resolution_error.take() {
       resolution_error.get_or_insert(err);
     }
@@ -1687,11 +1694,13 @@ where
 /// Replace every managed rule from the controller's accepted declarations.
 ///
 /// Clearing first removes resources deleted while ncproxy was offline. The
-/// previous complete directory state is restored when rendering or nginx
-/// validation rejects any candidate rule. Unavailable targets are omitted as
-/// for normal callbacks. Operational resolution failures are reported after
-/// commit/reload so recovery retries without blocking available routes; normal
-/// workload and secret events handle expected omissions such as stopped Cargoes.
+/// previous complete directory state is restored when nginx validation rejects
+/// the candidate configuration. Rules that fail preparation are omitted and
+/// retried without blocking the other declarations. Unavailable targets follow
+/// the same omission behavior as normal callbacks. Operational resolution
+/// failures are reported after commit/reload so recovery retries without blocking
+/// available routes; normal workload and secret events handle expected omissions
+/// such as stopped Cargoes.
 pub(crate) async fn rebuild_rules(
   rules: &[(String, ResourceProxyRule)],
   state: &SystemStateRef,
@@ -1888,6 +1897,64 @@ mod tests {
     assert_eq!(error.inner.to_string(), "validation rejected");
     drop(emitter);
     assert!(reloads.next().await.is_none());
+  }
+
+  #[ntex::test]
+  async fn recovery_isolates_rule_preparation_failures() {
+    use futures::StreamExt;
+
+    let state = test_state("unused");
+    let rejected = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Udp",
+        "Port": 9000,
+        "Ssl": {
+          "Certificate": "/unused/server.crt",
+          "CertificateKey": "/unused/server.key"
+        },
+        "Target": { "UnixPath": "/unused/rejected.sock" }
+      }]
+    }))
+    .unwrap();
+    let available = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Tcp",
+        "Port": 9001,
+        "Target": { "UnixPath": "/unused/available.sock" }
+      }]
+    }))
+    .unwrap();
+    let declarations = vec![
+      ("rejected".to_owned(), rejected),
+      ("available".to_owned(), available),
+    ];
+    // UDP/TLS validation and Unix-target rendering perform no I/O.
+    let (prepared, failure) =
+      prepare_rebuild(&declarations, &state).await.unwrap();
+    assert_eq!(prepared.len(), 1);
+    assert_eq!(prepared[0].0, "available");
+    assert!(prepared[0].1.stream.as_ref().unwrap().contains("9001"));
+    let committed = std::cell::Cell::new(false);
+    let (sender, mut reloads) = futures::channel::mpsc::unbounded();
+    let emitter = crate::models::EventEmitter(Arc::new(sender));
+    let error = finish_rebuild(
+      async {
+        committed.set(true);
+        Ok(())
+      },
+      &emitter,
+      failure,
+    )
+    .await
+    .unwrap_err();
+    assert!(committed.get());
+    assert!(matches!(
+      reloads.next().await,
+      Some(crate::models::SystemEventKind::Reload)
+    ));
+    assert_eq!(error.context.as_deref(), Some("Proxy stream"));
   }
 
   #[ntex::test]

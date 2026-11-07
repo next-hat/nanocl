@@ -1,6 +1,10 @@
-use std::{str::FromStr, sync::Arc};
+use std::{future::Future, str::FromStr, sync::Arc, time::Duration};
 
-use futures::{StreamExt, stream::FuturesUnordered};
+use futures::{
+  Stream, StreamExt,
+  future::{Either, LocalBoxFuture, pending, select},
+  stream::FuturesUnordered,
+};
 use ntex::rt;
 
 use nanocl_error::io::{IoError, IoResult};
@@ -12,22 +16,22 @@ use nanocld_client::{
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActorKind, NativeEventAction},
+    system::{EventActorKind, EventKind, NativeEventAction},
   },
 };
 
 use crate::{models::SystemStateRef, utils, vars};
 
-const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+const RETRY_DELAY: Duration = Duration::from_secs(2);
+const MAX_RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(30);
 
-fn is_process_observation_update(event: &Event) -> bool {
-  event.actor.as_ref().is_some_and(|actor| {
-    actor.kind == EventActorKind::Process
-      && matches!(
-        NativeEventAction::from_str(&event.action),
-        Ok(NativeEventAction::Update)
-      )
-  })
+fn is_state_sync(event: &Event) -> bool {
+  event.kind == EventKind::Normal
+    && event.action == NativeEventAction::Update.to_string()
+    && event.reason == "state_sync"
+    && event.actor.as_ref().is_some_and(|actor| {
+      actor.kind == EventActorKind::Process && actor.key.is_none()
+    })
 }
 
 fn cargo_has_committed_start(
@@ -192,9 +196,6 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
-    (EventActorKind::Process, NativeEventAction::Update) => {
-      utils::resource::rebuild_all_rules(state).await
-    }
     (EventActorKind::Cargo, action @ NativeEventAction::Start)
     | (EventActorKind::Cargo, action @ NativeEventAction::Healthy) => {
       let (name, namespace) = get_workload_attributes(&actor.attributes)?;
@@ -279,6 +280,58 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
+/// Keep recovery and its retry timer owned by the subscribed stream. Ordinary
+/// events neither cancel the pending retry nor wait for recovery to succeed.
+async fn consume_events<S, E, H, HF, R, RF>(
+  mut stream: S,
+  mut handle: H,
+  mut recover: R,
+  retry_delay: Duration,
+  max_retry_delay: Duration,
+) where
+  S: Stream<Item = Result<Event, E>> + Unpin,
+  E: std::fmt::Display,
+  H: FnMut(Event) -> HF,
+  HF: Future<Output = IoResult<()>>,
+  R: FnMut() -> RF,
+  RF: Future<Output = IoResult<()>>,
+{
+  let mut retry: LocalBoxFuture<'static, ()> = Box::pin(async {});
+  let mut next_delay = retry_delay;
+  loop {
+    // Poll the retained timer first so a busy event stream cannot postpone it.
+    match select(&mut retry, stream.next()).await {
+      Either::Left(_) => {}
+      Either::Right((Some(Ok(event)), _)) if is_state_sync(&event) => {}
+      Either::Right((Some(Ok(event)), _)) => {
+        if let Err(err) = handle(event).await {
+          log::warn!("event::loop: {err}");
+        }
+        continue;
+      }
+      Either::Right((Some(Err(err)), _)) => {
+        log::warn!("event::loop: {err}");
+        break;
+      }
+      Either::Right((None, _)) => break,
+    }
+    match recover().await {
+      Ok(()) => {
+        retry = Box::pin(pending());
+        next_delay = retry_delay;
+      }
+      Err(err) => {
+        log::warn!(
+          "event::loop: reconciliation failed: {err}; retrying in {} seconds",
+          next_delay.as_secs()
+        );
+        retry = Box::pin(ntex::time::sleep(next_delay));
+        next_delay = next_delay.saturating_mul(2).min(max_retry_delay);
+      }
+    }
+  }
+}
+
 async fn r#loop(state: &SystemStateRef) {
   loop {
     log::info!("event::loop: subscribing to nanocld events");
@@ -286,7 +339,7 @@ async fn r#loop(state: &SystemStateRef) {
       Err(err) => {
         log::warn!("event::loop: {err}");
       }
-      Ok(mut stream) => {
+      Ok(stream) => {
         if let Err(err) = ensure_self_config(&state.client).await {
           log::warn!("event::loop: {err}");
           ntex::time::sleep(RETRY_DELAY).await;
@@ -295,27 +348,15 @@ async fn r#loop(state: &SystemStateRef) {
         if let Err(err) = utils::nginx::ensure_conf(state).await {
           log::warn!("event::loop: configuration validation failed: {err}");
         }
-        if let Err(err) = utils::resource::rebuild_all_rules(state).await {
-          log::warn!("event::loop: initial reconciliation failed: {err}");
-          ntex::time::sleep(RETRY_DELAY).await;
-          continue;
-        }
         log::info!("event::loop: subscribed to nanocld events");
-        while let Some(event) = stream.next().await {
-          let event = match event {
-            Err(err) => {
-              log::warn!("event::loop: {err}");
-              break;
-            }
-            Ok(event) => event,
-          };
-          if let Err(err) = on_event(&event, state).await {
-            log::warn!("event::loop: {err}");
-            if is_process_observation_update(&event) {
-              break;
-            }
-          }
-        }
+        consume_events(
+          stream,
+          |event| async move { on_event(&event, state).await },
+          || utils::resource::rebuild_all_rules(state),
+          RETRY_DELAY,
+          MAX_RECOVERY_RETRY_DELAY,
+        )
+        .await;
       }
     }
     log::warn!("event::loop: retrying in 2 seconds");
@@ -342,6 +383,118 @@ mod tests {
   };
 
   use super::*;
+
+  fn state_sync_event() -> Event {
+    serde_json::from_value(serde_json::json!({
+      "Key": "00000000-0000-0000-0000-000000000000",
+      "CreatedAt": "2026-01-01T00:00:00",
+      "ExpiresAt": "2026-01-01T00:00:00",
+      "ReportingNode": "node",
+      "ReportingController": "nanocl.io/core",
+      "Kind": "normal",
+      "Action": "update",
+      "Reason": "state_sync",
+      "Actor": {"Kind": EventActorKind::Process}
+    }))
+    .unwrap()
+  }
+
+  #[test]
+  fn only_completed_inventory_events_trigger_recovery() {
+    let event = state_sync_event();
+    assert!(is_state_sync(&event));
+    let mut changed = event.clone();
+    changed.kind = EventKind::Error;
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.action = NativeEventAction::Healthy.to_string();
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.reason = "health_status".into();
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.actor.as_mut().unwrap().key = Some("container-id".into());
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.actor.as_mut().unwrap().kind = EventActorKind::Cargo;
+    assert!(!is_state_sync(&changed));
+    changed.actor = None;
+    assert!(!is_state_sync(&changed));
+  }
+
+  #[ntex::test]
+  async fn failed_recovery_keeps_consuming_workload_and_secret_events() {
+    let mut events = vec![state_sync_event()];
+    for kind in [
+      EventActorKind::Cargo,
+      EventActorKind::Vm,
+      EventActorKind::Secret,
+    ] {
+      let mut event = state_sync_event();
+      event.actor.as_mut().unwrap().kind = kind;
+      event.reason = "update".into();
+      events.push(event);
+    }
+    let handled = std::cell::Cell::new(0);
+    let recoveries = std::cell::Cell::new(0);
+    consume_events(
+      futures::stream::iter(events.into_iter().map(Ok::<_, IoError>)),
+      |_| {
+        handled.set(handled.get() + 1);
+        futures::future::ready(Ok(()))
+      },
+      || {
+        recoveries.set(recoveries.get() + 1);
+        futures::future::ready(Err(IoError::other("Recovery", "unavailable")))
+      },
+      Duration::from_secs(3600),
+      Duration::from_secs(3600),
+    )
+    .await;
+    // Both startup and inventory-triggered recovery fail, but all ordinary
+    // events are consumed before the pending retry; EOF cancels that timer.
+    assert_eq!(recoveries.get(), 2);
+    assert_eq!(handled.get(), 3);
+  }
+
+  #[ntex::test]
+  async fn recovery_timer_retries_without_another_stream_event() {
+    let (release, released) = futures::channel::oneshot::channel();
+    let release = std::cell::RefCell::new(Some(release));
+    let recoveries = std::cell::Cell::new(0);
+    let handled = std::cell::Cell::new(0);
+    let stream = Box::pin(futures::stream::once(async {
+      released.await.unwrap();
+      let mut event = state_sync_event();
+      event.actor.as_mut().unwrap().kind = EventActorKind::Secret;
+      Ok::<_, IoError>(event)
+    }));
+    ntex::time::timeout(
+      Duration::from_secs(1),
+      consume_events(
+        stream,
+        |_| {
+          handled.set(handled.get() + 1);
+          futures::future::ready(Ok(()))
+        },
+        || {
+          recoveries.set(recoveries.get() + 1);
+          futures::future::ready(if recoveries.get() == 1 {
+            Err(IoError::other("Recovery", "temporarily unavailable"))
+          } else {
+            release.borrow_mut().take().unwrap().send(()).unwrap();
+            Ok(())
+          })
+        },
+        Duration::from_millis(1),
+        Duration::from_millis(4),
+      ),
+    )
+    .await
+    .unwrap();
+    assert_eq!(recoveries.get(), 2);
+    assert_eq!(handled.get(), 1);
+  }
 
   fn cargo(actual: ObjPsStatusKind) -> CargoInspect {
     CargoInspect {

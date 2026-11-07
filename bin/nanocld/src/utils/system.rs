@@ -618,23 +618,16 @@ pub(crate) async fn refresh_process_observations(
     if name == process.name && data == process.data {
       continue;
     }
-    // Updating an existing immutable Docker ID cannot recreate a row removed
-    // by a concurrent workload operation.
-    if let Err(error) = ProcessDb::update_pk(
-      &process.key,
-      ProcessUpdateDb {
-        name: Some(name),
-        data: Some(data),
-        updated_at: Some(chrono::Utc::now().naive_utc()),
-        ..Default::default()
-      },
-      &state.inner.pool,
-    )
-    .await
+    if !process
+      .update_observation_if_current(name, data, &state.inner.pool)
+      .await?
     {
-      if error.inner.kind() != std::io::ErrorKind::NotFound {
-        return Err(error);
-      }
+      // Do not announce a completed refresh after losing to a newer event or
+      // workload update. The caller retries from a fresh database snapshot.
+      return Err(IoError::interrupted(
+        "Refresh process observations",
+        &format!("Process {} changed during inspection", process.key),
+      ));
     }
   }
   Ok(())

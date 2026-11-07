@@ -1,10 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use futures_util::{
-  StreamExt,
-  future::{Either, select},
-  pin_mut,
-};
+use futures_util::{StreamExt, future::select, pin_mut};
 use ntex::rt;
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -879,10 +875,32 @@ async fn exec_docker(
   Ok(())
 }
 
+async fn refresh_observation_loop<F, R>(
+  mut refresh: F,
+  interval: std::time::Duration,
+  retry_delay: std::time::Duration,
+) where
+  F: FnMut() -> R,
+  R: std::future::Future<Output = IoResult<()>>,
+{
+  loop {
+    let delay = match refresh().await {
+      Ok(()) => interval,
+      Err(err) => {
+        log::warn!("event::docker: observation refresh failed: {err}");
+        retry_delay
+      }
+    };
+    ntex::time::sleep(delay).await;
+  }
+}
+
 /// Create a new thread with his own loop to analyze events from docker
 pub fn analyze(state: &SystemState) {
   const NETWORK_RECONCILE_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(30);
+  const PROCESS_RECONCILE_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(300);
 
   let reconcile_state = state.clone();
   rt::spawn(async move {
@@ -901,24 +919,16 @@ pub fn analyze(state: &SystemState) {
     loop {
       let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
       log::info!("event::analyze_docker: stream connected");
-      let refresh = async {
-        loop {
-          let result = async {
-            utils::container::network::reconcile_networks(&state).await?;
-            utils::system::refresh_process_observations(&state).await?;
-            utils::system::emit_process_sync(&state);
-            Ok::<_, nanocl_error::io::IoError>(())
-          }
-          .await;
-          match result {
-            Ok(()) => break,
-            Err(err) => log::warn!(
-              "event::docker: reconnect observation refresh failed: {err}"
-            ),
-          }
-          ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-        }
-      };
+      let refresh = refresh_observation_loop(
+        || async {
+          utils::container::network::reconcile_networks(&state).await?;
+          utils::system::refresh_process_observations(&state).await?;
+          utils::system::emit_process_sync(&state);
+          Ok(())
+        },
+        PROCESS_RECONCILE_INTERVAL,
+        std::time::Duration::from_secs(2),
+      );
       let consume = async {
         while let Some(event) = streams.next().await {
           match event {
@@ -934,12 +944,11 @@ pub fn analyze(state: &SystemState) {
           }
         }
       };
-      // Refresh alongside events, retrying only while this stream is alive.
+      // Periodic inventory also repairs missed events on a healthy connection.
+      // Emit a sync even for unchanged observations so subscribers can recover.
       // Dropping the pending refresh prevents reconnects from accumulating tasks.
       pin_mut!(refresh, consume);
-      if let Either::Left(((), consume)) = select(refresh, consume).await {
-        consume.await;
-      }
+      select(refresh, consume).await;
       log::warn!("event::analyze_docker: disconnected trying to reconnect");
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     }
@@ -948,6 +957,43 @@ pub fn analyze(state: &SystemState) {
 
 #[cfg(test)]
 mod tests {
+  #[ntex::test]
+  async fn inventory_refresh_continues_after_success_and_transient_failure() {
+    use std::{cell::Cell, time::Duration};
+
+    let attempts = Cell::new(0);
+    let (complete, completed) = futures::channel::oneshot::channel();
+    let mut complete = Some(complete);
+    let refresh = super::refresh_observation_loop(
+      || {
+        let attempt = attempts.get() + 1;
+        attempts.set(attempt);
+        if attempt == 3 {
+          complete.take().unwrap().send(()).unwrap();
+        }
+        futures::future::ready(if attempt == 2 {
+          Err(nanocl_error::io::IoError::other("Inventory", "retry"))
+        } else {
+          Ok(())
+        })
+      },
+      Duration::ZERO,
+      Duration::ZERO,
+    );
+    futures::pin_mut!(refresh);
+    let result = ntex::time::timeout(
+      Duration::from_secs(1),
+      futures::future::select(refresh, completed),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+      result,
+      futures::future::Either::Right((Ok(()), _))
+    ));
+    assert_eq!(attempts.get(), 3);
+  }
+
   #[test]
   fn cargo_observation_rejects_foreign_and_partial_runtime_identity() {
     use super::cargo_observation_identity_matches;
