@@ -1,6 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use futures_util::{StreamExt, future::select, pin_mut};
+use futures::channel::mpsc;
+use futures_util::{
+  StreamExt,
+  future::{Either, select},
+  pin_mut,
+};
 use ntex::rt;
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -877,6 +882,7 @@ async fn exec_docker(
 
 async fn refresh_observation_loop<F, R>(
   mut refresh: F,
+  mut reconnects: mpsc::Receiver<()>,
   interval: std::time::Duration,
   retry_delay: std::time::Duration,
 ) where
@@ -885,19 +891,26 @@ async fn refresh_observation_loop<F, R>(
 {
   let mut next_retry = retry_delay;
   loop {
-    let delay = match refresh().await {
+    match refresh().await {
       Ok(()) => {
         next_retry = retry_delay;
-        interval
+        let delay = ntex::time::sleep(interval);
+        pin_mut!(delay);
+        if matches!(
+          select(delay, reconnects.next()).await,
+          Either::Right((None, _))
+        ) {
+          return;
+        }
       }
       Err(err) => {
         log::warn!("event::docker: observation refresh failed: {err}");
         let delay = next_retry;
         next_retry = next_retry.saturating_mul(2).min(interval);
-        delay
+        // Reconnects cannot bypass failure backoff or cancel an active scan.
+        ntex::time::sleep(delay).await;
       }
-    };
-    ntex::time::sleep(delay).await;
+    }
   }
 }
 
@@ -922,24 +935,33 @@ pub fn analyze(state: &SystemState) {
 
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
-    loop {
-      let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
-      log::info!("event::analyze_docker: stream connected");
-      let refresh = refresh_observation_loop(
-        || async {
-          // Network failures have their own periodic retry above. They must
-          // not suppress fresh process observations or their completion event.
-          if let Err(err) =
-            utils::container::network::reconcile_networks(&state).await
-          {
-            log::warn!("event::network: reconciliation failed: {err}");
-          }
-          utils::system::refresh_process_observations(&state).await
-        },
-        PROCESS_RECONCILE_INTERVAL,
-        std::time::Duration::from_secs(2),
-      );
-      let consume = async {
+    // The single sender has one reserved slot; no extra buffer coalesces
+    // reconnects into at most one pending inventory request.
+    let (mut reconnect, reconnects) = mpsc::channel(0);
+    let refresh = refresh_observation_loop(
+      || async {
+        // Network failures have their own periodic retry above. They must
+        // not suppress fresh process observations or their completion event.
+        if let Err(err) =
+          utils::container::network::reconcile_networks(&state).await
+        {
+          log::warn!("event::network: reconciliation failed: {err}");
+        }
+        utils::system::refresh_process_observations(&state).await
+      },
+      reconnects,
+      PROCESS_RECONCILE_INTERVAL,
+      std::time::Duration::from_secs(2),
+    );
+    let consume = async {
+      let mut first_connection = true;
+      loop {
+        if !first_connection {
+          let _ = reconnect.try_send(());
+        }
+        first_connection = false;
+        let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
+        log::info!("event::analyze_docker: stream connected");
         while let Some(event) = streams.next().await {
           match event {
             Ok(event) => {
@@ -953,25 +975,109 @@ pub fn analyze(state: &SystemState) {
             }
           }
         }
-      };
-      // Periodic inventory also repairs missed events on a healthy connection.
-      // Completed scans publish unchanged and partial observations as well.
-      // Dropping the pending refresh prevents reconnects from accumulating tasks.
-      pin_mut!(refresh, consume);
-      select(refresh, consume).await;
-      log::warn!("event::analyze_docker: disconnected trying to reconnect");
-      ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    }
+        log::warn!("event::analyze_docker: disconnected trying to reconnect");
+        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+      }
+    };
+    // One worker survives individual event-stream reconnects. Both futures
+    // remain owned by this arbiter task and are cancelled together on shutdown.
+    pin_mut!(refresh, consume);
+    select(refresh, consume).await;
   });
 }
 
 #[cfg(test)]
 mod tests {
   #[ntex::test]
+  async fn inventory_refresh_survives_coalesced_reconnects() {
+    use futures::FutureExt;
+    use std::{cell::Cell, cell::RefCell, time::Duration};
+
+    let attempts = Cell::new(0);
+    let completed = Cell::new(0);
+    let (finish_scan, scan_finished) = futures::channel::oneshot::channel();
+    let scan_finished = RefCell::new(Some(scan_finished));
+    let (done, finished) = futures::channel::oneshot::channel();
+    let done = RefCell::new(Some(done));
+    let (mut reconnect, reconnects) = futures::channel::mpsc::channel(0);
+    let refresh = super::refresh_observation_loop(
+      || {
+        let attempt = attempts.get() + 1;
+        attempts.set(attempt);
+        let scan_finished = scan_finished.borrow_mut().take();
+        let done = (attempt == 2).then(|| done.borrow_mut().take().unwrap());
+        let completed = &completed;
+        async move {
+          if let Some(scan_finished) = scan_finished {
+            scan_finished.await.unwrap();
+          }
+          completed.set(completed.get() + 1);
+          if let Some(done) = done {
+            done.send(()).unwrap();
+          }
+          Ok(())
+        }
+      },
+      reconnects,
+      Duration::from_secs(3600),
+      Duration::from_secs(2),
+    );
+    futures::pin_mut!(refresh);
+    assert!(refresh.as_mut().now_or_never().is_none());
+    reconnect.try_send(()).unwrap();
+    assert!(reconnect.try_send(()).unwrap_err().is_full());
+    assert!(refresh.as_mut().now_or_never().is_none());
+    assert_eq!(attempts.get(), 1);
+    assert_eq!(completed.get(), 0);
+
+    // The original scan survives the reconnect requests. Its queued wake then
+    // starts one follow-up without waiting for the normal periodic interval.
+    finish_scan.send(()).unwrap();
+    let result = ntex::time::timeout(
+      Duration::from_secs(1),
+      futures::future::select(refresh, finished),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+      result,
+      futures::future::Either::Right((Ok(()), _))
+    ));
+    assert_eq!(attempts.get(), 2);
+    assert_eq!(completed.get(), 2);
+  }
+
+  #[test]
+  fn dropping_inventory_worker_cancels_inflight_scan() {
+    use futures::FutureExt;
+    use std::time::Duration;
+
+    let (finish_scan, scan_finished) = futures::channel::oneshot::channel();
+    let mut scan_finished = Some(scan_finished);
+    let (_reconnect, reconnects) = futures::channel::mpsc::channel(0);
+    let mut refresh = Box::pin(super::refresh_observation_loop(
+      || {
+        let scan_finished = scan_finished.take().unwrap();
+        async move {
+          scan_finished.await.unwrap();
+          Ok(())
+        }
+      },
+      reconnects,
+      Duration::from_secs(3600),
+      Duration::from_secs(2),
+    ));
+    assert!(refresh.as_mut().now_or_never().is_none());
+    drop(refresh);
+    assert!(finish_scan.send(()).is_err());
+  }
+
+  #[ntex::test]
   async fn inventory_refresh_continues_after_success_and_transient_failure() {
     use std::{cell::Cell, time::Duration};
 
     let attempts = Cell::new(0);
+    let (_reconnect, reconnects) = futures::channel::mpsc::channel(0);
     let (complete, completed) = futures::channel::oneshot::channel();
     let mut complete = Some(complete);
     let refresh = super::refresh_observation_loop(
@@ -987,6 +1093,7 @@ mod tests {
           Ok(())
         })
       },
+      reconnects,
       Duration::ZERO,
       Duration::ZERO,
     );
