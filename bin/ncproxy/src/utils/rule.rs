@@ -831,6 +831,25 @@ pub async fn gen_ssl_config(
   }
 }
 
+pub(crate) fn upstream_key(target: &UpstreamTarget) -> IoResult<String> {
+  let (name, namespace, kind) = parse_upstream_target(&target.key)?;
+  let suffix = match kind.as_str() {
+    "c" => "cargo",
+    "v" => "vm",
+    _ => {
+      return Err(IoError::invalid_data(
+        "UpstreamTarget",
+        &format!("Unknown Kind {kind}"),
+      ));
+    }
+  };
+  Ok(format!("{namespace}.{name}-{}-{suffix}", target.port))
+}
+
+pub(crate) fn unix_upstream_key(unix: &UnixTarget) -> String {
+  format!("unix-{}", unix.unix_path.replace('/', "-"))
+}
+
 pub async fn gen_upstream(
   target: &UpstreamTarget,
   state: &SystemStateRef,
@@ -872,7 +891,7 @@ pub async fn gen_upstream(
           &desired_essential_apps,
           &cargo.status.actual,
         )?;
-        let key = format!("{}-{}-cargo", cargo.spec.cargo_key, port);
+        let key = upstream_key(target)?;
         let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
           "key": key,
           "port": port,
@@ -888,7 +907,7 @@ pub async fn gen_upstream(
           },
         )?;
         let addresses = get_addresses(&vm.instances, &local_node).await?;
-        let key = format!("{}-{}-vm", vm.spec.vm_key, port);
+        let key = upstream_key(target)?;
         let data = UPSTREAM_TEMPLATE.compile(&liquid::object!({
           "key": key,
           "port": port,
@@ -907,7 +926,7 @@ pub async fn gen_upstream(
 }
 
 pub async fn gen_unix_target(unix: &UnixTarget) -> IoResult<PreparedUpstream> {
-  let upstream_key = format!("unix-{}", unix.unix_path.replace('/', "-"));
+  let upstream_key = unix_upstream_key(unix);
   let data = UNIX_UPSTREAM_TEMPLATE.compile(&liquid::object!({
     "upstream_key": upstream_key,
     "path": unix.unix_path,
@@ -1252,7 +1271,25 @@ mod tests {
         "c".to_owned()
       )
     );
-    for key in ["api", "global.api.", "global.api/name.c"] {
+    for (key, expected) in [
+      ("global.api.c", "global.api-8080-cargo"),
+      ("global.api.v", "global.api-8080-vm"),
+      (
+        "team.production.Api-2_x.c",
+        "team.production.Api-2_x-8080-cargo",
+      ),
+    ] {
+      let target = UpstreamTarget {
+        key: key.to_owned(),
+        port: 8080,
+        path: None,
+        enable_logging: None,
+        ssl: None,
+      };
+      assert_eq!(upstream_key(&target).unwrap(), expected);
+    }
+    // Proxy targets always require an explicit namespace, including global.
+    for key in ["api", "api.c", "global.api.", "global.api/name.c"] {
       assert!(
         parse_upstream_target(key).is_err(),
         "{key:?} must be invalid"

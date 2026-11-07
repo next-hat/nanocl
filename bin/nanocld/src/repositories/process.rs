@@ -141,6 +141,29 @@ impl ProcessDb {
     .await
   }
 
+  /// Forget a container confirmed absent by Docker only if its observation has
+  /// not changed since the inspection began. Desired workload rows stay intact.
+  pub(crate) async fn delete_observation_if_current(
+    &self,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let snapshot = self.clone();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let removed = diesel::delete(
+        processes::table
+          .find(&snapshot.key)
+          .filter(processes::created_at.eq(snapshot.created_at))
+          .filter(processes::updated_at.eq(snapshot.updated_at))
+          .filter(processes::name.eq(&snapshot.name))
+          .filter(processes::data.eq(&snapshot.data)),
+      )
+      .execute(conn)
+      .map_err(Self::map_err)?;
+      Ok(removed == 1)
+    })
+    .await
+  }
+
   fn belongs_to_operation(&self, owner: &OperationOwner) -> bool {
     // ProcessKind's stored spelling differs from the resource kind used by
     // operations. Keep this conversion exact instead of accepting arbitrary case.
@@ -527,13 +550,38 @@ mod tests {
           .await
           .unwrap()
       );
+      assert!(!snapshot.delete_observation_if_current(pool).await.unwrap());
       snapshot = ProcessDb::read_by_pk(&key, pool).await.unwrap();
       assert_eq!(snapshot.updated_at, newer.updated_at);
       assert_eq!(snapshot.name, newer.name);
       assert_eq!(snapshot.data, newer.data);
     }
 
-    ProcessDb::del_by_pk(&key, pool).await.unwrap();
+    // A replacement may reuse the display name and workload key, but its
+    // immutable Docker ID must never be removed with the missing container.
+    let replacement = ProcessDb::create_from(
+      &ProcessPartial {
+        key: uuid::Uuid::new_v4().to_string(),
+        name: snapshot.name.clone(),
+        kind: ProcessKind::Cargo,
+        data: serde_json::json!({}),
+        node_name: snapshot.node_name.clone(),
+        kind_key: snapshot.kind_key.clone(),
+        created_at: None,
+      },
+      pool,
+    )
+    .await
+    .unwrap();
+    assert!(snapshot.delete_observation_if_current(pool).await.unwrap());
+    assert!(!snapshot.delete_observation_if_current(pool).await.unwrap());
+    assert_eq!(
+      ProcessDb::read_by_pk(&replacement.key, pool)
+        .await
+        .unwrap()
+        .name,
+      replacement.name,
+    );
     assert!(
       !snapshot
         .update_observation_if_current(
@@ -553,6 +601,7 @@ mod tests {
         .kind(),
       std::io::ErrorKind::NotFound,
     );
+    ProcessDb::del_by_pk(&replacement.key, pool).await.unwrap();
     state.wait_event_loop().await;
   }
 

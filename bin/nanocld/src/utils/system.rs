@@ -602,7 +602,19 @@ pub(crate) async fn refresh_process_observations(
       Err(bollard_next::errors::Error::DockerResponseServerError {
         status_code: 404,
         ..
-      }) => continue,
+      }) => {
+        // Match destroy-event observation cleanup, fenced against concurrent
+        // writes. This never removes a replacement with a different Docker ID
+        // or changes the owning Cargo/VM/Job's desired lifecycle state.
+        if let Err(error) = process
+          .delete_observation_if_current(&state.inner.pool)
+          .await
+        {
+          log::warn!("Process observation {}: {error}", process.key);
+          failure.get_or_insert(error);
+        }
+        continue;
+      }
       Err(error) => {
         let error = *error.map_err_context(|| "Refresh process observations");
         log::warn!("Process observation {}: {error}", process.key);
