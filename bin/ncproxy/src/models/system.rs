@@ -49,28 +49,54 @@ struct SystemEventInner {
 
 pub struct SystemEvent(SystemEventInner);
 
-async fn reload_loop<F, R>(
+async fn reload_loop<F, R, W, S>(
   requested: &AtomicU64,
-  delay: Duration,
+  debounce: Duration,
   mut reload: F,
+  mut wait: W,
 ) -> IoResult<()>
 where
   F: FnMut() -> R,
   R: Future<Output = IoResult<()>>,
+  W: FnMut(Duration) -> S,
+  S: Future<Output = ()>,
 {
+  let mut revision = requested.load(Ordering::Relaxed);
+  let mut delay = debounce;
   loop {
-    let revision = requested.load(Ordering::Relaxed);
-    ntex::time::sleep(delay).await;
-    if requested.load(Ordering::Relaxed) != revision {
-      continue;
+    let mut remaining = delay;
+    loop {
+      // Observe new requests at the debounce cadence without acquiring the
+      // config lock or leaving a newer configuration behind a long retry wait.
+      let step = remaining.min(debounce);
+      wait(step).await;
+      let latest = requested.load(Ordering::Relaxed);
+      if latest != revision {
+        revision = latest;
+        delay = debounce;
+        remaining = debounce;
+        continue;
+      }
+      remaining = remaining.saturating_sub(step);
+      if remaining.is_zero() {
+        break;
+      }
     }
-    if let Err(err) = reload().await {
-      log::warn!("system: {err}");
-      continue;
+    let result = reload().await;
+    let latest = requested.load(Ordering::Relaxed);
+    match result {
+      Ok(()) if latest == revision => return Ok(()),
+      Ok(()) => delay = debounce,
+      Err(err) => {
+        log::warn!("system: {err}");
+        delay = if latest == revision {
+          delay.saturating_mul(2).min(Duration::from_secs(30))
+        } else {
+          debounce
+        };
+      }
     }
-    if requested.load(Ordering::Relaxed) == revision {
-      return Ok(());
-    }
+    revision = latest;
   }
 }
 
@@ -93,12 +119,17 @@ impl SystemEvent {
     let config_lock = Arc::clone(&self.0.config_lock);
     let requested = Arc::clone(&self.0.requested);
     self.0.task = Some(rt::spawn(async move {
-      reload_loop(&requested, Duration::from_millis(750), || async {
-        let _guard = config_lock.lock().await;
-        // Once work starts, keep its lock until the bounded reload ends.
-        // Later events request a follow-up instead of cancelling a reload.
-        utils::nginx::reload(&store).await
-      })
+      reload_loop(
+        &requested,
+        Duration::from_millis(750),
+        || async {
+          let _guard = config_lock.lock().await;
+          // Once work starts, keep its lock until the bounded reload ends.
+          // Later events request a follow-up instead of cancelling a reload.
+          utils::nginx::reload(&store).await
+        },
+        ntex::time::sleep,
+      )
       .await
     }));
   }
@@ -145,15 +176,20 @@ mod tests {
   async fn failed_reload_retries_without_another_event() {
     let requested = AtomicU64::new(1);
     let attempts = std::cell::Cell::new(0);
-    reload_loop(&requested, Duration::ZERO, || {
-      let attempt = attempts.get();
-      attempts.set(attempt + 1);
-      futures::future::ready(if attempt == 0 {
-        Err(IoError::other("Reload", "temporarily unavailable"))
-      } else {
-        Ok(())
-      })
-    })
+    reload_loop(
+      &requested,
+      Duration::ZERO,
+      || {
+        let attempt = attempts.get();
+        attempts.set(attempt + 1);
+        futures::future::ready(if attempt == 0 {
+          Err(IoError::other("Reload", "temporarily unavailable"))
+        } else {
+          Ok(())
+        })
+      },
+      ntex::time::sleep,
+    )
     .await
     .unwrap();
     assert_eq!(attempts.get(), 2);
@@ -163,16 +199,95 @@ mod tests {
   async fn reload_retries_when_a_new_request_arrives_during_reload() {
     let requested = AtomicU64::new(1);
     let attempts = std::cell::Cell::new(0);
-    reload_loop(&requested, Duration::ZERO, || {
-      if attempts.get() == 0 {
-        requested.fetch_add(1, Ordering::Relaxed);
-      }
-      attempts.set(attempts.get() + 1);
-      futures::future::ready(Ok(()))
-    })
+    reload_loop(
+      &requested,
+      Duration::ZERO,
+      || {
+        if attempts.get() == 0 {
+          requested.fetch_add(1, Ordering::Relaxed);
+        }
+        attempts.set(attempts.get() + 1);
+        futures::future::ready(Ok(()))
+      },
+      ntex::time::sleep,
+    )
     .await
     .unwrap();
     assert_eq!(attempts.get(), 2);
+  }
+
+  #[ntex::test]
+  async fn reload_failure_backoff_is_capped_and_success_resets_it() {
+    let requested = AtomicU64::new(1);
+    let waited = std::cell::Cell::new(Duration::ZERO);
+    let delays = std::cell::RefCell::new(Vec::new());
+    reload_loop(
+      &requested,
+      Duration::from_millis(750),
+      || {
+        let mut delays = delays.borrow_mut();
+        delays.push(waited.replace(Duration::ZERO));
+        let result = if delays.len() <= 8 {
+          Err(IoError::other("Reload", "temporarily unavailable"))
+        } else {
+          if delays.len() == 9 {
+            requested.fetch_add(1, Ordering::Relaxed);
+          }
+          Ok(())
+        };
+        futures::future::ready(result)
+      },
+      |delay| {
+        waited.set(waited.get() + delay);
+        futures::future::ready(())
+      },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+      *delays.borrow(),
+      [
+        750, 1500, 3000, 6000, 12000, 24000, 30000, 30000, 30000, 750
+      ]
+      .map(Duration::from_millis)
+    );
+  }
+
+  #[ntex::test]
+  async fn new_reload_request_resets_backoff_and_debounce() {
+    let requested = AtomicU64::new(1);
+    let waited = std::cell::Cell::new(Duration::ZERO);
+    let delays = std::cell::RefCell::new(Vec::new());
+    reload_loop(
+      &requested,
+      Duration::from_millis(750),
+      || {
+        let mut delays = delays.borrow_mut();
+        delays.push(waited.replace(Duration::ZERO));
+        futures::future::ready(if delays.len() <= 3 {
+          Err(IoError::other("Reload", "temporarily unavailable"))
+        } else {
+          Ok(())
+        })
+      },
+      |delay| {
+        waited.set(waited.get() + delay);
+        if delays.borrow().len() == 3 && requested.load(Ordering::Relaxed) == 1
+        {
+          requested.fetch_add(1, Ordering::Relaxed);
+        }
+        futures::future::ready(())
+      },
+    )
+    .await
+    .unwrap();
+    // The new request arrives one base interval into a six-second retry wait.
+    // It gets a complete fresh debounce, then runs without the old backoff.
+    assert_eq!(
+      *delays.borrow(),
+      [750, 1500, 3000, 1500].map(Duration::from_millis)
+    );
+    assert_eq!(requested.load(Ordering::Relaxed), 2);
   }
 
   #[ntex::test]

@@ -157,6 +157,29 @@ wait_unix_health() {
   return 1
 }
 
+ensure_containers_running() {
+  local container running failed=0
+  for container in "$@"; do
+    if ! running="$(timeout 10s docker inspect \
+      --format '{{.State.Running}}' "$container")"; then
+      failed=1
+      continue
+    fi
+    [ "$running" = true ] && continue
+
+    # Docker's restart policy may win the race after the first inspection.
+    # Keep start diagnostics, and accept only an observed running container.
+    timeout 30s docker start "$container" || true
+    if ! running="$(timeout 10s docker inspect \
+      --format '{{.State.Running}}' "$container")" ||
+      [ "$running" != true ]; then
+      echo "container did not start: $container" >&2
+      failed=1
+    fi
+  done
+  return "$failed"
+}
+
 teardown() {
   local recovery_failed=0
   # The restart regression holds nanocld offline deliberately. Restore its
@@ -165,7 +188,7 @@ teardown() {
     timeout 90s sudo -n systemctl start docker || recovery_failed=1
     timeout 20s docker update --restart="$E2E_RECOVERY_DAEMON_POLICY" \
       "$E2E_RECOVERY_DAEMON" || recovery_failed=1
-    timeout 30s docker start "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS" \
+    ensure_containers_running "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS" \
       "$E2E_RECOVERY_DAEMON" || recovery_failed=1
     wait_unix_health /run/nanocl/nanocl.sock http://localhost/v0.0/version || recovery_failed=1
   fi
@@ -596,7 +619,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run timeout 90s sudo -n systemctl restart docker
   [ "$status" -eq 0 ]
-  run timeout 30s docker start "$backend" "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  run ensure_containers_running "$backend" "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
   [ "$status" -eq 0 ]
   run docker inspect --format '{{.State.Running}}' "$E2E_RECOVERY_DAEMON"
   [ "$status" -eq 0 ]
@@ -614,7 +637,7 @@ teardown_file() {
 
   # The backend start event has already happened while nanocld was offline.
   # Neither a Statefile reapply nor a workload restart may repair the routes.
-  run timeout 30s docker start "$E2E_RECOVERY_DAEMON"
+  run ensure_containers_running "$E2E_RECOVERY_DAEMON"
   [ "$status" -eq 0 ]
   wait_unix_health /run/nanocl/nanocl.sock http://localhost/v0.0/version
   run timeout 100s curl --silent --fail --retry 90 --retry-all-errors \

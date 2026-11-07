@@ -622,12 +622,12 @@ pub(crate) async fn refresh_process_observations(
       .update_observation_if_current(name, data, &state.inner.pool)
       .await?
     {
-      // Do not announce a completed refresh after losing to a newer event or
-      // workload update. The caller retries from a fresh database snapshot.
-      return Err(IoError::interrupted(
-        "Refresh process observations",
-        &format!("Process {} changed during inspection", process.key),
-      ));
+      // Preserve the concurrent change and revisit this row on the next scan.
+      // A busy process must not prevent the rest of the inventory from syncing.
+      log::debug!(
+        "Refresh process observations: process {} changed during inspection",
+        process.key
+      );
     }
   }
   Ok(())
