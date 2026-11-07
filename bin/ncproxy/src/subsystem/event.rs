@@ -276,6 +276,7 @@ async fn r#loop(state: &SystemStateRef) {
       Ok(mut stream) => {
         if let Err(err) = ensure_self_config(&state.client).await {
           log::warn!("event::loop: {err}");
+          ntex::time::sleep(RETRY_DELAY).await;
           continue;
         }
         if let Err(err) = utils::nginx::ensure_conf(state).await {
@@ -289,7 +290,7 @@ async fn r#loop(state: &SystemStateRef) {
           let event = match event {
             Err(err) => {
               log::warn!("event::loop: {err}");
-              continue;
+              break;
             }
             Ok(event) => event,
           };

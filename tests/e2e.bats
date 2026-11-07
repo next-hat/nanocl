@@ -13,6 +13,7 @@ cleanup_nanocl_artifacts() {
   cleanup_statefile ./tests/cargo_none.yml
   cleanup_statefile ./tests/network_partitioning_dns_secondary.yml
   cleanup_statefile ./tests/network_partitioning.yml
+  cleanup_statefile ./tests/routing_recovery.yml
   local cargo
   for cargo in \
     test \
@@ -20,21 +21,27 @@ cleanup_nanocl_artifacts() {
     e2e-none \
     e2e-private-api \
     e2e-private-peer \
-    e2e-default-client
+    e2e-default-client \
+    e2e-routing-backend
   do
     nanocl cargo rm -yf "global.$cargo" >/dev/null 2>&1 || true
   done
   docker network rm e2e-private >/dev/null 2>&1 || true
+  docker network rm e2e-routing-recovery >/dev/null 2>&1 || true
 }
 
 assert_dns_address() {
   local container="$1"
   local name="$2"
   local expected="$3"
+  local lookup_args=("$name")
+  if [ -n "${4:-}" ]; then
+    lookup_args+=("$4")
+  fi
   local answers
-  local attempt
-  for attempt in 1 2 3 4 5 6 7 8 9 10; do
-    run docker exec "$container" nslookup "$name"
+  local deadline=$((SECONDS + ${5:-60}))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    run timeout 5s docker exec "$container" nslookup "${lookup_args[@]}"
     answers=""
     if [ "$status" -eq 0 ]; then
       answers="$(printf '%s\n' "$output" | awk '
@@ -135,7 +142,33 @@ setup_file() {
   cleanup_nanocl_artifacts
 }
 
+wait_unix_health() {
+  local socket="$1"
+  local url="$2"
+  local deadline=$((SECONDS + 120))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if curl --silent --fail --max-time 2 --output /dev/null \
+      --unix-socket "$socket" "$url"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "service did not recover: $socket $url" >&2
+  return 1
+}
+
 teardown() {
+  local recovery_failed=0
+  # The restart regression holds nanocld offline deliberately. Restore its
+  # original policy and services even when an intermediate assertion fails.
+  if [ -n "${E2E_RECOVERY_DAEMON_POLICY:-}" ]; then
+    timeout 90s sudo -n systemctl start docker || recovery_failed=1
+    timeout 20s docker update --restart="$E2E_RECOVERY_DAEMON_POLICY" \
+      "$E2E_RECOVERY_DAEMON" || recovery_failed=1
+    timeout 30s docker start "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS" \
+      "$E2E_RECOVERY_DAEMON" || recovery_failed=1
+    wait_unix_health /run/nanocl/nanocl.sock http://localhost/v0.0/version || recovery_failed=1
+  fi
   if [ -z "${BATS_TEST_COMPLETED:-}" ] && [ -n "${E2E_DIAGNOSTIC_CARGO:-}" ]; then
     echo "Cargo container state before cleanup: $E2E_DIAGNOSTIC_CARGO" >&2
     local container_ids container_id
@@ -152,6 +185,7 @@ teardown() {
     fi
   fi
   cleanup_nanocl_artifacts
+  [ "$recovery_failed" -eq 0 ]
 }
 
 teardown_file() {
@@ -489,6 +523,137 @@ teardown_file() {
 
   run docker network inspect e2e-private
   [ "$status" -eq 0 ]
+}
+
+@test "ncproxy and ncdns recover changed addresses after Docker restarts" {
+  # This restarts the host Docker service. CI opts in on its disposable runner;
+  # local runs must explicitly opt in on a dedicated test host as well.
+  [ "${NANOCL_E2E_DOCKER_RESTART:-0}" = "1" ] || \
+    skip "set NANOCL_E2E_DOCKER_RESTART=1 on a dedicated Docker test host"
+  run sudo -n systemctl is-active docker
+  [ "$status" -eq 0 ]
+  run docker info --format '{{.LiveRestoreEnabled}}'
+  [ "$status" -eq 0 ]
+  [ "$output" = "false" ]
+
+  run docker network create --subnet 192.0.2.0/24 --gateway 192.0.2.1 \
+    e2e-routing-recovery
+  [ "$status" -eq 0 ]
+  run nanocl state apply -ys ./tests/routing_recovery.yml
+  [ "$status" -eq 0 ]
+  E2E_DIAGNOSTIC_CARGO=global.e2e-routing-backend
+  local backend old_address old_started_at new_started_at new_address
+  backend="$(running_cargo_container global.e2e-routing-backend app backend)"
+  old_address="$(docker inspect --format \
+    '{{(index .NetworkSettings.Networks "e2e-routing-recovery").IPAddress}}' "$backend")"
+  [ -n "$old_address" ]
+  old_started_at="$(docker inspect --format '{{.State.StartedAt}}' "$backend")"
+  run curl --silent --fail --retry 20 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 60 --connect-timeout 2 --max-time 5 \
+    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
+  [ "$status" -eq 0 ]
+  [ "$output" = "routing-recovery-ok" ]
+  assert_dns_address "$backend" routing-recovery.nanocl.test 192.0.2.1 192.0.2.1
+
+  # Inspect and history must stay byte-for-byte equal: recovery is not a
+  # resource mutation and must not add a revision or rewrite dynamic selectors.
+  local resource view index=0
+  local snapshots=()
+  for resource in e2e-routing-proxy e2e-routing-dns; do
+    for view in inspect histories; do
+      run curl --silent --show-error --fail --max-time 5 \
+        --unix-socket /run/nanocl/nanocl.sock \
+        "http://localhost/v0.18.0/resources/${resource}/${view}"
+      [ "$status" -eq 0 ]
+      snapshots+=("$output")
+    done
+  done
+
+  E2E_RECOVERY_DAEMON="$(running_installer_cargo system.ndaemon)"
+  E2E_RECOVERY_PROXY="$(running_installer_cargo system.ncproxy)"
+  E2E_RECOVERY_DNS="$(running_installer_cargo system.ncdns)"
+  E2E_RECOVERY_DAEMON_POLICY="$(docker inspect --format \
+    '{{.HostConfig.RestartPolicy.Name}}{{if eq .HostConfig.RestartPolicy.Name "on-failure"}}:{{.HostConfig.RestartPolicy.MaximumRetryCount}}{{end}}' \
+    "$E2E_RECOVERY_DAEMON")"
+  [ -n "$E2E_RECOVERY_DAEMON_POLICY" ]
+  run docker update --restart=no "$E2E_RECOVERY_DAEMON"
+  [ "$status" -eq 0 ]
+  run timeout 30s docker stop --time 10 "$E2E_RECOVERY_DAEMON"
+  [ "$status" -eq 0 ]
+  run timeout 30s docker stop --time 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  [ "$status" -eq 0 ]
+
+  # Force different addresses instead of depending on Docker's allocation
+  # order. Keep the same backend container and canonical Statefile resources.
+  run docker network disconnect e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run docker network rm e2e-routing-recovery
+  [ "$status" -eq 0 ]
+  run docker network create --subnet 198.51.100.0/24 --gateway 198.51.100.1 \
+    e2e-routing-recovery
+  [ "$status" -eq 0 ]
+  run docker network connect --ip 198.51.100.2 e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run timeout 90s sudo -n systemctl restart docker
+  [ "$status" -eq 0 ]
+  run timeout 30s docker start "$backend" "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  [ "$status" -eq 0 ]
+  run docker inspect --format '{{.State.Running}}' "$E2E_RECOVERY_DAEMON"
+  [ "$status" -eq 0 ]
+  [ "$output" = "false" ]
+  run docker inspect --format '{{.State.StartedAt}}' "$backend"
+  [ "$status" -eq 0 ]
+  [ "$output" != "$old_started_at" ]
+  new_started_at="$output"
+  new_address="$(docker inspect --format \
+    '{{(index .NetworkSettings.Networks "e2e-routing-recovery").IPAddress}}' "$backend")"
+  [ "$new_address" = "198.51.100.2" ]
+  [ "$new_address" != "$old_address" ]
+  wait_unix_health /run/nanocl/proxy.sock http://localhost/health
+  wait_unix_health /run/nanocl/dns.sock http://localhost/health
+
+  # The backend start event has already happened while nanocld was offline.
+  # Neither a Statefile reapply nor a workload restart may repair the routes.
+  run timeout 30s docker start "$E2E_RECOVERY_DAEMON"
+  [ "$status" -eq 0 ]
+  wait_unix_health /run/nanocl/nanocl.sock http://localhost/v0.0/version
+  run timeout 370s curl --silent --fail --retry 360 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 360 --connect-timeout 2 --max-time 5 \
+    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
+  [ "$status" -eq 0 ]
+  [ "$output" = "routing-recovery-ok" ]
+  assert_dns_address "$backend" routing-recovery.nanocl.test 198.51.100.1 198.51.100.1 90
+
+  # Also change the backend endpoint after reconnect recovery has settled.
+  # This produces no Cargo start event: the periodic observation must repair
+  # the proxy even if its initial reconnect happened to use fresh process data.
+  run docker network disconnect e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run docker network connect --ip 198.51.100.3 e2e-routing-recovery "$backend"
+  [ "$status" -eq 0 ]
+  run docker inspect --format \
+    '{{(index .NetworkSettings.Networks "e2e-routing-recovery").IPAddress}}' "$backend"
+  [ "$status" -eq 0 ]
+  [ "$output" = "198.51.100.3" ]
+  run timeout 100s curl --silent --fail --retry 90 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 90 --connect-timeout 2 --max-time 5 \
+    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
+  [ "$status" -eq 0 ]
+  [ "$output" = "routing-recovery-ok" ]
+  run docker inspect --format '{{.State.StartedAt}}' "$backend"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$new_started_at" ]
+  [ "$(running_cargo_container global.e2e-routing-backend app backend)" = "$backend" ]
+  for resource in e2e-routing-proxy e2e-routing-dns; do
+    for view in inspect histories; do
+      run curl --silent --show-error --fail --max-time 5 \
+        --unix-socket /run/nanocl/nanocl.sock \
+        "http://localhost/v0.18.0/resources/${resource}/${view}"
+      [ "$status" -eq 0 ]
+      [ "$output" = "${snapshots[$index]}" ]
+      index=$((index + 1))
+    done
+  done
 }
 
 @test "nanocl rejects an invalid Statefile" {

@@ -877,21 +877,6 @@ async fn exec_docker(
 
 /// Create a new thread with his own loop to analyze events from docker
 pub fn analyze(state: &SystemState) {
-  const NETWORK_RECONCILE_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(30);
-
-  let reconcile_state = state.clone();
-  rt::spawn(async move {
-    loop {
-      ntex::time::sleep(NETWORK_RECONCILE_INTERVAL).await;
-      if let Err(err) =
-        utils::container::network::reconcile_networks(&reconcile_state).await
-      {
-        log::warn!("event::network: periodic reconciliation failed: {err}");
-      }
-    }
-  });
-
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
     loop {

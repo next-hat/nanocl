@@ -88,5 +88,7 @@ jobs:
           ./tests/e2e_prepare_ci.sh
       # Run E2E tests
       - name: E2E
+        env:
+          NANOCL_E2E_DOCKER_RESTART: "1"
         run: |
           bats --verbose-run ./tests/e2e.bats

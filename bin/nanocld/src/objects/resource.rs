@@ -37,6 +37,39 @@ fn mutation_lock(key: &str) -> ResourceMutationLock {
 }
 
 impl ResourceDb {
+  /// Reapply the current routing declaration without publishing a revision.
+  /// Read under the normal mutation owner so recovery cannot restore a stale
+  /// declaration between a controller callback and canonical publication.
+  pub(crate) async fn recover_routing_rule(
+    key: &str,
+    pool: &Pool,
+  ) -> HttpResult<()> {
+    let name = key.to_owned();
+    let pool = pool.clone();
+    Self::mutate(key, async move {
+      let resource = match Self::transform_read_by_pk(&name, &pool).await {
+        Ok(resource) => resource,
+        Err(error) if error.inner.kind() == std::io::ErrorKind::NotFound => {
+          return Ok(());
+        }
+        Err(error) => return Err(error.into()),
+      };
+      if !matches!(resource.kind.as_str(), "ncproxy.io/rule" | "ncdns.io/rule")
+      {
+        return Ok(());
+      }
+      let accepted = ResourcePartial {
+        name: resource.spec.resource_key,
+        kind: format!("{}/{}", resource.kind, resource.spec.version),
+        data: resource.spec.data,
+        metadata: resource.spec.metadata,
+      };
+      Self::hook_create(&accepted, &pool).await?;
+      Ok(())
+    })
+    .await
+  }
+
   /// Order this daemon's mutations from their reads through controller apply,
   /// canonical publication and completion events. The owner outlives its waiter;
   /// this is not a cross-daemon or crash-recovery transaction.
