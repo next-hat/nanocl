@@ -145,15 +145,17 @@ setup_file() {
 wait_unix_health() {
   local socket="$1"
   local url="$2"
+  local health_error=""
   local deadline=$((SECONDS + 120))
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if curl --silent --fail --max-time 2 --output /dev/null \
-      --unix-socket "$socket" "$url"; then
+    if health_error="$(curl --silent --show-error --fail --max-time 2 \
+      --output /dev/null --unix-socket "$socket" "$url" 2>&1)"; then
       return 0
     fi
     sleep 1
   done
-  echo "service did not recover: $socket $url" >&2
+  echo "service did not recover: $socket $url: $health_error" >&2
+  ls -l "$socket" >&2 || true
   return 1
 }
 
@@ -182,6 +184,16 @@ ensure_containers_running() {
 
 teardown() {
   local recovery_failed=0
+  if [ -z "${BATS_TEST_COMPLETED:-}" ] && [ -n "${E2E_RECOVERY_PROXY:-}" ]; then
+    local service
+    for service in "$E2E_RECOVERY_DAEMON" "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"; do
+      echo "Recovery service state before cleanup: $service" >&2
+      timeout 10s docker inspect --format \
+        '{{.Name}} status={{.State.Status}} exit_code={{.State.ExitCode}} error={{.State.Error}}' \
+        "$service" >&2 || true
+      timeout 10s docker logs --tail 80 "$service" >&2 || true
+    done
+  fi
   # The restart regression holds nanocld offline deliberately. Restore its
   # original policy and services even when an intermediate assertion fails.
   if [ -n "${E2E_RECOVERY_DAEMON_POLICY:-}" ]; then
@@ -601,9 +613,9 @@ teardown_file() {
   [ -n "$E2E_RECOVERY_DAEMON_POLICY" ]
   run docker update --restart=no "$E2E_RECOVERY_DAEMON"
   [ "$status" -eq 0 ]
-  run timeout 30s docker stop --time 10 "$E2E_RECOVERY_DAEMON"
+  run timeout 30s docker stop --timeout 10 "$E2E_RECOVERY_DAEMON"
   [ "$status" -eq 0 ]
-  run timeout 30s docker stop --time 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  run timeout 30s docker stop --timeout 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
   [ "$status" -eq 0 ]
 
   # Force different addresses instead of depending on Docker's allocation
@@ -649,7 +661,7 @@ teardown_file() {
 
   # Controllers must also recover independently while nanocld stays available.
   # The backend remains untouched, so a Cargo lifecycle event cannot help.
-  run timeout 40s docker restart --time 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  run timeout 40s docker restart --timeout 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
   [ "$status" -eq 0 ]
   wait_unix_health /run/nanocl/proxy.sock http://localhost/health
   wait_unix_health /run/nanocl/dns.sock http://localhost/health

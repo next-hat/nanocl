@@ -347,9 +347,8 @@ async fn r#loop(state: &SystemStateRef) {
           ntex::time::sleep(RETRY_DELAY).await;
           continue;
         }
-        if let Err(err) = utils::nginx::ensure_conf(state).await {
-          log::warn!("event::loop: configuration validation failed: {err}");
-        }
+        // Initialization owns the base config; reconnecting must not replace
+        // its health generation without an nginx reload.
         log::info!("event::loop: subscribed to nanocld events");
         consume_events(
           stream,

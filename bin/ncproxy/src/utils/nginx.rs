@@ -120,6 +120,7 @@ fn apply_location_options(
   });
 }
 
+#[cfg(test)]
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let _guard = state.config_lock.lock().await;
   let _fences = admit_fences(&state.store)?;
@@ -896,7 +897,10 @@ async fn start_nginx_cmd(
   }
   let status = timeout(
     COMMAND_TIMEOUT,
-    command.stdout(Stdio::null()).stderr(Stdio::null()).status(),
+    command
+      .stdout(Stdio::null())
+      .stderr(Stdio::inherit())
+      .status(),
   )
   .await
   .map_err(|_| IoError::other("exec", "nginx start timed out"))??;
