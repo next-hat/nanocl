@@ -1,6 +1,10 @@
-use std::{str::FromStr, sync::Arc};
+use std::{future::Future, str::FromStr, sync::Arc, time::Duration};
 
-use futures::{StreamExt, stream::FuturesUnordered};
+use futures::{
+  Stream, StreamExt,
+  future::{Either, LocalBoxFuture, pending, select},
+  stream::FuturesUnordered,
+};
 use ntex::rt;
 
 use nanocl_error::io::{IoError, IoResult};
@@ -12,13 +16,23 @@ use nanocld_client::{
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActorKind, NativeEventAction},
+    system::{EventActorKind, EventKind, NativeEventAction},
   },
 };
 
 use crate::{models::SystemStateRef, utils, vars};
 
-const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+const RETRY_DELAY: Duration = Duration::from_secs(2);
+const MAX_RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(30);
+
+fn is_state_sync(event: &Event) -> bool {
+  event.kind == EventKind::Normal
+    && event.action == NativeEventAction::Update.to_string()
+    && event.reason == "state_sync"
+    && event.actor.as_ref().is_some_and(|actor| {
+      actor.kind == EventActorKind::Process && actor.key.is_none()
+    })
+}
 
 fn cargo_has_committed_start(
   cargo: &nanocld_client::stubs::cargo::CargoInspect,
@@ -94,7 +108,7 @@ async fn update_cargo_rule(
       let resource: ResourcePartial = resource.into();
       let rule = utils::resource::serialize(&resource.data)?;
       if let Err(err) =
-        utils::nginx::add_rule(&resource.name, &rule, state).await
+        utils::resource::refresh_rule(&resource.name, &rule, state).await
       {
         log::warn!("event::update_cargo_rule: {err}");
       }
@@ -142,7 +156,7 @@ async fn update_vm_rule(
       let resource: ResourcePartial = resource.into();
       let rule = utils::resource::serialize(&resource.data)?;
       if let Err(err) =
-        utils::nginx::add_rule(&resource.name, &rule, state).await
+        utils::resource::refresh_rule(&resource.name, &rule, state).await
       {
         log::warn!("event::update_vm_rule: {err}");
       }
@@ -266,6 +280,60 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
+/// Keep recovery and its retry timer owned by the subscribed stream. Ordinary
+/// events neither cancel the pending retry nor wait for recovery to succeed.
+/// Await each handler and recovery serially: event-driven route refreshes must
+/// finish before another recovery resolves or commits its configuration.
+async fn consume_events<S, E, H, HF, R, RF>(
+  mut stream: S,
+  mut handle: H,
+  mut recover: R,
+  retry_delay: Duration,
+  max_retry_delay: Duration,
+) where
+  S: Stream<Item = Result<Event, E>> + Unpin,
+  E: std::fmt::Display,
+  H: FnMut(Event) -> HF,
+  HF: Future<Output = IoResult<()>>,
+  R: FnMut() -> RF,
+  RF: Future<Output = IoResult<()>>,
+{
+  let mut retry: LocalBoxFuture<'static, ()> = Box::pin(async {});
+  let mut next_delay = retry_delay;
+  loop {
+    // Poll the retained timer first so a busy event stream cannot postpone it.
+    match select(&mut retry, stream.next()).await {
+      Either::Left(_) => {}
+      Either::Right((Some(Ok(event)), _)) if is_state_sync(&event) => {}
+      Either::Right((Some(Ok(event)), _)) => {
+        if let Err(err) = handle(event).await {
+          log::warn!("event::loop: {err}");
+        }
+        continue;
+      }
+      Either::Right((Some(Err(err)), _)) => {
+        log::warn!("event::loop: {err}");
+        break;
+      }
+      Either::Right((None, _)) => break,
+    }
+    match recover().await {
+      Ok(()) => {
+        retry = Box::pin(pending());
+        next_delay = retry_delay;
+      }
+      Err(err) => {
+        log::warn!(
+          "event::loop: reconciliation failed: {err}; retrying in {} seconds",
+          next_delay.as_secs()
+        );
+        retry = Box::pin(ntex::time::sleep(next_delay));
+        next_delay = next_delay.saturating_mul(2).min(max_retry_delay);
+      }
+    }
+  }
+}
+
 async fn r#loop(state: &SystemStateRef) {
   loop {
     log::info!("event::loop: subscribing to nanocld events");
@@ -273,30 +341,23 @@ async fn r#loop(state: &SystemStateRef) {
       Err(err) => {
         log::warn!("event::loop: {err}");
       }
-      Ok(mut stream) => {
+      Ok(stream) => {
         if let Err(err) = ensure_self_config(&state.client).await {
           log::warn!("event::loop: {err}");
+          ntex::time::sleep(RETRY_DELAY).await;
           continue;
         }
-        if let Err(err) = utils::nginx::ensure_conf(state).await {
-          log::warn!("event::loop: configuration validation failed: {err}");
-        }
-        if let Err(err) = utils::resource::rebuild_all_rules(state).await {
-          log::warn!("event::loop: initial reconciliation failed: {err}");
-        }
+        // Initialization owns the base config; reconnecting must not replace
+        // its health generation without an nginx reload.
         log::info!("event::loop: subscribed to nanocld events");
-        while let Some(event) = stream.next().await {
-          let event = match event {
-            Err(err) => {
-              log::warn!("event::loop: {err}");
-              continue;
-            }
-            Ok(event) => event,
-          };
-          if let Err(err) = on_event(&event, state).await {
-            log::warn!("event::loop: {err}");
-          }
-        }
+        consume_events(
+          stream,
+          |event| async move { on_event(&event, state).await },
+          || utils::resource::rebuild_all_rules(state),
+          RETRY_DELAY,
+          MAX_RECOVERY_RETRY_DELAY,
+        )
+        .await;
       }
     }
     log::warn!("event::loop: retrying in 2 seconds");
@@ -323,6 +384,183 @@ mod tests {
   };
 
   use super::*;
+
+  fn state_sync_event() -> Event {
+    serde_json::from_value(serde_json::json!({
+      "Key": "00000000-0000-0000-0000-000000000000",
+      "CreatedAt": "2026-01-01T00:00:00",
+      "ExpiresAt": "2026-01-01T00:00:00",
+      "ReportingNode": "node",
+      "ReportingController": "nanocl.io/core",
+      "Kind": "normal",
+      "Action": "update",
+      "Reason": "state_sync",
+      "Actor": {"Kind": EventActorKind::Process}
+    }))
+    .unwrap()
+  }
+
+  #[test]
+  fn only_completed_inventory_events_trigger_recovery() {
+    let event = state_sync_event();
+    assert!(is_state_sync(&event));
+    let mut changed = event.clone();
+    changed.kind = EventKind::Error;
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.action = NativeEventAction::Healthy.to_string();
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.reason = "health_status".into();
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.actor.as_mut().unwrap().key = Some("container-id".into());
+    assert!(!is_state_sync(&changed));
+    changed = event.clone();
+    changed.actor.as_mut().unwrap().kind = EventActorKind::Cargo;
+    assert!(!is_state_sync(&changed));
+    changed.actor = None;
+    assert!(!is_state_sync(&changed));
+  }
+
+  #[ntex::test]
+  async fn failed_recovery_keeps_consuming_workload_and_secret_events() {
+    let mut events = vec![state_sync_event()];
+    for kind in [
+      EventActorKind::Cargo,
+      EventActorKind::Vm,
+      EventActorKind::Secret,
+    ] {
+      let mut event = state_sync_event();
+      event.actor.as_mut().unwrap().kind = kind;
+      event.reason = "update".into();
+      events.push(event);
+    }
+    let handled = std::cell::Cell::new(0);
+    let recoveries = std::cell::Cell::new(0);
+    consume_events(
+      futures::stream::iter(events.into_iter().map(Ok::<_, IoError>)),
+      |_| {
+        handled.set(handled.get() + 1);
+        futures::future::ready(Ok(()))
+      },
+      || {
+        recoveries.set(recoveries.get() + 1);
+        futures::future::ready(Err(IoError::other("Recovery", "unavailable")))
+      },
+      Duration::from_secs(3600),
+      Duration::from_secs(3600),
+    )
+    .await;
+    // Both startup and inventory-triggered recovery fail, but all ordinary
+    // events are consumed before the pending retry; EOF cancels that timer.
+    assert_eq!(recoveries.get(), 2);
+    assert_eq!(handled.get(), 3);
+  }
+
+  #[ntex::test]
+  async fn recovery_timer_retries_without_another_stream_event() {
+    let (release, released) = futures::channel::oneshot::channel();
+    let release = std::cell::RefCell::new(Some(release));
+    let recoveries = std::cell::Cell::new(0);
+    let handled = std::cell::Cell::new(0);
+    let stream = Box::pin(futures::stream::once(async {
+      released.await.unwrap();
+      let mut event = state_sync_event();
+      event.actor.as_mut().unwrap().kind = EventActorKind::Secret;
+      Ok::<_, IoError>(event)
+    }));
+    ntex::time::timeout(
+      Duration::from_secs(1),
+      consume_events(
+        stream,
+        |_| {
+          handled.set(handled.get() + 1);
+          futures::future::ready(Ok(()))
+        },
+        || {
+          recoveries.set(recoveries.get() + 1);
+          futures::future::ready(if recoveries.get() == 1 {
+            Err(IoError::other("Recovery", "temporarily unavailable"))
+          } else {
+            release.borrow_mut().take().unwrap().send(()).unwrap();
+            Ok(())
+          })
+        },
+        Duration::from_millis(1),
+        Duration::from_millis(4),
+      ),
+    )
+    .await
+    .unwrap();
+    assert_eq!(recoveries.get(), 2);
+    assert_eq!(handled.get(), 1);
+  }
+
+  #[ntex::test]
+  async fn yielding_event_handlers_and_recovery_never_overlap() {
+    async fn yield_once() {
+      let mut yielded = false;
+      futures::future::poll_fn(move |cx| {
+        if yielded {
+          std::task::Poll::Ready(())
+        } else {
+          yielded = true;
+          cx.waker().wake_by_ref();
+          std::task::Poll::Pending
+        }
+      })
+      .await;
+    }
+
+    let mut workload = state_sync_event();
+    workload.actor.as_mut().unwrap().kind = EventActorKind::Cargo;
+    let events = [workload.clone(), state_sync_event(), workload];
+    let active = std::cell::Cell::new(None);
+    let order = std::cell::RefCell::new(Vec::new());
+    let consume = consume_events(
+      futures::stream::iter(events.into_iter().map(Ok::<_, IoError>)),
+      |_| async {
+        assert_eq!(active.replace(Some("handler")), None);
+        order.borrow_mut().push("handler started");
+        yield_once().await;
+        assert_eq!(active.take(), Some("handler"));
+        order.borrow_mut().push("handler completed");
+        Ok(())
+      },
+      || async {
+        assert_eq!(active.replace(Some("recovery")), None);
+        order.borrow_mut().push("recovery started");
+        yield_once().await;
+        assert_eq!(active.take(), Some("recovery"));
+        order.borrow_mut().push("recovery completed");
+        Ok(())
+      },
+      Duration::from_secs(1),
+      Duration::from_secs(30),
+    );
+    futures::pin_mut!(consume);
+    // Every operation yields while the remaining stream events are ready.
+    // None may start another operation before its current one completes.
+    for _ in 0..4 {
+      assert!(futures::poll!(consume.as_mut()).is_pending());
+    }
+    assert!(futures::poll!(consume.as_mut()).is_ready());
+    assert_eq!(active.get(), None);
+    assert_eq!(
+      *order.borrow(),
+      [
+        "recovery started",
+        "recovery completed",
+        "handler started",
+        "handler completed",
+        "recovery started",
+        "recovery completed",
+        "handler started",
+        "handler completed",
+      ]
+    );
+  }
 
   fn cargo(actual: ObjPsStatusKind) -> CargoInspect {
     CargoInspect {

@@ -29,15 +29,16 @@ jobs:
         with:
           key: ${{ hashFiles('./Cargo.lock') }}
 
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
           components: clippy
           override: true
+          cache: false
+          build-warnings: ""
 
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Clippy
+        run: cargo clippy
 
   fmt:
     name: Fmt
@@ -45,13 +46,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
-          profile: minimal
           toolchain: 1.99.0
           components: rustfmt
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+          cache: false
+          build-warnings: ""
+      - name: Check formatting
+        run: cargo fmt --all -- --check
