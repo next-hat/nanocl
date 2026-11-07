@@ -20,7 +20,10 @@ use nanocl_stubs::{
   namespace::NamespacePartial,
   process::ProcessPartial,
   resource_key::ResourceKey,
-  system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
+  system::{
+    EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
+    ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial,
+  },
 };
 
 use crate::{
@@ -572,6 +575,120 @@ fn stale_process_ids(initial: Vec<String>, observed: &[String]) -> Vec<String> {
     .collect()
 }
 
+/// Refresh existing observations and publish completed scans, including partial
+/// results. This does not adopt, start, stop, or remove workloads.
+pub(crate) async fn refresh_process_observations(
+  state: &SystemState,
+) -> IoResult<()> {
+  let node = state.inner.config.hostname.clone();
+  let local = run_query_owned(&state.inner.pool, (), move |conn| {
+    Ok(
+      processes::table
+        .filter(processes::node_name.eq(&node))
+        .load::<ProcessDb>(conn)
+        .map_err(ProcessDb::map_err)?,
+    )
+  })
+  .await?;
+  let mut failure = None;
+  for process in local {
+    let instance = match state
+      .inner
+      .docker_api
+      .inspect_container(&process.key, None::<InspectContainerOptions>)
+      .await
+    {
+      Ok(instance) => instance,
+      Err(bollard_next::errors::Error::DockerResponseServerError {
+        status_code: 404,
+        ..
+      }) => {
+        // Match destroy-event observation cleanup, fenced against concurrent
+        // writes. This never removes a replacement with a different Docker ID
+        // or changes the owning Cargo/VM/Job's desired lifecycle state.
+        if let Err(error) = process
+          .delete_observation_if_current(&state.inner.pool)
+          .await
+        {
+          log::warn!("Process observation {}: {error}", process.key);
+          failure.get_or_insert(error);
+        }
+        continue;
+      }
+      Err(error) => {
+        let error = *error.map_err_context(|| "Refresh process observations");
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+        continue;
+      }
+    };
+    let name = instance
+      .name
+      .as_deref()
+      .map(|name| name.trim_start_matches('/'))
+      .filter(|name| !name.is_empty())
+      .unwrap_or(&process.name)
+      .to_owned();
+    let data = match serde_json::to_value(instance) {
+      Ok(data) => data,
+      Err(error) => {
+        let error = *error.map_err_context(|| "Process observation");
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+        continue;
+      }
+    };
+    if name == process.name && data == process.data {
+      continue;
+    }
+    match process
+      .update_observation_if_current(name, data, &state.inner.pool)
+      .await
+    {
+      Ok(true) => {}
+      Ok(false) => {
+        // Preserve the concurrent change and revisit this row on the next scan.
+        // A busy process must not prevent the rest of the inventory from syncing.
+        log::debug!(
+          "Refresh process observations: process {} changed during inspection",
+          process.key
+        );
+      }
+      Err(error) => {
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+      }
+    }
+  }
+  // Successful rows must reach observers even when another row needs a retry.
+  // An initial inventory-query failure returns before publishing this signal.
+  emit_process_sync(state);
+  match failure {
+    Some(error) => Err(error),
+    None => Ok(()),
+  }
+}
+
+/// Let observers re-read observations after a completed scan, including partial
+/// results. Each subscriber decides how to update its runtime.
+pub(crate) fn emit_process_sync(state: &SystemState) {
+  state.spawn_emit_event(EventPartial {
+    reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+    reporting_node: state.inner.config.hostname.clone(),
+    kind: EventKind::Normal,
+    action: NativeEventAction::Update.to_string(),
+    reason: "state_sync".to_owned(),
+    note: Some("Local process observation scan completed".to_owned()),
+    actor: Some(EventActor {
+      key: None,
+      kind: EventActorKind::Process,
+      attributes: None,
+    }),
+    related: None,
+    metadata: None,
+  });
+}
+
 /// Rebuild observed process rows and adopt installer/bootstrap Cargoes whose
 /// desired rows do not exist yet.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
@@ -746,6 +863,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     ProcessDb::del_by(&filter, &state.inner.pool).await?;
   }
   log::info!("system::sync_processes: done");
+  emit_process_sync(state);
   Ok(())
 }
 

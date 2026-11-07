@@ -18,13 +18,14 @@ pub(crate) fn is_active() -> bool {
 pub(crate) fn print(diff: &StateDiff, opts: &StateDiffOpts) -> IoResult<()> {
   let terminal = io::stdin().is_terminal() && io::stdout().is_terminal();
   let term = std::env::var_os("TERM");
+  let width = super::print::terminal_width();
   if !should_page(opts, terminal, term.as_deref()) {
-    return diff.write_to(&mut io::stdout().lock(), opts.json);
+    return write_output(diff, opts, &mut io::stdout().lock(), width);
   }
 
   // Render before opening the pager, preserving silent output for empty diffs.
   let mut bytes = Vec::new();
-  diff.write_to(&mut bytes, false)?;
+  write_output(diff, opts, &mut bytes, width)?;
   if bytes.is_empty() {
     return Ok(());
   }
@@ -56,12 +57,29 @@ pub(crate) fn print(diff: &StateDiff, opts: &StateDiffOpts) -> IoResult<()> {
   pager_result(written, status?.success())
 }
 
+fn write_output(
+  diff: &StateDiff,
+  opts: &StateDiffOpts,
+  writer: &mut impl Write,
+  width: usize,
+) -> IoResult<()> {
+  if opts.summary {
+    diff.write_summary_to(writer, width)
+  } else {
+    diff.write_to(writer, opts.json)
+  }
+}
+
 fn should_page(
   opts: &StateDiffOpts,
   terminal: bool,
   term: Option<&OsStr>,
 ) -> bool {
-  !opts.json && !opts.no_pager && terminal && term != Some(OsStr::new("dumb"))
+  !opts.json
+    && !opts.no_pager
+    && (!opts.summary || opts.pager)
+    && terminal
+    && term != Some(OsStr::new("dumb"))
 }
 
 fn pager_command() -> Command {
@@ -89,7 +107,7 @@ mod tests {
 
   #[test]
   fn paging_requires_interactive_text_and_respects_direct_output() {
-    for flags in [vec![], vec!["--pager"]] {
+    for flags in [vec![], vec!["--pager"], vec!["--summary", "--pager"]] {
       let opts =
         StateDiffOpts::try_parse_from(["diff"].into_iter().chain(flags))
           .unwrap();
@@ -98,10 +116,67 @@ mod tests {
       assert!(!should_page(&opts, false, Some(OsStr::new("xterm"))));
       assert!(!should_page(&opts, true, Some(OsStr::new("dumb"))));
     }
-    for flag in ["--json", "--no-pager"] {
-      let opts = StateDiffOpts::try_parse_from(["diff", flag]).unwrap();
+    for flags in [
+      vec!["--json"],
+      vec!["--no-pager"],
+      vec!["--summary"],
+      vec!["--summary", "--no-pager"],
+    ] {
+      let opts =
+        StateDiffOpts::try_parse_from(["diff"].into_iter().chain(flags))
+          .unwrap();
       assert!(!should_page(&opts, true, Some(OsStr::new("xterm"))));
+      assert!(!should_page(&opts, true, None));
     }
+  }
+
+  #[test]
+  fn summary_selects_action_output_without_changing_default_or_json() {
+    let diff = StateDiff::new(Vec::new());
+    let summary = StateDiffOpts::try_parse_from(["diff", "--summary"]).unwrap();
+    assert!(!should_page(&summary, true, Some(OsStr::new("xterm"))));
+    let mut output = Vec::new();
+    write_output(&diff, &summary, &mut output, 80).unwrap();
+    assert_eq!(output, b"No changes.\n");
+    let paged =
+      StateDiffOpts::try_parse_from(["diff", "--summary", "--pager"]).unwrap();
+    assert!(should_page(&paged, true, Some(OsStr::new("xterm"))));
+    let mut paged_output = Vec::new();
+    write_output(&diff, &paged, &mut paged_output, 80).unwrap();
+    assert_eq!(paged_output, output);
+    let default = StateDiffOpts::try_parse_from(["diff"]).unwrap();
+    output.clear();
+    write_output(&diff, &default, &mut output, 80).unwrap();
+    assert!(output.is_empty());
+    let json = StateDiffOpts::try_parse_from(["diff", "--json"]).unwrap();
+    output.clear();
+    write_output(&diff, &json, &mut output, 80).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["schema_version"], 1);
+    assert_eq!(value["summary"]["created"], 0);
+    assert!(
+      StateDiffOpts::try_parse_from(["diff", "--summary", "--json"]).is_err()
+    );
+  }
+
+  #[test]
+  fn supplied_width_wraps_summary_without_changing_default_or_json() {
+    let diff = StateDiff::new(Vec::new());
+    let summary = StateDiffOpts::try_parse_from(["diff", "--summary"]).unwrap();
+    let mut output = Vec::new();
+    write_output(&diff, &summary, &mut output, 8).unwrap();
+    assert_eq!(output, b"No \nchanges.\n");
+
+    let default = StateDiffOpts::try_parse_from(["diff"]).unwrap();
+    output.clear();
+    write_output(&diff, &default, &mut output, 8).unwrap();
+    assert!(output.is_empty());
+
+    let json = StateDiffOpts::try_parse_from(["diff", "--json"]).unwrap();
+    write_output(&diff, &json, &mut output, 8).unwrap();
+    let mut wider = Vec::new();
+    write_output(&diff, &json, &mut wider, 80).unwrap();
+    assert_eq!(output, wider);
   }
 
   #[test]

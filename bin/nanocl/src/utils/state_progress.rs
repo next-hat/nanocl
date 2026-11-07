@@ -177,10 +177,32 @@ fn next_rollout_phase(
 fn plain_rollout_line(
   resource: &str,
   phase: &str,
+  event: &Event,
   elapsed: Duration,
 ) -> String {
+  let phase = if let Some(phase) = phase.strip_prefix("observed candidate ") {
+    let name = event.actor.as_ref().and_then(|actor| actor.key.as_deref());
+    let prefix = resource.strip_prefix("cargo/").map(|key| format!("{key}-"));
+    let name = name.and_then(|name| {
+      prefix
+        .as_deref()
+        .and_then(|prefix| name.strip_prefix(prefix))
+        .and_then(|name| name.strip_suffix(".candidate.c"))
+    });
+    match name {
+      Some(name) => {
+        format!("candidate {name}@{} {phase}", event.reporting_node)
+      }
+      None => format!("candidate {phase}"),
+    }
+  } else {
+    phase
+      .strip_prefix("observed cargo ")
+      .unwrap_or(phase)
+      .to_owned()
+  };
   format!(
-    "  {resource}  {phase} [{}; awaiting operation completion]",
+    "  {resource}  pending: {phase} [{}]",
     super::progress::plain_elapsed(elapsed)
   )
 }
@@ -448,7 +470,13 @@ pub async fn with_image_progress<T>(
                 break 'observe Some(Err(err));
               }
             } else {
-              let line = plain_rollout_line(&resource, phase, item.elapsed());
+              let line =
+                plain_rollout_line(&resource, phase, &event, item.elapsed());
+              let line = super::print::wrap_lines(
+                &line,
+                super::print::stderr_width(),
+                2,
+              );
               if progress.is_hidden() {
                 eprintln!("{line}");
               } else {
@@ -706,19 +734,50 @@ mod tests {
       .unwrap();
       let observed = output["elapsed_ms"].as_u64().unwrap();
       assert!((before..=item.elapsed().as_millis() as u64).contains(&observed));
+      assert_eq!(output["status"], "observed cargo healthy");
+      assert!(output.get("success").is_none());
     }
     for (seconds, formatted) in [(62, "1m 02s"), (3723, "1h 02m 03s")] {
       assert_eq!(
         plain_rollout_line(
           "cargo/global.app",
           "observed cargo healthy",
+          &cargo_event("healthy"),
           Duration::from_secs(seconds)
         ),
-        format!(
-          "  cargo/global.app  observed cargo healthy [{formatted}; awaiting operation completion]"
-        )
+        format!("  cargo/global.app  pending: healthy [{formatted}]")
       );
     }
+  }
+
+  #[test]
+  fn compact_candidate_observations_keep_pending_and_process_identity() {
+    let first = candidate_event("app", "start");
+    let mut second = first.clone();
+    let actor = second.actor.as_mut().unwrap();
+    let name = "global.app-r1-api-ghijkl.candidate.c";
+    actor.key = Some(name.to_owned());
+    let attributes = actor.attributes.as_mut().unwrap();
+    attributes["name"] = json!(name);
+    attributes["io.nanocl.cargo.replica-ordinal"] = json!("1");
+    let lines = [&first, &second].map(|event| {
+      let phase = rollout_phase(event, "global.app", &EventActorKind::Cargo)
+        .expect("valid candidate observation");
+      plain_rollout_line(
+        "cargo/global.app",
+        phase,
+        event,
+        Duration::from_secs(4),
+      )
+    });
+    assert!(lines[0].contains("pending: candidate r0-api-abcdef@node-a"));
+    assert!(lines[1].contains("pending: candidate r1-api-ghijkl@node-a"));
+    assert!(
+      lines
+        .iter()
+        .all(|line| !line.contains("operation completion"))
+    );
+    assert!(lines.iter().all(|line| line.len() <= 80));
   }
 
   #[test]
