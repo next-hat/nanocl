@@ -56,6 +56,73 @@ The controller proxy will watch for events:
 - Cargo,Vm:
   - Creation, Update, Suppression
 
+## Startup fencing and upgrading
+
+ncproxy uses advisory locks in `/run` and its state directory to serialize
+controllers and nginx starts. nginx must inherit both startup-lock file
+descriptors; ncproxy verifies that the master holds them before treating it as
+managed. These files must not be removed or replaced while either process is
+running. ncproxy does not require the state directory or fence and pending
+files to have the same owner as its process; normal filesystem access
+permissions apply. The state directory must not be writable by group or other
+users. The `/run` and state-directory paths must
+have trusted, stable ancestry. This protocol cannot fence older versions or
+other programs that ignore the locks.
+
+An existing installation needs a one-time migration because an older nginx
+could still be starting without a PID or listening socket. An interrupted or
+uncertain operation leaves a pending marker; ncproxy fails closed until an
+operator resolves that ambiguity. A completed configuration-validation failure
+clears its markers. A completed reload-command failure or worker-readiness
+failure also clears them when the same managed nginx master still holds both
+startup fences. Command timeouts, cancellation, and unverifiable master or
+fence ownership retain the markers. Reaped startup failures clear their markers
+only after the controller drops its inherited descriptors, independently
+reacquires both fences, and verifies that no managed master exists. A startup
+readiness failure can also settle when the same master still holds both fences.
+
+Separate configuration markers cover rule and credential mutations, validation,
+and rollback. They are removed only after the completed configuration has been
+synchronized to disk; interrupted writes and incomplete rollback block startup.
+These markers are `ncproxy-config.pending` in the runtime directory and
+`.ncproxy-config.pending` in the state directory. Explicit stopped-process
+recovery synchronizes the restored configuration and credentials before clearing
+them. Fence, pending-state, I/O, and uncertain validation errors prevent startup.
+A completed configuration rejection lets ncproxy continue to rule reconciliation
+so stale on-disk rules can be rebuilt from nanocld state before nginx starts.
+
+For migration or recovery, first stop ncproxy and **all** nginx instances and
+launchers that can use the same state directory or `/run/nginx.pid`, including
+instances in other containers sharing either path. Prevent their automatic
+restart and verify that none can still bind the socket or read the config.
+After verifying that no such process remains, run the installed ncproxy binary
+as the ncproxy user in its `/run` mount namespace, replacing the example
+state directory with the actual one:
+
+```sh
+ncproxy --state-dir /var/lib/nanocl/proxy --recover-nginx-fences --acknowledge-nginx-stopped
+```
+
+This command takes the controller and startup locks, preserves their inodes,
+and synchronizes the markers before releasing the locks. It checks the PID
+file and rejects unsafe lock or pending files. The acknowledgement is an
+operator assertion: the command cannot establish that an older launcher in
+another namespace is stopped. It does not remove or alter nginx configuration.
+If `/run/nginx.pid` is empty, malformed, or points to an unrelated process,
+recovery stops. Investigate the PID file and process ownership first; remove a
+stale PID file only after verifying that all relevant nginx processes and
+launchers are stopped, then retry the command.
+Fence files must be regular, singly linked files with mode 0600.
+The global fence and pending paths are `/run/ncproxy-nginx.fence` and
+`/run/ncproxy-nginx.pending`; the state counterparts are
+`<state-dir>/.ncproxy-nginx.fence` and `<state-dir>/.ncproxy-nginx.pending`.
+The controller files are `/run/ncproxy-controller.lock` and
+`<state-dir>/.ncproxy-controller.lock`.
+
+Start ncproxy only after recovery is complete. It checks the health socket and
+removes it only if disconnected. If a lock is busy, investigate its owner; do
+not delete lock files to bypass the check.
+
 ## Access logs
 
 Access logging is disabled by default. Opt in for a cargo or VM target with

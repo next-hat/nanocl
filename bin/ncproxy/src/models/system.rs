@@ -22,6 +22,8 @@ pub struct SystemState {
   pub nginx_dir: String,
   /// Serializes every nginx configuration mutation and validation cycle.
   pub config_lock: Arc<Mutex<()>>,
+  /// Holds both controller admission locks until the process shuts down.
+  pub _controller_locks: Option<Arc<(std::fs::File, std::fs::File)>>,
 }
 
 pub type SystemStateRef = Arc<SystemState>;
@@ -32,7 +34,7 @@ pub enum SystemEventKind {
 }
 
 struct SystemEventInner {
-  state_dir: String,
+  store: Store,
   config_lock: Arc<Mutex<()>>,
   task: Option<ntex::rt::JoinHandle<IoResult<()>>>,
   requested: Arc<AtomicU64>,
@@ -41,9 +43,9 @@ struct SystemEventInner {
 pub struct SystemEvent(SystemEventInner);
 
 impl SystemEvent {
-  pub fn new(state_dir: &str, config_lock: Arc<Mutex<()>>) -> Self {
+  pub fn new(store: &Store, config_lock: Arc<Mutex<()>>) -> Self {
     Self(SystemEventInner {
-      state_dir: state_dir.to_owned(),
+      store: store.clone(),
       config_lock,
       task: None,
       requested: Arc::new(AtomicU64::new(0)),
@@ -55,7 +57,7 @@ impl SystemEvent {
     if self.0.task.as_ref().is_some_and(|task| !task.is_finished()) {
       return;
     }
-    let state_dir = self.0.state_dir.clone();
+    let store = self.0.store.clone();
     let config_lock = Arc::clone(&self.0.config_lock);
     let requested = Arc::clone(&self.0.requested);
     self.0.task = Some(rt::spawn(async move {
@@ -69,7 +71,7 @@ impl SystemEvent {
           let _guard = config_lock.lock().await;
           // Once work starts, keep its lock until the bounded reload ends.
           // Later events request a follow-up instead of cancelling a reload.
-          if let Err(err) = utils::nginx::reload(&state_dir).await {
+          if let Err(err) = utils::nginx::reload(&store).await {
             log::warn!("system: {err}");
           }
         }
@@ -86,12 +88,12 @@ pub struct EventEmitter(pub Arc<mpsc::UnboundedSender<SystemEventKind>>);
 
 impl EventEmitter {
   /// Create a new thread with it's own event loop and return an emitter to send events to it
-  pub fn new(state_dir: &str, config_lock: Arc<Mutex<()>>) -> Self {
+  pub fn new(store: &Store, config_lock: Arc<Mutex<()>>) -> Self {
     let (tx, mut rx) = mpsc::unbounded();
-    let state_dir = state_dir.to_owned();
+    let store = store.clone();
     rt::Arbiter::new().handle().spawn(async move {
       rt::spawn(async move {
-        let mut local_event = SystemEvent::new(&state_dir, config_lock);
+        let mut local_event = SystemEvent::new(&store, config_lock);
         while let Some(e) = rx.next().await {
           local_event.handle(e);
         }
@@ -118,7 +120,8 @@ mod tests {
 
   #[ntex::test]
   async fn reload_events_preserve_an_active_task_and_record_follow_up() {
-    let mut event = SystemEvent::new("unused", Arc::new(Mutex::new(())));
+    let mut event =
+      SystemEvent::new(&Store::isolated("unused"), Arc::new(Mutex::new(())));
     assert!(event.0.task.is_none());
     let (release, wait) = futures::channel::oneshot::channel::<()>();
     let (finished, completion) = futures::channel::oneshot::channel::<()>();
