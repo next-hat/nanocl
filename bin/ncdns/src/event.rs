@@ -172,6 +172,8 @@ async fn consume_events<S, E, R, RF>(
   R: FnMut() -> RF,
   RF: Future<Output = IoResult<()>>,
 {
+  // An already-ready timer performs the first recovery immediately on every
+  // subscription, before waiting for any daemon event (including reconnects).
   let mut retry: LocalBoxFuture<'static, ()> = Box::pin(async {});
   let mut next_delay = retry_delay;
   loop {
@@ -342,6 +344,27 @@ mod tests {
     .await;
     assert_eq!(recoveries.get(), 2);
     assert_eq!(consumed.get(), 4);
+  }
+
+  #[test]
+  fn subscription_recovers_immediately_without_stream_events() {
+    use futures::FutureExt;
+
+    let recoveries = std::cell::Cell::new(0);
+    for subscription in 1..=2 {
+      let consuming = consume_events(
+        futures::stream::pending::<Result<Event, IoError>>(),
+        || {
+          recoveries.set(recoveries.get() + 1);
+          futures::future::ready(Ok(()))
+        },
+        RETRY_DELAY,
+        MAX_RECOVERY_RETRY_DELAY,
+      );
+      // One poll performs recovery and then waits on the eventless stream.
+      assert!(consuming.now_or_never().is_none());
+      assert_eq!(recoveries.get(), subscription);
+    }
   }
 
   #[ntex::test]
