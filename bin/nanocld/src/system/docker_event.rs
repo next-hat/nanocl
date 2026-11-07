@@ -883,12 +883,18 @@ async fn refresh_observation_loop<F, R>(
   F: FnMut() -> R,
   R: std::future::Future<Output = IoResult<()>>,
 {
+  let mut next_retry = retry_delay;
   loop {
     let delay = match refresh().await {
-      Ok(()) => interval,
+      Ok(()) => {
+        next_retry = retry_delay;
+        interval
+      }
       Err(err) => {
         log::warn!("event::docker: observation refresh failed: {err}");
-        retry_delay
+        let delay = next_retry;
+        next_retry = next_retry.saturating_mul(2).min(interval);
+        delay
       }
     };
     ntex::time::sleep(delay).await;
@@ -928,9 +934,7 @@ pub fn analyze(state: &SystemState) {
           {
             log::warn!("event::network: reconciliation failed: {err}");
           }
-          utils::system::refresh_process_observations(&state).await?;
-          utils::system::emit_process_sync(&state);
-          Ok(())
+          utils::system::refresh_process_observations(&state).await
         },
         PROCESS_RECONCILE_INTERVAL,
         std::time::Duration::from_secs(2),
@@ -951,7 +955,7 @@ pub fn analyze(state: &SystemState) {
         }
       };
       // Periodic inventory also repairs missed events on a healthy connection.
-      // Emit a sync even for unchanged observations so subscribers can recover.
+      // Completed scans publish unchanged and partial observations as well.
       // Dropping the pending refresh prevents reconnects from accumulating tasks.
       pin_mut!(refresh, consume);
       select(refresh, consume).await;
@@ -974,10 +978,10 @@ mod tests {
       || {
         let attempt = attempts.get() + 1;
         attempts.set(attempt);
-        if attempt == 3 {
+        if attempt == 5 {
           complete.take().unwrap().send(()).unwrap();
         }
-        futures::future::ready(if attempt == 2 {
+        futures::future::ready(if matches!(attempt, 2 | 3) {
           Err(nanocl_error::io::IoError::other("Inventory", "retry"))
         } else {
           Ok(())
@@ -997,7 +1001,7 @@ mod tests {
       result,
       futures::future::Either::Right((Ok(()), _))
     ));
-    assert_eq!(attempts.get(), 3);
+    assert_eq!(attempts.get(), 5);
   }
 
   #[test]

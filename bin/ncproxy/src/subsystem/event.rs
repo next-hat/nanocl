@@ -282,6 +282,8 @@ pub(super) async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
 
 /// Keep recovery and its retry timer owned by the subscribed stream. Ordinary
 /// events neither cancel the pending retry nor wait for recovery to succeed.
+/// Await each handler and recovery serially: event-driven route refreshes must
+/// finish before another recovery resolves or commits its configuration.
 async fn consume_events<S, E, H, HF, R, RF>(
   mut stream: S,
   mut handle: H,
@@ -494,6 +496,71 @@ mod tests {
     .unwrap();
     assert_eq!(recoveries.get(), 2);
     assert_eq!(handled.get(), 1);
+  }
+
+  #[ntex::test]
+  async fn yielding_event_handlers_and_recovery_never_overlap() {
+    async fn yield_once() {
+      let mut yielded = false;
+      futures::future::poll_fn(move |cx| {
+        if yielded {
+          std::task::Poll::Ready(())
+        } else {
+          yielded = true;
+          cx.waker().wake_by_ref();
+          std::task::Poll::Pending
+        }
+      })
+      .await;
+    }
+
+    let mut workload = state_sync_event();
+    workload.actor.as_mut().unwrap().kind = EventActorKind::Cargo;
+    let events = [workload.clone(), state_sync_event(), workload];
+    let active = std::cell::Cell::new(None);
+    let order = std::cell::RefCell::new(Vec::new());
+    let consume = consume_events(
+      futures::stream::iter(events.into_iter().map(Ok::<_, IoError>)),
+      |_| async {
+        assert_eq!(active.replace(Some("handler")), None);
+        order.borrow_mut().push("handler started");
+        yield_once().await;
+        assert_eq!(active.take(), Some("handler"));
+        order.borrow_mut().push("handler completed");
+        Ok(())
+      },
+      || async {
+        assert_eq!(active.replace(Some("recovery")), None);
+        order.borrow_mut().push("recovery started");
+        yield_once().await;
+        assert_eq!(active.take(), Some("recovery"));
+        order.borrow_mut().push("recovery completed");
+        Ok(())
+      },
+      Duration::from_secs(1),
+      Duration::from_secs(30),
+    );
+    futures::pin_mut!(consume);
+    // Every operation yields while the remaining stream events are ready.
+    // None may start another operation before its current one completes.
+    for _ in 0..4 {
+      assert!(futures::poll!(consume.as_mut()).is_pending());
+    }
+    assert!(futures::poll!(consume.as_mut()).is_ready());
+    assert_eq!(active.get(), None);
+    assert_eq!(
+      *order.borrow(),
+      [
+        "recovery started",
+        "recovery completed",
+        "handler started",
+        "handler completed",
+        "recovery started",
+        "recovery completed",
+        "handler started",
+        "handler completed",
+      ]
+    );
   }
 
   fn cargo(actual: ObjPsStatusKind) -> CargoInspect {

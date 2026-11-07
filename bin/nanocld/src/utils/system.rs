@@ -575,8 +575,8 @@ fn stale_process_ids(initial: Vec<String>, observed: &[String]) -> Vec<String> {
     .collect()
 }
 
-/// Refresh existing observations after reconnecting to Docker. This does not
-/// adopt, start, stop, or remove workloads; those remain lifecycle operations.
+/// Refresh existing observations and publish completed scans, including partial
+/// results. This does not adopt, start, stop, or remove workloads.
 pub(crate) async fn refresh_process_observations(
   state: &SystemState,
 ) -> IoResult<()> {
@@ -590,6 +590,7 @@ pub(crate) async fn refresh_process_observations(
     )
   })
   .await?;
+  let mut failure = None;
   for process in local {
     let instance = match state
       .inner
@@ -603,7 +604,10 @@ pub(crate) async fn refresh_process_observations(
         ..
       }) => continue,
       Err(error) => {
-        return Err(*error.map_err_context(|| "Refresh process observations"));
+        let error = *error.map_err_context(|| "Refresh process observations");
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+        continue;
       }
     };
     let name = instance
@@ -613,28 +617,48 @@ pub(crate) async fn refresh_process_observations(
       .filter(|name| !name.is_empty())
       .unwrap_or(&process.name)
       .to_owned();
-    let data = serde_json::to_value(instance)
-      .map_err(|error| error.map_err_context(|| "Process observation"))?;
+    let data = match serde_json::to_value(instance) {
+      Ok(data) => data,
+      Err(error) => {
+        let error = *error.map_err_context(|| "Process observation");
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+        continue;
+      }
+    };
     if name == process.name && data == process.data {
       continue;
     }
-    if !process
+    match process
       .update_observation_if_current(name, data, &state.inner.pool)
-      .await?
+      .await
     {
-      // Preserve the concurrent change and revisit this row on the next scan.
-      // A busy process must not prevent the rest of the inventory from syncing.
-      log::debug!(
-        "Refresh process observations: process {} changed during inspection",
-        process.key
-      );
+      Ok(true) => {}
+      Ok(false) => {
+        // Preserve the concurrent change and revisit this row on the next scan.
+        // A busy process must not prevent the rest of the inventory from syncing.
+        log::debug!(
+          "Refresh process observations: process {} changed during inspection",
+          process.key
+        );
+      }
+      Err(error) => {
+        log::warn!("Process observation {}: {error}", process.key);
+        failure.get_or_insert(error);
+      }
     }
   }
-  Ok(())
+  // Successful rows must reach observers even when another row needs a retry.
+  // An initial inventory-query failure returns before publishing this signal.
+  emit_process_sync(state);
+  match failure {
+    Some(error) => Err(error),
+    None => Ok(()),
+  }
 }
 
-/// Let observers re-read the inventory after a startup/reconnect scan. The
-/// daemon publishes facts; each subscriber decides how to update its runtime.
+/// Let observers re-read observations after a completed scan, including partial
+/// results. Each subscriber decides how to update its runtime.
 pub(crate) fn emit_process_sync(state: &SystemState) {
   state.spawn_emit_event(EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
@@ -642,7 +666,7 @@ pub(crate) fn emit_process_sync(state: &SystemState) {
     kind: EventKind::Normal,
     action: NativeEventAction::Update.to_string(),
     reason: "state_sync".to_owned(),
-    note: Some("Local process observations refreshed".to_owned()),
+    note: Some("Local process observation scan completed".to_owned()),
     actor: Some(EventActor {
       key: None,
       kind: EventActorKind::Process,
