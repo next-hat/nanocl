@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Show compact, terminal-width-aware Statefile status with readable states and
+  failure details below each object. Add `state status --wide` for the full
+  table and exact failure times, and `state stats --wide` for memory limits,
+  I/O, and PID counts. Shorten action progress and Cargo receipts; use
+  `state apply --wide` for full revision, process, and image identifiers.
+  Add `state diff --summary` for planned actions and counts.
 - Namespace backup files now use `namespaces/<encoded-name>.yml` beneath the
   backup directory. Update automation that expects them at the backup root.
 - List and `ps` commands reject the previously ignored `--filters` option.

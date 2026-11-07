@@ -31,6 +31,8 @@ jobs:
     steps:
       # Clone project
       - uses: actions/checkout@v7.0.1
+      - name: Install repository Rust toolchain
+        run: rustup toolchain install
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           # The explicit rust-cache step below separates host images.
