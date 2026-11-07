@@ -768,6 +768,39 @@ impl Dnsmasq {
     Ok(())
   }
 
+  /// Remove generated fragments absent from the complete accepted declaration
+  /// inventory. The caller holds the controller lock shared with callbacks.
+  pub(crate) async fn remove_stale_rules(
+    &self,
+    retained: &BTreeSet<String>,
+  ) -> IoResult<()> {
+    let _guard = self.update_lock.lock().await;
+    let manager = self.clone();
+    let retained = retained.clone();
+    web::block(move || {
+      let mut stale = BTreeSet::new();
+      for paths in manager.configured_instances()? {
+        for fragment in Self::rule_fragments(&paths)? {
+          let Some(key) = fragment.file_stem().and_then(OsStr::to_str) else {
+            return Err(IoError::invalid_data(
+              "dnsmasq rule",
+              "invalid resource fragment filename",
+            ));
+          };
+          if !retained.contains(key) {
+            stale.insert(key.to_owned());
+          }
+        }
+      }
+      for key in stale {
+        manager.remove_rule_blocking(&key)?;
+      }
+      Ok::<_, IoError>(())
+    })
+    .await?;
+    Ok(())
+  }
+
   /// Create the manager directory and stop the pre-0.18 singleton instance,
   /// which otherwise keeps its old nanoclbr0 bind alive across upgrades.
   pub(crate) fn ensure(&self) -> IoResult<Self> {

@@ -1349,6 +1349,45 @@ pub(crate) struct PreparedRule {
   stream: Option<String>,
   upstreams: Vec<(PreparedUpstream, NginxRuleKind)>,
   files: Vec<PreparedFile>,
+  /// Recovery retries operational failures, while expected omissions remain
+  /// driven by the normal Cargo/VM/Secret events.
+  resolution_error: Option<IoError>,
+}
+
+fn record_resolution_error(error: IoError, failure: &mut Option<IoError>) {
+  use std::io::ErrorKind;
+
+  let retry = if let Some(http) = error
+    .inner
+    .get_ref()
+    .and_then(|cause| cause.downcast_ref::<nanocl_error::http::HttpError>())
+  {
+    // HttpError conversion uses InvalidData even for server failures.
+    http.status.is_server_error()
+      || http.status == ntex::http::StatusCode::REQUEST_TIMEOUT
+      || http.status == ntex::http::StatusCode::TOO_MANY_REQUESTS
+  } else {
+    match (error.inner.kind(), error.context.as_deref()) {
+      (ErrorKind::InvalidInput | ErrorKind::NotFound, _) => false,
+      (
+        ErrorKind::InvalidData,
+        Some(
+          "Cargo"
+          | "Process"
+          | "TargetKey"
+          | "UpstreamTarget"
+          | "Unable to deserialize ProxySslConfig",
+        ),
+      ) => false,
+      // InvalidData also represents malformed daemon responses. Only the
+      // explicit semantic contexts produced by the resolvers above are
+      // expected omissions; unknown failures must remain retryable.
+      _ => true,
+    }
+  };
+  if retry {
+    failure.get_or_insert(error);
+  }
 }
 
 async fn prepare_rule(
@@ -1370,6 +1409,7 @@ async fn prepare_rule(
   let mut http_conf = String::new();
   let mut upstreams = Vec::new();
   let mut files = Vec::new();
+  let mut resolution_error = None;
   for rule in &rule.rules {
     match rule {
       ProxyRule::Stream(stream_rule) => {
@@ -1385,6 +1425,7 @@ async fn prepare_rule(
           {
             Err(err) => {
               log::warn!("{err} {:#?}", stream_rule.target);
+              record_resolution_error(err, &mut resolution_error);
               continue;
             }
             Ok(upstream) => upstream,
@@ -1393,6 +1434,7 @@ async fn prepare_rule(
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+              record_resolution_error(err, &mut resolution_error);
               None
             }
             Ok(prepared) => {
@@ -1437,6 +1479,7 @@ async fn prepare_rule(
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {
               log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+              record_resolution_error(err, &mut resolution_error);
               None
             }
             Ok(prepared) => {
@@ -1455,6 +1498,7 @@ async fn prepare_rule(
                 match super::rule::gen_upstream(upstream, state).await {
                   Err(err) => {
                     log::warn!("{err} {:#?}", upstream);
+                    record_resolution_error(err, &mut resolution_error);
                     continue;
                   }
                   Ok(upstream) => upstream,
@@ -1464,6 +1508,7 @@ async fn prepare_rule(
                   match super::rule::gen_ssl_config(ssl, state).await {
                     Err(err) => {
                       log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+                      record_resolution_error(err, &mut resolution_error);
                       None
                     }
                     Ok(prepared) => {
@@ -1583,6 +1628,7 @@ async fn prepare_rule(
     stream: (!stream_conf.is_empty()).then_some(stream_conf),
     upstreams,
     files,
+    resolution_error,
   })
 }
 
@@ -1606,19 +1652,52 @@ async fn apply_prepared_rule(
     .await
 }
 
-/// Replace every managed rule from a persisted nanocld snapshot.
+async fn prepare_rebuild<'a>(
+  rules: &'a [(String, ResourceProxyRule)],
+  state: &SystemStateRef,
+) -> IoResult<(Vec<(&'a str, PreparedRule)>, Option<IoError>)> {
+  let mut prepared_rules = Vec::with_capacity(rules.len());
+  let mut resolution_error = None;
+  for (name, rule) in rules {
+    let mut prepared = prepare_rule(name, rule, state).await?;
+    if let Some(err) = prepared.resolution_error.take() {
+      resolution_error.get_or_insert(err);
+    }
+    prepared_rules.push((name.as_str(), prepared));
+  }
+  Ok((prepared_rules, resolution_error))
+}
+
+async fn finish_rebuild<C>(
+  commit: C,
+  emitter: &crate::models::EventEmitter,
+  resolution_error: Option<IoError>,
+) -> IoResult<()>
+where
+  C: Future<Output = IoResult<()>>,
+{
+  commit.await?;
+  emitter.emit_reload().await;
+  match resolution_error {
+    Some(err) => Err(err),
+    None => Ok(()),
+  }
+}
+
+/// Replace every managed rule from the controller's accepted declarations.
 ///
 /// Clearing first removes resources deleted while ncproxy was offline. The
 /// previous complete directory state is restored when rendering or nginx
-/// validation rejects any candidate rule.
+/// validation rejects any candidate rule. Unavailable targets are omitted as
+/// for normal callbacks. Operational resolution failures are reported after
+/// commit/reload so recovery retries without blocking available routes; normal
+/// workload and secret events handle expected omissions such as stopped Cargoes.
 pub(crate) async fn rebuild_rules(
   rules: &[(String, ResourceProxyRule)],
   state: &SystemStateRef,
 ) -> IoResult<()> {
-  let mut prepared_rules = Vec::with_capacity(rules.len());
-  for (name, rule) in rules {
-    prepared_rules.push((name, prepare_rule(name, rule, state).await?));
-  }
+  let (prepared_rules, resolution_error) =
+    prepare_rebuild(rules, state).await?;
   let _guard = state.config_lock.lock().await;
   let _fences = admit_fences(&state.store)?;
   let credential_paths = prepared_rules
@@ -1627,13 +1706,17 @@ pub(crate) async fn rebuild_rules(
       prepared.files.iter().map(|file| file.path.as_str())
     })
     .collect::<Vec<_>>();
-  config_transaction(&state.store, &credential_paths, || async {
-    state.store.clear_config().await?;
-    for (name, prepared) in &prepared_rules {
-      apply_prepared_rule(name, prepared, state).await?;
-    }
-    self::test(&state.store).await
-  })
+  finish_rebuild(
+    config_transaction(&state.store, &credential_paths, || async {
+      state.store.clear_config().await?;
+      for (name, prepared) in &prepared_rules {
+        apply_prepared_rule(name, prepared, state).await?;
+      }
+      self::test(&state.store).await
+    }),
+    &state.event_emitter,
+    resolution_error,
+  )
   .await
 }
 
@@ -1666,8 +1749,145 @@ mod tests {
       event_emitter: crate::models::EventEmitter(Arc::new(sender)),
       nginx_dir: String::new(),
       config_lock: Arc::new(futures::lock::Mutex::new(())),
+      accepted_rules: Default::default(),
       _controller_locks: None,
     })
+  }
+
+  #[ntex::test]
+  async fn recovery_commits_available_routes_without_retrying_expected_omissions()
+   {
+    use futures::StreamExt;
+
+    let state = test_state("unused");
+    let unavailable = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Tcp",
+        "Port": 9000,
+        "Target": { "Uri": "127.0.0.1:9001" }
+      }]
+    }))
+    .unwrap();
+    let available = serde_json::from_value(serde_json::json!({
+      "Rules": [{
+        "Network": "Local",
+        "Protocol": "Tcp",
+        "Port": 9001,
+        "Target": { "UnixPath": "/unused/upstream.sock" }
+      }]
+    }))
+    .unwrap();
+    // Both preparation paths avoid daemon calls and filesystem access.
+    let declarations = vec![
+      ("unavailable".to_owned(), unavailable),
+      ("available".to_owned(), available),
+    ];
+    let (prepared, failure) =
+      prepare_rebuild(&declarations, &state).await.unwrap();
+    assert!(prepared[0].1.stream.is_none());
+    assert!(prepared[1].1.stream.as_ref().unwrap().contains("9001"));
+    assert!(failure.is_none());
+
+    let committed = std::cell::Cell::new(false);
+    let (sender, mut reloads) = futures::channel::mpsc::unbounded();
+    let emitter = crate::models::EventEmitter(Arc::new(sender));
+    finish_rebuild(
+      async {
+        committed.set(true);
+        Ok(())
+      },
+      &emitter,
+      failure,
+    )
+    .await
+    .unwrap();
+    assert!(committed.get());
+    assert!(matches!(
+      reloads.next().await,
+      Some(crate::models::SystemEventKind::Reload)
+    ));
+  }
+
+  #[test]
+  fn resolution_retry_preserves_server_and_response_failures() {
+    use nanocl_error::http::HttpError;
+
+    let mut failure = None;
+    for error in [
+      IoError::invalid_data("Cargo", "no serving replica"),
+      IoError::invalid_data("Process", "no running address"),
+      IoError::invalid_input("StreamTarget", "uri not supported"),
+      IoError::not_found("Secret", "deleted"),
+      HttpError::not_found("deleted target").into(),
+    ] {
+      record_resolution_error(error, &mut failure);
+      assert!(failure.is_none());
+    }
+    for error in [
+      IoError::invalid_data("HTTP 404", "unrecognized response"),
+      IoError::invalid_data("Unable to inspect cargo", "malformed response"),
+      std::io::Error::from(std::io::ErrorKind::TimedOut).into(),
+      HttpError::new(ntex::http::StatusCode::BAD_GATEWAY, "unavailable").into(),
+    ] {
+      record_resolution_error(error, &mut failure);
+      assert!(failure.take().is_some());
+    }
+  }
+
+  #[ntex::test]
+  async fn recovery_retries_server_failure_after_committing_available_routes() {
+    use futures::StreamExt;
+    use nanocl_error::http::HttpError;
+
+    let mut failure = None;
+    record_resolution_error(
+      HttpError::new(
+        ntex::http::StatusCode::SERVICE_UNAVAILABLE,
+        "temporarily unavailable",
+      )
+      .into(),
+      &mut failure,
+    );
+    assert!(failure.is_some());
+    let committed = std::cell::Cell::new(false);
+    let (sender, mut reloads) = futures::channel::mpsc::unbounded();
+    let emitter = crate::models::EventEmitter(Arc::new(sender));
+    let error = finish_rebuild(
+      async {
+        committed.set(true);
+        Ok(())
+      },
+      &emitter,
+      failure,
+    )
+    .await
+    .unwrap_err();
+    assert!(committed.get());
+    assert!(matches!(
+      reloads.next().await,
+      Some(crate::models::SystemEventKind::Reload)
+    ));
+    assert!(error.to_string().contains("temporarily unavailable"));
+  }
+
+  #[ntex::test]
+  async fn recovery_commit_failure_does_not_request_reload() {
+    use futures::StreamExt;
+
+    let (sender, mut reloads) = futures::channel::mpsc::unbounded();
+    let emitter = crate::models::EventEmitter(Arc::new(sender));
+    let error = finish_rebuild(
+      async { Err(IoError::other("Config", "validation rejected")) },
+      &emitter,
+      Some(IoError::other("Upstream", "temporarily unavailable")),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.context.as_deref(), Some("Config"));
+    assert_eq!(error.inner.to_string(), "validation rejected");
+    drop(emitter);
+    assert!(reloads.next().await.is_none());
   }
 
   #[ntex::test]
@@ -1768,6 +1988,7 @@ mod tests {
       stream: None,
       upstreams: Vec::new(),
       files,
+      resolution_error: None,
     };
     let paths = prepared
       .files
@@ -1804,6 +2025,7 @@ mod tests {
       site: None,
       stream: None,
       upstreams: Vec::new(),
+      resolution_error: None,
       files: [old_path, new_path, failed_path]
         .into_iter()
         .map(|path| PreparedFile {

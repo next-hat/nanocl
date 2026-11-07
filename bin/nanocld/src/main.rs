@@ -66,7 +66,6 @@ async fn main() -> std::io::Result<()> {
       // Listeners are bound and accepting; @reboot requests can now queue
       // while HTTP workers finish starting.
       start_crond();
-      system::recover_routing(&daemon_state);
       // Start http server and wait for shutdown
       // Server should never shutdown unless it's explicitly asked
       if let Err(err) = server.await {

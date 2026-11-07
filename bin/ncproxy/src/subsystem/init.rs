@@ -34,6 +34,7 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
     store,
     nginx_dir: cli.nginx_dir.clone(),
     config_lock,
+    accepted_rules: Default::default(),
     _controller_locks: Some(controller_locks),
   });
   // Admission and the first configuration/start happen before any background

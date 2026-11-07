@@ -1,6 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use futures_util::StreamExt;
+use futures_util::{
+  StreamExt,
+  future::{Either, select},
+  pin_mut,
+};
 use ntex::rt;
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -877,30 +881,64 @@ async fn exec_docker(
 
 /// Create a new thread with his own loop to analyze events from docker
 pub fn analyze(state: &SystemState) {
+  const NETWORK_RECONCILE_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(30);
+
+  let reconcile_state = state.clone();
+  rt::spawn(async move {
+    loop {
+      ntex::time::sleep(NETWORK_RECONCILE_INTERVAL).await;
+      if let Err(err) =
+        utils::container::network::reconcile_networks(&reconcile_state).await
+      {
+        log::warn!("event::network: periodic reconciliation failed: {err}");
+      }
+    }
+  });
+
   let state = state.clone();
   rt::Arbiter::new().handle().spawn(async move {
     loop {
       let mut streams = state.inner.docker_api.events(None::<EventsOptions>);
       log::info!("event::analyze_docker: stream connected");
-      let reconnect_state = state.clone();
-      rt::spawn(async move {
-        if let Err(err) =
-          utils::container::network::reconcile_networks(&reconnect_state).await
-        {
-          log::warn!("event::network: reconnect reconciliation failed: {err}");
+      let refresh = async {
+        loop {
+          let result = async {
+            utils::container::network::reconcile_networks(&state).await?;
+            utils::system::refresh_process_observations(&state).await?;
+            utils::system::emit_process_sync(&state);
+            Ok::<_, nanocl_error::io::IoError>(())
+          }
+          .await;
+          match result {
+            Ok(()) => break,
+            Err(err) => log::warn!(
+              "event::docker: reconnect observation refresh failed: {err}"
+            ),
+          }
+          ntex::time::sleep(std::time::Duration::from_secs(2)).await;
         }
-      });
-      while let Some(event) = streams.next().await {
-        match event {
-          Ok(event) => {
-            if let Err(err) = exec_docker(&event, &state).await {
-              log::warn!("event::analyze_docker: {err}")
+      };
+      let consume = async {
+        while let Some(event) = streams.next().await {
+          match event {
+            Ok(event) => {
+              if let Err(err) = exec_docker(&event, &state).await {
+                log::warn!("event::analyze_docker: {err}")
+              }
+            }
+            Err(err) => {
+              log::warn!("event::analyze_docker: {err}");
+              break;
             }
           }
-          Err(err) => {
-            log::warn!("event::analyze_docker: {err}");
-          }
         }
+      };
+      // Refresh alongside events, retrying only while this stream is alive.
+      // Dropping the pending refresh prevents reconnects from accumulating tasks.
+      pin_mut!(refresh, consume);
+      if let Either::Left(((), consume)) = select(refresh, consume).await {
+        consume.await;
       }
       log::warn!("event::analyze_docker: disconnected trying to reconnect");
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;

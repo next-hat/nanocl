@@ -20,6 +20,16 @@ use crate::{models::SystemStateRef, utils, vars};
 
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
+fn is_process_observation_update(event: &Event) -> bool {
+  event.actor.as_ref().is_some_and(|actor| {
+    actor.kind == EventActorKind::Process
+      && matches!(
+        NativeEventAction::from_str(&event.action),
+        Ok(NativeEventAction::Update)
+      )
+  })
+}
+
 fn cargo_has_committed_start(
   cargo: &nanocld_client::stubs::cargo::CargoInspect,
 ) -> bool {
@@ -94,7 +104,7 @@ async fn update_cargo_rule(
       let resource: ResourcePartial = resource.into();
       let rule = utils::resource::serialize(&resource.data)?;
       if let Err(err) =
-        utils::nginx::add_rule(&resource.name, &rule, state).await
+        utils::resource::refresh_rule(&resource.name, &rule, state).await
       {
         log::warn!("event::update_cargo_rule: {err}");
       }
@@ -142,7 +152,7 @@ async fn update_vm_rule(
       let resource: ResourcePartial = resource.into();
       let rule = utils::resource::serialize(&resource.data)?;
       if let Err(err) =
-        utils::nginx::add_rule(&resource.name, &rule, state).await
+        utils::resource::refresh_rule(&resource.name, &rule, state).await
       {
         log::warn!("event::update_vm_rule: {err}");
       }
@@ -182,6 +192,9 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
+    (EventActorKind::Process, NativeEventAction::Update) => {
+      utils::resource::rebuild_all_rules(state).await
+    }
     (EventActorKind::Cargo, action @ NativeEventAction::Start)
     | (EventActorKind::Cargo, action @ NativeEventAction::Healthy) => {
       let (name, namespace) = get_workload_attributes(&actor.attributes)?;
@@ -284,6 +297,8 @@ async fn r#loop(state: &SystemStateRef) {
         }
         if let Err(err) = utils::resource::rebuild_all_rules(state).await {
           log::warn!("event::loop: initial reconciliation failed: {err}");
+          ntex::time::sleep(RETRY_DELAY).await;
+          continue;
         }
         log::info!("event::loop: subscribed to nanocld events");
         while let Some(event) = stream.next().await {
@@ -296,6 +311,9 @@ async fn r#loop(state: &SystemStateRef) {
           };
           if let Err(err) = on_event(&event, state).await {
             log::warn!("event::loop: {err}");
+            if is_process_observation_update(&event) {
+              break;
+            }
           }
         }
       }

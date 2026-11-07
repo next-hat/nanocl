@@ -20,7 +20,10 @@ use nanocl_stubs::{
   namespace::NamespacePartial,
   process::ProcessPartial,
   resource_key::ResourceKey,
-  system::{ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial},
+  system::{
+    EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
+    ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial,
+  },
 };
 
 use crate::{
@@ -572,6 +575,91 @@ fn stale_process_ids(initial: Vec<String>, observed: &[String]) -> Vec<String> {
     .collect()
 }
 
+/// Refresh existing observations after reconnecting to Docker. This does not
+/// adopt, start, stop, or remove workloads; those remain lifecycle operations.
+pub(crate) async fn refresh_process_observations(
+  state: &SystemState,
+) -> IoResult<()> {
+  let node = state.inner.config.hostname.clone();
+  let local = run_query_owned(&state.inner.pool, (), move |conn| {
+    Ok(
+      processes::table
+        .filter(processes::node_name.eq(&node))
+        .load::<ProcessDb>(conn)
+        .map_err(ProcessDb::map_err)?,
+    )
+  })
+  .await?;
+  for process in local {
+    let instance = match state
+      .inner
+      .docker_api
+      .inspect_container(&process.key, None::<InspectContainerOptions>)
+      .await
+    {
+      Ok(instance) => instance,
+      Err(bollard_next::errors::Error::DockerResponseServerError {
+        status_code: 404,
+        ..
+      }) => continue,
+      Err(error) => {
+        return Err(*error.map_err_context(|| "Refresh process observations"));
+      }
+    };
+    let name = instance
+      .name
+      .as_deref()
+      .map(|name| name.trim_start_matches('/'))
+      .filter(|name| !name.is_empty())
+      .unwrap_or(&process.name)
+      .to_owned();
+    let data = serde_json::to_value(instance)
+      .map_err(|error| error.map_err_context(|| "Process observation"))?;
+    if name == process.name && data == process.data {
+      continue;
+    }
+    // Updating an existing immutable Docker ID cannot recreate a row removed
+    // by a concurrent workload operation.
+    if let Err(error) = ProcessDb::update_pk(
+      &process.key,
+      ProcessUpdateDb {
+        name: Some(name),
+        data: Some(data),
+        updated_at: Some(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+      },
+      &state.inner.pool,
+    )
+    .await
+    {
+      if error.inner.kind() != std::io::ErrorKind::NotFound {
+        return Err(error);
+      }
+    }
+  }
+  Ok(())
+}
+
+/// Let observers re-read the inventory after a startup/reconnect scan. The
+/// daemon publishes facts; each subscriber decides how to update its runtime.
+pub(crate) fn emit_process_sync(state: &SystemState) {
+  state.spawn_emit_event(EventPartial {
+    reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+    reporting_node: state.inner.config.hostname.clone(),
+    kind: EventKind::Normal,
+    action: NativeEventAction::Update.to_string(),
+    reason: "state_sync".to_owned(),
+    note: Some("Local process observations refreshed".to_owned()),
+    actor: Some(EventActor {
+      key: None,
+      kind: EventActorKind::Process,
+      attributes: None,
+    }),
+    related: None,
+    metadata: None,
+  });
+}
+
 /// Rebuild observed process rows and adopt installer/bootstrap Cargoes whose
 /// desired rows do not exist yet.
 pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
@@ -746,6 +834,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     ProcessDb::del_by(&filter, &state.inner.pool).await?;
   }
   log::info!("system::sync_processes: done");
+  emit_process_sync(state);
   Ok(())
 }
 

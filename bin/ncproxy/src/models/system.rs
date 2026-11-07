@@ -1,17 +1,21 @@
-use std::sync::{
-  Arc,
-  atomic::{AtomicU64, Ordering},
+use std::{
+  future::Future,
+  sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+  },
+  time::Duration,
 };
 
 use futures::{SinkExt, StreamExt, channel::mpsc, lock::Mutex};
 use ntex::rt;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
 use crate::utils;
 
-use super::Store;
+use super::{AcceptedRules, Store};
 
 /// Shared state of the program
 #[derive(Clone)]
@@ -22,6 +26,8 @@ pub struct SystemState {
   pub nginx_dir: String,
   /// Serializes every nginx configuration mutation and validation cycle.
   pub config_lock: Arc<Mutex<()>>,
+  /// Serializes accepted callbacks with declaration bootstrap and recovery.
+  pub(crate) accepted_rules: Arc<Mutex<AcceptedRules>>,
   /// Holds both controller admission locks until the process shuts down.
   pub _controller_locks: Option<Arc<(std::fs::File, std::fs::File)>>,
 }
@@ -42,6 +48,31 @@ struct SystemEventInner {
 
 pub struct SystemEvent(SystemEventInner);
 
+async fn reload_loop<F, R>(
+  requested: &AtomicU64,
+  delay: Duration,
+  mut reload: F,
+) -> IoResult<()>
+where
+  F: FnMut() -> R,
+  R: Future<Output = IoResult<()>>,
+{
+  loop {
+    let revision = requested.load(Ordering::Relaxed);
+    ntex::time::sleep(delay).await;
+    if requested.load(Ordering::Relaxed) != revision {
+      continue;
+    }
+    if let Err(err) = reload().await {
+      log::warn!("system: {err}");
+      continue;
+    }
+    if requested.load(Ordering::Relaxed) == revision {
+      return Ok(());
+    }
+  }
+}
+
 impl SystemEvent {
   pub fn new(store: &Store, config_lock: Arc<Mutex<()>>) -> Self {
     Self(SystemEventInner {
@@ -61,24 +92,13 @@ impl SystemEvent {
     let config_lock = Arc::clone(&self.0.config_lock);
     let requested = Arc::clone(&self.0.requested);
     self.0.task = Some(rt::spawn(async move {
-      loop {
-        let revision = requested.load(Ordering::Relaxed);
-        ntex::time::sleep(std::time::Duration::from_millis(750)).await;
-        if requested.load(Ordering::Relaxed) != revision {
-          continue;
-        }
-        {
-          let _guard = config_lock.lock().await;
-          // Once work starts, keep its lock until the bounded reload ends.
-          // Later events request a follow-up instead of cancelling a reload.
-          if let Err(err) = utils::nginx::reload(&store).await {
-            log::warn!("system: {err}");
-          }
-        }
-        if requested.load(Ordering::Relaxed) == revision {
-          return Ok::<_, IoError>(());
-        }
-      }
+      reload_loop(&requested, Duration::from_millis(750), || async {
+        let _guard = config_lock.lock().await;
+        // Once work starts, keep its lock until the bounded reload ends.
+        // Later events request a follow-up instead of cancelling a reload.
+        utils::nginx::reload(&store).await
+      })
+      .await
     }));
   }
 }
@@ -116,7 +136,43 @@ impl EventEmitter {
 
 #[cfg(test)]
 mod tests {
+  use nanocl_error::io::IoError;
+
   use super::*;
+
+  #[ntex::test]
+  async fn failed_reload_retries_without_another_event() {
+    let requested = AtomicU64::new(1);
+    let attempts = std::cell::Cell::new(0);
+    reload_loop(&requested, Duration::ZERO, || {
+      let attempt = attempts.get();
+      attempts.set(attempt + 1);
+      futures::future::ready(if attempt == 0 {
+        Err(IoError::other("Reload", "temporarily unavailable"))
+      } else {
+        Ok(())
+      })
+    })
+    .await
+    .unwrap();
+    assert_eq!(attempts.get(), 2);
+  }
+
+  #[ntex::test]
+  async fn reload_retries_when_a_new_request_arrives_during_reload() {
+    let requested = AtomicU64::new(1);
+    let attempts = std::cell::Cell::new(0);
+    reload_loop(&requested, Duration::ZERO, || {
+      if attempts.get() == 0 {
+        requested.fetch_add(1, Ordering::Relaxed);
+      }
+      attempts.set(attempts.get() + 1);
+      futures::future::ready(Ok(()))
+    })
+    .await
+    .unwrap();
+    assert_eq!(attempts.get(), 2);
+  }
 
   #[ntex::test]
   async fn reload_events_preserve_an_active_task_and_record_follow_up() {

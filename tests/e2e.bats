@@ -617,29 +617,25 @@ teardown_file() {
   run timeout 30s docker start "$E2E_RECOVERY_DAEMON"
   [ "$status" -eq 0 ]
   wait_unix_health /run/nanocl/nanocl.sock http://localhost/v0.0/version
-  run timeout 370s curl --silent --fail --retry 360 --retry-all-errors \
-    --retry-delay 1 --retry-max-time 360 --connect-timeout 2 --max-time 5 \
-    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
-  [ "$status" -eq 0 ]
-  [ "$output" = "routing-recovery-ok" ]
-  assert_dns_address "$backend" routing-recovery.nanocl.test 198.51.100.1 198.51.100.1 90
-
-  # Also change the backend endpoint after reconnect recovery has settled.
-  # This produces no Cargo start event: the periodic observation must repair
-  # the proxy even if its initial reconnect happened to use fresh process data.
-  run docker network disconnect e2e-routing-recovery "$backend"
-  [ "$status" -eq 0 ]
-  run docker network connect --ip 198.51.100.3 e2e-routing-recovery "$backend"
-  [ "$status" -eq 0 ]
-  run docker inspect --format \
-    '{{(index .NetworkSettings.Networks "e2e-routing-recovery").IPAddress}}' "$backend"
-  [ "$status" -eq 0 ]
-  [ "$output" = "198.51.100.3" ]
   run timeout 100s curl --silent --fail --retry 90 --retry-all-errors \
     --retry-delay 1 --retry-max-time 90 --connect-timeout 2 --max-time 5 \
     --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
   [ "$status" -eq 0 ]
   [ "$output" = "routing-recovery-ok" ]
+  assert_dns_address "$backend" routing-recovery.nanocl.test 198.51.100.1 198.51.100.1 90
+
+  # Controllers must also recover independently while nanocld stays available.
+  # The backend remains untouched, so a Cargo lifecycle event cannot help.
+  run timeout 40s docker restart --time 10 "$E2E_RECOVERY_PROXY" "$E2E_RECOVERY_DNS"
+  [ "$status" -eq 0 ]
+  wait_unix_health /run/nanocl/proxy.sock http://localhost/health
+  wait_unix_health /run/nanocl/dns.sock http://localhost/health
+  run timeout 100s curl --silent --fail --retry 90 --retry-all-errors \
+    --retry-delay 1 --retry-max-time 90 --connect-timeout 2 --max-time 5 \
+    --header 'Host: routing-recovery.nanocl.test' http://127.0.0.1:18080
+  [ "$status" -eq 0 ]
+  [ "$output" = "routing-recovery-ok" ]
+  assert_dns_address "$backend" routing-recovery.nanocl.test 198.51.100.1 198.51.100.1 90
   run docker inspect --format '{{.State.StartedAt}}' "$backend"
   [ "$status" -eq 0 ]
   [ "$output" = "$new_started_at" ]

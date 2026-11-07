@@ -26,12 +26,15 @@ pub(crate) async fn apply_rule(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
+  let mut rules = state.rules.lock().await;
+  let rule = payload.into_inner();
   log::debug!("rule::apply: resolving {}", path.1);
-  let scope = utils::resolve_rule(&payload, &state.client).await?;
+  let scope = utils::resolve_rule(&rule, &state.client).await?;
   log::debug!("rule::apply: applying {}", path.1);
   state.dnsmasq.apply_rule(&path.1, scope).await?;
+  rules.applied(path.1.clone(), rule.clone());
   log::debug!("rule::apply: applied {}", path.1);
-  Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
+  Ok(web::HttpResponse::Ok().json(&rule))
 }
 
 /// Delete a DnsRule
@@ -51,10 +54,15 @@ pub(crate) async fn remove_rule(
   _request_state: (),
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
-  // Nanocld invokes the controller before deleting the persisted resource.
-  state.client.inspect_resource(&path.1).await?;
+  let mut rules = state.rules.lock().await;
+  // A compensating DELETE can precede publication of an accepted CREATE.
+  // Preserve the unknown-rule check when this process has no declaration.
+  if !rules.declarations.contains_key(&path.1) {
+    state.client.inspect_resource(&path.1).await?;
+  }
   log::debug!("rule::remove: removing {}", path.1);
   state.dnsmasq.remove_rule(&path.1).await?;
+  rules.removed(&path.1);
   log::debug!("rule::remove: removed {}", path.1);
   Ok(web::HttpResponse::Ok().build())
 }
