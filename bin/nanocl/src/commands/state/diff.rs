@@ -500,6 +500,7 @@ mod tests {
     StateDiffOpts {
       source: None,
       json: false,
+      summary: false,
       pager: false,
       no_pager: false,
       reload: false,

@@ -135,6 +135,95 @@ impl StateDiff {
     writer.flush()?;
     Ok(())
   }
+
+  /// Summarize the planned actions, including updates with no displayable diff.
+  /// Only object identity and planner reasons are shown; configuration values
+  /// and sensitive field paths remain outside this view.
+  pub(crate) fn write_summary_to(
+    &self,
+    writer: &mut impl Write,
+    width: usize,
+  ) -> IoResult<()> {
+    use super::print::wrap_lines;
+
+    for item in &self.items {
+      let action = match item.action {
+        StateDiffAction::Create => "create",
+        StateDiffAction::Update => "update",
+        StateDiffAction::Unchanged => "unchanged",
+        StateDiffAction::Remove => "remove",
+      };
+      let line = format!(
+        "{action:<9} {}/{}{}",
+        summary_text(&item.kind),
+        summary_text(&item.name),
+        if item.orphan { " (orphan)" } else { "" },
+      );
+      if dialoguer::console::measure_text_width(&line) <= width {
+        writeln!(writer, "{line}")?;
+      } else {
+        writeln!(writer, "{}", wrap_lines(&line, width, 0))?;
+      }
+      if let Some(reason) = &item.reason {
+        // The row already identifies orphans; retain the useful explanation.
+        let reason = if item.orphan {
+          reason.strip_prefix("orphan ").unwrap_or(reason)
+        } else {
+          reason
+        };
+        writeln!(writer, "{}", wrap_lines(&summary_text(reason), width, 2))?;
+      }
+    }
+    let summary = &self.summary;
+    let message = if summary.created + summary.updated + summary.removed == 0 {
+      if summary.unchanged == 0 {
+        "No changes.".to_owned()
+      } else {
+        format!("No changes. {} unchanged.", summary.unchanged)
+      }
+    } else {
+      let counts = [
+        (summary.created, "create"),
+        (summary.updated, "update"),
+        (summary.removed, "remove"),
+        (summary.unchanged, "unchanged"),
+      ]
+      .into_iter()
+      .filter(|(count, _)| *count > 0)
+      .map(|(count, action)| format!("{count} {action}"))
+      .collect::<Vec<_>>()
+      .join(", ");
+      format!("Plan: {counts}")
+    };
+    if !self.items.is_empty() {
+      writeln!(writer)?;
+    }
+    writeln!(writer, "{}", wrap_lines(&message, width, 0))?;
+    if summary.orphans > 0 {
+      writeln!(
+        writer,
+        "{}",
+        wrap_lines(&format!("Orphans: {}", summary.orphans), width, 0)
+      )?;
+    }
+    writer.flush()?;
+    Ok(())
+  }
+}
+
+fn summary_text(value: &str) -> String {
+  value
+    .chars()
+    .map(|ch| {
+      if ch.is_control()
+        || matches!(ch, '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+      {
+        ch.escape_debug().to_string()
+      } else {
+        ch.to_string()
+      }
+    })
+    .collect()
 }
 
 /// Keep useful image / Statefile references without credentials, signed query
@@ -485,9 +574,161 @@ fn push_change(
 mod tests {
   use std::io;
 
+  use nanocld_client::stubs::cargo_spec::{CargoSpec, Config, ContainerSpec};
   use serde_json::json;
 
   use super::*;
+
+  fn cargo_comparison_fixture() -> CargoSpec {
+    let container = |name: &str| ContainerSpec {
+      name: name.into(),
+      essential: true,
+      secrets: Vec::new(),
+      image_pull_secret: None,
+      image_pull_policy: Default::default(),
+      container_config: Config {
+        image: Some("alpine:latest".into()),
+        exposed_ports: Some(vec!["9000/tcp".into(), "8080/tcp".into()]),
+        volumes: Some(vec!["/logs".into(), "/data".into()]),
+        env: Some(vec!["A=1".into(), "B=2".into()]),
+        cmd: Some(vec!["first".into(), "second".into()]),
+        ..Default::default()
+      },
+    };
+    CargoSpec {
+      name: "app".into(),
+      init_containers: vec![container("prepare"), container("migrate")],
+      containers: vec![container("api"), container("worker")],
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn cargo_state_diff_ignores_native_map_key_order_without_mutating_inputs() {
+    let current = cargo_comparison_fixture();
+    let mut desired = current.clone();
+    for container in desired
+      .init_containers
+      .iter_mut()
+      .chain(&mut desired.containers)
+    {
+      container
+        .container_config
+        .exposed_ports
+        .as_mut()
+        .unwrap()
+        .reverse();
+      container
+        .container_config
+        .volumes
+        .as_mut()
+        .unwrap()
+        .reverse();
+    }
+    let before = serde_json::to_value(&current).unwrap();
+    let after = serde_json::to_value(&desired).unwrap();
+    assert_ne!(current, desired);
+    // Native Config vectors serialize as Docker maps. JSON comparisons already
+    // ignore their insertion order, matching apply's native comparison.
+    assert_eq!(before, after);
+    for field in ["InitContainers", "Containers"] {
+      assert!(before[field][0]["ExposedPorts"].is_object());
+      assert!(before[field][0]["Volumes"].is_object());
+    }
+    for reload in [false, true] {
+      let diff = diff_item(
+        "Statefile.yml",
+        "cargo",
+        "global.app",
+        Some(&before),
+        Some(&after),
+        reload,
+        false,
+        reload.then_some("apply --reload forces an update"),
+      );
+      assert_eq!(
+        diff.action,
+        if reload {
+          StateDiffAction::Update
+        } else {
+          StateDiffAction::Unchanged
+        }
+      );
+      assert!(diff.changes.is_empty());
+      let report = StateDiff::new(vec![diff]);
+      assert_eq!(report.summary.updated, usize::from(reload));
+      assert_eq!(report.summary.unchanged, usize::from(!reload));
+      let mut text = Vec::new();
+      report.write_to(&mut text, false).unwrap();
+      assert!(text.is_empty());
+      let mut summary = Vec::new();
+      report.write_summary_to(&mut summary, 80).unwrap();
+      let summary = String::from_utf8(summary).unwrap();
+      assert_eq!(summary.contains("No changes."), !reload);
+    }
+    assert_eq!(before, serde_json::to_value(&current).unwrap());
+    assert_eq!(after, serde_json::to_value(&desired).unwrap());
+  }
+
+  #[test]
+  fn cargo_state_diff_preserves_real_map_key_and_ordered_field_changes() {
+    let current = cargo_comparison_fixture();
+    let before = serde_json::to_value(&current).unwrap();
+    for init in [false, true] {
+      for field in ["ExposedPorts", "Volumes", "Env", "Cmd", "Containers"] {
+        let mut desired = current.clone();
+        let containers = if init {
+          &mut desired.init_containers
+        } else {
+          &mut desired.containers
+        };
+        let config = &mut containers.first_mut().unwrap().container_config;
+        match field {
+          "ExposedPorts" => {
+            config.exposed_ports.as_mut().unwrap().pop();
+          }
+          "Volumes" => {
+            config.volumes.as_mut().unwrap().pop();
+          }
+          "Env" => config.env.as_mut().unwrap().reverse(),
+          "Cmd" => config.cmd.as_mut().unwrap().reverse(),
+          _ => containers.reverse(),
+        }
+        let after = serde_json::to_value(&desired).unwrap();
+        let diff = diff_item(
+          "Statefile.yml",
+          "cargo",
+          "global.app",
+          Some(&before),
+          Some(&after),
+          false,
+          false,
+          None,
+        );
+        assert_eq!(diff.action, StateDiffAction::Update, "init={init} {field}");
+        assert!(!diff.changes.is_empty(), "init={init} {field}");
+        assert_eq!(after, serde_json::to_value(&desired).unwrap());
+      }
+    }
+    // Similarly named fields in metadata are user data, not Docker map keys.
+    let mut desired = before.clone();
+    desired["Metadata"] =
+      json!({"Containers": [{"Volumes": ["/data", "/logs"]}]});
+    let mut current = desired.clone();
+    current["Metadata"]["Containers"][0]["Volumes"] = json!(["/logs", "/data"]);
+    let diff = diff_item(
+      "Statefile.yml",
+      "cargo",
+      "global.app",
+      Some(&current),
+      Some(&desired),
+      false,
+      false,
+      None,
+    );
+    assert_eq!(diff.action, StateDiffAction::Update);
+    assert!(!diff.changes.is_empty());
+  }
 
   #[test]
   fn vm_state_diff_ignores_omitted_allocated_identity_and_preserved_options() {
@@ -990,6 +1231,156 @@ mod tests {
     assert!(json["items"][0].get("after").is_none());
   }
 
+  fn summary(report: &StateDiff, width: usize) -> String {
+    let mut output = Vec::new();
+    report.write_summary_to(&mut output, width).unwrap();
+    String::from_utf8(output).unwrap()
+  }
+
+  #[test]
+  fn summary_reports_actual_plan_including_hidden_and_forced_updates() {
+    let before = json!({"Data": {"password": "secret-before"}});
+    let after = json!({"Data": {"password": "secret-after"}});
+    let config = json!({"Replicas": 1});
+    let report = StateDiff::new(vec![
+      diff_item(
+        "state.yml",
+        "cargo",
+        "global.new",
+        None,
+        Some(&config),
+        false,
+        false,
+        None,
+      ),
+      diff_item(
+        "state.yml",
+        "secret",
+        "credentials",
+        Some(&before),
+        Some(&after),
+        false,
+        false,
+        None,
+      ),
+      diff_item(
+        "state.yml",
+        "cargo",
+        "global.reload",
+        Some(&config),
+        Some(&config),
+        true,
+        false,
+        Some("apply --reload forces an update"),
+      ),
+      diff_item(
+        "state.yml",
+        "job",
+        "backup",
+        Some(&config),
+        Some(&config),
+        false,
+        true,
+        Some("orphan retained: apply does not prune jobs"),
+      ),
+      diff_item(
+        "state.yml",
+        "cargo",
+        "global.old",
+        Some(&config),
+        None,
+        false,
+        true,
+        Some("orphan removed by apply --remove-orphans"),
+      ),
+    ]);
+    let output = summary(&report, 80);
+    let rows = [
+      "create    cargo/global.new",
+      "update    secret/credentials",
+      "update    cargo/global.reload",
+      "unchanged job/backup (orphan)",
+      "remove    cargo/global.old (orphan)",
+    ];
+    let mut previous = 0;
+    for row in rows {
+      // The action column reserves nine characters, followed by one separator.
+      let (action, identity) = row.split_once(' ').unwrap();
+      let row = format!("{action:<9} {}", identity.trim_start());
+      let position = output
+        .find(&row)
+        .unwrap_or_else(|| panic!("missing {row}: {output}"));
+      assert!(position >= previous, "apply order must be preserved");
+      previous = position;
+    }
+    assert!(output.contains("apply --reload forces an update"));
+    assert!(output.contains("retained: apply does not prune jobs"));
+    assert!(output.contains("removed by apply --remove-orphans"));
+    assert!(output.contains("Plan: 1 create, 2 update, 1 remove, 1 unchanged"));
+    assert!(output.contains("Orphans: 2"));
+    for hidden in [
+      "secret-before",
+      "secret-after",
+      "password",
+      "Replicas",
+      "Data",
+    ] {
+      assert!(!output.contains(hidden), "{output}");
+    }
+    assert!(!output.contains("No changes"));
+  }
+
+  #[test]
+  fn summary_explicitly_reports_empty_and_unchanged_plans() {
+    assert_eq!(summary(&StateDiff::new(vec![]), 80), "No changes.\n");
+    let config = json!({"Replicas": 1});
+    let report = StateDiff::new(vec![diff_item(
+      "state.yml",
+      "cargo",
+      "global.web",
+      Some(&config),
+      Some(&config),
+      false,
+      false,
+      None,
+    )]);
+    let output = summary(&report, 80);
+    assert!(output.contains("unchanged cargo/global.web"));
+    assert!(output.ends_with("No changes. 1 unchanged.\n"));
+  }
+
+  #[test]
+  fn summary_wraps_long_unicode_names_and_escapes_terminal_controls() {
+    let name = format!("global.{}\n\u{1b}[2J\u{202e}", "界".repeat(45));
+    let config = json!({"Replicas": 1});
+    let report = StateDiff::new(vec![diff_item(
+      "state.yml",
+      "cargo",
+      &name,
+      None,
+      Some(&config),
+      false,
+      true,
+      Some("orphan retained: section omitted from Statefile"),
+    )]);
+    for width in [20, 40, 80, 100] {
+      let output = summary(&report, width);
+      assert!(
+        output
+          .lines()
+          .all(|line| dialoguer::console::measure_text_width(line) <= width),
+        "{output}"
+      );
+      let unwrapped = output.split_whitespace().collect::<String>();
+      assert!(
+        unwrapped.contains(&summary_text(&name)),
+        "names must not be truncated"
+      );
+      assert!(!output.contains('\u{1b}'));
+      assert!(!output.contains('\u{202e}'));
+    }
+  }
+
   #[test]
   fn resource_port_change_is_visible_with_yaml_context_and_no_boilerplate() {
     let before = json!({"Name": "deploy-example.com", "Kind": "ncproxy.io/rule", "Data": {
@@ -1110,6 +1501,12 @@ mod tests {
           .unwrap_err();
         assert_eq!(error.inner.kind(), io::ErrorKind::BrokenPipe);
       }
+    }
+    for fail_on_flush in [false, true] {
+      let error = report
+        .write_summary_to(&mut FailingWriter { fail_on_flush }, 80)
+        .unwrap_err();
+      assert_eq!(error.inner.kind(), io::ErrorKind::BrokenPipe);
     }
   }
 }

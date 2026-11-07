@@ -6,6 +6,7 @@ use std::{
   time::Duration,
 };
 
+use dialoguer::console::measure_text_width;
 use futures::{StreamExt, stream};
 use nanocl_error::{
   http_client::HttpClientError,
@@ -15,11 +16,18 @@ use nanocld_client::stubs::{
   process::{ProcessStats, ProcessStatsQuery},
   statefile::Statefile,
 };
+use tabled::{
+  Table,
+  settings::{Alignment, Modify, Padding, Style, object::Segment},
+};
 
 use crate::{
   config::CliConfig,
-  models::{ProcessStatsRow, StateRef, StateStatsOpts},
-  utils::{print::render_table, process::resource_key},
+  models::{ProcessStatsCompactRow, ProcessStatsRow, StateRef, StateStatsOpts},
+  utils::{
+    print::{render_table, terminal_width, wrap_lines},
+    process::resource_key,
+  },
 };
 
 use super::{
@@ -71,23 +79,81 @@ fn targets(
   Ok(targets)
 }
 
+fn render_stats(
+  stats: &BTreeMap<String, ProcessStats>,
+  wide: bool,
+  width: usize,
+) -> String {
+  if stats.is_empty() {
+    return if wide {
+      "No process stats available.".into()
+    } else {
+      wrap_lines("No process stats available.", width, 0)
+    };
+  }
+  let rows = stats.values().cloned().map(ProcessStatsRow::from);
+  if wide {
+    return render_table(rows);
+  }
+  let rows = rows
+    .map(ProcessStatsCompactRow::from)
+    .map(|mut row| {
+      // Avoid control sequences in process names changing a watch display.
+      row.process = row
+        .process
+        .chars()
+        .map(|ch| if ch.is_control() { ' ' } else { ch })
+        .collect();
+      row
+    })
+    .collect::<Vec<_>>();
+  let table = Table::new(&rows)
+    .with(Style::empty())
+    .with(
+      Modify::new(Segment::all())
+        .with(Padding::new(0, 2, 0, 0))
+        .with(Alignment::left()),
+    )
+    .to_string();
+  let table = table
+    .lines()
+    .map(str::trim_end)
+    .collect::<Vec<_>>()
+    .join("\n");
+  if table.lines().all(|line| measure_text_width(line) <= width) {
+    return table;
+  }
+  // Long identities stay complete, without making every other row wider.
+  rows
+    .iter()
+    .map(|row| {
+      format!(
+        "{}\n{}",
+        wrap_lines(&row.process, width, 0),
+        wrap_lines(
+          &format!(
+            "CPU {}  MEM {}  MEM% {}",
+            row.cpu, row.memory, row.memory_percent
+          ),
+          width,
+          2,
+        ),
+      )
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
 fn print_stats(
   stats: &BTreeMap<String, ProcessStats>,
   clear: bool,
+  wide: bool,
 ) -> IoResult<()> {
   let mut stdout = io::stdout().lock();
   if clear {
     stdout.write_all(b"\x1b[2J\x1b[H")?;
   }
-  if stats.is_empty() {
-    writeln!(stdout, "No process stats available.")?;
-  } else {
-    writeln!(
-      stdout,
-      "{}",
-      render_table(stats.values().cloned().map(ProcessStatsRow::from))
-    )?;
-  }
+  writeln!(stdout, "{}", render_stats(stats, wide, terminal_width()))?;
   stdout.flush()?;
   Ok(())
 }
@@ -156,7 +222,7 @@ pub(super) async fn exec_state_stats(
       Ok(sample) => {
         stats.insert(sample.name.clone(), sample);
         if !opts.no_stream {
-          print_stats(&stats, clear)?;
+          print_stats(&stats, clear, opts.wide)?;
         }
       }
       Err(err) => {
@@ -166,7 +232,7 @@ pub(super) async fn exec_state_stats(
     }
   }
   if opts.no_stream || stats.is_empty() {
-    print_stats(&stats, false)?;
+    print_stats(&stats, false, opts.wide)?;
   }
   if read_failed {
     return Err(IoError::other("State stats", "some stats reads failed"));
@@ -236,5 +302,71 @@ mod tests {
     let mut state = state_ref(None);
     state.data.cargoes.as_mut().unwrap()[0].name = "invalid.name".into();
     assert!(targets(&[state]).is_err());
+  }
+
+  fn samples(name: &str) -> BTreeMap<String, ProcessStats> {
+    BTreeMap::from([(
+      name.to_owned(),
+      ProcessStats {
+        name: name.to_owned(),
+        stats: serde_json::from_value(serde_json::json!({
+          "cpu_stats": {"cpu_usage": {"total_usage": 200}, "system_cpu_usage": 1200, "online_cpus": 2},
+          "precpu_stats": {"cpu_usage": {"total_usage": 100}, "system_cpu_usage": 1000},
+          "memory_stats": {"usage": 805306368_u64, "limit": 1073741824_u64, "stats": {"cache": 268435456_u64}},
+          "pids_stats": {"current": 4}
+        }))
+        .unwrap(),
+      },
+    )])
+  }
+
+  #[test]
+  fn stats_compact_and_wide_preserve_usage_with_optional_details() {
+    let stats = samples("production.web.r0.app.c");
+    let compact = render_stats(&stats, false, 80);
+    for expected in [
+      "PROCESS", "CPU", "MEM", "MEM%", "100.00%", "512.0MiB", "50.00%",
+    ] {
+      assert!(compact.contains(expected), "missing {expected}");
+    }
+    for hidden in ["LIMIT", "1.00GiB", "NET I/O", "BLOCK I/O", "PIDS"] {
+      assert!(!compact.contains(hidden), "unexpected {hidden}");
+    }
+    assert!(compact.lines().all(|line| measure_text_width(line) <= 80));
+    let wide = render_stats(&stats, true, 80);
+    for expected in [
+      "MEM USAGE / LIMIT",
+      "1.00GiB",
+      "NET I/O",
+      "BLOCK I/O",
+      "PIDS",
+    ] {
+      assert!(wide.contains(expected), "missing {expected}");
+    }
+    assert!(wide.contains("production.web.r0.app.c"));
+  }
+
+  #[test]
+  fn stats_narrow_output_preserves_full_ascii_and_unicode_process_names() {
+    for name in [
+      format!("production.{}.r0.app.c", "long-name-".repeat(12)),
+      format!("production.{}.r0.app.c", "服务".repeat(40)),
+    ] {
+      for width in [20, 40, 80, 100] {
+        let output = render_stats(&samples(&name), false, width);
+        assert!(
+          output.lines().all(|line| measure_text_width(line) <= width),
+          "output exceeded {width} columns: {output}",
+        );
+        let identity = output
+          .lines()
+          .take_while(|line| !line.starts_with("  "))
+          .collect::<String>();
+        assert_eq!(identity, name);
+        assert!(output.contains("512.0MiB"));
+        assert!(output.contains("100.00%"));
+        assert!(output.contains("50.00%"));
+      }
+    }
   }
 }

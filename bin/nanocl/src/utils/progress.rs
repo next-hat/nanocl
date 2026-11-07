@@ -146,7 +146,7 @@ pub(crate) fn create_state_item(
   let pg = progress.insert_before(summary, ProgressBar::new_spinner());
   pg.set_style(
     ProgressStyle::with_template(
-      "  {spinner:.cyan} {prefix:<48.bold}  {msg:<10} [{elapsed_precise:.dim}]",
+      "  {spinner:.cyan} {prefix:.bold}  {msg} [{elapsed_precise:.dim}]",
     )
     .unwrap(),
   );
@@ -192,9 +192,9 @@ pub(crate) fn finish_state_item(
   output: Option<&StateOutput>,
 ) -> IoResult<()> {
   let template = if failed {
-    "    {prefix:<48.bold}  {msg:<10.red} [{elapsed_precise:.dim}]"
+    "    {prefix:.bold}  {msg:.red} [{elapsed_precise:.dim}]"
   } else {
-    "    {prefix:<48.bold}  {msg:<10.green} [{elapsed_precise:.dim}]"
+    "    {prefix:.bold}  {msg:.green} [{elapsed_precise:.dim}]"
   };
   pg.set_style(ProgressStyle::with_template(template).unwrap());
   pg.finish_with_message(status.to_owned());
