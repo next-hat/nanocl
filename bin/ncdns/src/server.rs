@@ -2,20 +2,15 @@ use ntex::web;
 
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_utils::ntex::middlewares;
-use nanocld_client::NanocldClient;
 
+use crate::models::SystemState;
 use crate::services;
-use crate::{dnsmasq::Dnsmasq, models::SystemState};
 
 pub fn generate(
   host: &str,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
+  state: &SystemState,
 ) -> IoResult<ntex::server::Server> {
-  let state = SystemState {
-    dnsmasq: dnsmasq.clone(),
-    client: client.clone(),
-  };
+  let state = state.clone();
   let mut server = web::server_with_config(
     async move || Ok::<_, std::io::Error>(state.clone()),
     async |_| {
@@ -57,7 +52,7 @@ mod tests {
   use super::*;
   use crate::dnsmasq::Dnsmasq;
   use nanocl_error::io::IoResult;
-  use nanocld_client::ConnectOpts;
+  use nanocld_client::{ConnectOpts, NanocldClient};
 
   #[ntex::test]
   async fn generate_unix_and_tcp() -> IoResult<()> {
@@ -66,9 +61,10 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
+    let state = SystemState::new(dnsmasq, client);
+    let server = generate("unix:///tmp/ncdns.sock", &state)?;
     server.stop(true).await;
-    let server = generate("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
+    let server = generate("tcp://0.0.0.0:9987", &state)?;
     server.stop(true).await;
     Ok(())
   }
@@ -80,7 +76,8 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     })?;
-    let server = generate("wrong://dsadsa", &dnsmasq, &client);
+    let state = SystemState::new(dnsmasq, client);
+    let server = generate("wrong://dsadsa", &state);
     assert!(server.is_err());
     Ok(())
   }

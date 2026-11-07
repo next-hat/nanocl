@@ -16,6 +16,7 @@ use nanocld_client::NanocldClient;
 
 use cli::Cli;
 use dnsmasq::Dnsmasq;
+use models::SystemState;
 
 async fn run(cli: &Cli) -> IoResult<()> {
   let dnsmasq = Dnsmasq::new(&cli.state_dir)
@@ -31,10 +32,11 @@ async fn run(cli: &Cli) -> IoResult<()> {
   };
   #[cfg(not(any(feature = "dev", feature = "test")))]
   let client = NanocldClient::connect_with_unix_default();
+  let state = SystemState::new(dnsmasq, client);
   // Do not block socket binding on nanocld availability.
-  event::spawn(&client);
-  let server = server::generate(&cli.host, &dnsmasq, &client)?;
-  dnsmasq.spawn();
+  let server = server::generate(&cli.host, &state)?;
+  event::spawn(&state);
+  state.dnsmasq.spawn();
   server.await?;
   Ok(())
 }

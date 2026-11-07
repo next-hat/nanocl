@@ -28,13 +28,29 @@ fn workload_target_key(
 pub(crate) async fn list_all(
   client: &NanocldClient,
 ) -> IoResult<Vec<Resource>> {
-  let filter = GenericFilter::new()
-    .limit(10_000)
-    .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
-  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list ncproxy resources from nanocld")
-  })?;
-  Ok(resources)
+  const PAGE_SIZE: usize = 100;
+  let mut resources = Vec::new();
+  let mut last_key = None;
+  loop {
+    let mut filter = GenericFilter::new()
+      .limit(PAGE_SIZE)
+      .r#where("kind", GenericClause::Eq(vars::RULE_KEY.to_owned()));
+    filter.order_by = Some(vec!["key asc".to_owned()]);
+    if let Some(key) = last_key {
+      filter = filter.r#where("key", GenericClause::Gt(key));
+    }
+    let page = client.list_resource(Some(&filter)).await.map_err(|err| {
+      err.map_err_context(|| "Unable to list ncproxy resources from nanocld")
+    })?;
+    let count = page.len();
+    last_key = page
+      .last()
+      .map(|resource| resource.spec.resource_key.clone());
+    resources.extend(page);
+    if count < PAGE_SIZE {
+      return Ok(resources);
+    }
+  }
 }
 
 pub async fn list_by_secret(
@@ -142,7 +158,7 @@ pub(crate) async fn update_rules(
     .map(|resource| async move {
       let resource: ResourcePartial = resource.clone().into();
       let rule = serialize(&resource.data)?;
-      super::nginx::add_rule(&resource.name, &rule, state).await?;
+      refresh_rule(&resource.name, &rule, state).await?;
       Ok::<_, IoError>(())
     })
     .collect::<FuturesUnordered<_>>()
@@ -153,24 +169,49 @@ pub(crate) async fn update_rules(
   Ok(())
 }
 
-/// Rebuild the complete generated configuration from committed nanocld state.
-///
-/// The nginx layer clears the managed directories transactionally, which also
-/// removes resources deleted while this controller was offline.
+pub(crate) async fn refresh_rule(
+  name: &str,
+  rule: &ResourceProxyRule,
+  state: &SystemStateRef,
+) -> IoResult<()> {
+  loop {
+    let (generation, current) = {
+      let accepted = state.accepted_rules.lock().await;
+      (accepted.generation, accepted.resolve(name, rule))
+    };
+    let Some(current) = current else {
+      return Ok(());
+    };
+    if super::nginx::add_rule_if_current(name, &current, generation, state)
+      .await?
+    {
+      return Ok(());
+    }
+  }
+}
+
+/// Bootstrap persisted declarations once, then resolve the declarations this
+/// controller has accepted. Callbacks precede database publication, so a fresh
+/// database snapshot on reconnect could undo an already accepted update.
 pub(crate) async fn rebuild_all_rules(state: &SystemStateRef) -> IoResult<()> {
-  let resources = list_all(&state.client).await?;
-  let mut rules = resources
-    .into_iter()
-    .map(|resource| {
-      let resource: ResourcePartial = resource.into();
-      let rule = serialize(&resource.data)?;
-      Ok::<_, IoError>((resource.name, rule))
-    })
-    .collect::<IoResult<Vec<_>>>()?;
-  rules.sort_by(|left, right| left.0.cmp(&right.0));
-  super::nginx::rebuild_rules(&rules, state).await?;
-  state.event_emitter.emit_reload().await;
-  Ok(())
+  let needs_bootstrap = !state.accepted_rules.lock().await.initialized;
+  if needs_bootstrap {
+    let resources = list_all(&state.client).await?;
+    let rules = resources
+      .into_iter()
+      .map(|resource| {
+        let resource: ResourcePartial = resource.into();
+        let rule = serialize(&resource.data)?;
+        Ok::<_, IoError>((resource.name, rule))
+      })
+      .collect::<IoResult<Vec<_>>>()?;
+    state.accepted_rules.lock().await.initialize(rules);
+  }
+  let (generation, rules) = {
+    let accepted = state.accepted_rules.lock().await;
+    (accepted.generation, accepted.snapshot())
+  };
+  super::nginx::rebuild_rules(&rules, generation, state).await
 }
 
 #[cfg(test)]

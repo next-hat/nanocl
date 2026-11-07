@@ -11,15 +11,17 @@ stats - Show process statistics for workloads from a Statefile
 
 ## SYNOPSIS
 
-**stats** \[**-s**\|**--source** *SOURCE*\] \[**--no-stream**\]
+**stats** \[**-s**\|**--source** *SOURCE*\] \[**--no-stream**\] \[**--wide**\]
 \[**-h**\|**--help**\] \[**--** *ARGS*\]
 
 ## DESCRIPTION
 
 Show statistics for the processes of cargoes, virtual machines, and jobs
-declared in a Statefile. The combined table includes CPU %, MEM USAGE / LIMIT,
-MEM %, NET I/O, BLOCK I/O, and PIDS. Resources, secrets, and namespace
-declarations have no process statistics and are skipped.
+declared in a Statefile. The compact table shows PROCESS, CPU, MEM usage, and
+MEM%. Process names remain complete; narrow terminals use wrapped per-process
+lines when the table would overflow. With --wide, include memory limits,
+network I/O, block I/O, and PIDS in the full table. Resources, secrets, and
+namespace declarations have no process statistics and are skipped.
 
 The Statefile and its recursive SubStates are rendered once with the supplied
 template arguments. Stats reads the resulting declarations without applying
@@ -47,6 +49,10 @@ Path or URL to the Statefile. Uses the same default source lookup as state apply
 **--no-stream**\
 Disable streaming and print one combined snapshot.
 
+**--wide**\
+Show the full statistics table, including memory limits, network I/O, block
+I/O, and PIDS. Columns are not constrained to terminal width.
+
 **-h**, **--help**\
 Print help
 
@@ -58,5 +64,6 @@ Additional arguments to pass to the Statefile template
 ```sh
 nanocl state stats -s Statefile.yml
 nanocl state stats -s Statefile.yml --no-stream
+nanocl state stats -s Statefile.yml --no-stream --wide
 nanocl state stats -s Statefile.yml --no-stream -- --name example
 ```

@@ -110,6 +110,60 @@ impl RepositoryReadByTransform for ProcessDb {
 }
 
 impl ProcessDb {
+  /// Apply an inspected observation only while its source snapshot is current.
+  /// A concurrent event/update or deletion must win over an older inspection.
+  pub(crate) async fn update_observation_if_current(
+    &self,
+    name: String,
+    data: serde_json::Value,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let snapshot = self.clone();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let changed = diesel::update(
+        processes::table
+          .find(&snapshot.key)
+          .filter(processes::created_at.eq(snapshot.created_at))
+          .filter(processes::updated_at.eq(snapshot.updated_at))
+          .filter(processes::name.eq(&snapshot.name))
+          .filter(processes::data.eq(&snapshot.data)),
+      )
+      .set(ProcessUpdateDb {
+        name: Some(name),
+        data: Some(data),
+        updated_at: Some(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+      })
+      .execute(conn)
+      .map_err(Self::map_err)?;
+      Ok(changed == 1)
+    })
+    .await
+  }
+
+  /// Forget a container confirmed absent by Docker only if its observation has
+  /// not changed since the inspection began. Desired workload rows stay intact.
+  pub(crate) async fn delete_observation_if_current(
+    &self,
+    pool: &Pool,
+  ) -> IoResult<bool> {
+    let snapshot = self.clone();
+    super::operation::run_query_owned(pool, (), move |conn| {
+      let removed = diesel::delete(
+        processes::table
+          .find(&snapshot.key)
+          .filter(processes::created_at.eq(snapshot.created_at))
+          .filter(processes::updated_at.eq(snapshot.updated_at))
+          .filter(processes::name.eq(&snapshot.name))
+          .filter(processes::data.eq(&snapshot.data)),
+      )
+      .execute(conn)
+      .map_err(Self::map_err)?;
+      Ok(removed == 1)
+    })
+    .await
+  }
+
   fn belongs_to_operation(&self, owner: &OperationOwner) -> bool {
     // ProcessKind's stored spelling differs from the resource kind used by
     // operations. Keep this conversion exact instead of accepting arbitrary case.
@@ -428,6 +482,128 @@ mod tests {
   };
 
   fn no_routes(_: &mut ntex::web::ServiceConfig<SystemState>) {}
+
+  #[ntex::test]
+  async fn observation_refresh_preserves_newer_updates_and_deleted_processes() {
+    let system = gen_test_system(no_routes, vars::VERSION).await;
+    let state = &system.state;
+    let pool = &state.inner.pool;
+    NodeDb::register(state).await.unwrap();
+    let key = uuid::Uuid::new_v4().to_string();
+    let mut snapshot = ProcessDb::create_from(
+      &ProcessPartial {
+        key: key.clone(),
+        name: "observation-before".into(),
+        kind: ProcessKind::Cargo,
+        data: serde_json::json!({"Id": key, "NetworkSettings": {"IPAddress": "10.0.0.1"}}),
+        node_name: state.inner.config.hostname.clone(),
+        kind_key: format!("observation-{key}"),
+        created_at: None,
+      },
+      pool,
+    )
+    .await
+    .unwrap();
+    let refreshed_data = serde_json::json!({"Id": key, "NetworkSettings": {"IPAddress": "10.0.0.2"}});
+    assert!(
+      snapshot
+        .update_observation_if_current(
+          "observation-refreshed".into(),
+          refreshed_data.clone(),
+          pool,
+        )
+        .await
+        .unwrap()
+    );
+    snapshot = ProcessDb::read_by_pk(&key, pool).await.unwrap();
+    assert_eq!(snapshot.name, "observation-refreshed");
+    assert_eq!(snapshot.data, refreshed_data);
+
+    // Deterministically interleave a newer write between the source snapshot
+    // and its inspection result. Each predicate must fence independently,
+    // including data/name changes whose timestamps happen to be identical.
+    let newer_updates = [
+      ProcessUpdateDb {
+        updated_at: Some(snapshot.updated_at + chrono::Duration::seconds(1)),
+        ..Default::default()
+      },
+      ProcessUpdateDb {
+        name: Some("observation-newer".into()),
+        ..Default::default()
+      },
+      ProcessUpdateDb {
+        data: Some(
+          serde_json::json!({"Id": key, "NetworkSettings": {"IPAddress": "10.0.0.3"}}),
+        ),
+        ..Default::default()
+      },
+    ];
+    for update in newer_updates {
+      let newer = ProcessDb::update_pk(&key, update, pool).await.unwrap();
+      assert!(
+        !snapshot
+          .update_observation_if_current(
+            "observation-stale".into(),
+            refreshed_data.clone(),
+            pool,
+          )
+          .await
+          .unwrap()
+      );
+      assert!(!snapshot.delete_observation_if_current(pool).await.unwrap());
+      snapshot = ProcessDb::read_by_pk(&key, pool).await.unwrap();
+      assert_eq!(snapshot.updated_at, newer.updated_at);
+      assert_eq!(snapshot.name, newer.name);
+      assert_eq!(snapshot.data, newer.data);
+    }
+
+    // A replacement may reuse the display name and workload key, but its
+    // immutable Docker ID must never be removed with the missing container.
+    let replacement = ProcessDb::create_from(
+      &ProcessPartial {
+        key: uuid::Uuid::new_v4().to_string(),
+        name: snapshot.name.clone(),
+        kind: ProcessKind::Cargo,
+        data: serde_json::json!({}),
+        node_name: snapshot.node_name.clone(),
+        kind_key: snapshot.kind_key.clone(),
+        created_at: None,
+      },
+      pool,
+    )
+    .await
+    .unwrap();
+    assert!(snapshot.delete_observation_if_current(pool).await.unwrap());
+    assert!(!snapshot.delete_observation_if_current(pool).await.unwrap());
+    assert_eq!(
+      ProcessDb::read_by_pk(&replacement.key, pool)
+        .await
+        .unwrap()
+        .name,
+      replacement.name,
+    );
+    assert!(
+      !snapshot
+        .update_observation_if_current(
+          "observation-deleted".into(),
+          refreshed_data,
+          pool,
+        )
+        .await
+        .unwrap()
+    );
+    assert_eq!(
+      ProcessDb::read_by_pk(&key, pool)
+        .await
+        .err()
+        .unwrap()
+        .inner
+        .kind(),
+      std::io::ErrorKind::NotFound,
+    );
+    ProcessDb::del_by_pk(&replacement.key, pool).await.unwrap();
+    state.wait_event_loop().await;
+  }
 
   #[ntex::test]
   async fn owned_vm_process_uses_process_kind_and_preserves_owner_fences() {

@@ -88,16 +88,36 @@ pub(crate) fn cargo_receipt(
   }
 }
 
-pub(crate) fn format_cargo_receipt(receipt: &StateCargoReceipt) -> String {
+pub(crate) fn format_cargo_receipt(
+  receipt: &StateCargoReceipt,
+  wide: bool,
+) -> String {
   let mut lines = vec![format!(
-    "  {}  revision {}; application processes running {}/{}",
-    receipt.resource, receipt.revision, receipt.running, receipt.total,
+    "  {}  app processes {}/{} running/observed",
+    receipt.resource, receipt.running, receipt.total,
   )];
+  if wide {
+    lines.push(format!("    revision {}", receipt.revision));
+  }
+  let prefix = receipt
+    .resource
+    .strip_prefix("cargo/")
+    .map(|key| format!("{key}-"));
   for process in &receipt.processes {
+    // Remove only identity already supplied by the parent row. Retain replica
+    // ordinals and incarnation suffixes so two observations never look alike.
+    let name = if wide {
+      process.name.as_str()
+    } else {
+      prefix
+        .as_deref()
+        .and_then(|prefix| process.name.strip_prefix(prefix))
+        .and_then(|name| name.strip_suffix(".c"))
+        .unwrap_or(&process.name)
+    };
     lines.push(format!(
-      "    {} ({} on {}): {}; health {}; image ID {}",
-      process.container,
-      process.name,
+      "    {}@{}  {}  health {}",
+      name,
       process.node,
       if process.running {
         "running"
@@ -105,8 +125,14 @@ pub(crate) fn format_cargo_receipt(receipt: &StateCargoReceipt) -> String {
         "not running"
       },
       process.health,
-      process.image_id.as_deref().unwrap_or("unavailable"),
     ));
+    if wide {
+      lines.push(format!("      container {}", process.container));
+      lines.push(format!(
+        "      image ID {}",
+        process.image_id.as_deref().unwrap_or("unavailable"),
+      ));
+    }
   }
   lines.join("\n")
 }
@@ -235,8 +261,8 @@ mod tests {
         .any(|process| process.name.starts_with("init-services."))
     );
     assert!(
-      format_cargo_receipt(&receipt)
-        .contains("application processes running 1/2")
+      format_cargo_receipt(&receipt, false)
+        .contains("app processes 1/2 running/observed")
     );
   }
 
@@ -246,13 +272,45 @@ mod tests {
       "cargo/global.app",
       &inspect(vec![process("global.app-r0.c", "app")]),
     );
-    let plain = format_cargo_receipt(&receipt);
+    let plain = format_cargo_receipt(&receipt, true);
     assert!(plain.contains("image ID sha256:local-image-id"));
     assert!(!plain.contains("manifest"));
     assert!(!plain.contains("digest"));
     let json = serde_json::to_value(&receipt).unwrap();
     assert_eq!(json["processes"][0]["image_id"], "sha256:local-image-id");
     assert!(json["processes"][0].get("image_digest").is_none());
+  }
+
+  #[test]
+  fn compact_receipt_keeps_processes_distinct_and_wide_retains_full_ids() {
+    let mut stopped = process("global.app-r1-api-ghijkl.c", "app");
+    stopped.data.state.as_mut().unwrap().running = Some(false);
+    let receipt = cargo_receipt(
+      "cargo/global.app",
+      &inspect(vec![
+        process("global.app-r0-api-abcdef.c", "app"),
+        stopped,
+        // Unexpected names must remain intact rather than losing identity.
+        process("other-prefix-r2-api-mnopqr.c", "app"),
+      ]),
+    );
+    let compact = format_cargo_receipt(&receipt, false);
+    assert!(compact.contains("app processes 2/3 running/observed"));
+    assert!(compact.contains("r0-api-abcdef@node-a  running  health disabled"));
+    assert!(
+      compact.contains("r1-api-ghijkl@node-a  not running  health disabled")
+    );
+    assert!(compact.contains("other-prefix-r2-api-mnopqr.c@node-a"));
+    assert!(!compact.contains(&receipt.revision));
+    assert!(!compact.contains("sha256:local-image-id"));
+    assert!(compact.lines().all(|line| line.len() <= 80));
+
+    let wide = format_cargo_receipt(&receipt, true);
+    assert!(wide.contains(&format!("revision {}", receipt.revision)));
+    assert!(wide.contains("global.app-r0-api-abcdef.c@node-a"));
+    assert!(wide.contains("container api"));
+    assert!(wide.contains("image ID sha256:local-image-id"));
+    assert!(wide.contains("not running  health disabled"));
   }
 
   #[test]
@@ -271,7 +329,7 @@ mod tests {
     inspect.spec.metadata = Some(json!({"private": "metadata-secret"}));
     let receipt = cargo_receipt("cargo/global.app", &inspect);
     let json = serde_json::to_string(&receipt).unwrap();
-    let plain = format_cargo_receipt(&receipt);
+    let plain = format_cargo_receipt(&receipt, false);
     for secret in [
       "environment-secret",
       "label-secret",

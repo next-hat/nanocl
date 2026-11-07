@@ -13,7 +13,7 @@ apply - Create or Update elements from a Statefile
 
 **apply** \[**-s**\|**--source**\] \[**-f**\|**--follow**\]
 \[**-y**\|**--yes**\] \[**-r**\|**--reload**\] \[**--remove-orphans**\]
-\[**--json**\] \[**-h**\|**--help**\] \[*ARGS*\]
+\[**--json**\] \[**--wide**\] \[**-h**\|**--help**\] \[*ARGS*\]
 
 ## DESCRIPTION
 
@@ -29,17 +29,22 @@ credentials, query strings and fragments are omitted from summary sources.
 
 Progress includes elapsed time and resource names, including when output is
 redirected. Long-running steps print a waiting update every 30 seconds in plain
-logs. Cargo rollout observations describe phases seen on the event stream;
-they do not mark the operation complete. An observed healthy candidate can
-still fail later in the rollout. Missing event detail leaves the ordinary
-operation progress in place. Optional event subscription setup is limited to
+logs. Cargo rollout observations are labelled **pending** and describe phases
+seen on the event stream; they do not mark the operation complete. An observed
+healthy candidate can still fail later in the rollout. Missing event detail
+leaves the ordinary operation progress in place. Optional event subscription setup is limited to
 two seconds before apply falls back to ordinary progress.
 
-After each successful Cargo step, a best-effort current snapshot shows its
-revision, running application processes, effective health status and image IDs.
-Image IDs are not registry manifest digests. Disabled checks are distinguished
-from unavailable health information. The snapshot is an observation, not an
-extra readiness gate or a guarantee that no concurrent update occurred. A
+After each successful Cargo step, a best-effort current snapshot shows application
+process counts as **running/observed**, followed by each process's runtime and
+effective health status. These counts are not desired replicas or readiness.
+Compact process names omit the Cargo prefix already shown in the parent row,
+while retaining replica and incarnation identifiers and the node. Long snapshot
+and observation lines wrap to the terminal width. **--wide** adds full revision,
+process and image IDs to the snapshot. Image IDs are not registry manifest
+digests. Disabled checks are distinguished from unavailable health information.
+The snapshot is an observation, not an extra readiness gate or a guarantee
+that no concurrent update occurred. A
 failed or timed-out snapshot, or a failure to write it, does not fail apply;
 use **nanocl state status** to inspect current state. Existing apply completion
 and exit-code semantics are unchanged.
@@ -64,8 +69,13 @@ Remove orphaned elements
 **--json**
 
 Emit newline-delimited JSON (NDJSON) for tools and dashboards. Requires
-**-y**/**--yes** and cannot be combined with **-f**/**--follow**.
+**-y**/**--yes** and cannot be combined with **-f**/**--follow** or **--wide**.
 See [State command JSON output](../state-json.md) for the record format.
+
+**--wide**
+
+Show full revision, process and image IDs in Cargo snapshots without wrapping.
+Cannot be combined with **--json**, which always retains its complete fields.
 
 **-h**, **--help**  
 Print help
