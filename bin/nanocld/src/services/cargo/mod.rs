@@ -1656,6 +1656,186 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn abandoned_delete_with_exited_runtime_recovers_and_can_retry() {
+    use crate::{
+      tasks::generic::ObjTask,
+      utils::{
+        container::cargo::{lifecycle_lock, recovery::recover_one},
+        operation::create_owner,
+      },
+    };
+
+    let system = gen_default_test_system().await;
+    let name = format!("delete-recovery-{}", uuid::Uuid::new_v4().simple());
+    let key = format!("global.{name}");
+    let mut spec = operation_fixture_spec(&name, "true");
+    spec.init_containers.clear();
+    let response = system
+      .client
+      .send_post(ENDPOINT, Some(&spec), None::<String>)
+      .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    start_cargo(&system, &key).await;
+    let events =
+      cargo_completion_events(&system, &key, NativeEventAction::Stop).await;
+    let response = system
+      .client
+      .send_post(
+        &format!("/processes/cargo/{key}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    wait_cargo_completion(&system, &key, NativeEventAction::Stop, events).await;
+    let before = cargo_runtime_snapshot(&system, &key).await;
+    assert_eq!(before.len(), 1);
+    assert!(before.values().all(|runtime| runtime["Running"] == false));
+    let replicas =
+      CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    assert_eq!(replicas.len(), 1);
+    let mappings = CargoReplicaProcessDb::list_by_replica(
+      replicas[0].key,
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+
+    // Accept deletion with real ownership, then lose the executor before it
+    // removes the exited runtime. Recovery must observe, not replay, removal.
+    let guard = lifecycle_lock(&key).lock_owned().await;
+    let cargo = CargoDb::transform_read_by_pk(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    let incarnation = CargoDb::incarnation(&key, &system.state.inner.pool)
+      .await
+      .unwrap();
+    let mutex = CargoDb::create_mutex(&key, "delete", &system.state)
+      .await
+      .unwrap();
+    let (owner, owner_guard) = create_owner(
+      mutex.key,
+      "Cargo",
+      &key,
+      incarnation,
+      &system.state.inner.config.hostname,
+      &system.state.inner.config.state_dir,
+    )
+    .unwrap();
+    let lease = (std::sync::Arc::new(guard), owner_guard);
+    let pending =
+      OperationDb::new(&owner, "Cargo", &key, cargo.spec.key, "delete");
+    let accepted = CargoDb::accept_operation(
+      &cargo,
+      None,
+      pending.clone(),
+      lease.clone(),
+      &system.state.inner.pool,
+    )
+    .await
+    .unwrap();
+    assert_eq!(accepted.cargo.status.actual, ObjPsStatusKind::Destroying);
+    assert!(!recover_one(&pending, &system.state).await.unwrap());
+    drop(lease);
+
+    let interrupted = cargo_event_condition(
+      &key,
+      EventKind::Error,
+      NativeEventAction::Destroying,
+    );
+    let destroyed = cargo_event_condition(
+      &key,
+      EventKind::Normal,
+      NativeEventAction::Destroy,
+    );
+    let mut terminal = interrupted.clone();
+    terminal.kind.push(EventKind::Normal);
+    terminal.action.push(NativeEventAction::Destroy);
+    let events = system
+      .state
+      .subscribe_raw(Some(vec![terminal]))
+      .await
+      .unwrap();
+    assert!(recover_one(&pending, &system.state).await.unwrap());
+    let events = collect_events(events).await;
+    assert!(events.iter().any(|event| interrupted == *event));
+    assert!(!events.iter().any(|event| destroyed == *event));
+    let recovered = OperationDb::get(pending.key, &system.state.inner.pool)
+      .await
+      .unwrap()
+      .unwrap();
+    assert_eq!(recovered.outcome.as_deref(), Some("interrupted"));
+    assert!(recovered.completed_at.is_some());
+    assert_eq!(recovered.incarnation_key, incarnation);
+    assert_eq!(recovered.spec_key, cargo.spec.key);
+    assert_eq!(
+      OperationDb::current("Cargo", &key, &system.state.inner.pool)
+        .await
+        .unwrap(),
+      Some(recovered)
+    );
+    let observed =
+      CargoDb::transform_read_by_pk(&key, &system.state.inner.pool)
+        .await
+        .unwrap();
+    assert_eq!(observed.status.actual, ObjPsStatusKind::Stop);
+    assert_eq!(observed.status.wanted, ObjPsStatusKind::Destroy);
+    assert_eq!(
+      serde_json::to_value(&observed.spec).unwrap(),
+      serde_json::to_value(&cargo.spec).unwrap()
+    );
+    assert_eq!(
+      CargoDb::incarnation(&key, &system.state.inner.pool)
+        .await
+        .unwrap(),
+      incarnation
+    );
+    assert_eq!(cargo_runtime_snapshot(&system, &key).await, before);
+    assert_eq!(
+      CargoReplicaDb::list_by_cargo(&key, &system.state.inner.pool)
+        .await
+        .unwrap(),
+      replicas
+    );
+    assert_eq!(
+      CargoReplicaProcessDb::list_by_replica(
+        replicas[0].key,
+        &system.state.inner.pool,
+      )
+      .await
+      .unwrap(),
+      mappings
+    );
+    for id in before.keys() {
+      assert!(
+        ProcessDb::read_by_pk(id, &system.state.inner.pool)
+          .await
+          .is_ok()
+      );
+    }
+    assert!(
+      DistributedMutexDb::read_by_pk(
+        &pending.key.to_string(),
+        &system.state.inner.pool,
+      )
+      .await
+      .is_err()
+    );
+
+    delete_cargo_fixture(&system, &key).await;
+    assert!(
+      CargoDb::read_by_pk(&key, &system.state.inner.pool)
+        .await
+        .is_err()
+    );
+    assert!(cargo_runtime_snapshot(&system, &key).await.is_empty());
+    assert!(!recover_one(&pending, &system.state).await.unwrap());
+    system.state.wait_event_loop().await;
+  }
+
+  #[ntex::test]
   async fn collection_namespace_and_key_semantics() {
     const NAME: &str = "same-name-namespace-test";
     const NAMESPACE: &str = "cargo-collection-test";

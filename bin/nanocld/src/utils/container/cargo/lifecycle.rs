@@ -10,8 +10,11 @@ use crate::{
   },
   repositories::generic::*,
 };
-use bollard_next::query_parameters::{
-  KillContainerOptions, ListContainersOptions, RemoveContainerOptions,
+use bollard_next::{
+  models::ContainerState,
+  query_parameters::{
+    KillContainerOptions, ListContainersOptions, RemoveContainerOptions,
+  },
 };
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
@@ -532,6 +535,30 @@ pub(crate) async fn observe(
   cargo: &Cargo,
   state: &SystemState,
 ) -> IoResult<ObjPsStatusUpdate> {
+  observe_runtime(cargo, state, false).await
+}
+
+pub(super) async fn observe_interrupted_delete(
+  cargo: &Cargo,
+  state: &SystemState,
+) -> IoResult<ObjPsStatusUpdate> {
+  observe_runtime(cargo, state, true).await
+}
+
+fn deletion_inspection_settles(state: Option<&ContainerState>) -> bool {
+  state.is_some_and(|state| {
+    super::recovery::deletion_runtime_settles(
+      state.status.as_ref().map(AsRef::as_ref),
+    ) && state.restarting != Some(true)
+      && state.running.is_some()
+  })
+}
+
+async fn observe_runtime(
+  cargo: &Cargo,
+  state: &SystemState,
+  require_settled_deletion: bool,
+) -> IoResult<ObjPsStatusUpdate> {
   let replicas =
     CargoReplicaDb::list_by_cargo(&cargo.spec.cargo_key, &state.inner.pool)
       .await?;
@@ -590,6 +617,14 @@ pub(crate) async fn observe(
           "Docker runtime identity or running state is unknown",
         ));
       }
+      if require_settled_deletion
+        && !deletion_inspection_settles(process.data.state.as_ref())
+      {
+        return Err(IoError::interrupted(
+          "Cargo observation",
+          "Cargo deletion runtime is still changing or its state is unknown",
+        ));
+      }
       processes.push(process);
     }
   }
@@ -631,6 +666,39 @@ mod tests {
     ready_replica_processes,
   };
   use super::*;
+
+  #[test]
+  fn interrupted_delete_rechecks_inspection_after_settled_inventory() {
+    use bollard_next::models::ContainerStateStatusEnum;
+
+    assert!(super::super::recovery::deletion_runtime_settles(Some(
+      "exited"
+    )));
+    let mut inspected = ContainerState {
+      status: Some(ContainerStateStatusEnum::EXITED),
+      running: Some(false),
+      restarting: Some(false),
+      ..Default::default()
+    };
+    assert!(deletion_inspection_settles(Some(&inspected)));
+    for status in [
+      None,
+      Some(ContainerStateStatusEnum::EMPTY),
+      Some(ContainerStateStatusEnum::REMOVING),
+      Some(ContainerStateStatusEnum::RESTARTING),
+      Some(ContainerStateStatusEnum::STOPPING),
+    ] {
+      inspected.status = status;
+      assert!(!deletion_inspection_settles(Some(&inspected)), "{status:?}");
+    }
+    inspected.status = Some(ContainerStateStatusEnum::EXITED);
+    inspected.restarting = Some(true);
+    assert!(!deletion_inspection_settles(Some(&inspected)));
+    inspected.restarting = Some(false);
+    inspected.running = None;
+    assert!(!deletion_inspection_settles(Some(&inspected)));
+    assert!(!deletion_inspection_settles(None));
+  }
 
   #[test]
   fn cargo_noop_requires_complete_ready_runtime_and_finished_init() {
