@@ -192,6 +192,57 @@ where
         return;
       }
     };
+    if allow_unchanged_start {
+      let unchanged = async {
+        if OperationDb::current("Vm", &key, &state.inner.pool)
+          .await?
+          .is_some_and(|operation| operation.outcome.is_none())
+        {
+          return Err(HttpError::conflict(
+            "A VM lifecycle operation is awaiting completion or recovery",
+          ));
+        }
+        let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+        if utils::container::vm::state_is_unchanged(
+          &vm,
+          ObjPsStatusKind::Start,
+          &state,
+        )
+        .await?
+        {
+          let (current, _, _) =
+            VmDb::read_by_pk(&key, &state.inner.pool).await?;
+          if current.incarnation_key != live.incarnation_key
+            || current.spec_key != vm.spec.key
+          {
+            return Err(HttpError::conflict(
+              "VM identity or state changed during start admission",
+            ));
+          }
+          Ok(Some(vm))
+        } else {
+          Ok(None)
+        }
+      }
+      .await;
+      if let Some(unchanged) = unchanged.transpose() {
+        let cleanup = VmDb::delete_mutex(&mutex.key, &state).await;
+        drop(guard);
+        let result = match unchanged {
+          Ok(vm) => cleanup.map(|()| (vm, None)).map_err(Into::into),
+          Err(error) => {
+            if let Err(cleanup) = cleanup {
+              log::warn!(
+                "VM unchanged admission cleanup failed: {key}: {cleanup}"
+              );
+            }
+            Err(error)
+          }
+        };
+        let _ = reply.send(result);
+        return;
+      }
+    }
     let (owner, owner_guard) = match utils::operation::create_owner(
       mutex.key,
       "Vm",
@@ -213,70 +264,6 @@ where
       }
     };
     let lease = (guard, owner_guard);
-    if allow_unchanged_start {
-      let unchanged = async {
-        if OperationDb::current("Vm", &key, &state.inner.pool)
-          .await?
-          .is_some_and(|operation| operation.outcome.is_none())
-        {
-          return Err(HttpError::conflict(
-            "A VM lifecycle operation is awaiting completion or recovery",
-          ));
-        }
-        let vm = VmDb::transform_read_by_pk(&key, &state.inner.pool).await?;
-        if utils::container::vm::state_is_unchanged(
-          &vm,
-          ObjPsStatusKind::Start,
-          &state,
-        )
-        .await?
-        {
-          let (current, _, _) =
-            VmDb::read_by_pk(&key, &state.inner.pool).await?;
-          if current.incarnation_key != owner.incarnation_key
-            || current.spec_key != vm.spec.key
-          {
-            return Err(HttpError::conflict(
-              "VM identity or state changed during start admission",
-            ));
-          }
-          Ok(Some(vm))
-        } else {
-          Ok(None)
-        }
-      }
-      .await;
-      if let Some(unchanged) = unchanged.transpose() {
-        // No durable acceptance exists. Remove temporary admission evidence
-        // and release both leases before returning an unchanged response.
-        let cleanup = async {
-          if !utils::operation::cleanup_owner(&lease.1, &state.inner.pool)
-            .await?
-          {
-            return Err(IoError::interrupted(
-              "VM start admission",
-              "Temporary operation owner could not be released",
-            ));
-          }
-          VmDb::delete_mutex(&mutex.key, &state).await
-        }
-        .await;
-        drop(lease);
-        let result = match unchanged {
-          Ok(vm) => cleanup.map(|()| (vm, None)).map_err(Into::into),
-          Err(error) => {
-            if let Err(cleanup) = cleanup {
-              log::warn!(
-                "VM unchanged admission cleanup failed: {key}: {cleanup}"
-              );
-            }
-            Err(error)
-          }
-        };
-        let _ = reply.send(result);
-        return;
-      }
-    }
     let accepted_operation = match prepare(owner, lease.clone()).await {
       Ok(accepted) => accepted,
       Err(error) => {
