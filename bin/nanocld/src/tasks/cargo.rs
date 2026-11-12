@@ -220,6 +220,28 @@ where
         return;
       }
     };
+    if allow_unchanged
+      && let Some(unchanged) =
+        unchanged_current(&key, phase, incarnation, &state)
+          .await
+          .transpose()
+    {
+      let cleanup = CargoDb::delete_mutex(&mutex.key, &state).await;
+      drop(guard);
+      let result = match unchanged {
+        Ok(cargo) => cleanup.map(|()| (cargo, None)).map_err(http_error),
+        Err(error) => {
+          if let Err(cleanup) = cleanup {
+            log::warn!(
+              "Cargo unchanged admission cleanup failed: {key}: {cleanup}"
+            );
+          }
+          Err(error)
+        }
+      };
+      let _ = reply.send(result);
+      return;
+    }
     let (owner, owner_guard) = match utils::operation::create_owner(
       mutex.key,
       "Cargo",
@@ -241,18 +263,7 @@ where
       }
     };
     let lease = (std::sync::Arc::new(guard), owner_guard);
-    let prepared: HttpResult<(Cargo, Option<OperationDb>)> = async {
-      if allow_unchanged
-        && let Some(cargo) =
-          unchanged_current(&key, phase, incarnation, &state).await?
-      {
-        return Ok((cargo, None));
-      }
-      let accepted = prepare(owner, lease.clone()).await?;
-      Ok((accepted.cargo, Some(accepted.operation)))
-    }
-    .await;
-    let (cargo, operation) = match prepared {
+    let accepted = match prepare(owner, lease.clone()).await {
       Ok(value) => value,
       Err(error) => {
         match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
@@ -277,26 +288,7 @@ where
         return;
       }
     };
-    let Some(operation) = operation else {
-      let released = async {
-        if !utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await?
-        {
-          return Err(IoError::interrupted(
-            "Cargo unchanged",
-            "No-op ownership could not be released",
-          ));
-        }
-        CargoDb::delete_mutex(&mutex.key, &state).await
-      }
-      .await;
-      drop(lease);
-      let _ = reply.send(released.map(|()| (cargo, None)).map_err(http_error));
-      return;
-    };
-    let accepted = AcceptedCargoOperation {
-      cargo: cargo.clone(),
-      operation,
-    };
+    let cargo = accepted.cargo.clone();
     let operation = accepted.operation.key;
     let revision = accepted.operation.spec_key;
     let error_state = state.clone();
@@ -469,8 +461,7 @@ async fn unchanged_current(
   if !matches!(observed, Ok(Ok(true))) {
     return Ok(None);
   }
-  // Keep the same owner while checking that observation still belongs to the
-  // same settled definition. A no-op never creates or settles an operation.
+  // Recheck the observed definition while both admission locks are held.
   let current = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
   if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation
     || current.spec.key != cargo.spec.key
