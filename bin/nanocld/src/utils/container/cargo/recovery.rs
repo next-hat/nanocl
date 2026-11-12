@@ -116,20 +116,20 @@ pub(crate) async fn recover_one(
       .map_err(|_| {
         deferred("Docker inventory unavailable; operation remains pending")
       })?;
-    if candidate.action == "delete" {
-      if !deletion_observation_settles(
+    if candidate.action == "delete"
+      && deletion_observation_settles(
         inventory.is_empty(),
         processes.is_empty(),
         mapped_ids.is_empty(),
-      ) {
-        return Err(deferred(
-          "Cargo deletion is not confirmed by empty runtime inventory, process rows, and attachments",
-        ));
-      }
+      )
+    {
       // Runtime removal also removes Process rows before the definition is
       // deleted. Do not tombstone while stale rows still need reconciliation.
       return Ok(None);
     }
+    // A failed removal can leave owned runtime or Process rows behind. Observe
+    // those identities below and settle as interrupted, preserving the Cargo
+    // definition so an explicit retry can finish deletion.
     if ids.iter().any(|id| !mapped_ids.contains(*id))
       || mapped_ids.iter().any(|id| !ids.contains(id.as_str()))
     {
@@ -139,6 +139,15 @@ pub(crate) async fn recover_one(
     }
     let mut inventory_ids = HashSet::new();
     for container in inventory {
+      if candidate.action == "delete"
+        && !deletion_runtime_settles(
+          container.state.as_ref().map(AsRef::as_ref),
+        )
+      {
+        return Err(deferred(
+          "Cargo deletion runtime is still changing or its state is unknown",
+        ));
+      }
       let id = container
         .id
         .as_deref()
@@ -208,7 +217,11 @@ pub(crate) async fn recover_one(
         }
       }
     }
-    let observed = super::observe(&cargo, state).await?;
+    let observed = if candidate.action == "delete" {
+      super::lifecycle::observe_interrupted_delete(&cargo, state).await?
+    } else {
+      super::observe(&cargo, state).await?
+    };
     if !runtime_observation_settles(
       &candidate.action,
       observed.actual.as_deref(),
@@ -224,6 +237,7 @@ pub(crate) async fn recover_one(
     .map_err(|_| {
       deferred("Runtime observation timed out; operation remains pending")
     })??;
+  let deleted = observed.is_none();
   let finished = match observed {
     None => {
       CargoDb::delete_operation(candidate, lease.clone(), &state.inner.pool)
@@ -240,7 +254,7 @@ pub(crate) async fn recover_one(
     {
       log::warn!("Cargo recovery owner cleanup deferred: {error}");
     }
-    if candidate.action == "delete" {
+    if deleted {
       state
         .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
         .await;
@@ -262,17 +276,26 @@ fn runtime_observation_settles(action: &str, actual: Option<&str>) -> bool {
   // These observations do not prove the requested action succeeded. Once the
   // caller has proved abandoned local ownership and associated runtime, they
   // allow recording that state with an interrupted outcome without replay.
-  // Delete still requires its separate empty-runtime proof and transaction.
+  // Completing deletion still requires the separate empty-runtime proof;
+  // observing retained runtime only releases the interrupted operation.
   matches!(
     action,
     "start"
       | "update"
       | "stop"
       | "restart"
+      | "delete"
       | "stop_process"
       | "restart_process"
       | "signal"
   ) && matches!(actual, Some("start" | "stop" | "fail"))
+}
+
+pub(super) fn deletion_runtime_settles(state: Option<&str>) -> bool {
+  matches!(
+    state,
+    Some("created" | "running" | "paused" | "exited" | "dead")
+  )
 }
 
 fn deletion_observation_settles(
@@ -396,6 +419,7 @@ mod tests {
       "update",
       "stop",
       "restart",
+      "delete",
       "restart_process",
       "stop_process",
       "signal",
@@ -423,10 +447,25 @@ mod tests {
         );
       }
     }
-    for action in ["delete", "unknown"] {
-      for actual in [None, Some("start"), Some("stop"), Some("fail")] {
-        assert!(!runtime_observation_settles(action, actual));
-      }
+    for actual in [None, Some("start"), Some("stop"), Some("fail")] {
+      assert!(!runtime_observation_settles("unknown", actual));
+    }
+  }
+
+  #[test]
+  fn interrupted_delete_requires_known_runtime_state_before_retry() {
+    for state in ["created", "running", "paused", "exited", "dead"] {
+      assert!(deletion_runtime_settles(Some(state)), "{state}");
+    }
+    for state in [
+      None,
+      Some(""),
+      Some("removing"),
+      Some("restarting"),
+      Some("stopping"),
+      Some("unknown"),
+    ] {
+      assert!(!deletion_runtime_settles(state), "{state:?}");
     }
   }
 
