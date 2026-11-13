@@ -291,8 +291,8 @@ fn same_vm_exit(metadata: &serde_json::Value, state: &ContainerState) -> bool {
     })
 }
 
-/// Combine reports of the same container exit, preserving confirmed OOM.
-fn merge_exit_oom(event: &mut Event, processes: &[Process]) -> Option<usize> {
+/// Locate the inventory snapshot for the execution reported by the event.
+fn matching_exit(event: &Event, processes: &[Process]) -> Option<usize> {
   let actor = event.actor.as_ref()?;
   if event.reporting_controller != "nanocl.io/core"
     || event.reason != "state_sync"
@@ -304,8 +304,7 @@ fn merge_exit_oom(event: &mut Event, processes: &[Process]) -> Option<usize> {
   let key = actor.key.as_deref()?;
   let id = metadata["ContainerId"].as_str()?;
   let code = metadata["ExitCode"].as_i64()?;
-  let event_oom = metadata["OOMKilled"].as_bool() == Some(true);
-  let index = processes.iter().position(|process| {
+  processes.iter().position(|process| {
     let Some(state) = process.data.state.as_ref() else {
       return false;
     };
@@ -315,7 +314,6 @@ fn merge_exit_oom(event: &mut Event, processes: &[Process]) -> Option<usize> {
       || state.running != Some(false)
       || state.restarting == Some(true)
       || state.exit_code != Some(code)
-      || !(event_oom || state.oom_killed == Some(true))
     {
       return false;
     }
@@ -338,12 +336,7 @@ fn merge_exit_oom(event: &mut Event, processes: &[Process]) -> Option<usize> {
       }
       _ => false,
     }
-  })?;
-  let note = event.note.as_mut()?;
-  if !event_oom {
-    note.push_str(" (OOM killed)");
-  }
-  Some(index)
+  })
 }
 
 fn status_failure(
@@ -351,11 +344,29 @@ fn status_failure(
   mut processes: Vec<Process>,
   since: NaiveDateTime,
 ) -> Option<(NaiveDateTime, String)> {
-  if let Some(index) =
-    event.as_mut().and_then(|e| merge_exit_oom(e, &processes))
+  if let Some(event) = &mut event
+    && let Some(index) = matching_exit(event, &processes)
   {
     // Inventory refresh time is not a new failure of this exited container.
-    processes.remove(index);
+    if let Some(note) =
+      event.note.as_mut().filter(|note| !note.trim().is_empty())
+    {
+      let process = processes.remove(index);
+      if process
+        .data
+        .state
+        .is_some_and(|state| state.oom_killed == Some(true))
+        && !event
+          .metadata
+          .as_ref()
+          .is_some_and(|metadata| metadata["OOMKilled"] == true)
+      {
+        note.push_str(" (OOM killed)");
+      }
+    } else {
+      // Use the observed reason at the event time when the event has no note.
+      processes[index].updated_at = event.created_at;
+    }
   }
   failure_detail(event, recent_failure(&processes, since))
 }
@@ -1162,6 +1173,31 @@ mod tests {
     }
   }
 
+  fn assert_ordinary_exit_keeps_event_time(event: &Event, process: &Process) {
+    let mut refreshed = process.clone();
+    refreshed.updated_at = time(30);
+    assert_eq!(
+      status_failure(Some(event.clone()), vec![refreshed.clone()], time(0)),
+      Some((event.created_at, event.note.clone().unwrap()))
+    );
+    let mut without_note = event.clone();
+    without_note.note = None;
+    assert_eq!(
+      status_failure(Some(without_note), vec![refreshed.clone()], time(0)),
+      Some((event.created_at, "app: exited with code 137".into()))
+    );
+
+    let mut newer = process.clone();
+    newer.key = "another-container".into();
+    newer.name = "worker".into();
+    newer.updated_at = time(25);
+    newer.data.state.as_mut().unwrap().exit_code = Some(7);
+    assert_eq!(
+      status_failure(Some(event.clone()), vec![refreshed, newer], time(0)),
+      Some((time(25), "worker: exited with code 7".into()))
+    );
+  }
+
   #[test]
   fn status_adds_oom_only_for_the_exited_container_of_the_failed_run() {
     let mut terminal = event(
@@ -1208,6 +1244,7 @@ mod tests {
     assert_eq!(select(other, &failed), (time(20), expected.clone()));
     failed.data.state.as_mut().unwrap().oom_killed = None;
     assert_eq!(select(terminal.clone(), &failed), (time(20), expected));
+    assert_ordinary_exit_keeps_event_time(&terminal, &failed);
 
     terminal.metadata.as_mut().unwrap()["OOMKilled"] = true.into();
     let oom_note = "Job app failed: Step 1 ran out of memory (exit code 137)";
@@ -1277,6 +1314,7 @@ mod tests {
       "VM guest stopped unexpectedly when process app exited (exit code 137)"
         .into(),
     );
+    assert_ordinary_exit_keeps_event_time(&die, &snapshot);
     snapshot.data.state.as_mut().unwrap().oom_killed = Some(true);
     assert_eq!(
       select(&die, &snapshot),
