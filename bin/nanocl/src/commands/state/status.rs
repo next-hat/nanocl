@@ -237,16 +237,19 @@ fn failure_detail(
     .as_deref()
     .map(str::trim)
     .filter(|note| !note.is_empty());
-  // A status-only message adds no explanation to a concrete process failure.
+  // An actor label or a status-only note adds no cause to a process failure.
   if observed.is_some()
     && event.reason == "state_sync"
     && let Ok(action @ (NativeEventAction::Fail | NativeEventAction::Unhealthy)) =
       event.action.parse()
     && note.is_none_or(|note| {
-      event
-        .actor
-        .as_ref()
-        .is_some_and(|actor| note == action.lifecycle_note(actor))
+      event.actor.as_ref().is_some_and(|actor| {
+        note == action.lifecycle_note(actor)
+          || note.split_once(' ').is_some_and(|(kind, key)| {
+            actor.key.as_deref() == Some(key)
+              && kind.eq_ignore_ascii_case(&actor.kind.to_string())
+          })
+      })
     })
   {
     return observed;
@@ -1124,6 +1127,37 @@ mod tests {
           observed.clone()
         ),
         observed
+      );
+    }
+  }
+
+  #[test]
+  fn actor_only_failure_notes_do_not_hide_the_process_cause() {
+    let observed =
+      Some((time(10), "worker: out of memory (OOM killed)".into()));
+    for (action, kind, key, label) in [
+      ("fail", "Job", "migrate", "Job migrate"),
+      ("unhealthy", "Cargo", "app", "Cargo app"),
+      ("fail", "Vm", "guest", "Vm guest"),
+      ("fail", "Vm", "guest", "VM guest"),
+    ] {
+      let mut failure = event(20, action, "state_sync", label);
+      failure.actor = Some(
+        serde_json::from_value(json!({"Key": key, "Kind": kind})).unwrap(),
+      );
+      assert_eq!(
+        failure_detail(Some(failure.clone()), observed.clone()),
+        observed
+      );
+      assert_eq!(
+        failure_detail(Some(failure.clone()), None),
+        Some((time(20), label.into()))
+      );
+      let detail = format!("{label} exited with code 7");
+      failure.note = Some(detail.clone());
+      assert_eq!(
+        failure_detail(Some(failure), observed.clone()),
+        Some((time(20), detail))
       );
     }
   }
