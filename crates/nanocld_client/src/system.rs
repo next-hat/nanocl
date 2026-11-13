@@ -23,8 +23,8 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Watch daemon events
-  /// It will emit an event when the daemon state change
+  /// Stream daemon events until all requested stop conditions have matched.
+  /// A truncated event is returned as a stream error.
   ///
   /// ## Example
   ///
@@ -44,7 +44,7 @@ impl NanocldClient {
     let res = self
       .send_post("/events/watch", conditions, None::<String>)
       .await?;
-    Ok(Self::res_stream(res).await)
+    Ok(Self::res_stream_strict(res).await)
   }
 
   /// Check if the daemon is running

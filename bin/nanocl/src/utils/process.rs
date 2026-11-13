@@ -191,7 +191,9 @@ async fn wait_job_deletion_events(
     }) {
       continue;
     }
-    if event.kind == EventKind::Error {
+    // A terminal run failure can arrive during deletion of that same run.
+    // The deletion task still publishes its own completion or error.
+    if event.kind == EventKind::Error && event.action != "fail" {
       return Err(IoError::interrupted(
         "Job deletion",
         &event.note.unwrap_or_default(),
@@ -700,6 +702,7 @@ mod tests {
     let events = vec![
       wrong_key,
       wrong_kind,
+      deletion_event(incarnation, run, "error", "fail"),
       deletion_event(uuid::Uuid::from_u128(3), run, "normal", "destroy"),
       deletion_event(
         incarnation,

@@ -15,7 +15,11 @@ use bollard_next::{
 };
 use futures::StreamExt;
 use nanocl_error::io::{IoError, IoResult};
-use nanocl_stubs::{job::Job, process::ProcessKind, system::NativeEventAction};
+use nanocl_stubs::{
+  job::Job,
+  process::ProcessKind,
+  system::{EventKind, NativeEventAction},
+};
 
 use crate::{
   models::{
@@ -344,13 +348,68 @@ async fn record_observation(
   Ok(observed)
 }
 
+fn terminal_event(
+  job_name: &str,
+  outcome: &str,
+  diagnostic: Option<&str>,
+) -> (NativeEventAction, EventKind, String) {
+  let (action, kind, summary) = match outcome {
+    "Succeeded" => {
+      return (
+        NativeEventAction::Finish,
+        EventKind::Normal,
+        format!("Job {job_name} completed successfully"),
+      );
+    }
+    "Interrupted" => (
+      NativeEventAction::Stop,
+      EventKind::Normal,
+      "was interrupted",
+    ),
+    _ => (NativeEventAction::Fail, EventKind::Error, "failed"),
+  };
+  let mut note = format!("Job {job_name} {summary}");
+  if let Some(detail) = diagnostic {
+    note.push_str(": ");
+    note.push_str(detail);
+  }
+  (action, kind, note)
+}
+
+fn step_exit_reason(index: i32, code: i64, oom_killed: bool) -> String {
+  if oom_killed {
+    format!("Step {index} ran out of memory (exit code {code})")
+  } else {
+    format!("Step {index} exited with code {code}")
+  }
+}
+
+fn confirmed_oom_exit(
+  runtime: &ContainerInspectResponse,
+  id: &str,
+  code: i64,
+) -> bool {
+  runtime.id.as_deref() == Some(id)
+    && runtime.state.as_ref().is_some_and(|state| {
+      state.oom_killed == Some(true)
+        && state.running == Some(false)
+        && state.restarting != Some(true)
+        && state.exit_code == Some(code)
+    })
+}
+
 async fn finish(
   run: &JobRunDb,
   outcome: &str,
   reason: Option<String>,
+  exit: Option<(&str, i64, bool)>,
   owner: &OperationGuard,
   state: &SystemState,
 ) -> IoResult<()> {
+  // The caller constructs this diagnostic from known execution facts. Stored
+  // step errors and arbitrary Docker response text do not belong in events.
+  let (action, kind, note) =
+    terminal_event(&run.job_name, outcome, reason.as_deref());
   if !JobRunDb::finish(run, outcome, reason, owner.clone(), &state.inner.pool)
     .await?
   {
@@ -361,12 +420,23 @@ async fn finish(
     && job.incarnation_key == run.incarnation_key
     && job.current_run_key == Some(run.key)
   {
-    let action = match outcome {
-      "Succeeded" => NativeEventAction::Finish,
-      "Interrupted" => NativeEventAction::Stop,
-      _ => NativeEventAction::Fail,
-    };
-    state.emit_normal_native_action_sync(&job, action).await;
+    state
+      .emit_action_sync(
+        &job.clone().into(),
+        action,
+        kind,
+        "state_sync",
+        Some(note),
+        exit.map(|(id, code, oom_killed)| {
+          let mut metadata =
+            serde_json::json!({"ContainerId": id, "ExitCode": code});
+          if oom_killed {
+            metadata["OOMKilled"] = true.into();
+          }
+          metadata
+        }),
+      )
+      .await;
     schedule_ttl(&job, run.key, state);
   }
   Ok(())
@@ -409,13 +479,13 @@ async fn settle_observed(
     .iter()
     .map(|(_, id, _)| id.clone())
     .collect::<std::collections::HashSet<_>>();
-  for (index, id, runtime) in observed {
-    match record_observation(run, index, &id, &runtime, owner, state).await? {
+  for (index, id, runtime) in &observed {
+    match record_observation(run, *index, id, runtime, owner, state).await? {
       JobRuntimeObservation::Running => running = true,
       JobRuntimeObservation::NotStarted => {
         JobRunDb::update_step(
           run,
-          index,
+          *index,
           fallback,
           None,
           Some(reason.clone()),
@@ -491,7 +561,7 @@ async fn settle_observed(
   let all_succeeded = steps
     .iter()
     .all(|step| step.state == "Succeeded" && step.exit_code == Some(0));
-  let failed = steps.iter().any(|step| {
+  let failed_step = steps.iter().find(|step| {
     step.state == "Failed" || step.exit_code.is_some_and(|code| code != 0)
   });
   let outcome = if fallback == "Interrupted" && run.cancellation_requested {
@@ -500,12 +570,37 @@ async fn settle_observed(
     "Failed"
   } else if all_succeeded {
     "Succeeded"
-  } else if failed {
+  } else if failed_step.is_some() {
     "Failed"
   } else {
     fallback
   };
-  finish(run, outcome, Some(reason), owner, state).await?;
+  // Recovery can discover a failed step while settling an interrupted run.
+  // Its numeric exit status is more specific than the recovery trigger.
+  let (reason, exit) = if outcome == "Failed"
+    && fallback == "Interrupted"
+    && let Some(step) = failed_step
+    && let Some(code) = step.exit_code.filter(|code| *code != 0)
+  {
+    let oom_killed = observed.iter().any(|(index, id, runtime)| {
+      *index == step.step_index
+        && Some(id.as_str()) == step.container_id.as_deref()
+        && confirmed_oom_exit(runtime, id, code)
+    });
+    (
+      format!(
+        "{}. {reason}",
+        step_exit_reason(step.step_index, code, oom_killed)
+      ),
+      step
+        .container_id
+        .as_deref()
+        .map(|id| (id, code, oom_killed)),
+    )
+  } else {
+    (reason, None)
+  };
+  finish(run, outcome, Some(reason), exit, owner, state).await?;
   Ok(true)
 }
 
@@ -516,6 +611,10 @@ async fn fail_execution(
   owner: &OperationGuard,
   state: &SystemState,
 ) -> IoResult<()> {
+  let reason = match index {
+    Some(index) => format!("Step {index}: {reason}"),
+    None => reason,
+  };
   if let Some(index) = index {
     JobRunDb::update_step(
       run,
@@ -640,7 +739,7 @@ pub(crate) async fn execute(
         Ok(created) => created.id,
         Err(error) => {
           let uncertain = RuntimeError::is_uncertain(&error);
-          let reason = error.to_string();
+          let reason = format!("Step {index}: {error}");
           JobRunDb::update_step(
             run,
             index,
@@ -661,7 +760,7 @@ pub(crate) async fn execute(
             .await?;
             return Ok(());
           }
-          return finish(run, "Failed", Some(reason), owner, state).await;
+          return finish(run, "Failed", Some(reason), None, owner, state).await;
         }
       };
       if !JobRunDb::attach_container(
@@ -719,7 +818,14 @@ pub(crate) async fn execute(
         );
       }
       state
-        .emit_normal_native_action_sync(job, NativeEventAction::Start)
+        .emit_action_sync(
+          &job.clone().into(),
+          NativeEventAction::Start,
+          EventKind::Normal,
+          "state_sync",
+          Some(format!("Job {} started step {index}", run.job_name)),
+          None,
+        )
         .await;
       id
     };
@@ -753,7 +859,7 @@ pub(crate) async fn execute(
               JobRuntimeObservation::Exited(code)
                 if code == exit.status_code =>
               {
-                Ok(code)
+                Ok((code, confirmed_oom_exit(&runtime, &id, code)))
               }
               _ => Err(
                 "Docker did not confirm that the waited container stopped"
@@ -764,7 +870,7 @@ pub(crate) async fn execute(
           Err(bollard_next::errors::Error::DockerResponseServerError {
             status_code: 404,
             ..
-          }) => Ok(exit.status_code),
+          }) => Ok((exit.status_code, false)),
           _ => Err("Docker wait result could not be confirmed".into()),
         }
       }
@@ -775,7 +881,7 @@ pub(crate) async fn execute(
         Ok(runtime) if runtime_step(run, &runtime)? == index => {
           match observation(&runtime)? {
             JobRuntimeObservation::Exited(observed) if observed == code => {
-              Ok(code)
+              Ok((code, confirmed_oom_exit(&runtime, &id, code)))
             }
             _ => Err(
               "Docker wait exit was followed by an unconfirmed runtime state"
@@ -786,7 +892,7 @@ pub(crate) async fn execute(
         Err(bollard_next::errors::Error::DockerResponseServerError {
           status_code: 404,
           ..
-        }) => Ok(code),
+        }) => Ok((code, false)),
         _ => {
           JobRunDb::update_step(run, index, "Failed", Some(code), Some(format!("Container exited with code {code}; runtime confirmation is unavailable")), owner.clone(), &state.inner.pool).await?;
           Err("Docker wait exit was observed but runtime confirmation is unavailable".into())
@@ -801,8 +907,8 @@ pub(crate) async fn execute(
       )),
       None => Err("Docker wait ended without an execution result".to_owned()),
     };
-    let code = match result {
-      Ok(code) => code,
+    let (code, mut oom_killed) = match result {
+      Ok(exit) => exit,
       Err(error) => {
         return fail_execution(run, Some(index), error, owner, state).await;
       }
@@ -824,19 +930,23 @@ pub(crate) async fn execute(
     if let Ok(runtime) =
       state.inner.docker_api.inspect_container(&id, None).await
       && runtime_step(run, &runtime)? == index
-      && let Err(error) =
-        utils::system::sync_process(&run.job_name, "job", &runtime, state).await
     {
-      log::warn!(
-        "Job process observation refresh deferred for {}: {error}",
-        run.key
-      );
+      oom_killed |= confirmed_oom_exit(&runtime, &id, code);
+      if let Err(error) =
+        utils::system::sync_process(&run.job_name, "job", &runtime, state).await
+      {
+        log::warn!(
+          "Job process observation refresh deferred for {}: {error}",
+          run.key
+        );
+      }
     }
     if code != 0 {
       return finish(
         run,
         "Failed",
-        Some(format!("Step {index} exited with code {code}")),
+        Some(step_exit_reason(index, code, oom_killed)),
+        Some((&id, code, oom_killed)),
         owner,
         state,
       )
@@ -845,7 +955,7 @@ pub(crate) async fn execute(
   }
   let _serialized = lifecycle_lock(&run.job_name).lock_owned().await;
   if JobRunDb::can_execute(run, owner.clone(), &state.inner.pool).await? {
-    finish(run, "Succeeded", None, owner, state).await?;
+    finish(run, "Succeeded", None, None, owner, state).await?;
   }
   Ok(())
 }
@@ -968,6 +1078,38 @@ mod tests {
   use nanocl_error::io::FromIo;
 
   #[test]
+  fn job_terminal_events_distinguish_failed_steps_interruption_and_success() {
+    assert_eq!(
+      terminal_event("backup", "Failed", Some("Step 1 exited with code 7")),
+      (
+        NativeEventAction::Fail,
+        EventKind::Error,
+        "Job backup failed: Step 1 exited with code 7".into()
+      )
+    );
+    assert_eq!(
+      terminal_event("backup", "Interrupted", Some("Job stop requested")),
+      (
+        NativeEventAction::Stop,
+        EventKind::Normal,
+        "Job backup was interrupted: Job stop requested".into()
+      )
+    );
+    assert_eq!(
+      terminal_event(
+        "backup",
+        "Succeeded",
+        Some("A recovery pass observed the runtime")
+      ),
+      (
+        NativeEventAction::Finish,
+        EventKind::Normal,
+        "Job backup completed successfully".into()
+      )
+    );
+  }
+
+  #[test]
   fn job_preparation_failure_reports_safe_specific_causes() {
     let missing = utils::secret::missing_secret_reference("registry.test");
     let image = preparation_failure("image", &missing);
@@ -1087,6 +1229,33 @@ mod tests {
       observation(&runtime).unwrap(),
       JobRuntimeObservation::Running
     );
+  }
+  #[test]
+  fn job_exit_requires_a_matching_stopped_container_to_report_oom() {
+    let mut runtime = ContainerInspectResponse {
+      id: Some("container".into()),
+      state: Some(ContainerState {
+        running: Some(false),
+        exit_code: Some(137),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    assert!(!confirmed_oom_exit(&runtime, "container", 137));
+    assert_eq!(
+      step_exit_reason(1, 137, false),
+      "Step 1 exited with code 137"
+    );
+    runtime.state.as_mut().unwrap().oom_killed = Some(true);
+    assert!(confirmed_oom_exit(&runtime, "container", 137));
+    assert_eq!(
+      step_exit_reason(1, 137, true),
+      "Step 1 ran out of memory (exit code 137)"
+    );
+    assert!(!confirmed_oom_exit(&runtime, "other-container", 137));
+    assert!(!confirmed_oom_exit(&runtime, "container", 1));
+    runtime.state.as_mut().unwrap().running = Some(true);
+    assert!(!confirmed_oom_exit(&runtime, "container", 137));
   }
 }
 

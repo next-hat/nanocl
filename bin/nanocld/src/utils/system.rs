@@ -21,8 +21,7 @@ use nanocl_stubs::{
   process::ProcessPartial,
   resource_key::ResourceKey,
   system::{
-    EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
-    ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial,
+    EventPartial, ObjPsHealthStatusKind, ObjPsStatusKind, ObjPsStatusPartial,
   },
 };
 
@@ -672,21 +671,10 @@ pub(crate) async fn refresh_process_observations(
 /// Let observers re-read observations after a completed scan, including partial
 /// results. Each subscriber decides how to update its runtime.
 pub(crate) fn emit_process_sync(state: &SystemState) {
-  state.spawn_emit_event(EventPartial {
-    reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-    reporting_node: state.inner.config.hostname.clone(),
-    kind: EventKind::Normal,
-    action: NativeEventAction::Update.to_string(),
-    reason: "state_sync".to_owned(),
-    note: Some("Local process observation scan completed".to_owned()),
-    actor: Some(EventActor {
-      key: None,
-      kind: EventActorKind::Process,
-      attributes: None,
-    }),
-    related: None,
-    metadata: None,
-  });
+  state.spawn_emit_event(EventPartial::process_inventory_sync(
+    state.inner.config.hostname.clone(),
+    vars::CONTROLLER_NAME.to_owned(),
+  ));
 }
 
 /// Rebuild observed process rows and adopt installer/bootstrap Cargoes whose

@@ -6,7 +6,7 @@ use std::{
 
 use bollard_next::query_parameters::ListContainersOptions;
 use nanocl_error::io::{IoError, IoResult};
-use nanocl_stubs::system::NativeEventAction;
+use nanocl_stubs::system::{EventKind, NativeEventAction};
 
 use crate::{
   models::{
@@ -254,9 +254,23 @@ pub(crate) async fn recover_one(
     {
       log::warn!("Cargo recovery owner cleanup deferred: {error}");
     }
+    let metadata = Some(serde_json::json!({
+      "Operation": candidate.key, "SpecKey": candidate.spec_key,
+    }));
+    let actor = cargo.into();
     if deleted {
       state
-        .emit_normal_native_action_sync(&cargo, NativeEventAction::Destroy)
+        .emit_action_sync(
+          &actor,
+          NativeEventAction::Destroy,
+          EventKind::Normal,
+          "state_sync",
+          Some(format!(
+            "Recovery confirmed deletion of Cargo {}",
+            candidate.resource_key
+          )),
+          metadata,
+        )
         .await;
       return Ok(true);
     }
@@ -267,7 +281,18 @@ pub(crate) async fn recover_one(
       "delete" => NativeEventAction::Destroying,
       _ => NativeEventAction::Restart,
     };
-    state.emit_error_native_action(&cargo, action, Some(format!("Cargo operation {} ({}) was interrupted; its local runtime was observed without replay", candidate.key, candidate.action)));
+    let note = format!(
+      "Cargo {} {} was interrupted. Recovery inspected the local runtime without repeating operation {}.",
+      candidate.resource_key, candidate.action, candidate.key,
+    );
+    state.emit_action(
+      &actor,
+      action,
+      EventKind::Error,
+      "state_sync",
+      Some(note),
+      metadata,
+    );
   }
   Ok(finished)
 }

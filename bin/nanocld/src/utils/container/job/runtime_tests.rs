@@ -1329,6 +1329,7 @@ async fn job_runtime_delayed_old_observation_cannot_rewrite_successor() {
     &first.run,
     "Failed",
     Some("Delayed previous executor result".into()),
+    None,
     &first_owner,
     &fixture.state,
   )

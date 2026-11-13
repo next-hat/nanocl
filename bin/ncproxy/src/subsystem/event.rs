@@ -16,7 +16,7 @@ use nanocld_client::{
     resource::ResourcePartial,
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
     system::Event,
-    system::{EventActorKind, EventKind, NativeEventAction},
+    system::{EventActorKind, NativeEventAction},
   },
 };
 
@@ -24,15 +24,6 @@ use crate::{models::SystemStateRef, utils, vars};
 
 const RETRY_DELAY: Duration = Duration::from_secs(2);
 const MAX_RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(30);
-
-fn is_state_sync(event: &Event) -> bool {
-  event.kind == EventKind::Normal
-    && event.action == NativeEventAction::Update.to_string()
-    && event.reason == "state_sync"
-    && event.actor.as_ref().is_some_and(|actor| {
-      actor.kind == EventActorKind::Process && actor.key.is_none()
-    })
-}
 
 fn cargo_has_committed_start(
   cargo: &nanocld_client::stubs::cargo::CargoInspect,
@@ -304,7 +295,8 @@ async fn consume_events<S, E, H, HF, R, RF>(
     // Poll the retained timer first so a busy event stream cannot postpone it.
     match select(&mut retry, stream.next()).await {
       Either::Left(_) => {}
-      Either::Right((Some(Ok(event)), _)) if is_state_sync(&event) => {}
+      Either::Right((Some(Ok(event)), _))
+        if event.is_process_inventory_sync() => {}
       Either::Right((Some(Ok(event)), _)) => {
         if let Err(err) = handle(event).await {
           log::warn!("event::loop: {err}");
@@ -380,7 +372,7 @@ pub(crate) fn spawn(state: &SystemStateRef) {
 mod tests {
   use nanocld_client::stubs::{
     cargo::CargoInspect,
-    system::{ObjPsHealthStatusKind, ObjPsStatusKind},
+    system::{EventKind, ObjPsHealthStatusKind, ObjPsStatusKind},
   };
 
   use super::*;
@@ -403,24 +395,24 @@ mod tests {
   #[test]
   fn only_completed_inventory_events_trigger_recovery() {
     let event = state_sync_event();
-    assert!(is_state_sync(&event));
+    assert!(event.is_process_inventory_sync());
     let mut changed = event.clone();
     changed.kind = EventKind::Error;
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
     changed = event.clone();
     changed.action = NativeEventAction::Healthy.to_string();
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
     changed = event.clone();
     changed.reason = "health_status".into();
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
     changed = event.clone();
     changed.actor.as_mut().unwrap().key = Some("container-id".into());
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
     changed = event.clone();
     changed.actor.as_mut().unwrap().kind = EventActorKind::Cargo;
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
     changed.actor = None;
-    assert!(!is_state_sync(&changed));
+    assert!(!changed.is_process_inventory_sync());
   }
 
   #[ntex::test]

@@ -19,7 +19,7 @@ list - List existing events
 List existing events
 
 By default, the compact table shows AGE in seconds (`s`), minutes (`m`),
-hours (`h`), or days (`d`). Use `--wide` to show the reporting node and exact creation timestamp.
+hours (`h`), or days (`d`). Use `--wide` to show the actor, reason, reporting node, and exact creation timestamp.
 
 ## OPTIONS
 

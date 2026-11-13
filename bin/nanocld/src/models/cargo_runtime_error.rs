@@ -12,7 +12,7 @@ pub(crate) enum CargoRuntimeError {
   /// A remote node reported a reference verified against the accepted spec.
   RemoteMissingSecret(String),
   /// Docker confirmed a nonzero init-container exit.
-  InitExit(i64),
+  InitExit { code: i64, oom_killed: bool },
 }
 
 impl CargoRuntimeError {
@@ -37,10 +37,13 @@ impl CargoRuntimeError {
     ))
   }
 
-  pub(crate) fn init_exit(code: i64) -> IoError {
+  pub(crate) fn init_exit(code: i64, oom_killed: bool) -> IoError {
     IoError::with_context(
       "CargoInitContainerExit",
-      io::Error::new(io::ErrorKind::Interrupted, Self::InitExit(code)),
+      io::Error::new(
+        io::ErrorKind::Interrupted,
+        Self::InitExit { code, oom_killed },
+      ),
     )
   }
 
@@ -73,7 +76,16 @@ impl fmt::Display for CargoRuntimeError {
       Self::RemoteMissingSecret(name) => {
         write!(f, "A node reported that secret {name:?} does not exist")
       }
-      Self::InitExit(code) => {
+      Self::InitExit {
+        code,
+        oom_killed: true,
+      } => {
+        write!(f, "Init container ran out of memory (exit code {code})")
+      }
+      Self::InitExit {
+        code,
+        oom_killed: false,
+      } => {
         write!(f, "Init container exited with code {code}")
       }
     }
@@ -84,7 +96,7 @@ impl std::error::Error for CargoRuntimeError {
   fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
     match self {
       Self::Candidate(cause) => Some(cause),
-      Self::InitExit(_) | Self::RemoteMissingSecret(_) => None,
+      Self::InitExit { .. } | Self::RemoteMissingSecret(_) => None,
     }
   }
 }
