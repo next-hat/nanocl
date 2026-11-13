@@ -16,7 +16,8 @@ use nanocl_stubs::{
 use crate::{
   models::{
     AcceptedVmOperation, DistributedMutexDb, EventDb, OperationDb,
-    OperationOwner, SystemState, VmDb, VmOperationLease, VmRestartTask,
+    OperationOwner, RuntimeError, SystemState, VmDb, VmOperationLease,
+    VmRestartTask,
   },
   repositories::generic::*,
   utils, vars,
@@ -326,7 +327,7 @@ where
         Ok(())
       }
       .await;
-      let (mut result, settled) = match admission {
+      let mut result = match admission {
         Ok(()) => {
           log::debug!(
             "Executing VM task: {key} {task_action} operation={operation} revision={revision}"
@@ -352,7 +353,7 @@ where
             .await
           }
         }
-        Err(error) => (Err(error), false),
+        Err(error) => Err(RuntimeError::unconfirmed(error)),
       };
       // Runtime helpers settle ordinary outcomes under this same owner. A
       // still-pending row is retained for evidence-based recovery after exit.
@@ -360,7 +361,7 @@ where
       // with removing the live row; it cannot be completed a second time.
       let mut completed =
         accepted_operation.action == "delete" && result.is_ok();
-      if settled && !completed {
+      if !completed && !result.as_ref().is_err_and(RuntimeError::is_uncertain) {
         match VmDb::complete_operation(
           &accepted_operation,
           if result.is_ok() {
@@ -424,7 +425,7 @@ where
         return Ok(());
       }
       if let Some(restart) = restart {
-        let _ = restart.completion.send(result.clone());
+        return finish_restart(restart.completion, result, completed);
       }
       result
     });
@@ -562,14 +563,16 @@ fn require_committed_result(
   result: IoResult<()>,
   completed: bool,
 ) -> IoResult<()> {
-  result?;
-  if !completed {
-    return Err(IoError::interrupted(
+  if completed {
+    return result;
+  }
+  let error = result.err().unwrap_or_else(|| {
+    IoError::interrupted(
       "VM operation",
       "Runtime work finished but operation completion was not recorded",
-    ));
-  }
-  Ok(())
+    )
+  });
+  Err(RuntimeError::unconfirmed(error))
 }
 
 fn result_after_cleanup(
@@ -584,6 +587,18 @@ fn result_after_cleanup(
   } else {
     result.and(cleanup)
   }
+}
+
+fn finish_restart(
+  reply: tokio::sync::oneshot::Sender<IoResult<()>>,
+  result: IoResult<()>,
+  completed: bool,
+) -> IoResult<()> {
+  // Restart events describe the runtime action. Its synchronous caller also
+  // needs durable completion and receives the original typed error.
+  let notification = result.clone();
+  let _ = reply.send(require_committed_result(result, completed));
+  notification
 }
 
 fn report_task_error(
@@ -722,7 +737,12 @@ mod tests {
       status_code: 503,
       message: "secret-value-must-not-persist".into(),
     };
-    let diagnostic = vm_failure_diagnostic(&docker.map_err_context(|| "VM"));
+    let unconfirmed =
+      RuntimeError::unconfirmed(docker.map_err_context(|| "VM"));
+    assert!(RuntimeError::is_uncertain(&unconfirmed));
+    let observed = RuntimeError::into_cause(unconfirmed);
+    assert!(!RuntimeError::is_uncertain(&observed));
+    let diagnostic = vm_failure_diagnostic(&observed);
     assert!(diagnostic.contains("Docker HTTP 503"));
     assert!(!diagnostic.contains("secret-value"));
     let timed_out = IoError::with_context(
@@ -789,6 +809,7 @@ mod tests {
     assert!(super::require_committed_result(Ok(()), true).is_ok());
     let incomplete =
       super::require_committed_result(Ok(()), false).unwrap_err();
+    assert!(RuntimeError::is_uncertain(&incomplete));
     assert_eq!(incomplete.inner.kind(), std::io::ErrorKind::Interrupted);
     for completed in [false, true] {
       let error = super::require_committed_result(
@@ -798,6 +819,8 @@ mod tests {
       .unwrap_err();
       assert_eq!(error.context(), Some("runtime"));
       assert_eq!(error.inner.kind(), std::io::ErrorKind::Other);
+      assert_eq!(RuntimeError::is_uncertain(&error), !completed);
+      assert_eq!(error.inner.to_string(), "start failed");
     }
   }
 
@@ -856,6 +879,48 @@ mod tests {
         .context(),
       Some("cleanup")
     );
+  }
+
+  #[test]
+  fn vm_restart_reply_requires_durable_completion_after_cleanup() {
+    use bollard_next::errors::Error as DockerError;
+    use nanocl_error::io::FromIo;
+
+    let finish = |runtime, completed, cleanup| {
+      let (send, mut receive) = tokio::sync::oneshot::channel();
+      let result = result_after_cleanup(runtime, completed, cleanup);
+      let notification = finish_restart(send, result, completed);
+      (receive.try_recv().unwrap(), notification)
+    };
+    let (reply, notification) = finish(Ok(()), false, Ok(()));
+    let error = reply.unwrap_err();
+    assert!(RuntimeError::is_uncertain(&error));
+    assert_eq!(error.context(), Some("VM operation"));
+    assert!(notification.is_ok());
+
+    let cleanup = || Err(IoError::other("cleanup", "mutex unavailable"));
+    let (reply, notification) = finish(Ok(()), true, cleanup());
+    assert!(reply.is_ok());
+    assert!(notification.is_ok());
+    let (reply, notification) = finish(Ok(()), false, cleanup());
+    assert_eq!(reply.unwrap_err().context(), Some("cleanup"));
+    assert_eq!(notification.unwrap_err().context(), Some("cleanup"));
+
+    let failed =
+      DockerError::RequestTimeoutError.map_err_context(|| "VM restart");
+    let (reply, _) = finish(Err(*failed), false, cleanup());
+    let error = reply.unwrap_err();
+    assert!(RuntimeError::is_uncertain(&error));
+    let cause = RuntimeError::into_cause(error);
+    assert_eq!(cause.context(), Some("VM restart"));
+    assert_eq!(cause.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(matches!(
+      cause
+        .inner
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<DockerError>()),
+      Some(DockerError::RequestTimeoutError)
+    ));
   }
 
   use nanocl_stubs::system::{

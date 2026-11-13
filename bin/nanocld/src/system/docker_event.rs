@@ -75,6 +75,19 @@ fn labels_describe_active_cargo_runtime(
   }
 }
 
+fn cargo_pause_affects_readiness(
+  kind: &EventActorKind,
+  action: &str,
+  event_name: &str,
+  current_name: &str,
+  labels: &HashMap<String, String>,
+) -> bool {
+  kind == &EventActorKind::Cargo
+    && matches!(action, "pause" | "unpause")
+    && labels_describe_active_cargo_runtime(event_name, Some(labels))
+    && labels_describe_active_cargo_runtime(current_name, Some(labels))
+}
+
 fn reconciliation_owns_cargo_health(actual: &str, prev_actual: &str) -> bool {
   actual == ObjPsStatusKind::Updating.to_string()
     || actual == ObjPsStatusKind::Starting.to_string()
@@ -875,7 +888,18 @@ async fn exec_docker(
   }
   state.spawn_emit_event(event);
   if !observation_refreshed {
-    let _ = refresh_process_observation(&id, &name, &kind, state).await?;
+    let current_name =
+      refresh_process_observation(&id, &name, &kind, state).await?;
+    if cargo_pause_affects_readiness(
+      &kind,
+      action,
+      &name,
+      &current_name,
+      &attributes,
+    ) {
+      let _ =
+        reduce_cargo_runtime_readiness(&kind_key, &id, action, state).await?;
+    }
   }
   Ok(())
 }
@@ -1429,6 +1453,52 @@ mod tests {
       vec![NativeEventAction::Start, NativeEventAction::Healthy]
     );
     assert!(successful_cargo_readiness_actions(false, false).is_empty());
+  }
+
+  #[test]
+  fn pause_and_unpause_reconcile_only_active_required_cargo_runtime() {
+    let app = HashMap::from([
+      (LABEL_CARGO_ROLE.into(), "app".into()),
+      (LABEL_CARGO_ESSENTIAL.into(), "true".into()),
+    ]);
+    let sandbox = HashMap::from([(LABEL_CARGO_ROLE.into(), "sandbox".into())]);
+    let optional = HashMap::from([
+      (LABEL_CARGO_ROLE.into(), "app".into()),
+      (LABEL_CARGO_ESSENTIAL.into(), "false".into()),
+    ]);
+    let init = HashMap::from([(LABEL_CARGO_ROLE.into(), "init".into())]);
+    let current = "demo-api.c";
+    for action in ["pause", "unpause"] {
+      let affects = |kind, event_name, current_name, labels| {
+        cargo_pause_affects_readiness(
+          &kind,
+          action,
+          event_name,
+          current_name,
+          labels,
+        )
+      };
+      for required in [&app, &sandbox] {
+        assert!(affects(EventActorKind::Cargo, current, current, required));
+      }
+      for skipped in [&optional, &init] {
+        assert!(!affects(EventActorKind::Cargo, current, current, skipped));
+      }
+      for rollout in ["demo-api.tmp.c", "demo-api.candidate.c"] {
+        assert!(!affects(EventActorKind::Cargo, rollout, current, &app));
+        assert!(!affects(EventActorKind::Cargo, current, rollout, &app));
+      }
+      for kind in [EventActorKind::Vm, EventActorKind::Job] {
+        assert!(!affects(kind, current, current, &app));
+      }
+    }
+    assert!(!cargo_pause_affects_readiness(
+      &EventActorKind::Cargo,
+      "rename",
+      current,
+      current,
+      &app,
+    ));
   }
 
   #[test]

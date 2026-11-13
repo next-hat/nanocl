@@ -4,6 +4,9 @@ use std::{
   time::{Duration, Instant},
 };
 
+use bollard_next::models::{
+  ContainerInspectResponse, ContainerStateStatusEnum,
+};
 use bollard_next::query_parameters::{
   InspectContainerOptions, ListContainersOptions, RemoveContainerOptions,
   RenameContainerOptions, StartContainerOptions, StopContainerOptions,
@@ -25,9 +28,9 @@ use crate::{
   models::{
     CargoCandidateFailure, CargoDb, CargoPreviousRuntime, CargoReplicaDb,
     CargoReplicaProcessDb, CargoReplicaProcessRole, CargoRuntimeContext,
-    CompileDeclaredOpts, EnsureExistingSlotOpts, NewCargoReplicaProcessDb,
-    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, ProcessUpdateDb,
-    SystemState,
+    CargoRuntimeError, CompileDeclaredOpts, EnsureExistingSlotOpts,
+    NewCargoReplicaProcessDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    ProcessDb, ProcessUpdateDb, RuntimeError, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -72,9 +75,9 @@ pub(crate) use init::{fail_next_init_wait, pause_next_init_start};
 pub use readiness::has_container_healthcheck;
 pub(crate) use readiness::{all_desired_replicas_ready, promotion_actions};
 use readiness::{
-  healthcheck_enabled, observed_container_ready, observed_container_running,
+  container_is_paused, healthcheck_enabled, observed_container_ready,
   required_candidate_topology_complete, required_slots_ready,
-  requires_steady_state_readiness,
+  requires_steady_state_readiness, running_for_readiness,
 };
 #[cfg(test)]
 pub(crate) use replacement::stop_fault::forget_next_init_stop;
@@ -660,14 +663,61 @@ async fn inspect_process(
   process_key: &str,
   state: &SystemState,
 ) -> IoResult<bollard_next::models::ContainerInspectResponse> {
-  Ok(
-    state
-      .inner
-      .docker_api
-      .inspect_container(process_key, None::<InspectContainerOptions>)
-      .await
-      .map_err(|error| error.map_err_context(|| "InspectCargoProcess"))?,
-  )
+  state
+    .inner
+    .docker_api
+    .inspect_container(process_key, None::<InspectContainerOptions>)
+    .await
+    .map_err(|error| {
+      CargoRuntimeError::candidate(
+        error.map_err_context(|| "InspectCargoProcess"),
+      )
+    })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ProcessStartAction {
+  AlreadyRunning,
+  Start,
+  Unpause,
+}
+
+fn process_start_action(
+  inspected: &ContainerInspectResponse,
+) -> ProcessStartAction {
+  if container_is_paused(inspected) {
+    ProcessStartAction::Unpause
+  } else if inspected.state.as_ref().and_then(|state| state.running)
+    == Some(true)
+  {
+    ProcessStartAction::AlreadyRunning
+  } else {
+    ProcessStartAction::Start
+  }
+}
+
+fn unpause_confirmed(id: &str, observed: &ContainerInspectResponse) -> bool {
+  observed.id.as_deref() == Some(id)
+    && process_start_action(observed) == ProcessStartAction::AlreadyRunning
+    && observed
+      .state
+      .as_ref()
+      .and_then(|state| state.status.as_ref())
+      == Some(&ContainerStateStatusEnum::RUNNING)
+}
+
+fn settle_unpause_error(
+  id: &str,
+  error: bollard_next::errors::Error,
+  inspection: IoResult<ContainerInspectResponse>,
+) -> IoResult<()> {
+  // Another caller may have resumed the container, or Docker may have lost
+  // the reply. Only an inspection of this exact ID proves the desired state.
+  let observed = inspection?;
+  if unpause_confirmed(id, &observed) {
+    return Ok(());
+  }
+  Err(lifecycle::start_docker_error(error))
 }
 
 async fn start_process(
@@ -676,27 +726,31 @@ async fn start_process(
 ) -> IoResult<()> {
   lifecycle::validate_process(&process.key, state).await?;
   let inspected = inspect_process(&process.key, state).await?;
-  if inspected
-    .state
-    .as_ref()
-    .and_then(|state| state.running)
-    .unwrap_or_default()
-  {
-    return Ok(());
-  }
-  match state
-    .inner
-    .docker_api
-    .start_container(&process.key, None::<StartContainerOptions>)
-    .await
-  {
-    Ok(_)
-    | Err(bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 304,
-      ..
-    }) => Ok(()),
-    Err(error) => {
-      Err(lifecycle::runtime_docker_error(error, "StartCargoProcess"))
+  let docker = &state.inner.docker_api;
+  match process_start_action(&inspected) {
+    ProcessStartAction::AlreadyRunning => Ok(()),
+    ProcessStartAction::Start => {
+      match docker
+        .start_container(&process.key, None::<StartContainerOptions>)
+        .await
+      {
+        Ok(_)
+        | Err(bollard_next::errors::Error::DockerResponseServerError {
+          status_code: 304,
+          ..
+        }) => Ok(()),
+        Err(error) => Err(lifecycle::start_docker_error(error)),
+      }
+    }
+    ProcessStartAction::Unpause => {
+      match docker.unpause_container(&process.key).await {
+        Ok(()) => Ok(()),
+        Err(error) => settle_unpause_error(
+          &process.key,
+          error,
+          inspect_process(&process.key, state).await,
+        ),
+      }
     }
   }
 }
@@ -726,7 +780,9 @@ async fn stop_process(
       status_code: 304,
       ..
     }) => Ok(()),
-    Err(error) => Err(*error.map_err_context(|| "StopCargoProcess")),
+    Err(error) => Err(RuntimeError::unconfirmed(
+      error.map_err_context(|| "StopCargoProcess"),
+    )),
   }
 }
 
@@ -744,10 +800,7 @@ async fn wait_until_ready(
     {
       let inspected = inspect_process(&slot.process.key, state).await?;
       let container_state = inspected.state.as_ref();
-      let running = container_state
-        .and_then(|state| state.running)
-        .unwrap_or_default();
-      if !running {
+      if !running_for_readiness(&inspected) {
         let status = container_state
           .and_then(|state| state.status.as_ref())
           .map(ToString::to_string)
@@ -975,6 +1028,24 @@ fn restart_topology_error(cargo_key: &str, reason: &str) -> IoError {
   )
 }
 
+fn validate_restart_sandbox(process: &Process) -> IoResult<()> {
+  if running_for_readiness(&process.data) {
+    return Ok(());
+  }
+  let status = if container_is_paused(&process.data) {
+    "paused"
+  } else {
+    "not running"
+  };
+  Err(restart_topology_error(
+    &process.kind_key,
+    &format!(
+      "sandbox process {} is {status} and will not be repaired by restart",
+      process.key
+    ),
+  ))
+}
+
 async fn preflight_cargo_restart(
   plan: &mut CargoRestartPlan,
   state: &SystemState,
@@ -1010,16 +1081,8 @@ async fn preflight_cargo_restart(
         ),
       ));
     }
-    if slot.role == CargoReplicaProcessRole::Sandbox
-      && !observed_container_running(&slot.process.data)
-    {
-      return Err(restart_topology_error(
-        &slot.process.kind_key,
-        &format!(
-          "sandbox process {} is not running and will not be repaired by restart",
-          slot.process.key
-        ),
-      ));
+    if slot.role == CargoReplicaProcessRole::Sandbox {
+      validate_restart_sandbox(&slot.process)?;
     }
   }
   Ok(())
@@ -1087,7 +1150,11 @@ pub(crate) async fn restart(
       .docker_api
       .restart_container(&slot.process.key, None)
       .await
-      .map_err(|error| error.map_err_context(|| "RestartCargoProcess"))?;
+      .map_err(|error| {
+        RuntimeError::unconfirmed(
+          error.map_err_context(|| "RestartCargoProcess"),
+        )
+      })?;
   }
   let any_healthcheck = wait_until_ready(&plan.slots, state).await?;
   refresh_slot_observations(&mut plan.slots, state).await?;
@@ -1209,13 +1276,11 @@ async fn active_slots(
             &state.inner.pool,
           )
           .await
-          .map_err(|error| {
-            IoError::with_context("Cargo rollback", error.inner)
-          })?;
+          .map_err(rollback_error)?;
           continue;
         }
         Err(error) => {
-          return Err(IoError::with_context("Cargo rollback", error.inner));
+          return Err(rollback_error(error));
         }
       };
     let identity = process_identity(&process)?;
@@ -1288,7 +1353,14 @@ fn previous_running_state(
 }
 
 fn previous_snapshot_error(error: IoError) -> IoError {
-  IoError::with_context("Cargo update preflight", error.inner)
+  CargoRuntimeError::settle_candidate("Cargo update preflight", error)
+}
+
+fn rollback_error(error: IoError) -> IoError {
+  RuntimeError::unconfirmed(IoError::with_context(
+    "Cargo rollback",
+    error.inner,
+  ))
 }
 
 fn previous_runtime_matches_ids<'a>(
@@ -1356,13 +1428,13 @@ async fn capture_previous_runtime(
   let count = usize::try_from(
     ProcessDb::count_by(&filter, &state.inner.pool)
       .await
-      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?,
+      .map_err(rollback_error)?,
   )
   .map_err(|_| rollback_result(true).unwrap_err())?;
   let processes =
     ProcessDb::transform_read_by(&filter.limit(count), &state.inner.pool)
       .await
-      .map_err(|error| IoError::with_context("Cargo rollback", error.inner))?;
+      .map_err(rollback_error)?;
   if processes.len() != count {
     return Err(rollback_result(true).unwrap_err());
   }
@@ -1458,7 +1530,11 @@ async fn rename_old_slots(
         RenameContainerOptions { name: name.clone() },
       )
       .await
-      .map_err(|error| error.map_err_context(|| "RenameCargoProcess"))?;
+      .map_err(|error| {
+        CargoRuntimeError::candidate(
+          error.map_err_context(|| "RenameCargoProcess"),
+        )
+      })?;
     slot.process.name = name.clone();
     ProcessDb::update_owned(
       &slot.process.key,
@@ -1504,7 +1580,11 @@ async fn set_candidate_marker(
           RenameContainerOptions { name: name.clone() },
         )
         .await
-        .map_err(|error| error.map_err_context(|| "MarkCargoCandidate"))?;
+        .map_err(|error| {
+          CargoRuntimeError::candidate(
+            error.map_err_context(|| "MarkCargoCandidate"),
+          )
+        })?;
       slot.process.name = name.clone();
     }
     ProcessDb::update_owned(
@@ -1778,14 +1858,8 @@ fn rollback_can_resolve_candidate_failure(
   tracked_candidate_removed
     && previous_retained
     && matches!(
-      error.context(),
-      Some(
-        "CargoInitContainer"
-          | "InspectCargoProcess"
-          | "StartCargoProcess"
-          | "RenameCargoProcess"
-          | "MarkCargoCandidate"
-      )
+      CargoRuntimeError::get(error),
+      Some(CargoRuntimeError::Candidate(_))
     )
 }
 
@@ -1794,7 +1868,7 @@ fn confirmed_rollback_error(error: IoError, confirmed: bool) -> IoError {
     return rollback_result(true).unwrap_err();
   }
   if rollback_can_resolve_candidate_failure(&error, true, true) {
-    IoError::with_context("Cargo update rolled back", error.inner)
+    CargoRuntimeError::settle_candidate("Cargo update rolled back", error)
   } else {
     error
   }
@@ -1954,10 +2028,10 @@ fn previous_attachments(
 
 fn rollback_result(failed: bool) -> IoResult<()> {
   if failed {
-    Err(IoError::interrupted(
+    Err(RuntimeError::unconfirmed(IoError::interrupted(
       "Cargo rollback",
       "Cargo cleanup or restoration was not fully confirmed; operation remains pending",
-    ))
+    )))
   } else {
     Ok(())
   }
@@ -2143,7 +2217,7 @@ async fn snapshot_prepared_candidate_readiness(
   {
     let slot = &mut prepared[replica_index].candidate.slots[slot_index];
     let slot_ready = if slot.role == CargoReplicaProcessRole::Sandbox {
-      observed_container_running(&inspected)
+      running_for_readiness(&inspected)
     } else {
       observed_container_ready(&inspected)
     };
@@ -2642,10 +2716,10 @@ pub async fn delete_instances(
       })
       .await
       .map_err(|_| {
-        IoError::interrupted(
+        RuntimeError::unconfirmed(IoError::interrupted(
           "Cargo remote execution",
           "Node did not confirm deletion of the accepted Cargo runtime",
-        )
+        ))
       })?;
   }
   Ok(())
@@ -2675,6 +2749,97 @@ mod tests {
   };
 
   use super::*;
+
+  #[test]
+  fn start_action_unpauses_by_flag_or_status_and_starts_stopped_processes() {
+    use ProcessStartAction::{AlreadyRunning, Start, Unpause};
+    use bollard_next::models::ContainerStateStatusEnum::{
+      EXITED, PAUSED, RUNNING,
+    };
+
+    for (running, paused, status, expected) in [
+      (Some(true), Some(true), None, Unpause),
+      (Some(true), None, Some(PAUSED), Unpause),
+      (None, None, Some(PAUSED), Unpause),
+      (Some(true), Some(false), Some(RUNNING), AlreadyRunning),
+      (Some(false), Some(false), Some(EXITED), Start),
+      (None, None, None, Start),
+    ] {
+      let inspected = ContainerInspectResponse {
+        state: Some(ContainerState {
+          running,
+          paused,
+          status,
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      assert_eq!(process_start_action(&inspected), expected);
+    }
+    assert_eq!(
+      process_start_action(&ContainerInspectResponse::default()),
+      Start
+    );
+  }
+
+  #[test]
+  fn unpause_errors_require_a_fresh_running_observation_of_the_same_process() {
+    use bollard_next::errors::Error as DockerError;
+
+    let response = |status_code| DockerError::DockerResponseServerError {
+      status_code,
+      message: "unpause failed".into(),
+    };
+    let mut observed = ContainerInspectResponse {
+      id: Some("owned-id".to_owned()),
+      state: Some(ContainerState {
+        running: Some(true),
+        status: Some(ContainerStateStatusEnum::RUNNING),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    for error in [
+      response(409),
+      response(500),
+      DockerError::RequestTimeoutError,
+    ] {
+      assert!(
+        settle_unpause_error("owned-id", error, Ok(observed.clone())).is_ok()
+      );
+    }
+    assert!(!unpause_confirmed("other-id", &observed));
+    for status in [
+      Some(ContainerStateStatusEnum::RESTARTING),
+      Some(ContainerStateStatusEnum::PAUSED),
+      None,
+    ] {
+      observed.state.as_mut().unwrap().status = status;
+      assert!(!unpause_confirmed("owned-id", &observed));
+    }
+    let state = observed.state.as_mut().unwrap();
+    state.status = Some(ContainerStateStatusEnum::RUNNING);
+    state.paused = Some(true);
+    for (status, uncertain) in [(409, false), (500, true)] {
+      let error = settle_unpause_error(
+        "owned-id",
+        response(status),
+        Ok(observed.clone()),
+      )
+      .unwrap_err();
+      assert_eq!(RuntimeError::is_uncertain(&error), uncertain);
+    }
+    for status in [409, 500] {
+      let unavailable = CargoRuntimeError::candidate(IoError::interrupted(
+        "InspectCargoProcess",
+        "inspection failed",
+      ));
+      let error =
+        settle_unpause_error("owned-id", response(status), Err(unavailable))
+          .unwrap_err();
+      assert!(RuntimeError::is_uncertain(&error));
+    }
+  }
 
   pub(super) fn declared_container(
     name: &str,
@@ -3404,14 +3569,15 @@ mod tests {
 
   #[test]
   fn previous_snapshot_failure_is_terminal_only_after_prior_rollback() {
-    let error = previous_snapshot_error(IoError::interrupted(
-      "InspectCargoProcess",
-      "read failed",
+    let error = previous_snapshot_error(CargoRuntimeError::candidate(
+      IoError::interrupted("InspectCargoProcess", "read failed"),
     ));
     assert_eq!(error.context(), Some("Cargo update preflight"));
     assert_eq!(error.inner.to_string(), "read failed");
+    assert!(!RuntimeError::is_uncertain(&error));
     let error = confirmed_rollback_error(error, false);
     assert_eq!(error.context(), Some("Cargo rollback"));
+    assert!(RuntimeError::is_uncertain(&error));
   }
 
   #[test]
@@ -3476,60 +3642,52 @@ mod tests {
 
   #[test]
   fn confirmed_rollback_requires_tracked_candidate_and_previous_runtime() {
-    for context in [
-      "CargoInitContainer",
-      "InspectCargoProcess",
-      "StartCargoProcess",
-    ] {
-      let error =
-        IoError::interrupted(context, "unknown candidate observation");
-      assert!(rollback_can_resolve_candidate_failure(&error, true, true));
-      assert!(!rollback_can_resolve_candidate_failure(&error, false, true));
-      assert!(!rollback_can_resolve_candidate_failure(&error, true, false));
-    }
-    for context in [
-      "CreateProcess",
-      "Cargo rollback",
-      "Cargo remote execution",
-      "Cargo remote observation",
-    ] {
-      let error = IoError::interrupted(context, "unknown runtime outcome");
-      assert!(!rollback_can_resolve_candidate_failure(&error, true, true));
-    }
+    let error = CargoRuntimeError::candidate(IoError::interrupted(
+      "renamed runtime check",
+      "unknown candidate observation",
+    ));
+    assert!(RuntimeError::is_uncertain(&error));
+    assert!(rollback_can_resolve_candidate_failure(&error, true, true));
+    assert!(!rollback_can_resolve_candidate_failure(&error, false, true));
+    assert!(!rollback_can_resolve_candidate_failure(&error, true, false));
+    let error = IoError::interrupted("InspectCargoProcess", "unknown outcome");
+    assert!(!rollback_can_resolve_candidate_failure(&error, true, true));
+    let error = RuntimeError::unconfirmed(error);
+    assert!(RuntimeError::is_uncertain(&error));
+    assert!(!rollback_can_resolve_candidate_failure(&error, true, true));
   }
 
   #[test]
   fn aggregate_rollback_normalizes_only_confirmed_local_failures() {
-    for context in [
-      "InspectCargoProcess",
-      "RenameCargoProcess",
-      "MarkCargoCandidate",
-    ] {
-      let error = confirmed_rollback_error(
-        IoError::interrupted(context, "original failure"),
-        true,
-      );
-      assert_eq!(error.context(), Some("Cargo update rolled back"));
-      assert_eq!(error.inner.to_string(), "original failure");
-      // Includes missing prior slots and the candidate-preserving liveness path.
-      let error = confirmed_rollback_error(
-        IoError::interrupted(context, "unconfirmed"),
-        false,
-      );
-      assert_eq!(error.context(), Some("Cargo rollback"));
-    }
-    for context in [
+    use bollard_next::errors::Error as DockerError;
+    let candidate_error = || {
+      CargoRuntimeError::candidate(
+        DockerError::RequestTimeoutError
+          .map_err_context(|| "InspectCargoProcess"),
+      )
+    };
+    let error = confirmed_rollback_error(candidate_error(), true);
+    assert_eq!(error.context(), Some("Cargo update rolled back"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+    assert!(matches!(
+      error
+        .inner
+        .get_ref()
+        .and_then(|error| error.downcast_ref::<DockerError>()),
+      Some(DockerError::RequestTimeoutError)
+    ));
+    assert!(!RuntimeError::is_uncertain(&error));
+    // Includes missing prior slots and the candidate-preserving liveness path.
+    let error = confirmed_rollback_error(candidate_error(), false);
+    assert_eq!(error.context(), Some("Cargo rollback"));
+    assert!(RuntimeError::is_uncertain(&error));
+    let error = RuntimeError::unconfirmed(IoError::interrupted(
       "CreateProcess",
-      "Cargo rollback",
-      "Cargo remote execution",
-      "Cargo remote observation",
-    ] {
-      let error = confirmed_rollback_error(
-        IoError::interrupted(context, "untracked outcome"),
-        true,
-      );
-      assert_eq!(error.context(), Some(context));
-    }
+      "untracked outcome",
+    ));
+    let error = confirmed_rollback_error(error, true);
+    assert_eq!(error.context(), Some("CreateProcess"));
+    assert!(RuntimeError::is_uncertain(&error));
   }
 
   #[test]
@@ -3540,6 +3698,7 @@ mod tests {
         false,
       );
       assert_eq!(error.context(), Some("Cargo rollback"));
+      assert!(RuntimeError::is_uncertain(&error));
     }
   }
 

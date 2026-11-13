@@ -698,7 +698,7 @@ pub(crate) async fn run_restart_owned(
   operation: &OperationDb,
   lease: &VmOperationLease,
   state: &SystemState,
-) -> (IoResult<()>, bool) {
+) -> IoResult<()> {
   let owner = Some(operation.owner());
   let result = run_lifecycle(
     key,

@@ -21,7 +21,7 @@ use crate::{
   models::{
     AcceptedJobControl, AcceptedJobRun, JobDb, JobLifecycleLock,
     JobLifecycleLocks, JobRunDb, JobRuntimeObservation, OperationGuard,
-    ProcessDb, SystemState,
+    ProcessDb, RuntimeError, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -86,14 +86,20 @@ fn preparation_failure(stage: &str, error: &IoError) -> String {
   }
 }
 
-fn create_rejected(error: &bollard_next::errors::Error) -> bool {
-  matches!(
-    error,
-    bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 400 | 404 | 409,
-      ..
-    }
-  )
+fn create_error(error: bollard_next::errors::Error) -> IoError {
+  let kind = docker_error_kind(&error);
+  if super::process::docker_request_rejected(&error) {
+    std::io::Error::new(
+      std::io::ErrorKind::InvalidInput,
+      format!("Container creation rejected ({kind})"),
+    )
+    .into()
+  } else {
+    RuntimeError::unconfirmed(std::io::Error::new(
+      std::io::ErrorKind::Interrupted,
+      format!("Container creation outcome is unconfirmed ({kind})"),
+    ))
+  }
 }
 
 fn conflict(message: &str) -> IoError {
@@ -628,46 +634,34 @@ pub(crate) async fn execute(
           }),
           config,
         )
-        .await;
+        .await
+        .map_err(create_error);
       let id = match created {
         Ok(created) => created.id,
-        Err(error) if create_rejected(&error) => {
-          let reason = format!(
-            "Container creation rejected ({})",
-            docker_error_kind(&error)
-          );
-          // Docker rejected this create request before creating a container.
-          // No exit code or start timestamp exists for this failed step.
-          JobRunDb::update_step(
-            run,
-            index,
-            "Failed",
-            None,
-            Some(reason.clone()),
-            owner.clone(),
-            &state.inner.pool,
-          )
-          .await?;
-          return finish(run, "Failed", Some(reason), owner, state).await;
-        }
         Err(error) => {
-          let reason = format!(
-            "Container creation outcome is unconfirmed ({})",
-            docker_error_kind(&error)
-          );
+          let uncertain = RuntimeError::is_uncertain(&error);
+          let reason = error.to_string();
           JobRunDb::update_step(
             run,
             index,
-            "Unknown",
+            if uncertain { "Unknown" } else { "Failed" },
             None,
             Some(reason.clone()),
             owner.clone(),
             &state.inner.pool,
           )
           .await?;
-          JobRunDb::mark_unknown(run, reason, owner.clone(), &state.inner.pool)
+          if uncertain {
+            JobRunDb::mark_unknown(
+              run,
+              reason,
+              owner.clone(),
+              &state.inner.pool,
+            )
             .await?;
-          return Ok(());
+            return Ok(());
+          }
+          return finish(run, "Failed", Some(reason), owner, state).await;
         }
       };
       if !JobRunDb::attach_container(
@@ -1011,19 +1005,28 @@ mod tests {
   #[test]
   fn job_create_rejection_excludes_server_and_transport_uncertainty() {
     for status_code in [400, 404, 409, 408, 429, 500, 503] {
-      let error = bollard_next::errors::Error::DockerResponseServerError {
-        status_code,
-        message: "secret-value-must-not-persist".into(),
+      let error =
+        create_error(bollard_next::errors::Error::DockerResponseServerError {
+          status_code,
+          message: "secret-value-must-not-persist".into(),
+        });
+      let rejected = matches!(status_code, 400 | 404 | 409);
+      assert_eq!(RuntimeError::is_uncertain(&error), !rejected);
+      let expected = if rejected {
+        format!("Container creation rejected (Docker HTTP {status_code})")
+      } else {
+        format!(
+          "Container creation outcome is unconfirmed (Docker HTTP {status_code})"
+        )
       };
-      assert_eq!(
-        create_rejected(&error),
-        matches!(status_code, 400 | 404 | 409)
-      );
-      assert!(!docker_error_kind(&error).contains("secret-value"));
+      assert_eq!(error.to_string(), expected);
     }
-    assert!(!create_rejected(
-      &bollard_next::errors::Error::RequestTimeoutError
-    ));
+    let error = create_error(bollard_next::errors::Error::RequestTimeoutError);
+    assert!(RuntimeError::is_uncertain(&error));
+    assert_eq!(
+      error.to_string(),
+      "Container creation outcome is unconfirmed (Docker transport or response error)"
+    );
   }
 
   #[test]
