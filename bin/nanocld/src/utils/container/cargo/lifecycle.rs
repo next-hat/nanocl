@@ -1,6 +1,7 @@
 use super::{
   LABEL_INCARNATION, LABEL_OPERATION, LABEL_SPEC, all_desired_replicas_ready,
-  is_rollout_process_name, process_identity, stop_process,
+  is_rollout_process_name, process_identity, running_for_readiness,
+  stop_process,
 };
 use crate::{
   models::{
@@ -482,9 +483,9 @@ fn observed_state_matches(
             return false;
           };
           if identity.role != CargoReplicaProcessRole::Init {
-            return process.data.state.as_ref().is_some_and(|state| {
-              state.running == Some(true) && state.restarting != Some(true)
-            });
+            let state = process.data.state.as_ref();
+            return running_for_readiness(&process.data)
+              && state.and_then(|state| state.restarting) != Some(true);
           }
           process.data.state.as_ref().is_some_and(|state| {
             state.running == Some(false)
@@ -795,15 +796,16 @@ mod tests {
       &processes[..1],
       &ObjPsStatusKind::Start
     ));
-    for running in [Some(false), None] {
-      processes
-        .last_mut()
-        .unwrap()
-        .data
-        .state
-        .as_mut()
-        .unwrap()
-        .running = running;
+    for (running, paused, restarting) in [
+      (Some(false), false, false),
+      (None, false, false),
+      (Some(true), true, false),
+      (Some(true), false, true),
+    ] {
+      let state = processes.last_mut().unwrap().data.state.as_mut().unwrap();
+      state.running = running;
+      state.paused = Some(paused);
+      state.restarting = Some(restarting);
       assert!(!observed_state_matches(
         &cargo,
         &replicas,
@@ -811,21 +813,6 @@ mod tests {
         &ObjPsStatusKind::Start
       ));
     }
-    *processes.last_mut().unwrap() = optional.clone();
-    processes
-      .last_mut()
-      .unwrap()
-      .data
-      .state
-      .as_mut()
-      .unwrap()
-      .restarting = Some(true);
-    assert!(!observed_state_matches(
-      &cargo,
-      &replicas,
-      &processes,
-      &ObjPsStatusKind::Start
-    ));
     *processes.last_mut().unwrap() = optional.clone();
     processes.push(optional);
     assert!(!observed_state_matches(

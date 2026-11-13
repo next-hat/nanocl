@@ -4,6 +4,9 @@ use std::{
   time::{Duration, Instant},
 };
 
+use bollard_next::models::{
+  ContainerInspectResponse, ContainerStateStatusEnum,
+};
 use bollard_next::query_parameters::{
   InspectContainerOptions, ListContainersOptions, RemoveContainerOptions,
   RenameContainerOptions, StartContainerOptions, StopContainerOptions,
@@ -72,7 +75,7 @@ pub(crate) use init::{fail_next_init_wait, pause_next_init_start};
 pub use readiness::has_container_healthcheck;
 pub(crate) use readiness::{all_desired_replicas_ready, promotion_actions};
 use readiness::{
-  healthcheck_enabled, observed_container_ready,
+  container_is_paused, healthcheck_enabled, observed_container_ready,
   required_candidate_topology_complete, required_slots_ready,
   requires_steady_state_readiness, running_for_readiness,
 };
@@ -672,32 +675,78 @@ async fn inspect_process(
     })
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ProcessStartAction {
+  AlreadyRunning,
+  Start,
+  Unpause,
+}
+
+fn process_start_action(
+  inspected: &ContainerInspectResponse,
+) -> ProcessStartAction {
+  if container_is_paused(inspected) {
+    ProcessStartAction::Unpause
+  } else if inspected.state.as_ref().and_then(|state| state.running)
+    == Some(true)
+  {
+    ProcessStartAction::AlreadyRunning
+  } else {
+    ProcessStartAction::Start
+  }
+}
+
+fn unpause_confirmed(id: &str, observed: &ContainerInspectResponse) -> bool {
+  observed.id.as_deref() == Some(id)
+    && process_start_action(observed) == ProcessStartAction::AlreadyRunning
+    && observed
+      .state
+      .as_ref()
+      .and_then(|state| state.status.as_ref())
+      == Some(&ContainerStateStatusEnum::RUNNING)
+}
+
 async fn start_process(
   process: &Process,
   state: &CargoRuntimeContext,
 ) -> IoResult<()> {
   lifecycle::validate_process(&process.key, state).await?;
   let inspected = inspect_process(&process.key, state).await?;
-  if inspected
-    .state
-    .as_ref()
-    .and_then(|state| state.running)
-    .unwrap_or_default()
-  {
-    return Ok(());
-  }
-  match state
-    .inner
-    .docker_api
-    .start_container(&process.key, None::<StartContainerOptions>)
-    .await
-  {
-    Ok(_)
-    | Err(bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 304,
-      ..
-    }) => Ok(()),
-    Err(error) => Err(lifecycle::start_docker_error(error)),
+  let docker = &state.inner.docker_api;
+  match process_start_action(&inspected) {
+    ProcessStartAction::AlreadyRunning => Ok(()),
+    ProcessStartAction::Start => {
+      match docker
+        .start_container(&process.key, None::<StartContainerOptions>)
+        .await
+      {
+        Ok(_)
+        | Err(bollard_next::errors::Error::DockerResponseServerError {
+          status_code: 304,
+          ..
+        }) => Ok(()),
+        Err(error) => Err(lifecycle::start_docker_error(error)),
+      }
+    }
+    ProcessStartAction::Unpause => {
+      match docker.unpause_container(&process.key).await {
+        // A concurrent unpause can win between our inspection and the request.
+        // Accept the conflict only after observing the same running container.
+        Err(
+          error @ bollard_next::errors::Error::DockerResponseServerError {
+            status_code: 409,
+            ..
+          },
+        ) => {
+          let observed = inspect_process(&process.key, state).await?;
+          if unpause_confirmed(&process.key, &observed) {
+            return Ok(());
+          }
+          Err(lifecycle::start_docker_error(error))
+        }
+        result => result.map_err(lifecycle::start_docker_error),
+      }
+    }
   }
 }
 
@@ -2691,6 +2740,66 @@ mod tests {
   };
 
   use super::*;
+
+  #[test]
+  fn start_action_unpauses_by_flag_or_status_and_starts_stopped_processes() {
+    use ProcessStartAction::{AlreadyRunning, Start, Unpause};
+    use bollard_next::models::ContainerStateStatusEnum::{
+      EXITED, PAUSED, RUNNING,
+    };
+
+    for (running, paused, status, expected) in [
+      (Some(true), Some(true), None, Unpause),
+      (Some(true), None, Some(PAUSED), Unpause),
+      (None, None, Some(PAUSED), Unpause),
+      (Some(true), Some(false), Some(RUNNING), AlreadyRunning),
+      (Some(false), Some(false), Some(EXITED), Start),
+      (None, None, None, Start),
+    ] {
+      let inspected = ContainerInspectResponse {
+        state: Some(ContainerState {
+          running,
+          paused,
+          status,
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      assert_eq!(process_start_action(&inspected), expected);
+    }
+    assert_eq!(
+      process_start_action(&ContainerInspectResponse::default()),
+      Start
+    );
+  }
+
+  #[test]
+  fn unpause_conflict_requires_a_fresh_running_observation_of_the_same_process()
+  {
+    let mut observed = ContainerInspectResponse {
+      id: Some("owned-id".to_owned()),
+      state: Some(ContainerState {
+        running: Some(true),
+        status: Some(ContainerStateStatusEnum::RUNNING),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    assert!(unpause_confirmed("owned-id", &observed));
+    assert!(!unpause_confirmed("other-id", &observed));
+    for status in [
+      Some(ContainerStateStatusEnum::RESTARTING),
+      Some(ContainerStateStatusEnum::PAUSED),
+      None,
+    ] {
+      observed.state.as_mut().unwrap().status = status;
+      assert!(!unpause_confirmed("owned-id", &observed));
+    }
+    let state = observed.state.as_mut().unwrap();
+    state.status = Some(ContainerStateStatusEnum::RUNNING);
+    state.paused = Some(true);
+    assert!(!unpause_confirmed("owned-id", &observed));
+  }
 
   pub(super) fn declared_container(
     name: &str,

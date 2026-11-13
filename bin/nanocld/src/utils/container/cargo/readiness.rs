@@ -127,15 +127,19 @@ pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
   })
 }
 
+pub(super) fn container_is_paused(observed: &ContainerInspectResponse) -> bool {
+  // Docker can keep Running and the previous healthcheck result while paused.
+  observed.state.as_ref().is_some_and(|state| {
+    state.paused == Some(true)
+      || state.status == Some(ContainerStateStatusEnum::PAUSED)
+  })
+}
+
 pub(super) fn running_for_readiness(
   observed: &ContainerInspectResponse,
 ) -> bool {
-  // Docker can keep Running and the previous healthcheck result while paused.
-  observed.state.as_ref().is_some_and(|state| {
-    state.running == Some(true)
-      && state.paused != Some(true)
-      && state.status != Some(ContainerStateStatusEnum::PAUSED)
-  })
+  observed.state.as_ref().and_then(|state| state.running) == Some(true)
+    && !container_is_paused(observed)
 }
 
 pub(super) fn observed_container_ready(
@@ -508,6 +512,10 @@ mod tests {
           state.paused = paused;
           state.status = status;
           assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+          let state = processes[index].data.state.as_mut().unwrap();
+          state.paused = Some(false);
+          state.status = Some(ContainerStateStatusEnum::RUNNING);
+          assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
         }
       }
     }
