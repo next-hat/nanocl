@@ -58,6 +58,40 @@ fn create_process_error(
   }
 }
 
+/// A create returned an exact ID. For Cargo, retain the row for recovery
+/// until Docker confirms absence, then require the owned deletion to commit.
+async fn failed_create_error(
+  kind: &ProcessKind,
+  cause: IoError,
+  removed: Result<(), bollard_next::errors::Error>,
+  delete_row: impl Future<Output = IoResult<()>>,
+) -> IoError {
+  if *kind != ProcessKind::Cargo {
+    let _ = delete_row.await;
+    return cause;
+  }
+  if !matches!(
+    removed,
+    Ok(())
+      | Err(bollard_next::errors::Error::DockerResponseServerError {
+        status_code: 404,
+        ..
+      })
+  ) {
+    return RuntimeError::unconfirmed(IoError::interrupted(
+      "Cargo rollback",
+      "Docker did not confirm cleanup of the newly created Cargo process",
+    ));
+  }
+  if delete_row.await.is_err() {
+    return RuntimeError::unconfirmed(IoError::interrupted(
+      "Cargo rollback",
+      "Cargo process cleanup could not be committed under its accepted owner",
+    ));
+  }
+  RuntimeError::into_cause(cause)
+}
+
 /// Create a process (container) based on the kind and the item
 #[cfg(test)]
 pub async fn create(
@@ -108,6 +142,12 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
     .await
     .map_err(|error| create_process_error(kind, error))?;
   let process_key = res.id;
+  if *kind == ProcessKind::Cargo && process_key.is_empty() {
+    return Err(RuntimeError::unconfirmed(IoError::interrupted(
+      "CreateProcess",
+      "Docker did not identify the newly created Cargo process",
+    )));
+  }
   let result = async {
     let inspect = state
       .inner
@@ -155,48 +195,35 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
     })
   }
   .await;
-  if result.is_err() {
-    let removed = state
-      .inner
-      .docker_api
-      .remove_container(
-        &process_key,
-        Some(RemoveContainerOptions {
-          force: true,
-          ..Default::default()
-        }),
-      )
-      .await;
-    if *kind == ProcessKind::Cargo
-      && !matches!(
-        removed,
-        Ok(())
-          | Err(bollard_next::errors::Error::DockerResponseServerError {
-            status_code: 404,
-            ..
-          })
-      )
-    {
-      return Err(RuntimeError::unconfirmed(IoError::interrupted(
-        "Cargo rollback",
-        "Docker did not confirm cleanup of the newly created Cargo process",
-      )));
-    }
-    let deleted = ProcessDb::delete_owned(
+  let cause = match result {
+    Ok(process) => return Ok(process),
+    Err(cause) => cause,
+  };
+  let removed = state
+    .inner
+    .docker_api
+    .remove_container(
       &process_key,
-      owner,
-      keepalive,
-      &state.inner.pool,
+      Some(RemoveContainerOptions {
+        force: true,
+        ..Default::default()
+      }),
     )
     .await;
-    if *kind == ProcessKind::Cargo && deleted.is_err() {
-      return Err(RuntimeError::unconfirmed(IoError::interrupted(
-        "Cargo rollback",
-        "Cargo process cleanup could not be committed under its accepted owner",
-      )));
-    }
-  }
-  result
+  Err(
+    failed_create_error(
+      kind,
+      cause,
+      removed,
+      ProcessDb::delete_owned(
+        &process_key,
+        owner,
+        keepalive,
+        &state.inner.pool,
+      ),
+    )
+    .await,
+  )
 }
 
 pub(crate) async fn delete_instance_owned<G: Send + 'static>(
@@ -395,6 +422,78 @@ pub(crate) async fn start_instances_owned<G: Send + 'static>(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn failed_cargo_create_preserves_cause_after_exact_cleanup() {
+    use bollard_next::errors::Error as DockerError;
+    use futures::executor::block_on;
+
+    for removed in [
+      Ok(()),
+      Err(DockerError::DockerResponseServerError {
+        status_code: 404,
+        message: "already absent".into(),
+      }),
+    ] {
+      let mut deleted = false;
+      let cause = unconfirmed_create_error(
+        &ProcessKind::Cargo,
+        DockerError::RequestTimeoutError.map_err_context(|| "CreateProcess"),
+      );
+      let error = block_on(failed_create_error(
+        &ProcessKind::Cargo,
+        cause,
+        removed,
+        async {
+          deleted = true;
+          Ok(())
+        },
+      ));
+      assert!(deleted);
+      assert!(!RuntimeError::is_uncertain(&error));
+      assert_eq!(error.context(), Some("CreateProcess"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidData);
+      assert!(matches!(
+        error
+          .inner
+          .get_ref()
+          .and_then(|source| source.downcast_ref()),
+        Some(DockerError::RequestTimeoutError)
+      ));
+    }
+  }
+
+  #[test]
+  fn failed_cargo_create_stays_uncertain_without_confirmed_cleanup() {
+    use bollard_next::errors::Error as DockerError;
+    use futures::executor::block_on;
+
+    let cause = || IoError::other("CreateProcess", "post-create failure");
+    for remove_error in [
+      DockerError::RequestTimeoutError,
+      DockerError::DockerResponseServerError {
+        status_code: 500,
+        message: "Docker failed to remove container".into(),
+      },
+    ] {
+      let error = block_on(failed_create_error(
+        &ProcessKind::Cargo,
+        cause(),
+        Err(remove_error),
+        async { panic!("the row must remain until Docker confirms absence") },
+      ));
+      assert_eq!(error.context(), Some("Cargo rollback"));
+      assert!(RuntimeError::is_uncertain(&error));
+    }
+    let error = block_on(failed_create_error(
+      &ProcessKind::Cargo,
+      cause(),
+      Ok(()),
+      async { Err(IoError::other("ProcessDb", "owner changed")) },
+    ));
+    assert_eq!(error.context(), Some("Cargo rollback"));
+    assert!(RuntimeError::is_uncertain(&error));
+  }
 
   #[test]
   fn cargo_create_rejection_is_definitive_without_changing_other_kinds() {

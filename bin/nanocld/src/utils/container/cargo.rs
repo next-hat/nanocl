@@ -706,6 +706,20 @@ fn unpause_confirmed(id: &str, observed: &ContainerInspectResponse) -> bool {
       == Some(&ContainerStateStatusEnum::RUNNING)
 }
 
+fn settle_unpause_error(
+  id: &str,
+  error: bollard_next::errors::Error,
+  inspection: IoResult<ContainerInspectResponse>,
+) -> IoResult<()> {
+  // Another caller may have resumed the container, or Docker may have lost
+  // the reply. Only an inspection of this exact ID proves the desired state.
+  let observed = inspection?;
+  if unpause_confirmed(id, &observed) {
+    return Ok(());
+  }
+  Err(lifecycle::start_docker_error(error))
+}
+
 async fn start_process(
   process: &Process,
   state: &CargoRuntimeContext,
@@ -730,21 +744,12 @@ async fn start_process(
     }
     ProcessStartAction::Unpause => {
       match docker.unpause_container(&process.key).await {
-        // A concurrent unpause can win between our inspection and the request.
-        // Accept the conflict only after observing the same running container.
-        Err(
-          error @ bollard_next::errors::Error::DockerResponseServerError {
-            status_code: 409,
-            ..
-          },
-        ) => {
-          let observed = inspect_process(&process.key, state).await?;
-          if unpause_confirmed(&process.key, &observed) {
-            return Ok(());
-          }
-          Err(lifecycle::start_docker_error(error))
-        }
-        result => result.map_err(lifecycle::start_docker_error),
+        Ok(()) => Ok(()),
+        Err(error) => settle_unpause_error(
+          &process.key,
+          error,
+          inspect_process(&process.key, state).await,
+        ),
       }
     }
   }
@@ -1023,6 +1028,24 @@ fn restart_topology_error(cargo_key: &str, reason: &str) -> IoError {
   )
 }
 
+fn validate_restart_sandbox(process: &Process) -> IoResult<()> {
+  if running_for_readiness(&process.data) {
+    return Ok(());
+  }
+  let status = if container_is_paused(&process.data) {
+    "paused"
+  } else {
+    "not running"
+  };
+  Err(restart_topology_error(
+    &process.kind_key,
+    &format!(
+      "sandbox process {} is {status} and will not be repaired by restart",
+      process.key
+    ),
+  ))
+}
+
 async fn preflight_cargo_restart(
   plan: &mut CargoRestartPlan,
   state: &SystemState,
@@ -1058,22 +1081,8 @@ async fn preflight_cargo_restart(
         ),
       ));
     }
-    if slot.role == CargoReplicaProcessRole::Sandbox
-      && slot
-        .process
-        .data
-        .state
-        .as_ref()
-        .and_then(|state| state.running)
-        != Some(true)
-    {
-      return Err(restart_topology_error(
-        &slot.process.kind_key,
-        &format!(
-          "sandbox process {} is not running and will not be repaired by restart",
-          slot.process.key
-        ),
-      ));
+    if slot.role == CargoReplicaProcessRole::Sandbox {
+      validate_restart_sandbox(&slot.process)?;
     }
   }
   Ok(())
@@ -2774,8 +2783,13 @@ mod tests {
   }
 
   #[test]
-  fn unpause_conflict_requires_a_fresh_running_observation_of_the_same_process()
-  {
+  fn unpause_errors_require_a_fresh_running_observation_of_the_same_process() {
+    use bollard_next::errors::Error as DockerError;
+
+    let response = |status_code| DockerError::DockerResponseServerError {
+      status_code,
+      message: "unpause failed".into(),
+    };
     let mut observed = ContainerInspectResponse {
       id: Some("owned-id".to_owned()),
       state: Some(ContainerState {
@@ -2785,7 +2799,15 @@ mod tests {
       }),
       ..Default::default()
     };
-    assert!(unpause_confirmed("owned-id", &observed));
+    for error in [
+      response(409),
+      response(500),
+      DockerError::RequestTimeoutError,
+    ] {
+      assert!(
+        settle_unpause_error("owned-id", error, Ok(observed.clone())).is_ok()
+      );
+    }
     assert!(!unpause_confirmed("other-id", &observed));
     for status in [
       Some(ContainerStateStatusEnum::RESTARTING),
@@ -2798,7 +2820,25 @@ mod tests {
     let state = observed.state.as_mut().unwrap();
     state.status = Some(ContainerStateStatusEnum::RUNNING);
     state.paused = Some(true);
-    assert!(!unpause_confirmed("owned-id", &observed));
+    for (status, uncertain) in [(409, false), (500, true)] {
+      let error = settle_unpause_error(
+        "owned-id",
+        response(status),
+        Ok(observed.clone()),
+      )
+      .unwrap_err();
+      assert_eq!(RuntimeError::is_uncertain(&error), uncertain);
+    }
+    for status in [409, 500] {
+      let unavailable = CargoRuntimeError::candidate(IoError::interrupted(
+        "InspectCargoProcess",
+        "inspection failed",
+      ));
+      let error =
+        settle_unpause_error("owned-id", response(status), Err(unavailable))
+          .unwrap_err();
+      assert!(RuntimeError::is_uncertain(&error));
+    }
   }
 
   pub(super) fn declared_container(
