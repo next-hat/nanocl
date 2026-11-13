@@ -32,6 +32,7 @@ enum Mode {
   Nonzero,
   StartError,
   WaitError,
+  WaitErrorAfterOom,
   ProcessSyncError,
   CreateError(u16),
   StopAlreadyStopped,
@@ -180,7 +181,16 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
     return web::HttpResponse::NoContent().build();
   }
   if path.ends_with("/wait") {
-    if fixture.mode == Mode::WaitError {
+    if matches!(fixture.mode, Mode::WaitError | Mode::WaitErrorAfterOom) {
+      if fixture.mode == Mode::WaitErrorAfterOom {
+        let mut runtimes = fixture.runtimes.lock().unwrap();
+        let runtime = runtimes
+          .iter_mut()
+          .find(|runtime| runtime.id == id)
+          .unwrap();
+        runtime.running = false;
+        runtime.exit = Some(137);
+      }
       return web::HttpResponse::InternalServerError()
         .json(&json!({"message":"secret-value-must-not-persist"}));
     }
@@ -240,6 +250,9 @@ async fn request(request: web::HttpRequest) -> web::HttpResponse {
     return match runtimes.iter().find(|runtime| runtime.id == id) {
       Some(runtime) => {
         let mut response = runtime.inspect();
+        if fixture.mode == Mode::WaitErrorAfterOom && runtime.exit.is_some() {
+          response["State"]["OOMKilled"] = json!(true);
+        }
         if fixture.mode == Mode::ProcessSyncError {
           // Docker state remains valid, but Process snapshot conversion fails.
           response["Created"] = json!("invalid-process-created-timestamp");
@@ -719,6 +732,62 @@ async fn job_runtime_nonzero_and_start_errors_prevent_later_steps() {
     );
     fixture.cleanup().await;
   }
+}
+
+#[ntex::test]
+async fn job_runtime_wait_error_preserves_inspected_oom_in_terminal_event() {
+  use nanocl_stubs::generic::{GenericClause, GenericFilter};
+
+  let fixture = Fixture::new(Mode::WaitErrorAfterOom).await;
+  crate::tasks::job::start(&fixture.job.spec.name, &fixture.state)
+    .await
+    .unwrap();
+  let run = fixture.wait_state("Failed").await;
+  let steps = JobRunDb::steps(run.key, &fixture.state.inner.pool)
+    .await
+    .unwrap();
+  assert_eq!(steps[0].exit_code, Some(137));
+  let container_id = steps[0].container_id.as_deref().unwrap();
+  assert_eq!(steps[1].state, "Skipped");
+  assert!(steps[1].container_id.is_none());
+  assert_eq!(fixture.docker.runtimes.lock().unwrap().len(), 1);
+
+  let filter = GenericFilter::new()
+    .r#where(
+      "actor",
+      GenericClause::Contains(
+        json!({"Kind": "Job", "Key": fixture.job.spec.name}),
+      ),
+    )
+    .r#where(
+      "action",
+      GenericClause::Eq(NativeEventAction::Fail.to_string()),
+    );
+  let events = crate::models::EventDb::transform_read_by(
+    &filter,
+    &fixture.state.inner.pool,
+  )
+  .await
+  .unwrap();
+  let [event] = events.as_slice() else {
+    panic!("expected one terminal Job failure, got {events:?}");
+  };
+  assert_eq!(event.kind, EventKind::Error);
+  let note = event.note.as_deref().unwrap();
+  assert!(
+    note.contains("Step 0 ran out of memory (exit code 137)"),
+    "{note}"
+  );
+  assert!(
+    note.contains("Container wait failed (Docker HTTP 500)"),
+    "{note}"
+  );
+  assert!(!note.contains("secret-value-must-not-persist"));
+  let metadata = event.metadata.as_ref().unwrap();
+  assert_eq!(metadata["ContainerId"], container_id);
+  assert_eq!(metadata["ExitCode"], 137);
+  assert_eq!(metadata["OOMKilled"], true);
+  fixture.cleanup().await;
 }
 
 #[ntex::test]

@@ -24,8 +24,8 @@ use nanocl_stubs::{
 use crate::{
   models::{
     AcceptedJobControl, AcceptedJobRun, JobDb, JobLifecycleLock,
-    JobLifecycleLocks, JobRunDb, JobRuntimeObservation, OperationGuard,
-    ProcessDb, RuntimeError, SystemState,
+    JobLifecycleLocks, JobRunDb, JobRunStepDb, JobRuntimeObservation,
+    OperationGuard, ProcessDb, RuntimeError, SystemState,
   },
   repositories::generic::*,
   utils,
@@ -575,18 +575,11 @@ async fn settle_observed(
   } else {
     fallback
   };
-  // Recovery can discover a failed step while settling an interrupted run.
-  // Its numeric exit status is more specific than the recovery trigger.
   let (reason, exit) = if outcome == "Failed"
-    && fallback == "Interrupted"
     && let Some(step) = failed_step
-    && let Some(code) = step.exit_code.filter(|code| *code != 0)
+    && let Some((code, oom_killed)) =
+      settled_step_exit(step, &observed, fallback)
   {
-    let oom_killed = observed.iter().any(|(index, id, runtime)| {
-      *index == step.step_index
-        && Some(id.as_str()) == step.container_id.as_deref()
-        && confirmed_oom_exit(runtime, id, code)
-    });
     (
       format!(
         "{}. {reason}",
@@ -602,6 +595,28 @@ async fn settle_observed(
   };
   finish(run, outcome, Some(reason), exit, owner, state).await?;
   Ok(true)
+}
+
+fn settled_step_exit(
+  step: &JobRunStepDb,
+  observed: &[(i32, String, ContainerInspectResponse)],
+  fallback: &str,
+) -> Option<(i64, bool)> {
+  let code = step.exit_code.filter(|code| *code != 0)?;
+  let Some((_, id, runtime)) = observed
+    .iter()
+    .find(|(index, _, _)| *index == step.step_index)
+  else {
+    // Recovery can still report the recorded exit after container removal.
+    // On a wait failure the recorded code may itself be unconfirmed.
+    return (fallback == "Interrupted").then_some((code, false));
+  };
+  if step.container_id.as_deref() != Some(id.as_str())
+    || !matches!(observation(runtime), Ok(JobRuntimeObservation::Exited(actual)) if actual == code)
+  {
+    return None;
+  }
+  Some((code, confirmed_oom_exit(runtime, id, code)))
 }
 
 async fn fail_execution(
@@ -1256,6 +1271,58 @@ mod tests {
     assert!(!confirmed_oom_exit(&runtime, "container", 1));
     runtime.state.as_mut().unwrap().running = Some(true);
     assert!(!confirmed_oom_exit(&runtime, "container", 137));
+  }
+
+  #[test]
+  fn wait_failure_reports_only_the_failed_steps_confirmed_exit() {
+    let mut step = JobRunStepDb {
+      run_key: uuid::Uuid::nil(),
+      step_index: 1,
+      container_id: Some("worker".into()),
+      state: "Failed".into(),
+      started_at: None,
+      finished_at: Some(Default::default()),
+      exit_code: Some(137),
+      error: Some("Container wait failed".into()),
+    };
+    let runtime = ContainerInspectResponse {
+      id: Some("worker".into()),
+      state: Some(ContainerState {
+        running: Some(false),
+        started_at: Some("2026-10-27T18:00:00Z".into()),
+        finished_at: Some("2026-10-27T18:00:01Z".into()),
+        exit_code: Some(137),
+        oom_killed: Some(true),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut observed = [(step.step_index, "worker".into(), runtime)];
+    for fallback in ["Failed", "Interrupted"] {
+      assert_eq!(
+        settled_step_exit(&step, &observed, fallback),
+        Some((137, true))
+      );
+    }
+    assert_eq!(settled_step_exit(&step, &[], "Failed"), None);
+    assert_eq!(
+      settled_step_exit(&step, &[], "Interrupted"),
+      Some((137, false))
+    );
+
+    observed[0].2.state.as_mut().unwrap().oom_killed = None;
+    assert_eq!(
+      settled_step_exit(&step, &observed, "Failed"),
+      Some((137, false))
+    );
+    step.container_id = Some("another-container".into());
+    assert_eq!(settled_step_exit(&step, &observed, "Failed"), None);
+    step.container_id = Some("worker".into());
+    step.exit_code = Some(7);
+    assert_eq!(settled_step_exit(&step, &observed, "Failed"), None);
+    step.exit_code = Some(137);
+    observed[0].2.state.as_mut().unwrap().finished_at = None;
+    assert_eq!(settled_step_exit(&step, &observed, "Failed"), None);
   }
 }
 
