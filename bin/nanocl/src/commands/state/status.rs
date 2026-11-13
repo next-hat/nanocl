@@ -173,9 +173,12 @@ fn failure_filter(
   kind: &EventActorKind,
   key: &str,
   since: NaiveDateTime,
+  job: Option<&JobInspect>,
 ) -> GenericFilter {
   let mut alternatives = Vec::new();
-  for relation in ["actor", "related"] {
+  for (relation, run_key) in
+    [("actor", "actor_run_key"), ("related", "related_run_key")]
+  {
     for (field, clause) in [
       ("kind", GenericClause::Eq("error".into())),
       (
@@ -183,7 +186,7 @@ fn failure_filter(
         GenericClause::In(vec!["fail".into(), "unhealthy".into()]),
       ),
     ] {
-      alternatives.push(std::collections::HashMap::from([
+      let mut branch = std::collections::HashMap::from([
         (
           relation.into(),
           GenericClause::Contains(json!({"Key": key, "Kind": kind})),
@@ -193,7 +196,17 @@ fn failure_filter(
           "created_at".into(),
           GenericClause::Ge(since.and_utc().to_rfc3339()),
         ),
-      ]));
+      ]);
+      if let Some(job) = job {
+        if let Some(run) = job.current_run_key {
+          let mut current = branch.clone();
+          current.insert(run_key.into(), GenericClause::Eq(run.to_string()));
+          alternatives.push(current);
+        }
+        // Job-level errors can be emitted without an execution identity.
+        branch.insert(run_key.into(), GenericClause::IsNull);
+      }
+      alternatives.push(branch);
     }
   }
   GenericFilter {
@@ -209,11 +222,9 @@ fn failure_filter(
 
 async fn recent_event(
   client: &NanocldClient,
-  kind: &EventActorKind,
-  key: &str,
-  since: NaiveDateTime,
+  filter: GenericFilter,
 ) -> Result<Option<Event>, String> {
-  let query = GenericListQuery::try_from(failure_filter(kind, key, since))
+  let query = GenericListQuery::try_from(filter)
     .map_err(|_| "cannot build event filter".to_owned())?;
   let res = client
     .send_get("/events", Some(query))
@@ -457,48 +468,42 @@ async fn inspect_target(
   key: &str,
   row: &mut StateStatusRow,
   since: NaiveDateTime,
-) -> Result<(NaiveDateTime, Vec<Process>), String> {
-  let (created_at, instances) = match kind {
-    EventActorKind::Cargo => {
-      match optional_read(client.inspect_cargo(key).await)? {
-        Some(cargo) => {
-          set_runtime(row, &cargo.status, &cargo.instances);
-          (cargo.created_at, cargo.instances)
-        }
-        None => return Ok((since, Vec::new())),
-      }
-    }
-    EventActorKind::Vm => match optional_read(client.inspect_vm(key).await)? {
-      Some(vm) => {
+) -> Result<(NaiveDateTime, GenericFilter, Vec<Process>), String> {
+  let history = |created_at, job: Option<&JobInspect>| {
+    let since = since.max(created_at);
+    (since, failure_filter(kind, key, since, job))
+  };
+  let target = match kind {
+    EventActorKind::Cargo => optional_read(client.inspect_cargo(key).await)?
+      .map(|cargo| {
+        set_runtime(row, &cargo.status, &cargo.instances);
+        (history(cargo.created_at, None), cargo.instances)
+      }),
+    EventActorKind::Vm => {
+      optional_read(client.inspect_vm(key).await)?.map(|vm| {
         set_runtime(row, &vm.status, &vm.instances);
-        (vm.created_at, vm.instances)
-      }
-      None => return Ok((since, Vec::new())),
-    },
+        (history(vm.created_at, None), vm.instances)
+      })
+    }
     EventActorKind::Job => {
-      match optional_read(client.inspect_job(key).await)? {
-        Some(job) => {
-          set_job(row, &job);
-          (job.created_at, job.instances)
-        }
-        None => return Ok((since, Vec::new())),
-      }
+      optional_read(client.inspect_job(key).await)?.map(|job| {
+        set_job(row, &job);
+        (history(job.created_at, Some(&job)), job.instances)
+      })
     }
     EventActorKind::Resource => {
-      match optional_read(client.inspect_resource(key).await)? {
-        Some(resource) => {
-          row.status = "present".into();
-          row.state = "present".into();
-          row.health = "not reported".into();
-          return Ok((since.max(resource.created_at), Vec::new()));
-        }
-        None => return Ok((since, Vec::new())),
-      }
+      optional_read(client.inspect_resource(key).await)?.map(|resource| {
+        row.status = "present".into();
+        row.state = "present".into();
+        row.health = "not reported".into();
+        (history(resource.created_at, None), Vec::new())
+      })
     }
     _ => unreachable!("only Statefile runtime objects are collected"),
   };
-  let since = since.max(created_at);
-  Ok((since, instances))
+  let ((since, filter), instances) =
+    target.unwrap_or_else(|| (history(since, None), Vec::new()));
+  Ok((since, filter, instances))
 }
 
 async fn collect_row(
@@ -508,7 +513,7 @@ async fn collect_row(
   since: NaiveDateTime,
 ) -> StateStatusRow {
   let mut row = empty_row(kind, key);
-  let (since, instances) = match ntex::time::timeout(
+  let (since, filter, instances) = match ntex::time::timeout(
     READ_TIMEOUT,
     inspect_target(client, kind, key, &mut row, since),
   )
@@ -529,8 +534,7 @@ async fn collect_row(
     }
   };
   let event =
-    ntex::time::timeout(READ_TIMEOUT, recent_event(client, kind, key, since))
-      .await;
+    ntex::time::timeout(READ_TIMEOUT, recent_event(client, filter)).await;
   let event = match event {
     Ok(Ok(event)) => event,
     result => {
@@ -992,7 +996,7 @@ mod tests {
   #[test]
   fn status_failure_filter_scopes_every_branch_and_orders_by_recency() {
     let since = time(123);
-    let filter = failure_filter(&EventActorKind::Job, "migrate", since);
+    let filter = failure_filter(&EventActorKind::Job, "migrate", since, None);
     assert_eq!(filter.limit, Some(1));
     assert_eq!(filter.order_by, Some(vec!["created_at desc".into()]));
     let predicates = filter.r#where.unwrap();
@@ -1050,10 +1054,9 @@ mod tests {
     assert_eq!(row.health, "unhealthy");
   }
 
-  #[test]
-  fn status_job_distinguishes_schedule_from_completed_runs() {
+  fn scheduled_job() -> JobInspect {
     let spec_key = uuid::Uuid::new_v4();
-    let mut job = JobInspect {
+    JobInspect {
       incarnation_key: uuid::Uuid::new_v4(),
       spec_key,
       current_run_key: None,
@@ -1074,7 +1077,56 @@ mod tests {
         ..Default::default()
       },
       instances: vec![],
-    };
+    }
+  }
+
+  #[test]
+  fn status_job_failure_filter_excludes_previous_runs() {
+    let mut job = scheduled_job();
+    let failed_run = uuid::Uuid::from_u128(1);
+    let successful_run = uuid::Uuid::from_u128(2);
+    for (run, status) in [
+      (None, ObjPsStatusKind::Create),
+      (Some(failed_run), ObjPsStatusKind::Fail),
+      (Some(successful_run), ObjPsStatusKind::Finish),
+    ] {
+      job.current_run_key = run;
+      job.status.actual = status;
+      let filter =
+        failure_filter(&EventActorKind::Job, "migrate", time(10), Some(&job));
+      assert_eq!(filter.limit, Some(1));
+      let predicates = filter.r#where.unwrap();
+      let branches: Vec<_> = std::iter::once(predicates.conditions)
+        .chain(predicates.or.unwrap())
+        .collect();
+      let run_key = run.map(|key| key.to_string());
+      let expected = BTreeSet::from([None, run_key.as_deref()]);
+      for relation in ["actor", "related"] {
+        let column = format!("{relation}_run_key");
+        for failure in ["kind", "action"] {
+          let eligible = branches
+            .iter()
+            .filter(|branch| {
+              branch.contains_key(relation) && branch.contains_key(failure)
+            })
+            .map(|branch| match branch.get(&column) {
+              Some(GenericClause::Eq(key)) => Some(key.as_str()),
+              Some(GenericClause::IsNull) => None,
+              other => {
+                panic!("missing run constraint for {relation}: {other:?}")
+              }
+            })
+            .collect::<BTreeSet<_>>();
+          assert_eq!(eligible, expected, "{relation} {failure}");
+        }
+      }
+      assert_eq!(branches.len(), 4 * expected.len());
+    }
+  }
+
+  #[test]
+  fn status_job_distinguishes_schedule_from_completed_runs() {
+    let mut job = scheduled_job();
     let mut row = empty_row(&EventActorKind::Job, "migrate");
     set_job(&mut row, &job);
     assert_eq!(row.status, "scheduled");
