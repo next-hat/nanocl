@@ -34,6 +34,12 @@ pub(crate) use cargo_replica::*;
 mod cargo_runtime;
 pub(crate) use cargo_runtime::*;
 
+mod cargo_runtime_error;
+pub(crate) use cargo_runtime_error::*;
+
+mod runtime_error;
+pub(crate) use runtime_error::*;
+
 mod distributed_mutex;
 pub use distributed_mutex::*;
 

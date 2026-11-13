@@ -7,8 +7,8 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{cargo::Cargo, node::CargoReplicaTask, process::Process};
 
 use crate::models::{
-  CargoReplicaProcessRole, CargoRuntimeContext, CompileDeclaredOpts,
-  EnsureExistingSlotOpts,
+  CargoReplicaProcessRole, CargoRuntimeContext, CargoRuntimeError,
+  CompileDeclaredOpts, EnsureExistingSlotOpts,
 };
 
 use super::{
@@ -175,23 +175,24 @@ async fn wait_init_outcome(
     {
       // Bollard reports confirmed nonzero exits as structured errors.
       // Keep the reason useful without retaining arbitrary Docker messages.
-      Err(IoError::interrupted(
-        "CargoInitContainerExit",
-        &format!("Init container exited with code {code}"),
-      ))
+      Err(CargoRuntimeError::init_exit(code))
     }
     Some(Ok(ContainerWaitResponse {
       status_code: 0,
       error: None,
     })) => Ok(()),
-    Some(Err(error)) => Err(IoError::interrupted(
-      "CargoInitContainer",
-      &error.to_string(),
-    )),
-    Some(Ok(_)) | None => Err(IoError::interrupted(
-      "CargoInitContainer",
-      "Docker wait did not establish an init-container exit result",
-    )),
+    Some(Err(error)) => {
+      Err(CargoRuntimeError::candidate(IoError::with_context(
+        "CargoInitContainer",
+        std::io::Error::new(std::io::ErrorKind::Interrupted, error),
+      )))
+    }
+    Some(Ok(_)) | None => {
+      Err(CargoRuntimeError::candidate(IoError::interrupted(
+        "CargoInitContainer",
+        "Docker wait did not establish an init-container exit result",
+      )))
+    }
   }
 }
 
@@ -227,6 +228,8 @@ mod wait_fault {
 
   use nanocl_error::io::{IoError, IoResult};
   use tokio::sync::oneshot;
+
+  use crate::models::CargoRuntimeError;
 
   enum Hook {
     WaitFailure(bool),
@@ -317,10 +320,10 @@ mod wait_fault {
     if let Some(Hook::BeforeStart(entered, release)) = hook {
       let _ = entered.send(id.to_owned());
       release.await.map_err(|_| {
-        IoError::interrupted(
+        CargoRuntimeError::candidate(IoError::interrupted(
           "CargoInitContainer",
           "init start barrier cancelled",
-        )
+        ))
       })?;
     }
     Ok(())
@@ -329,6 +332,7 @@ mod wait_fault {
 
 #[cfg(test)]
 mod tests {
+  use crate::models::RuntimeError;
   use bollard_next::models::ContainerWaitExitError;
   use futures::{FutureExt, executor::block_on, stream};
 
@@ -368,7 +372,13 @@ mod tests {
     futures::pin_mut!(start);
     assert!(start.as_mut().now_or_never().is_none());
     drop(barrier);
-    assert!(block_on(start).is_err());
+    let error =
+      block_on(start).expect_err("dropping the barrier cancels start");
+    assert!(RuntimeError::is_uncertain(&error));
+    assert!(matches!(
+      CargoRuntimeError::get(&error),
+      Some(CargoRuntimeError::Candidate(_))
+    ));
     drop(pause_next_init_start(&key));
     assert!(block_on(wait_fault::before_start(&key, "after-drop")).is_ok());
   }
@@ -410,6 +420,11 @@ mod tests {
       let error = block_on(wait_init_outcome(stream::iter([result])))
         .expect_err("a confirmed nonzero exit must fail");
       assert_eq!(error.context(), Some("CargoInitContainerExit"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+      assert!(matches!(
+        CargoRuntimeError::get(&error),
+        Some(CargoRuntimeError::InitExit(17))
+      ));
       assert_eq!(
         error.inner.to_string(),
         "Init container exited with code 17"
@@ -444,6 +459,12 @@ mod tests {
       let error = block_on(wait_init_outcome(stream::iter(result)))
         .expect_err("missing exit evidence must remain uncertain");
       assert_eq!(error.context(), Some("CargoInitContainer"));
+      assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
+      assert!(RuntimeError::is_uncertain(&error));
+      assert!(matches!(
+        CargoRuntimeError::get(&error),
+        Some(CargoRuntimeError::Candidate(_))
+      ));
     }
   }
 

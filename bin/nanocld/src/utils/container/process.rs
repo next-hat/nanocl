@@ -15,21 +15,38 @@ use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
 };
 
-use crate::models::{ObjPsStatusDb, OperationOwner, ProcessDb, SystemState};
+use crate::models::{
+  ObjPsStatusDb, OperationOwner, ProcessDb, RuntimeError, SystemState,
+};
+
+pub(super) fn docker_request_rejected(
+  error: &bollard_next::errors::Error,
+) -> bool {
+  matches!(
+    error,
+    bollard_next::errors::Error::DockerResponseServerError {
+      status_code: 400 | 404 | 409,
+      ..
+    }
+  )
+}
+
+fn unconfirmed_create_error(
+  kind: &ProcessKind,
+  error: impl Into<IoError>,
+) -> IoError {
+  if *kind == ProcessKind::Cargo {
+    RuntimeError::unconfirmed(error)
+  } else {
+    error.into()
+  }
+}
 
 fn create_process_error(
   kind: &ProcessKind,
   error: bollard_next::errors::Error,
 ) -> IoError {
-  if *kind == ProcessKind::Cargo
-    && matches!(
-      error,
-      bollard_next::errors::Error::DockerResponseServerError {
-        status_code: 400 | 404 | 409,
-        ..
-      }
-    )
-  {
+  if *kind == ProcessKind::Cargo && docker_request_rejected(&error) {
     // Docker definitively rejected creation; no new runtime can appear later
     // from this request. Keep uncertain transport/server failures pending.
     IoError::invalid_input(
@@ -37,7 +54,7 @@ fn create_process_error(
       "Docker rejected Cargo process creation",
     )
   } else {
-    *error.map_err_context(|| "CreateProcess")
+    unconfirmed_create_error(kind, error.map_err_context(|| "CreateProcess"))
   }
 }
 
@@ -97,14 +114,17 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
       .docker_api
       .inspect_container(&process_key, None::<InspectContainerOptions>)
       .await
-      .map_err(|err| err.map_err_context(|| "CreateProcess"))?;
+      .map_err(|err| {
+        unconfirmed_create_error(kind, err.map_err_context(|| "CreateProcess"))
+      })?;
     let created_at = inspect.created.clone().unwrap_or_default();
     let new_instance = ProcessPartial {
       key: process_key.clone(),
       name: name.to_owned(),
       kind: kind.clone(),
-      data: serde_json::to_value(&inspect)
-        .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
+      data: serde_json::to_value(&inspect).map_err(|err| {
+        unconfirmed_create_error(kind, err.map_err_context(|| "CreateProcess"))
+      })?,
       node_name: state.inner.config.hostname.clone(),
       kind_key: kind_key.to_owned(),
       created_at: Some(
@@ -113,9 +133,12 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
           "%Y-%m-%dT%H:%M:%S%.fZ",
         )
         .map_err(|err| {
-          IoError::interrupted(
-            "CreateProcess",
-            &format!("Error while creating process {err}"),
+          unconfirmed_create_error(
+            kind,
+            IoError::interrupted(
+              "CreateProcess",
+              &format!("Error while creating process {err}"),
+            ),
           )
         })?,
       ),
@@ -127,8 +150,9 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
       &state.inner.pool,
     )
     .await?;
-    Process::try_from(process)
-      .map_err(|err| err.map_err_context(|| "CreateProcess"))
+    Process::try_from(process).map_err(|err| {
+      unconfirmed_create_error(kind, err.map_err_context(|| "CreateProcess"))
+    })
   }
   .await;
   if result.is_err() {
@@ -153,10 +177,10 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
           })
       )
     {
-      return Err(IoError::interrupted(
+      return Err(RuntimeError::unconfirmed(IoError::interrupted(
         "Cargo rollback",
         "Docker did not confirm cleanup of the newly created Cargo process",
-      ));
+      )));
     }
     let deleted = ProcessDb::delete_owned(
       &process_key,
@@ -166,10 +190,10 @@ pub(crate) async fn create_owned<G: Clone + Send + 'static>(
     )
     .await;
     if *kind == ProcessKind::Cargo && deleted.is_err() {
-      return Err(IoError::interrupted(
+      return Err(RuntimeError::unconfirmed(IoError::interrupted(
         "Cargo rollback",
         "Cargo process cleanup could not be committed under its accepted owner",
-      ));
+      )));
     }
   }
   result
@@ -383,26 +407,29 @@ mod tests {
       let error = create_process_error(&ProcessKind::Cargo, response(status));
       assert_eq!(error.context(), Some("Cargo process rejection"));
       assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      assert!(!RuntimeError::is_uncertain(&error));
       for kind in [ProcessKind::Vm, ProcessKind::Job] {
-        assert_eq!(
-          create_process_error(&kind, response(status)).context(),
-          Some("CreateProcess"),
-        );
+        let error = create_process_error(&kind, response(status));
+        assert_eq!(error.context(), Some("CreateProcess"));
+        assert!(!RuntimeError::is_uncertain(&error));
+        assert!(matches!(
+          error.inner.get_ref().and_then(|source| source.downcast_ref()),
+          Some(bollard_next::errors::Error::DockerResponseServerError {
+            status_code, ..
+          }) if *status_code == status
+        ));
       }
     }
-    assert_eq!(
-      create_process_error(&ProcessKind::Cargo, response(500)).context(),
-      Some("CreateProcess"),
-    );
     let transport = bollard_next::errors::Error::IOError {
       err: std::io::Error::new(
         std::io::ErrorKind::ConnectionReset,
         "unconfirmed",
       ),
     };
-    assert_eq!(
-      create_process_error(&ProcessKind::Cargo, transport).context(),
-      Some("CreateProcess"),
-    );
+    for cause in [response(500), transport] {
+      let error = create_process_error(&ProcessKind::Cargo, cause);
+      assert_eq!(error.context(), Some("CreateProcess"));
+      assert!(RuntimeError::is_uncertain(&error));
+    }
   }
 }

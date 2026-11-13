@@ -6,9 +6,11 @@ use crate::{
   models::{
     CargoDb, CargoLifecycleLock, CargoLifecycleLocks, CargoReplicaDb,
     CargoReplicaProcessDb, CargoReplicaProcessRole, CargoRuntimeContext,
-    ObjPsStatusDb, ObjPsStatusUpdate, OperationDb, ProcessDb, SystemState,
+    CargoRuntimeError, ObjPsStatusDb, ObjPsStatusUpdate, OperationDb,
+    ProcessDb, RuntimeError, SystemState,
   },
   repositories::generic::*,
+  utils::container::process::docker_request_rejected,
 };
 use bollard_next::{
   models::ContainerState,
@@ -94,10 +96,10 @@ pub(super) async fn delete_instance(
       ..
     }) => {}
     Err(_) => {
-      return Err(IoError::interrupted(
+      return Err(RuntimeError::unconfirmed(IoError::interrupted(
         "DeleteProcess",
         "Docker did not confirm removal of the Cargo process",
-      ));
+      )));
     }
   }
   ProcessDb::delete_owned(
@@ -229,15 +231,7 @@ pub(crate) async fn stop(
     .await?;
     stop_process(&process, state).await?;
   }
-  let observed = observe(cargo, state).await?;
-  if observed.actual.as_deref()
-    != Some(ObjPsStatusKind::Stop.to_string().as_str())
-  {
-    return Err(IoError::interrupted(
-      "Cargo stop",
-      "Docker has not confirmed every runtime stopped",
-    ));
-  }
+  let observed = confirmed_stop_observation(observe(cargo, state).await)?;
   ObjPsStatusDb::update_owned(
     &cargo.spec.cargo_key,
     observed,
@@ -245,8 +239,24 @@ pub(crate) async fn stop(
     state.lease.clone(),
     &state.inner.pool,
   )
-  .await?;
-  Ok(())
+  .await
+  .map(|_| ())
+  .map_err(RuntimeError::unconfirmed)
+}
+
+fn confirmed_stop_observation(
+  result: IoResult<ObjPsStatusUpdate>,
+) -> IoResult<ObjPsStatusUpdate> {
+  let observed = result.map_err(RuntimeError::unconfirmed)?;
+  if observed.actual.as_deref()
+    != Some(ObjPsStatusKind::Stop.to_string().as_str())
+  {
+    return Err(RuntimeError::unconfirmed(IoError::interrupted(
+      "Cargo stop",
+      "Docker has not confirmed every runtime stopped",
+    )));
+  }
+  Ok(observed)
 }
 
 pub(crate) async fn process_action(
@@ -312,45 +322,32 @@ fn targeted_docker_error(
   error: bollard_next::errors::Error,
   phase: &str,
 ) -> IoError {
-  if matches!(
-    error,
-    bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 400 | 404 | 409,
-      ..
-    }
-  ) {
+  if docker_request_rejected(&error) {
     IoError::invalid_input(
       "Cargo process rejection",
       "Docker rejected the targeted process action",
     )
   } else {
-    IoError::interrupted(
+    RuntimeError::unconfirmed(IoError::interrupted(
       phase,
       "Docker did not confirm the targeted process action",
-    )
+    ))
   }
 }
 
-pub(super) fn runtime_docker_error(
+pub(super) fn start_docker_error(
   error: bollard_next::errors::Error,
-  phase: &str,
 ) -> IoError {
-  if matches!(
-    error,
-    bollard_next::errors::Error::DockerResponseServerError {
-      status_code: 400 | 404 | 409,
-      ..
-    }
-  ) {
+  if docker_request_rejected(&error) {
     IoError::invalid_input(
       "Cargo runtime rejection",
       "Docker rejected the Cargo runtime action",
     )
   } else {
-    IoError::interrupted(
-      phase,
+    CargoRuntimeError::candidate(IoError::interrupted(
+      "StartCargoProcess",
       "Docker did not confirm the Cargo runtime action",
-    )
+    ))
   }
 }
 
@@ -567,10 +564,10 @@ async fn observe_runtime(
       node != state.inner.config.hostname && node != "init-test.nanocl.io"
     })
   }) {
-    return Err(IoError::interrupted(
+    return Err(RuntimeError::unconfirmed(IoError::interrupted(
       "Cargo remote observation",
       "Remote execution remains uncertain; local inventory cannot settle the operation",
-    ));
+    )));
   }
   let mut processes = Vec::new();
   let mut missing = false;
@@ -920,6 +917,46 @@ mod tests {
   }
 
   #[test]
+  fn stop_requires_a_confirmed_final_observation() {
+    use bollard_next::errors::Error as DockerError;
+    let observation = |actual: Option<ObjPsStatusKind>| ObjPsStatusUpdate {
+      actual: actual.map(|status| status.to_string()),
+      ..Default::default()
+    };
+    assert!(
+      confirmed_stop_observation(Ok(observation(Some(ObjPsStatusKind::Stop))))
+        .is_ok()
+    );
+    for actual in [
+      Some(ObjPsStatusKind::Start),
+      Some(ObjPsStatusKind::Fail),
+      None,
+    ] {
+      let error =
+        confirmed_stop_observation(Ok(observation(actual))).unwrap_err();
+      assert!(RuntimeError::is_uncertain(&error));
+      assert_eq!(error.context(), Some("Cargo stop"));
+    }
+    let unavailable = IoError::with_context(
+      "Cargo observation",
+      std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        DockerError::RequestTimeoutError,
+      ),
+    );
+    let error = confirmed_stop_observation(Err(unavailable)).unwrap_err();
+    assert!(RuntimeError::is_uncertain(&error));
+    assert_eq!(error.context(), Some("Cargo observation"));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::TimedOut);
+    assert!(matches!(
+      RuntimeError::cause(&error)
+        .get_ref()
+        .and_then(|cause| cause.downcast_ref()),
+      Some(DockerError::RequestTimeoutError)
+    ));
+  }
+
+  #[test]
   fn cargo_stop_noop_requires_every_runtime_confirmed_stopped() {
     let replica = uuid::Uuid::new_v4();
     let replicas = HashSet::from([replica]);
@@ -967,16 +1004,17 @@ mod tests {
       );
       assert_eq!(error.context(), Some("Cargo process rejection"));
       assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      assert!(!RuntimeError::is_uncertain(&error));
       assert!(!error.to_string().contains("sensitive"));
-      let error = runtime_docker_error(
+      let error = start_docker_error(
         bollard_next::errors::Error::DockerResponseServerError {
           status_code: code,
           message: "sensitive daemon payload".into(),
         },
-        "StartCargoProcess",
       );
       assert_eq!(error.context(), Some("Cargo runtime rejection"));
       assert_eq!(error.inner.kind(), std::io::ErrorKind::InvalidInput);
+      assert!(!RuntimeError::is_uncertain(&error));
       assert!(!error.to_string().contains("sensitive"));
     }
     let error = targeted_docker_error(
@@ -987,15 +1025,23 @@ mod tests {
       "Cargo process signal",
     );
     assert_eq!(error.context(), Some("Cargo process signal"));
+    assert!(RuntimeError::is_uncertain(&error));
+    assert!(CargoRuntimeError::get(&error).is_none());
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
     assert!(!error.to_string().contains("sensitive"));
-    let error = runtime_docker_error(
+    let error = start_docker_error(
       bollard_next::errors::Error::DockerResponseServerError {
         status_code: 500,
         message: "sensitive daemon payload".into(),
       },
-      "StartCargoProcess",
     );
     assert_eq!(error.context(), Some("StartCargoProcess"));
+    assert!(RuntimeError::is_uncertain(&error));
+    assert!(matches!(
+      CargoRuntimeError::get(&error),
+      Some(CargoRuntimeError::Candidate(_))
+    ));
+    assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
     assert!(!error.to_string().contains("sensitive"));
   }
 }

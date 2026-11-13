@@ -807,14 +807,15 @@ mod tests {
         let primary =
           IoError::interrupted("VM test operation", "injected primary failure");
         let primary_message = primary.to_string();
-        let (result, settled) = super::super::record_task_outcome(
+        let error = super::super::record_task_outcome(
           &key,
           Err(primary),
           &unavailable_docker,
         )
-        .await;
-        assert!(!settled);
-        assert_eq!(result.unwrap_err().to_string(), primary_message);
+        .await
+        .unwrap_err();
+        assert!(crate::models::RuntimeError::is_uncertain(&error));
+        assert_eq!(error.to_string(), primary_message);
         assert_eq!(
           OperationDb::current("Vm", &key, &state.inner.pool)
             .await

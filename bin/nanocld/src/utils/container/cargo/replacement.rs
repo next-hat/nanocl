@@ -3,6 +3,7 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::cargo::Cargo;
 
 use super::cargo_network_mode;
+use crate::models::RuntimeError;
 
 fn has_fixed_port_bindings(cargo: &Cargo) -> bool {
   cargo.spec.port_bindings.as_ref().is_some_and(|bindings| {
@@ -64,10 +65,10 @@ pub(super) fn confirm_init_stopped(
   inspected: &ContainerInspectResponse,
 ) -> IoResult<()> {
   if inspected.state.as_ref().and_then(|state| state.running) != Some(false) {
-    return Err(IoError::interrupted(
+    return Err(RuntimeError::unconfirmed(IoError::interrupted(
       "StopCargoProcess",
       "Docker has not confirmed the old init container stopped",
-    ));
+    )));
   }
   Ok(())
 }
@@ -126,6 +127,7 @@ mod tests {
     let mut inspected = ContainerInspectResponse::default();
     let error = confirm_init_stopped(&inspected).unwrap_err();
     assert_eq!(error.context(), Some("StopCargoProcess"));
+    assert!(RuntimeError::is_uncertain(&error));
     assert_eq!(error.inner.kind(), std::io::ErrorKind::Interrupted);
     for running in [None, Some(true), Some(false)] {
       inspected.state = Some(ContainerState {
