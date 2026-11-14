@@ -13,6 +13,12 @@ pub(crate) enum CargoRuntimeError {
   RemoteMissingSecret(String),
   /// Docker confirmed a nonzero init-container exit.
   InitExit { code: i64, oom_killed: bool },
+  /// A required container exited before becoming ready.
+  ReadinessExit { name: String, id: String },
+  /// A required container failed its healthcheck.
+  ReadinessUnhealthy { name: String, id: String },
+  /// Required containers were still pending when readiness timed out.
+  ReadinessTimeout { pending: Vec<(String, String)> },
 }
 
 impl CargoRuntimeError {
@@ -44,6 +50,33 @@ impl CargoRuntimeError {
         io::ErrorKind::Interrupted,
         Self::InitExit { code, oom_killed },
       ),
+    )
+  }
+
+  pub(crate) fn readiness_exit(name: &str, id: &str) -> IoError {
+    Self::ReadinessExit {
+      name: name.to_owned(),
+      id: id.to_owned(),
+    }
+    .readiness_error()
+  }
+
+  pub(crate) fn readiness_unhealthy(name: &str, id: &str) -> IoError {
+    Self::ReadinessUnhealthy {
+      name: name.to_owned(),
+      id: id.to_owned(),
+    }
+    .readiness_error()
+  }
+
+  pub(crate) fn readiness_timeout(pending: Vec<(String, String)>) -> IoError {
+    Self::ReadinessTimeout { pending }.readiness_error()
+  }
+
+  fn readiness_error(self) -> IoError {
+    IoError::with_context(
+      "CargoReadiness",
+      io::Error::new(io::ErrorKind::Interrupted, self),
     )
   }
 
@@ -88,6 +121,28 @@ impl fmt::Display for CargoRuntimeError {
       } => {
         write!(f, "Init container exited with code {code}")
       }
+      Self::ReadinessExit { name, id } => {
+        write!(
+          f,
+          "Cargo container {name:?} (process {id:?}) exited before becoming ready"
+        )
+      }
+      Self::ReadinessUnhealthy { name, id } => {
+        write!(
+          f,
+          "Cargo container {name:?} (process {id:?}) became unhealthy"
+        )
+      }
+      Self::ReadinessTimeout { pending } => {
+        write!(f, "Timed out waiting for essential Cargo containers: ")?;
+        for (index, (name, id)) in pending.iter().enumerate() {
+          if index > 0 {
+            write!(f, ", ")?;
+          }
+          write!(f, "{name:?} (process {id:?})")?;
+        }
+        Ok(())
+      }
     }
   }
 }
@@ -96,7 +151,11 @@ impl std::error::Error for CargoRuntimeError {
   fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
     match self {
       Self::Candidate(cause) => Some(cause),
-      Self::InitExit { .. } | Self::RemoteMissingSecret(_) => None,
+      Self::InitExit { .. }
+      | Self::RemoteMissingSecret(_)
+      | Self::ReadinessExit { .. }
+      | Self::ReadinessUnhealthy { .. }
+      | Self::ReadinessTimeout { .. } => None,
     }
   }
 }

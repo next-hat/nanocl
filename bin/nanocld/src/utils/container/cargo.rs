@@ -806,15 +806,12 @@ async fn wait_until_ready(
           .map(ToString::to_string)
           .unwrap_or_else(|| "unknown".to_owned());
         if matches!(status.as_str(), "exited" | "dead") {
-          return Err(IoError::interrupted(
-            "CargoReadiness",
-            &format!(
-              "Cargo {:?} process {} exited before becoming ready",
-              slot.container_name, slot.process.key
-            ),
+          return Err(CargoRuntimeError::readiness_exit(
+            &slot.container_name,
+            &slot.process.key,
           ));
         }
-        pending.push(format!("{} runtime={status}", slot.container_name));
+        pending.push((slot.container_name.clone(), slot.process.key.clone()));
         continue;
       }
       if slot.role == CargoReplicaProcessRole::Sandbox {
@@ -836,28 +833,21 @@ async fn wait_until_ready(
       match health.as_str() {
         "healthy" => {}
         "unhealthy" => {
-          return Err(IoError::interrupted(
-            "CargoReadiness",
-            &format!(
-              "Cargo {:?} process {} became unhealthy",
-              slot.container_name, slot.process.key
-            ),
+          return Err(CargoRuntimeError::readiness_unhealthy(
+            &slot.container_name,
+            &slot.process.key,
           ));
         }
-        _ => pending.push(format!("{} health={health}", slot.container_name)),
+        _ => {
+          pending.push((slot.container_name.clone(), slot.process.key.clone()))
+        }
       }
     }
     if pending.is_empty() {
       return Ok(any_healthcheck);
     }
     if Instant::now() >= deadline {
-      return Err(IoError::interrupted(
-        "CargoReadiness",
-        &format!(
-          "Timed out waiting for essential Cargo processes: {}",
-          pending.join(", ")
-        ),
-      ));
+      return Err(CargoRuntimeError::readiness_timeout(pending));
     }
     ntex::time::sleep(READY_POLL_INTERVAL).await;
   }
@@ -3688,6 +3678,30 @@ mod tests {
     let error = confirmed_rollback_error(error, true);
     assert_eq!(error.context(), Some("CreateProcess"));
     assert!(RuntimeError::is_uncertain(&error));
+  }
+
+  #[test]
+  fn confirmed_rollback_preserves_readiness_failure_evidence() {
+    for confirmed in [true, false] {
+      for error in [
+        CargoRuntimeError::readiness_exit("web", "candidate-web"),
+        CargoRuntimeError::readiness_unhealthy("web", "candidate-web"),
+        CargoRuntimeError::readiness_timeout(vec![
+          ("web".to_owned(), "candidate-web".to_owned()),
+          ("worker".to_owned(), "candidate-worker".to_owned()),
+        ]),
+      ] {
+        let evidence = error.to_string();
+        let error = confirmed_rollback_error(error, confirmed);
+        assert_eq!(RuntimeError::is_uncertain(&error), !confirmed);
+        if confirmed {
+          assert_eq!(error.to_string(), evidence);
+          assert!(CargoRuntimeError::get(&error).is_some());
+        } else {
+          assert_eq!(error.context(), Some("Cargo rollback"));
+        }
+      }
+    }
   }
 
   #[test]
