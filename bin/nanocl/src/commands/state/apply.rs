@@ -94,9 +94,24 @@ fn vm_spec_for_comparison(
     desired.mac_address.as_deref(),
     current.mac_address.as_deref(),
   )?;
+  // Creation stores the canonical image path, but PATCH cannot replace the
+  // disk. Accept equivalent paths without requiring an unchanged absolute
+  // path to still exist on the CLI host.
+  if desired.image != current.image
+    && !utils::path::resolve_full_path(&desired.image)
+      .is_ok_and(|image| image == current.image)
+  {
+    return Err(IoError::invalid_input(
+      "VM specification",
+      "Image is immutable; create a new VM to use another disk",
+    ));
+  }
   // Resolve omitted values only for comparison. PATCH must retain omissions
   // so a concurrent change after this inspect is not overwritten.
   let mut desired = desired.clone();
+  desired.image = current.image.clone();
+  desired.host_config =
+    desired.host_config.or_else(|| current.host_config.clone());
   desired.mac_address = current.mac_address.clone();
   desired.cloud_init = desired.cloud_init.or(current.cloud_init);
   desired.cloud_init_user_data = desired
@@ -1475,6 +1490,12 @@ mod tests {
           .unwrap(),
       ),
       console: Some(true),
+      host_config: Some(nanocld_client::stubs::vm_spec::VmHostConfig {
+        cpu: 4,
+        memory: 2048,
+        runtime: Some("custom-qemu".to_owned()),
+        ..Default::default()
+      }),
       ..Default::default()
     };
     let mut desired = VmSpecPartial {
@@ -1485,7 +1506,13 @@ mod tests {
     assert_eq!(vm_spec_for_comparison(&desired, &current).unwrap(), current);
     let payload =
       serde_json::to_value(VmSpecUpdate::from(desired.clone())).unwrap();
-    for field in ["MacAddress", "CloudInit", "CloudInitUserData", "Console"] {
+    for field in [
+      "MacAddress",
+      "CloudInit",
+      "CloudInitUserData",
+      "Console",
+      "HostConfig",
+    ] {
       assert!(payload.get(field).is_none(), "{field} must remain omitted");
     }
     desired.console = Some(false);
@@ -1502,6 +1529,100 @@ mod tests {
     assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
     desired.mac_address = None;
     assert!(vm_spec_for_comparison(&desired, &invalid_current).is_err());
+  }
+
+  #[test]
+  fn vm_state_apply_rejects_image_changes() {
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: "/vm.qcow2".into(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
+      ..Default::default()
+    };
+    let mut desired = current.clone();
+    desired.image = "/another-vm.qcow2".into();
+    for hostname in [None, Some("changed-hostname".to_owned())] {
+      desired.hostname = hostname;
+      let error = vm_specs_match(&current, &desired).unwrap_err();
+      assert_eq!(error.inner.kind(), io::ErrorKind::InvalidInput);
+      assert!(error.to_string().contains("Image is immutable"));
+      assert!(error.to_string().contains("create a new VM"));
+    }
+  }
+
+  #[test]
+  fn vm_state_apply_normalizes_equivalent_image_paths() {
+    // Only path identity is compared, so the process working directory is a
+    // self-contained stand-in for an image, with no disk fixture required.
+    let image = utils::path::resolve_full_path(".").unwrap();
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: image.clone(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
+      host_config: Some(Default::default()),
+      ..Default::default()
+    };
+    let absolute_alias = std::path::Path::new(&image)
+      .join(".")
+      .to_str()
+      .unwrap()
+      .to_owned();
+    for image in [".".to_owned(), "./.".to_owned(), absolute_alias] {
+      let desired = VmSpecPartial {
+        name: current.name.clone(),
+        image,
+        ..Default::default()
+      };
+      let original = desired.clone();
+      for _ in 0..2 {
+        assert!(vm_specs_match(&current, &desired).unwrap());
+        assert_eq!(desired, original);
+      }
+      let update = serde_json::to_value(VmSpecUpdate::from(desired)).unwrap();
+      assert!(update.get("HostConfig").is_none());
+    }
+  }
+
+  #[test]
+  fn vm_state_apply_compares_explicit_host_config_without_merging_it() {
+    use nanocld_client::stubs::vm_spec::VmHostConfig;
+
+    let current = VmSpecPartial {
+      name: "guest".into(),
+      image: "/vm.qcow2".into(),
+      mac_address: Some("02:ab:cd:ef:00:01".into()),
+      host_config: Some(VmHostConfig {
+        runtime: Some("custom-qemu".into()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut desired = current.clone();
+    assert!(vm_specs_match(&current, &desired).unwrap());
+    for host_config in [
+      VmHostConfig::default(),
+      VmHostConfig {
+        cpu: 2,
+        ..current.host_config.clone().unwrap()
+      },
+      VmHostConfig {
+        memory: 1024,
+        ..current.host_config.clone().unwrap()
+      },
+    ] {
+      desired.host_config = Some(host_config.clone());
+      assert!(!vm_specs_match(&current, &desired).unwrap());
+      let comparison = vm_spec_for_comparison(&desired, &current).unwrap();
+      assert_eq!(comparison.host_config, Some(host_config.clone()));
+      let update = VmSpecUpdate::from(desired.clone());
+      assert_eq!(
+        update
+          .host_config
+          .unwrap()
+          .apply_to(current.host_config.as_ref().unwrap()),
+        host_config,
+      );
+    }
   }
 
   #[test]
