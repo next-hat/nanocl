@@ -199,6 +199,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     "Installing",
     output.as_ref(),
   )?;
+  let mut items = Vec::new();
   let result = async {
     let progress = &progress;
     let summary = &summary;
@@ -211,6 +212,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       utils::progress::run_state_step(
         progress,
         summary,
+        &mut items,
         &token,
         output,
         None,

@@ -262,6 +262,7 @@ pub(crate) fn finish_state_progress(
 pub(crate) async fn run_state_step<F, Fut>(
   progress: &indicatif::MultiProgress,
   summary: &ProgressBar,
+  items: &mut Vec<ProgressBar>,
   token: &str,
   output: Option<&StateOutput>,
   image_actor: Option<(
@@ -276,6 +277,9 @@ where
   Fut: std::future::Future<Output = nanocl_error::io::IoResult<&'static str>>,
 {
   let pg = create_state_item(progress, summary, token, output)?;
+  // MultiProgress clears dropped rows on println. Retain each handle until
+  // the caller finishes the whole state, including its summary.
+  items.push(pg.clone());
   let operation = operation(pg.clone());
   let operation = async {
     match image_actor {
@@ -444,13 +448,19 @@ mod tests {
       indicatif::ProgressDrawTarget::hidden(),
     );
     let summary = progress.add(ProgressBar::new(3));
+    let mut items = Vec::new();
+    let mut failed_item = None;
     let result = futures::executor::block_on(run_state_step(
       &progress,
       &summary,
+      &mut items,
       "cargo/global.app",
       None,
       None,
-      |_| async { Err(IoError::other("Apply", "image unavailable")) },
+      |pg| {
+        failed_item = Some(pg.downgrade());
+        async { Err(IoError::other("Apply", "image unavailable")) }
+      },
     ));
     assert!(result.is_err());
     finish_state_progress(&summary, "Apply failed", true, None).unwrap();
@@ -458,5 +468,57 @@ mod tests {
     assert_eq!(summary.length(), Some(3));
     assert_eq!(summary.message(), "Apply failed");
     assert!(summary.is_finished());
+    let failed_item = failed_item.unwrap();
+    assert_eq!(failed_item.upgrade().unwrap().message(), "Failed");
+    drop(items);
+    assert!(failed_item.upgrade().is_none());
+  }
+
+  #[test]
+  fn state_progress_retains_completed_rows_until_state_finishes() {
+    let progress = indicatif::MultiProgress::with_draw_target(
+      indicatif::ProgressDrawTarget::hidden(),
+    );
+    let summary = progress.add(ProgressBar::new(2));
+    let mut items = Vec::new();
+    let mut completed = Vec::new();
+    for (token, status) in [
+      ("secret/config", "Created"),
+      ("cargo/global.app", "Running"),
+    ] {
+      futures::executor::block_on(run_state_step(
+        &progress,
+        &summary,
+        &mut items,
+        token,
+        None,
+        None,
+        |pg| {
+          completed.push((pg.downgrade(), token, status));
+          async move { Ok(status) }
+        },
+      ))
+      .unwrap();
+      progress.println("receipt or rollout observation").unwrap();
+      for (item, token, status) in &completed {
+        let item = item.upgrade().expect("completed row must remain alive");
+        assert!(item.is_finished());
+        assert_eq!(item.prefix(), *token);
+        assert_eq!(item.message(), *status);
+      }
+    }
+    finish_state_progress(&summary, "Applied", false, None).unwrap();
+    assert_eq!(summary.position(), 2);
+    assert!(
+      completed
+        .iter()
+        .all(|(item, _, _)| item.upgrade().is_some())
+    );
+    drop(items);
+    assert!(
+      completed
+        .iter()
+        .all(|(item, _, _)| item.upgrade().is_none())
+    );
   }
 }

@@ -278,6 +278,7 @@ async fn state_apply(
   state_file: &StateRef<Statefile>,
   progress: &MultiProgress,
   summary: &ProgressBar,
+  items: &mut Vec<ProgressBar>,
   output: Option<&StateOutput>,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -290,6 +291,7 @@ async fn state_apply(
       utils::progress::run_state_step(
         progress,
         summary,
+        items,
         &token,
         output,
         None,
@@ -327,6 +329,7 @@ async fn state_apply(
       utils::progress::run_state_step(
         progress,
         summary,
+        items,
         &token,
         output,
         Some((client, &key, EventActorKind::Job)),
@@ -374,6 +377,7 @@ async fn state_apply(
       utils::progress::run_state_step(
         progress,
         summary,
+        items,
         &token,
         output,
         Some((client, &key, EventActorKind::Cargo)),
@@ -450,6 +454,7 @@ async fn state_apply(
       utils::progress::run_state_step(
         progress,
         summary,
+        items,
         &token,
         output,
         Some((client, &key, EventActorKind::Vm)),
@@ -525,6 +530,7 @@ async fn state_apply(
       utils::progress::run_state_step(
         progress,
         summary,
+        items,
         &token,
         output,
         None,
@@ -722,9 +728,17 @@ pub(super) async fn exec_state_apply(
       "Applying",
       output.as_ref(),
     )?;
-    let result =
-      state_apply(cli_conf, opts, state, &progress, &summary, output.as_ref())
-        .await;
+    let mut items = Vec::new();
+    let result = state_apply(
+      cli_conf,
+      opts,
+      state,
+      &progress,
+      &summary,
+      &mut items,
+      output.as_ref(),
+    )
+    .await;
     utils::progress::finish_state_progress(
       &summary,
       if result.is_ok() {
