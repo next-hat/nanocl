@@ -299,7 +299,6 @@ where
     let completion_actor: EventActor = vm.clone().into();
     let completion = completion_action(&action);
     let error_state = state.clone();
-    let error_key = key.clone();
     let error_action = action.clone();
     let error_actor: EventActor = vm.clone().into();
     let (start, ready) = tokio::sync::oneshot::channel();
@@ -406,8 +405,12 @@ where
       // while the mutation/owner lease is still held.
       drop(lease);
       if let Some(action) = completion {
-        let (action, kind, reason, note) =
-          completion_notification(action, &result, completed, &key);
+        let (action, kind, reason, note) = completion_notification(
+          action,
+          &result,
+          completed,
+          &completion_actor,
+        );
         task_state
           .emit_action_sync(
             &completion_actor,
@@ -425,7 +428,24 @@ where
         return Ok(());
       }
       if let Some(restart) = restart {
-        return finish_restart(restart.completion, result, completed);
+        if let Err(error) = &result {
+          log::error!(
+            "VM restart failed: {key} operation={operation}: {error}"
+          );
+        }
+        if let Some(diagnostic) =
+          finish_restart(restart.completion, result, completed)
+        {
+          report_task_error(
+            &completion_actor,
+            NativeEventAction::Restart,
+            &diagnostic,
+            &task_state,
+          );
+        }
+        // Restart reports its runtime outcome above. The callback handles an
+        // unexpected owner exit, which cannot supply a backend diagnostic.
+        return Ok(());
       }
       result
     });
@@ -436,7 +456,7 @@ where
         if let Some(action) = completion_action(&error_action) {
           // An owner exit cannot establish a durable operation outcome.
           let (action, kind, reason, note) =
-            completion_notification(action, &Err(error), false, &error_key);
+            completion_notification(action, &Err(error), false, &error_actor);
           error_state.emit_action(
             &error_actor,
             action,
@@ -448,7 +468,12 @@ where
             ),
           );
         } else {
-          report_task_error(&error_actor, error_action, error, &error_state);
+          report_task_error(
+            &error_actor,
+            error_action,
+            &vm_failure_diagnostic(&error),
+            &error_state,
+          );
         }
         Ok(())
       })
@@ -510,53 +535,55 @@ fn completion_notification(
   action: NativeEventAction,
   result: &IoResult<()>,
   completed: bool,
-  key: &str,
+  actor: &EventActor,
 ) -> (NativeEventAction, EventKind, &'static str, String) {
+  let key = actor.key.as_deref().unwrap_or_default();
   if !completed {
     return (
       NativeEventAction::Other("operation_pending".to_owned()),
       EventKind::Warning,
       "operation_pending",
       format!(
-        "VM {key} operation outcome is unknown and may remain pending recovery; inspect the runtime and operation before retrying"
+        "VM {key} {action} outcome is unknown. Inspect the runtime and operation before retrying."
       ),
     );
   }
   let (kind, note) = match result {
-    Ok(()) => (EventKind::Normal, format!("Vm {key}")),
-    Err(error) => (EventKind::Error, vm_failure_diagnostic(error)),
+    Ok(()) => (EventKind::Normal, action.lifecycle_note(actor)),
+    Err(error) => (
+      EventKind::Error,
+      format!("VM {key} {action} failed. {}", vm_failure_diagnostic(error)),
+    ),
   };
   (action, kind, "state_sync", note)
 }
 
 fn vm_failure_diagnostic(error: &IoError) -> String {
-  if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
-  {
-    return format!("VM execution failed: {detail}");
-  }
   if let Some(bollard_next::errors::Error::DockerResponseServerError {
     status_code,
     ..
-  }) = error
-    .inner
+  }) = RuntimeError::cause(error)
     .get_ref()
     .and_then(|source| source.downcast_ref::<bollard_next::errors::Error>())
   {
-    return format!("VM execution failed: Docker HTTP {status_code}");
+    return if error.context() == Some("DownloadImage") {
+      format!("Docker HTTP {status_code} while pulling the VM image")
+    } else {
+      format!("Docker HTTP {status_code}")
+    };
+  }
+  if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
+  {
+    return detail;
   }
   let detail = match error.inner.kind() {
-    std::io::ErrorKind::PermissionDenied => Some("permission denied"),
-    std::io::ErrorKind::TimedOut => Some("timed out"),
-    std::io::ErrorKind::ConnectionRefused => Some("connection refused"),
-    std::io::ErrorKind::ConnectionReset => Some("connection reset"),
-    _ => None,
+    std::io::ErrorKind::PermissionDenied => "Permission denied",
+    std::io::ErrorKind::TimedOut => "The operation timed out",
+    std::io::ErrorKind::ConnectionRefused => "Connection refused",
+    std::io::ErrorKind::ConnectionReset => "Connection reset",
+    _ => "Inspect the VM runtime and daemon logs for details",
   };
-  match detail {
-    Some(detail) => format!("VM execution failed: {detail}"),
-    None => {
-      "VM execution failed; inspect the VM runtime and daemon logs".to_owned()
-    }
-  }
+  detail.to_owned()
 }
 
 fn require_committed_result(
@@ -593,18 +620,19 @@ fn finish_restart(
   reply: tokio::sync::oneshot::Sender<IoResult<()>>,
   result: IoResult<()>,
   completed: bool,
-) -> IoResult<()> {
+) -> Option<String> {
   // Restart events describe the runtime action. Its synchronous caller also
   // needs durable completion and receives the original typed error.
-  let notification = result.clone();
+  // IoError::clone flattens the backend source, including Docker's HTTP status.
+  let diagnostic = result.as_ref().err().map(vm_failure_diagnostic);
   let _ = reply.send(require_committed_result(result, completed));
-  notification
+  diagnostic
 }
 
 fn report_task_error(
   actor: &EventActor,
   action: NativeEventAction,
-  error: IoError,
+  diagnostic: &str,
   state: &SystemState,
 ) {
   let action = match action {
@@ -616,7 +644,11 @@ fn report_task_error(
   };
   // The owning task reconciled status before releasing its lifecycle guard.
   // This delayed notification must never mutate a later operation's state.
-  state.emit_error_native_action(actor, action, Some(error.to_string()));
+  let key = actor.key.as_deref().unwrap_or_default();
+  let note = format!("VM {key} {action} did not report success. {diagnostic}");
+  // The runtime callback can run when durable settlement is still unknown.
+  // Only the operation owner or recovery publishes a correlated receipt.
+  state.emit_error_native_action(actor, action, Some(note));
 }
 
 async fn publish_acceptance(
@@ -627,6 +659,7 @@ async fn publish_acceptance(
 ) -> IoResult<()> {
   // Dispatch is already complete. Persist and publish this internal notification
   // directly, avoiding a second task without trusting event-supplied markers.
+  let actor = vm.clone().into();
   let event: Event = EventDb::create_try_from(
     EventPartial {
       reporting_controller: vars::CONTROLLER_NAME.to_owned(),
@@ -634,8 +667,8 @@ async fn publish_acceptance(
       kind: EventKind::Normal,
       action: action.to_string(),
       reason: "state_sync".to_owned(),
-      note: Some(format!("Vm {}", vm.spec.vm_key)),
-      actor: Some(vm.clone().into()),
+      note: Some(action.lifecycle_note(&actor)),
+      actor: Some(actor),
       related: None,
       metadata: Some(serde_json::json!({
         "Operation": operation,
@@ -715,6 +748,14 @@ impl ObjTaskUpdate for VmDb {
 
 #[cfg(test)]
 mod tests {
+  fn vm_event_actor(key: &str) -> EventActor {
+    EventActor {
+      kind: EventActorKind::Vm,
+      key: Some(key.into()),
+      attributes: None,
+    }
+  }
+
   #[test]
   fn vm_receipts_use_terminal_actions() {
     for (acceptance, terminal) in [
@@ -761,6 +802,7 @@ mod tests {
 
   #[test]
   fn vm_completion_notifications_distinguish_pending_operations() {
+    let actor = vm_event_actor("global.vm");
     for action in [
       NativeEventAction::Start,
       NativeEventAction::Update,
@@ -769,7 +811,7 @@ mod tests {
       for result in [Ok(()), Err(IoError::other("runtime", "execution failed"))]
       {
         let (pending_action, kind, reason, note) =
-          completion_notification(action.clone(), &result, false, "global.vm");
+          completion_notification(action.clone(), &result, false, &actor);
         assert_eq!(
           pending_action,
           NativeEventAction::Other("operation_pending".to_owned())
@@ -778,11 +820,11 @@ mod tests {
         assert_eq!(reason, "operation_pending");
         assert!(note.contains("outcome is unknown"));
         assert!(
-          note.contains("inspect the runtime and operation before retrying")
+          note.contains("Inspect the runtime and operation before retrying")
         );
 
         let (terminal_action, kind, reason, note) =
-          completion_notification(action.clone(), &result, true, "global.vm");
+          completion_notification(action.clone(), &result, true, &actor);
         assert_eq!(terminal_action, action);
         assert_eq!(
           kind,
@@ -796,8 +838,11 @@ mod tests {
         assert_eq!(
           note,
           match &result {
-            Ok(()) => "Vm global.vm".to_owned(),
-            Err(error) => vm_failure_diagnostic(error),
+            Ok(()) => action.lifecycle_note(&actor),
+            Err(error) => format!(
+              "VM global.vm {action} failed. {}",
+              vm_failure_diagnostic(error)
+            ),
           }
         );
       }
@@ -826,13 +871,19 @@ mod tests {
 
   #[test]
   fn vm_cleanup_failure_preserves_committed_operation_outcomes() {
+    let actor = vm_event_actor("vm");
     let cleanup_failure =
       || Err(IoError::other("cleanup", "mutex unavailable"));
     let succeeded = result_after_cleanup(Ok(()), true, cleanup_failure());
     assert!(succeeded.is_ok());
     assert_eq!(
-      completion_notification(NativeEventAction::Start, &succeeded, true, "vm")
-        .1,
+      completion_notification(
+        NativeEventAction::Start,
+        &succeeded,
+        true,
+        &actor
+      )
+      .1,
       EventKind::Normal
     );
     for completed in [false, true] {
@@ -847,7 +898,7 @@ mod tests {
           NativeEventAction::Start,
           &failed,
           completed,
-          "vm"
+          &actor
         )
         .1,
         if completed {
@@ -867,8 +918,13 @@ mod tests {
       Some("VM operation")
     );
     assert_eq!(
-      completion_notification(NativeEventAction::Start, &pending, false, "vm")
-        .2,
+      completion_notification(
+        NativeEventAction::Start,
+        &pending,
+        false,
+        &actor
+      )
+      .2,
       "operation_pending"
     );
     // The synchronous restart path still reports cleanup errors when durable
@@ -896,15 +952,18 @@ mod tests {
     let error = reply.unwrap_err();
     assert!(RuntimeError::is_uncertain(&error));
     assert_eq!(error.context(), Some("VM operation"));
-    assert!(notification.is_ok());
+    assert!(notification.is_none());
 
     let cleanup = || Err(IoError::other("cleanup", "mutex unavailable"));
     let (reply, notification) = finish(Ok(()), true, cleanup());
     assert!(reply.is_ok());
-    assert!(notification.is_ok());
+    assert!(notification.is_none());
     let (reply, notification) = finish(Ok(()), false, cleanup());
     assert_eq!(reply.unwrap_err().context(), Some("cleanup"));
-    assert_eq!(notification.unwrap_err().context(), Some("cleanup"));
+    assert_eq!(
+      notification.as_deref(),
+      Some("Inspect the VM runtime and daemon logs for details")
+    );
 
     let failed =
       DockerError::RequestTimeoutError.map_err_context(|| "VM restart");
@@ -921,6 +980,34 @@ mod tests {
         .and_then(|source| source.downcast_ref::<DockerError>()),
       Some(DockerError::RequestTimeoutError)
     ));
+  }
+
+  #[test]
+  fn vm_restart_keeps_docker_http_status_in_event_and_typed_reply() {
+    use bollard_next::errors::Error as DockerError;
+    use nanocl_error::io::FromIo;
+
+    for (completed, already_uncertain) in
+      [(true, false), (false, false), (false, true)]
+    {
+      let backend = DockerError::DockerResponseServerError {
+        status_code: 503,
+        message: "private response".into(),
+      };
+      let mut error = *backend.map_err_context(|| "VM restart");
+      if already_uncertain {
+        error = RuntimeError::unconfirmed(error);
+      }
+      let (send, mut receive) = tokio::sync::oneshot::channel();
+      let note = finish_restart(send, Err(error), completed);
+      assert_eq!(note.as_deref(), Some("Docker HTTP 503"));
+      let reply = receive.try_recv().unwrap().unwrap_err();
+      assert_eq!(RuntimeError::is_uncertain(&reply), !completed);
+      assert!(matches!(
+        RuntimeError::cause(&reply).get_ref().and_then(|cause| cause.downcast_ref::<DockerError>()),
+        Some(DockerError::DockerResponseServerError { status_code: 503, message }) if message == "private response"
+      ));
+    }
   }
 
   use nanocl_stubs::system::{
@@ -1573,7 +1660,7 @@ mod tests {
     report_task_error(
       &actor,
       NativeEventAction::Starting,
-      IoError::other("VM task", "older setup failed"),
+      "Older setup failed",
       state,
     );
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
@@ -1587,6 +1674,7 @@ mod tests {
           && event.actor.as_ref().and_then(|actor| actor.key.as_deref())
             == Some(key.as_str())
         {
+          assert!(event.metadata.is_none());
           break;
         }
       }

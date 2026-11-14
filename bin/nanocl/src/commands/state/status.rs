@@ -6,7 +6,7 @@ use std::{
   time::Duration,
 };
 
-use bollard_next::models::HealthStatusEnum;
+use bollard_next::models::{ContainerState, HealthStatusEnum};
 use chrono::{NaiveDateTime, Utc};
 use dialoguer::console::measure_text_width;
 use futures::{StreamExt, stream};
@@ -19,9 +19,12 @@ use nanocld_client::{
   stubs::{
     generic::{GenericClause, GenericFilter, GenericListQuery, GenericWhere},
     job::JobInspect,
-    process::Process,
+    process::{Process, ProcessKind},
     statefile::Statefile,
-    system::{Event, EventActorKind, ObjPsStatus, ObjPsStatusKind},
+    system::{
+      Event, EventActorKind, EventKind, NativeEventAction, ObjPsStatus,
+      ObjPsStatusKind,
+    },
   },
 };
 use serde_json::json;
@@ -170,9 +173,12 @@ fn failure_filter(
   kind: &EventActorKind,
   key: &str,
   since: NaiveDateTime,
+  job: Option<&JobInspect>,
 ) -> GenericFilter {
   let mut alternatives = Vec::new();
-  for relation in ["actor", "related"] {
+  for (relation, run_key) in
+    [("actor", "actor_run_key"), ("related", "related_run_key")]
+  {
     for (field, clause) in [
       ("kind", GenericClause::Eq("error".into())),
       (
@@ -180,7 +186,7 @@ fn failure_filter(
         GenericClause::In(vec!["fail".into(), "unhealthy".into()]),
       ),
     ] {
-      alternatives.push(std::collections::HashMap::from([
+      let mut branch = std::collections::HashMap::from([
         (
           relation.into(),
           GenericClause::Contains(json!({"Key": key, "Kind": kind})),
@@ -190,7 +196,17 @@ fn failure_filter(
           "created_at".into(),
           GenericClause::Ge(since.and_utc().to_rfc3339()),
         ),
-      ]));
+      ]);
+      if let Some(job) = job {
+        if let Some(run) = job.current_run_key {
+          let mut current = branch.clone();
+          current.insert(run_key.into(), GenericClause::Eq(run.to_string()));
+          alternatives.push(current);
+        }
+        // Job-level errors can be emitted without an execution identity.
+        branch.insert(run_key.into(), GenericClause::IsNull);
+      }
+      alternatives.push(branch);
     }
   }
   GenericFilter {
@@ -206,11 +222,9 @@ fn failure_filter(
 
 async fn recent_event(
   client: &NanocldClient,
-  kind: &EventActorKind,
-  key: &str,
-  since: NaiveDateTime,
+  filter: GenericFilter,
 ) -> Result<Option<Event>, String> {
-  let query = GenericListQuery::try_from(failure_filter(kind, key, since))
+  let query = GenericListQuery::try_from(filter)
     .map_err(|_| "cannot build event filter".to_owned())?;
   let res = client
     .send_get("/events", Some(query))
@@ -229,15 +243,30 @@ fn failure_detail(
   let Some(event) = event else {
     return observed;
   };
-  // Completion notifications often say only "Job <name>". Keep the exit/OOM
-  // or health-check detail, with its actual observation time, in that case.
-  if event.reason == "state_sync"
-    && matches!(event.action.as_str(), "fail" | "unhealthy")
-    && observed.is_some()
+  let note = event
+    .note
+    .as_deref()
+    .map(str::trim)
+    .filter(|note| !note.is_empty());
+  // An actor label or a status-only note adds no cause to a process failure.
+  if observed.is_some()
+    && event.reason == "state_sync"
+    && let Ok(action @ (NativeEventAction::Fail | NativeEventAction::Unhealthy)) =
+      event.action.parse()
+    && note.is_none_or(|note| {
+      event.actor.as_ref().is_some_and(|actor| {
+        note == action.lifecycle_note(actor)
+          || note.split_once(' ').is_some_and(|(kind, key)| {
+            actor.key.as_deref() == Some(key)
+              && kind.eq_ignore_ascii_case(&actor.kind.to_string())
+          })
+      })
+    })
   {
     return observed;
   }
-  let reason = match event.note.filter(|note| !note.trim().is_empty()) {
+  let reason = match note {
+    Some(note) if event.reason == "state_sync" => note.to_owned(),
     Some(note) => format!("{}: {}: {note}", event.action, event.reason),
     None => format!("{}: {}", event.action, event.reason),
   };
@@ -245,6 +274,112 @@ fn failure_detail(
     .into_iter()
     .chain(observed)
     .max_by_key(|(time, _)| *time)
+}
+
+// Docker reuses a VM container ID across restarts. Only the run observed by
+// the die event can contribute a cause to that event.
+fn same_vm_exit(metadata: &serde_json::Value, state: &ContainerState) -> bool {
+  let nanos = |value: &str| {
+    chrono::DateTime::parse_from_rfc3339(value)
+      .ok()
+      .and_then(|t| t.timestamp_nanos_opt())
+  };
+  let (Some(event), Some(start)) = (
+    metadata["DockerEventTimeNano"].as_i64(),
+    metadata["StartedAt"].as_str().and_then(nanos),
+  ) else {
+    return false;
+  };
+  if start > event || state.started_at.as_deref().and_then(nanos) != Some(start)
+  {
+    return false;
+  }
+  let finished = state.finished_at.as_deref().and_then(nanos);
+  let event_finished = metadata["FinishedAt"].as_str().and_then(nanos);
+  finished.is_none_or(|end| (start..=event).contains(&end))
+    && event_finished.is_none_or(|end| {
+      (start..=event).contains(&end) && finished.is_none_or(|seen| seen == end)
+    })
+}
+
+/// Locate the inventory snapshot for the execution reported by the event.
+fn matching_exit(event: &Event, processes: &[Process]) -> Option<usize> {
+  let actor = event.actor.as_ref()?;
+  if event.reporting_controller != "nanocl.io/core"
+    || event.reason != "state_sync"
+    || event.kind != EventKind::Error
+  {
+    return None;
+  }
+  let metadata = event.metadata.as_ref()?;
+  let key = actor.key.as_deref()?;
+  let id = metadata["ContainerId"].as_str()?;
+  let code = metadata["ExitCode"].as_i64()?;
+  processes.iter().position(|process| {
+    let Some(state) = process.data.state.as_ref() else {
+      return false;
+    };
+    if process.key != id
+      || process.kind_key != key
+      || process.node_name != event.reporting_node
+      || state.running != Some(false)
+      || state.restarting == Some(true)
+      || state.exit_code != Some(code)
+    {
+      return false;
+    }
+    match (&actor.kind, &process.kind, event.action.as_str()) {
+      (EventActorKind::Vm, ProcessKind::Vm, "die") => {
+        same_vm_exit(metadata, state)
+      }
+      (EventActorKind::Job, ProcessKind::Job, "fail") => {
+        let run = actor
+          .attributes
+          .as_ref()
+          .and_then(|attr| attr["RunKey"].as_str());
+        let process_run = process
+          .data
+          .config
+          .as_ref()
+          .and_then(|config| config.labels.as_ref())
+          .and_then(|labels| labels.get("io.nanocl.job.run"));
+        process_run.is_some_and(|label| Some(label.as_str()) == run)
+      }
+      _ => false,
+    }
+  })
+}
+
+fn status_failure(
+  mut event: Option<Event>,
+  mut processes: Vec<Process>,
+  since: NaiveDateTime,
+) -> Option<(NaiveDateTime, String)> {
+  if let Some(event) = &mut event
+    && let Some(index) = matching_exit(event, &processes)
+  {
+    // Inventory refresh time is not a new failure of this exited container.
+    if let Some(note) =
+      event.note.as_mut().filter(|note| !note.trim().is_empty())
+    {
+      let process = processes.remove(index);
+      if process
+        .data
+        .state
+        .is_some_and(|state| state.oom_killed == Some(true))
+        && !event
+          .metadata
+          .as_ref()
+          .is_some_and(|metadata| metadata["OOMKilled"] == true)
+      {
+        note.push_str(" (OOM killed)");
+      }
+    } else {
+      // Use the observed reason at the event time when the event has no note.
+      processes[index].updated_at = event.created_at;
+    }
+  }
+  failure_detail(event, recent_failure(&processes, since))
 }
 
 /// Latest observed process failure without exposing health-check log output.
@@ -333,48 +468,42 @@ async fn inspect_target(
   key: &str,
   row: &mut StateStatusRow,
   since: NaiveDateTime,
-) -> Result<(NaiveDateTime, Option<(NaiveDateTime, String)>), String> {
-  let (created_at, instances) = match kind {
-    EventActorKind::Cargo => {
-      match optional_read(client.inspect_cargo(key).await)? {
-        Some(cargo) => {
-          set_runtime(row, &cargo.status, &cargo.instances);
-          (cargo.created_at, cargo.instances)
-        }
-        None => return Ok((since, None)),
-      }
-    }
-    EventActorKind::Vm => match optional_read(client.inspect_vm(key).await)? {
-      Some(vm) => {
+) -> Result<(NaiveDateTime, GenericFilter, Vec<Process>), String> {
+  let history = |created_at, job: Option<&JobInspect>| {
+    let since = since.max(created_at);
+    (since, failure_filter(kind, key, since, job))
+  };
+  let target = match kind {
+    EventActorKind::Cargo => optional_read(client.inspect_cargo(key).await)?
+      .map(|cargo| {
+        set_runtime(row, &cargo.status, &cargo.instances);
+        (history(cargo.created_at, None), cargo.instances)
+      }),
+    EventActorKind::Vm => {
+      optional_read(client.inspect_vm(key).await)?.map(|vm| {
         set_runtime(row, &vm.status, &vm.instances);
-        (vm.created_at, vm.instances)
-      }
-      None => return Ok((since, None)),
-    },
+        (history(vm.created_at, None), vm.instances)
+      })
+    }
     EventActorKind::Job => {
-      match optional_read(client.inspect_job(key).await)? {
-        Some(job) => {
-          set_job(row, &job);
-          (job.created_at, job.instances)
-        }
-        None => return Ok((since, None)),
-      }
+      optional_read(client.inspect_job(key).await)?.map(|job| {
+        set_job(row, &job);
+        (history(job.created_at, Some(&job)), job.instances)
+      })
     }
     EventActorKind::Resource => {
-      match optional_read(client.inspect_resource(key).await)? {
-        Some(resource) => {
-          row.status = "present".into();
-          row.state = "present".into();
-          row.health = "not reported".into();
-          return Ok((since.max(resource.created_at), None));
-        }
-        None => return Ok((since, None)),
-      }
+      optional_read(client.inspect_resource(key).await)?.map(|resource| {
+        row.status = "present".into();
+        row.state = "present".into();
+        row.health = "not reported".into();
+        (history(resource.created_at, None), Vec::new())
+      })
     }
     _ => unreachable!("only Statefile runtime objects are collected"),
   };
-  let since = since.max(created_at);
-  Ok((since, recent_failure(&instances, since)))
+  let ((since, filter), instances) =
+    target.unwrap_or_else(|| (history(since, None), Vec::new()));
+  Ok((since, filter, instances))
 }
 
 async fn collect_row(
@@ -384,7 +513,7 @@ async fn collect_row(
   since: NaiveDateTime,
 ) -> StateStatusRow {
   let mut row = empty_row(kind, key);
-  let (since, observed) = match ntex::time::timeout(
+  let (since, filter, instances) = match ntex::time::timeout(
     READ_TIMEOUT,
     inspect_target(client, kind, key, &mut row, since),
   )
@@ -405,10 +534,9 @@ async fn collect_row(
     }
   };
   let event =
-    ntex::time::timeout(READ_TIMEOUT, recent_event(client, kind, key, since))
-      .await;
-  let failure = match event {
-    Ok(Ok(event)) => failure_detail(event, observed),
+    ntex::time::timeout(READ_TIMEOUT, recent_event(client, filter)).await;
+  let event = match event {
+    Ok(Ok(event)) => event,
     result => {
       row.read_failed = true;
       let error = match result {
@@ -418,10 +546,10 @@ async fn collect_row(
       };
       row.failure = format!("event history unavailable: {error}");
       row.read_error = Some(row.failure.clone());
-      observed
+      None
     }
   };
-  if let Some((time, reason)) = failure {
+  if let Some((time, reason)) = status_failure(event, instances, since) {
     let reason = display_text(&reason);
     row.recent_failure = Some((time, reason.clone()));
     let reason = format!("{} UTC {}", time.format("%Y-%m-%d %H:%M:%S"), reason);
@@ -724,7 +852,6 @@ mod tests {
   use nanocld_client::stubs::{
     cargo_spec::CargoSpec,
     job::{JobPartial, JobSpec},
-    process::ProcessKind,
     resource::ResourcePartial,
     system::ObjPsHealthStatusKind,
     vm_spec::VmSpecPartial,
@@ -869,7 +996,7 @@ mod tests {
   #[test]
   fn status_failure_filter_scopes_every_branch_and_orders_by_recency() {
     let since = time(123);
-    let filter = failure_filter(&EventActorKind::Job, "migrate", since);
+    let filter = failure_filter(&EventActorKind::Job, "migrate", since, None);
     assert_eq!(filter.limit, Some(1));
     assert_eq!(filter.order_by, Some(vec!["created_at desc".into()]));
     let predicates = filter.r#where.unwrap();
@@ -927,10 +1054,9 @@ mod tests {
     assert_eq!(row.health, "unhealthy");
   }
 
-  #[test]
-  fn status_job_distinguishes_schedule_from_completed_runs() {
+  fn scheduled_job() -> JobInspect {
     let spec_key = uuid::Uuid::new_v4();
-    let mut job = JobInspect {
+    JobInspect {
       incarnation_key: uuid::Uuid::new_v4(),
       spec_key,
       current_run_key: None,
@@ -951,7 +1077,56 @@ mod tests {
         ..Default::default()
       },
       instances: vec![],
-    };
+    }
+  }
+
+  #[test]
+  fn status_job_failure_filter_excludes_previous_runs() {
+    let mut job = scheduled_job();
+    let failed_run = uuid::Uuid::from_u128(1);
+    let successful_run = uuid::Uuid::from_u128(2);
+    for (run, status) in [
+      (None, ObjPsStatusKind::Create),
+      (Some(failed_run), ObjPsStatusKind::Fail),
+      (Some(successful_run), ObjPsStatusKind::Finish),
+    ] {
+      job.current_run_key = run;
+      job.status.actual = status;
+      let filter =
+        failure_filter(&EventActorKind::Job, "migrate", time(10), Some(&job));
+      assert_eq!(filter.limit, Some(1));
+      let predicates = filter.r#where.unwrap();
+      let branches: Vec<_> = std::iter::once(predicates.conditions)
+        .chain(predicates.or.unwrap())
+        .collect();
+      let run_key = run.map(|key| key.to_string());
+      let expected = BTreeSet::from([None, run_key.as_deref()]);
+      for relation in ["actor", "related"] {
+        let column = format!("{relation}_run_key");
+        for failure in ["kind", "action"] {
+          let eligible = branches
+            .iter()
+            .filter(|branch| {
+              branch.contains_key(relation) && branch.contains_key(failure)
+            })
+            .map(|branch| match branch.get(&column) {
+              Some(GenericClause::Eq(key)) => Some(key.as_str()),
+              Some(GenericClause::IsNull) => None,
+              other => {
+                panic!("missing run constraint for {relation}: {other:?}")
+              }
+            })
+            .collect::<BTreeSet<_>>();
+          assert_eq!(eligible, expected, "{relation} {failure}");
+        }
+      }
+      assert_eq!(branches.len(), 4 * expected.len());
+    }
+  }
+
+  #[test]
+  fn status_job_distinguishes_schedule_from_completed_runs() {
+    let mut job = scheduled_job();
     let mut row = empty_row(&EventActorKind::Job, "migrate");
     set_job(&mut row, &job);
     assert_eq!(row.status, "scheduled");
@@ -984,6 +1159,13 @@ mod tests {
 
   #[test]
   fn status_failure_detail_preserves_process_reason_for_generic_events() {
+    let status_event = |action, note, kind, key| {
+      let mut event = event(20, action, "state_sync", note);
+      event.actor = Some(
+        serde_json::from_value(json!({"Key": key, "Kind": kind})).unwrap(),
+      );
+      event
+    };
     for reason in [
       "app: exited with code 127",
       "app: out of memory (OOM killed)",
@@ -991,7 +1173,7 @@ mod tests {
       let observed = Some((time(10), reason.into()));
       assert_eq!(
         failure_detail(
-          Some(event(20, "fail", "state_sync", "Job migrate")),
+          Some(status_event("fail", "Job migrate failed", "Job", "migrate")),
           observed.clone()
         ),
         observed
@@ -1001,18 +1183,226 @@ mod tests {
       time(10),
       "app: unhealthy (health check exited with code 2)".into(),
     ));
+    for note in ["Cargo app is unhealthy", ""] {
+      assert_eq!(
+        failure_detail(
+          Some(status_event("unhealthy", note, "Cargo", "app")),
+          observed.clone()
+        ),
+        observed
+      );
+    }
+  }
+
+  #[test]
+  fn actor_only_failure_notes_do_not_hide_the_process_cause() {
+    let observed =
+      Some((time(10), "worker: out of memory (OOM killed)".into()));
+    for (action, kind, key, label) in [
+      ("fail", "Job", "migrate", "Job migrate"),
+      ("unhealthy", "Cargo", "app", "Cargo app"),
+      ("fail", "Vm", "guest", "Vm guest"),
+      ("fail", "Vm", "guest", "VM guest"),
+    ] {
+      let mut failure = event(20, action, "state_sync", label);
+      failure.actor = Some(
+        serde_json::from_value(json!({"Key": key, "Kind": kind})).unwrap(),
+      );
+      assert_eq!(
+        failure_detail(Some(failure.clone()), observed.clone()),
+        observed
+      );
+      assert_eq!(
+        failure_detail(Some(failure.clone()), None),
+        Some((time(20), label.into()))
+      );
+      let detail = format!("{label} exited with code 7");
+      failure.note = Some(detail.clone());
+      assert_eq!(
+        failure_detail(Some(failure), observed.clone()),
+        Some((time(20), detail))
+      );
+    }
+  }
+
+  fn assert_ordinary_exit_keeps_event_time(event: &Event, process: &Process) {
+    let mut refreshed = process.clone();
+    refreshed.updated_at = time(30);
     assert_eq!(
-      failure_detail(
-        Some(event(20, "unhealthy", "state_sync", "Cargo app")),
-        observed.clone()
-      ),
-      observed
+      status_failure(Some(event.clone()), vec![refreshed.clone()], time(0)),
+      Some((event.created_at, event.note.clone().unwrap()))
+    );
+    let mut without_note = event.clone();
+    without_note.note = None;
+    assert_eq!(
+      status_failure(Some(without_note), vec![refreshed.clone()], time(0)),
+      Some((event.created_at, "app: exited with code 137".into()))
+    );
+
+    let mut newer = process.clone();
+    newer.key = "another-container".into();
+    newer.name = "worker".into();
+    newer.updated_at = time(25);
+    newer.data.state.as_mut().unwrap().exit_code = Some(7);
+    assert_eq!(
+      status_failure(Some(event.clone()), vec![refreshed, newer], time(0)),
+      Some((time(25), "worker: exited with code 7".into()))
+    );
+  }
+
+  #[test]
+  fn status_adds_oom_only_for_the_exited_container_of_the_failed_run() {
+    let mut terminal = event(
+      20,
+      "fail",
+      "state_sync",
+      "Job app failed: Step 1 exited with code 137",
+    );
+    terminal.actor = Some(
+      serde_json::from_value(json!({
+        "Kind": "Job", "Key":"app", "Attributes": {"RunKey": "run-app"}
+      }))
+      .unwrap(),
+    );
+    terminal.metadata =
+      Some(json!({"ContainerId": "instance", "ExitCode": 137}));
+    let mut failed = instance(Some(false));
+    failed.data.config = Some(
+      serde_json::from_value(json!({
+        "Labels": {"io.nanocl.job.run": "run-app"}
+      }))
+      .unwrap(),
+    );
+    let state = failed.data.state.as_mut().unwrap();
+    state.oom_killed = Some(true);
+    state.exit_code = Some(137);
+    let expected = terminal.note.clone().unwrap();
+    let select = |event: Event, process: &Process| {
+      status_failure(Some(event), vec![process.clone()], time(0)).unwrap()
+    };
+    assert_eq!(
+      select(terminal.clone(), &failed),
+      (time(20), format!("{expected} (OOM killed)"))
+    );
+    let mut other = terminal.clone();
+    other.metadata.as_mut().unwrap()["ContainerId"] = "other-step".into();
+    assert_eq!(select(other, &failed), (time(20), expected.clone()));
+    let mut other = terminal.clone();
+    other.actor.as_mut().unwrap().attributes.as_mut().unwrap()["RunKey"] =
+      "next-run".into();
+    assert_eq!(select(other, &failed), (time(20), expected.clone()));
+    let mut other = terminal.clone();
+    other.metadata = None;
+    assert_eq!(select(other, &failed), (time(20), expected.clone()));
+    failed.data.state.as_mut().unwrap().oom_killed = None;
+    assert_eq!(select(terminal.clone(), &failed), (time(20), expected));
+    assert_ordinary_exit_keeps_event_time(&terminal, &failed);
+
+    terminal.metadata.as_mut().unwrap()["OOMKilled"] = true.into();
+    let oom_note = "Job app failed: Step 1 ran out of memory (exit code 137)";
+    terminal.note = Some(oom_note.into());
+    failed.updated_at = time(30);
+    assert_eq!(
+      select(terminal.clone(), &failed),
+      (time(20), oom_note.into())
+    );
+    let mut unrelated = failed.clone();
+    unrelated.key = "another-step".into();
+    unrelated.updated_at = time(25);
+    unrelated.data.state.as_mut().unwrap().exit_code = Some(7);
+    assert_eq!(
+      status_failure(Some(terminal), vec![failed, unrelated], time(0)),
+      Some((time(25), "app: exited with code 7".into()))
+    );
+  }
+
+  #[test]
+  fn status_vm_oom_matches_the_exited_run_of_a_restarted_container() {
+    let note = "VM guest stopped unexpectedly when process app ran out of memory (exit code 137)";
+    let mut die = event(20, "die", "state_sync", note);
+    die.actor =
+      Some(serde_json::from_value(json!({"Kind":"Vm","Key":"guest"})).unwrap());
+    let start = "1970-01-01T00:00:05Z";
+    let finish = "1970-01-01T00:00:15Z";
+    die.metadata = Some(json!({
+      "ContainerId":"instance", "ExitCode":137, "OOMKilled":true,
+      "DockerEventTimeNano":16_000_000_000_i64, "StartedAt":start, "FinishedAt":finish,
+    }));
+    let mut snapshot = instance(Some(false));
+    snapshot.kind = ProcessKind::Vm;
+    snapshot.kind_key = "guest".into();
+    snapshot.updated_at = time(30);
+    let state = snapshot.data.state.as_mut().unwrap();
+    state.started_at = Some(start.into());
+    state.finished_at = Some(finish.into());
+    state.exit_code = Some(137);
+    let select = |event: &Event, process: &Process| {
+      status_failure(Some(event.clone()), vec![process.clone()], time(0))
+        .unwrap()
+    };
+    assert_eq!(select(&die, &snapshot), (time(20), note.into()));
+    for (started, finished) in [
+      ("1970-01-01T00:00:02Z", "1970-01-01T00:00:04Z"),
+      ("1970-01-01T00:00:21Z", "1970-01-01T00:00:25Z"),
+      (start, "1970-01-01T00:00:14Z"),
+    ] {
+      let mut other = snapshot.clone();
+      let state = other.data.state.as_mut().unwrap();
+      state.started_at = Some(started.into());
+      state.finished_at = Some(finished.into());
+      assert_eq!(
+        select(&die, &other),
+        (time(30), "app: exited with code 137".into())
+      );
+    }
+    die
+      .metadata
+      .as_mut()
+      .unwrap()
+      .as_object_mut()
+      .unwrap()
+      .remove("OOMKilled");
+    die.note = Some(
+      "VM guest stopped unexpectedly when process app exited (exit code 137)"
+        .into(),
+    );
+    assert_ordinary_exit_keeps_event_time(&die, &snapshot);
+    snapshot.data.state.as_mut().unwrap().oom_killed = Some(true);
+    assert_eq!(
+      select(&die, &snapshot),
+      (
+        time(20),
+        format!("{} (OOM killed)", die.note.as_ref().unwrap())
+      )
     );
   }
 
   #[test]
   fn status_failure_detail_selects_newest_informative_reason() {
     let observed = Some((time(10), "app: exited with code 127".into()));
+    for (when, expected) in [
+      (
+        20,
+        Some((
+          time(20),
+          "Job backup failed: Step 1 exited with code 7".into(),
+        )),
+      ),
+      (5, observed.clone()),
+    ] {
+      assert_eq!(
+        failure_detail(
+          Some(event(
+            when,
+            "fail",
+            "state_sync",
+            "Job backup failed: Step 1 exited with code 7"
+          )),
+          observed.clone()
+        ),
+        expected
+      );
+    }
     assert_eq!(
       failure_detail(
         Some(event(20, "start", "image_pull", "image unavailable")),

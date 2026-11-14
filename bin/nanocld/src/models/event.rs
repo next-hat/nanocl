@@ -29,7 +29,7 @@ pub struct EventDb {
   /// It is machine-readable.
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub action: String,
-  /// Reason is why the action was taken. It is human-readable.
+  /// Stable reason for the action, used by consumers (e.g. `state_sync`).
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
   /// Human-readable description of the status of this operation

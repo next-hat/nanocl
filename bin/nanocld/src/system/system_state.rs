@@ -200,16 +200,13 @@ impl SystemState {
     A: Into<EventActor> + Clone,
   {
     let actor = actor.clone().into();
+    let note = action.lifecycle_note(&actor);
     self.emit_action(
       &actor,
       action,
       EventKind::Normal,
       "state_sync",
-      Some(format!(
-        "{} {}",
-        actor.kind,
-        actor.key.clone().unwrap_or_default()
-      )),
+      Some(note),
       None,
     );
   }
@@ -223,17 +220,14 @@ impl SystemState {
     A: Into<EventActor> + Clone,
   {
     let actor = actor.clone().into();
+    let note = action.lifecycle_note(&actor);
     self
       .emit_action_sync(
         &actor,
         action,
         EventKind::Normal,
         "state_sync",
-        Some(format!(
-          "{} {}",
-          actor.kind,
-          actor.key.clone().unwrap_or_default()
-        )),
+        Some(note),
         None,
       )
       .await;

@@ -11,7 +11,10 @@ use ntex::rt;
 use nanocl_error::io::{FromIo, IoResult};
 
 use bollard_next::{
-  models::{ContainerInspectResponse, EventMessage, EventMessageTypeEnum},
+  models::{
+    ContainerInspectResponse, ContainerState, EventMessage,
+    EventMessageTypeEnum,
+  },
   query_parameters::{EventsOptions, InspectContainerOptions},
 };
 use nanocl_stubs::system::{
@@ -158,6 +161,37 @@ fn vm_runtime_failure_guard(key: &str) -> Option<VmLifecycleObservationGuard> {
   utils::container::vm::lifecycle_lock(key).try_observe_owned()
 }
 
+fn vm_exit_diagnostic(
+  key: &str,
+  name: &str,
+  id: &str,
+  event_time: Option<i64>,
+  exit: &ContainerState,
+) -> (String, serde_json::Value) {
+  let mut metadata = serde_json::json!({"ContainerId": id});
+  if let Some(started) = &exit.started_at {
+    metadata["StartedAt"] = started.as_str().into();
+  }
+  if let Some(finished) = &exit.finished_at {
+    metadata["FinishedAt"] = finished.as_str().into();
+  }
+  if let Some(time_nano) = event_time {
+    metadata["DockerEventTimeNano"] = time_nano.into();
+  }
+  let mut note = format!("VM {key} stopped unexpectedly when process {name} ");
+  if exit.oom_killed == Some(true) {
+    note.push_str("ran out of memory");
+    metadata["OOMKilled"] = true.into();
+  } else {
+    note.push_str("exited");
+  }
+  if let Some(code) = exit.exit_code {
+    note.push_str(&format!(" (exit code {code})"));
+    metadata["ExitCode"] = code.into();
+  }
+  (note, metadata)
+}
+
 async fn handle_vm_runtime_exit(
   key: &str,
   name: &str,
@@ -201,17 +235,16 @@ async fn handle_vm_runtime_exit(
   }
   // A delayed die event can describe a replaced runtime or an earlier run of
   // a restarted container. Confirm that the current runtime is still exited.
-  let has_exited =
-    match utils::container::vm::inspect_runtime(&vm, state).await? {
-      Some(runtime) => vm_runtime_has_exited(id, event_time, &runtime),
-      None => false,
-    };
-  if !has_exited {
+  let Some(exit) = utils::container::vm::inspect_runtime(&vm, state)
+    .await?
+    .filter(|runtime| vm_runtime_has_exited(id, event_time, runtime))
+    .and_then(|runtime| runtime.state)
+  else {
     log::debug!(
       "VM {key} ignored stale or unconfirmed exit: container={id} event_time={event_time:?}"
     );
     return Ok(());
-  }
+  };
   if !VmDb::observe_runtime_status(
     &vm,
     live.incarnation_key,
@@ -224,10 +257,14 @@ async fn handle_vm_runtime_exit(
   {
     return Ok(());
   }
-  state.emit_error_native_action(
-    &vm,
+  let (note, metadata) = vm_exit_diagnostic(key, name, id, event_time, &exit);
+  state.emit_action(
+    &vm.into(),
     NativeEventAction::Die,
-    Some(format!("process {name} (container {id}, exit event {event_time:?}) died but should be alive")),
+    EventKind::Error,
+    "state_sync",
+    Some(note),
+    Some(metadata),
   );
   Ok(())
 }
@@ -618,12 +655,65 @@ async fn handle_cargo_health_event(
   Ok(())
 }
 
-fn normalize_job_observation_action(event: &mut EventPartial, action: &str) {
-  if action.starts_with("health_status:") {
-    event.action = NativeEventAction::Update.to_string();
-  } else {
-    action.clone_into(&mut event.action);
+fn process_observation<'a>(
+  name: &str,
+  action: &'a str,
+  exit_code: Option<i64>,
+) -> (&'a str, String, Option<serde_json::Value>) {
+  if let Some(raw_health) = action.strip_prefix("health_status:") {
+    let health = raw_health.trim();
+    let note = match health {
+      "starting" => format!("Process {name} is waiting for its health check"),
+      "healthy" => format!("Process {name} passed its health check"),
+      "unhealthy" => format!("Process {name} is unhealthy"),
+      _ => {
+        return (
+          "update",
+          format!("Docker reported a health update for process {name}"),
+          None,
+        );
+      }
+    };
+    return (
+      "update",
+      note,
+      Some(serde_json::json!({"HealthStatus": health})),
+    );
   }
+  // Docker appends the executed command to exec actions after a colon.
+  // Only publish the action name in the event shared by all consumers.
+  let action = action.split_once(':').map_or(action, |(kind, _)| kind);
+  let note = match action {
+    "create" => format!("Process {name} was created"),
+    "start" => format!("Process {name} started"),
+    "stop" => format!("Process {name} stopped"),
+    "die" => match exit_code {
+      Some(code) => format!("Process {name} exited with code {code}"),
+      None => format!("Process {name} exited"),
+    },
+    "destroy" => format!("Process {name} was removed"),
+    "oom" => {
+      format!("Docker reported an out-of-memory event for process {name}")
+    }
+    "pause" => format!("Process {name} was paused"),
+    "unpause" => format!("Process {name} was unpaused"),
+    "restart" => format!("Process {name} restarted"),
+    "exec_create" => {
+      format!("Docker created an exec session for process {name}")
+    }
+    "exec_start" => {
+      format!("Docker started an exec session for process {name}")
+    }
+    "exec_detach" => format!("An exec session detached from process {name}"),
+    "exec_die" => match exit_code {
+      Some(code) => {
+        format!("An exec session in process {name} exited with code {code}")
+      }
+      None => format!("An exec session in process {name} exited"),
+    },
+    _ => format!("Docker reported a process event for {name}"),
+  };
+  (action, note, None)
 }
 
 /// Take actions when a docker event is received
@@ -667,19 +757,24 @@ async fn exec_docker(
   let name = attributes.get("name").cloned().unwrap_or_default();
   let action = action.as_str();
   let mut observation_refreshed = false;
-  let mut event = EventPartial {
+  let exit_code = attributes
+    .get("exitCode")
+    .and_then(|code| code.parse().ok());
+  let (event_action, note, metadata) =
+    process_observation(&name, action, exit_code);
+  let event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
     reporting_node: state.inner.config.hostname.clone(),
     kind: EventKind::Normal,
-    action: NativeEventAction::Destroy.to_string(),
+    action: event_action.to_owned(),
     related: Some(EventActor {
       key: Some(kind_key.clone()),
       kind: kind.clone(),
       attributes: None,
     }),
     reason: "state_sync".to_owned(),
-    note: Some(format!("process {name} {action}")),
-    metadata: None,
+    note: Some(note),
+    metadata,
     actor: Some(EventActor {
       key: Some(name.clone()),
       kind: EventActorKind::Process,
@@ -693,7 +788,6 @@ async fn exec_docker(
   // retain their exact container and run labels, but must never look up or
   // update a replacement Job merely because it reused the same name.
   if kind == EventActorKind::Job {
-    normalize_job_observation_action(&mut event, action);
     state.spawn_emit_event(event);
     if action == "destroy" {
       let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;
@@ -704,7 +798,6 @@ async fn exec_docker(
   }
   match action {
     "start" => {
-      event.action = NativeEventAction::Start.to_string();
       let mut is_active_cargo_runtime_event = false;
       if kind == EventActorKind::Cargo {
         let current_name =
@@ -770,7 +863,6 @@ async fn exec_docker(
       let current_name =
         refresh_process_observation(&id, &name, &kind, state).await?;
       observation_refreshed = true;
-      event.action = NativeEventAction::Update.to_string();
       if kind == EventActorKind::Cargo
         && labels_describe_active_cargo_application(&name, Some(&attributes))
         && labels_describe_active_cargo_application(
@@ -792,7 +884,6 @@ async fn exec_docker(
             // before this queued event is consumed. Keep its event even when
             // refreshing the old observation fails; the analyzer logs the error.
             if kind == EventActorKind::Vm {
-              action.clone_into(&mut event.action);
               state.spawn_emit_event(event);
             }
             return Err(error);
@@ -837,7 +928,9 @@ async fn exec_docker(
               state.emit_error_native_action(
                 &cargo,
                 NativeEventAction::Die,
-                Some(format!("process {name} die but should be alive")),
+                Some(format!(
+                  "Cargo {kind_key} is unready after process {name} exited"
+                )),
               );
             }
           }
@@ -870,7 +963,6 @@ async fn exec_docker(
           _ => {}
         }
       }
-      action.clone_into(&mut event.action);
     }
     "destroy" => {
       state.spawn_emit_event(event);
@@ -878,13 +970,10 @@ async fn exec_docker(
       return Ok(());
     }
     "create" => {
-      event.action = NativeEventAction::Create.to_string();
       state.spawn_emit_event(event);
       return Ok(());
     }
-    _ => {
-      action.clone_into(&mut event.action);
-    }
+    _ => {}
   }
   state.spawn_emit_event(event);
   if !observation_refreshed {
@@ -1181,42 +1270,64 @@ mod tests {
   use super::*;
 
   #[test]
-  fn job_health_events_normalize_action_and_preserve_raw_observation() {
-    for (action, expected_action) in [
-      ("health_status: healthy", NativeEventAction::Update),
-      ("health_status: unhealthy", NativeEventAction::Update),
-      ("health_status: starting", NativeEventAction::Update),
-      ("start", NativeEventAction::Start),
-      ("die", NativeEventAction::Die),
-      ("destroy", NativeEventAction::Destroy),
+  fn process_observations_preserve_health_and_explain_exits() {
+    for (health, note) in [
+      ("starting", "Process worker is waiting for its health check"),
+      ("healthy", "Process worker passed its health check"),
+      ("unhealthy", "Process worker is unhealthy"),
     ] {
-      let mut event = EventPartial {
-        reporting_controller: "nanocl.io/core".into(),
-        reporting_node: "test-node".into(),
-        kind: EventKind::Normal,
-        action: NativeEventAction::Destroy.to_string(),
-        reason: "state_sync".into(),
-        note: Some(format!("process exact-run-container {action}")),
-        actor: Some(EventActor {
-          key: Some("exact-run-container".into()),
-          kind: EventActorKind::Process,
-          attributes: Some(serde_json::json!({
-            "io.nanocl.j": "backup",
-            "io.nanocl.job.run": "old-run",
-          })),
-        }),
-        related: Some(EventActor {
-          key: Some("backup".into()),
-          kind: EventActorKind::Job,
-          attributes: None,
-        }),
-        metadata: None,
-      };
-      let mut expected = serde_json::to_value(&event).unwrap();
-      expected["Action"] = serde_json::json!(expected_action.to_string());
-      normalize_job_observation_action(&mut event, action);
-      assert_eq!(serde_json::to_value(&event).unwrap(), expected);
-      assert!(event.note.as_ref().unwrap().ends_with(action));
+      let raw = format!("health_status: {health}");
+      assert_eq!(
+        process_observation("worker", &raw, None),
+        (
+          "update",
+          note.to_owned(),
+          Some(serde_json::json!({"HealthStatus": health}))
+        )
+      );
+    }
+    assert_eq!(
+      process_observation("worker", "health_status: private output", None),
+      (
+        "update",
+        "Docker reported a health update for process worker".into(),
+        None
+      )
+    );
+    assert_eq!(
+      process_observation("worker", "die", Some(137)),
+      ("die", "Process worker exited with code 137".into(), None)
+    );
+    assert_eq!(
+      process_observation("worker", "die", None),
+      ("die", "Process worker exited".into(), None)
+    );
+  }
+
+  #[test]
+  fn process_exec_events_only_publish_the_action_name() {
+    for (action, note) in [
+      (
+        "exec_create",
+        "Docker created an exec session for process worker",
+      ),
+      (
+        "exec_start",
+        "Docker started an exec session for process worker",
+      ),
+      (
+        "exec_die",
+        "An exec session in process worker exited with code 2",
+      ),
+      (
+        "exec_detach",
+        "An exec session detached from process worker",
+      ),
+    ] {
+      let raw = format!("{action}: sh -c 'echo private:argument'");
+      let expected = (action, note.to_owned(), None);
+      assert_eq!(process_observation("worker", &raw, Some(2)), expected);
+      assert_eq!(process_observation("worker", action, Some(2)), expected);
     }
   }
 
@@ -1686,6 +1797,38 @@ mod tests {
       Some(11),
       &unknown_start
     ));
+  }
+
+  #[test]
+  fn vm_exit_event_retains_confirmed_oom_and_exit_code() {
+    let mut exit = ContainerState {
+      exit_code: Some(137),
+      started_at: Some("1970-01-01T00:00:00.000000001Z".into()),
+      finished_at: Some("1970-01-01T00:00:00.000000009Z".into()),
+      ..Default::default()
+    };
+    let (note, metadata) =
+      vm_exit_diagnostic("demo", "guest", "id", Some(10), &exit);
+    assert_eq!(
+      note,
+      "VM demo stopped unexpectedly when process guest exited (exit code 137)"
+    );
+    assert_eq!(
+      metadata,
+      serde_json::json!({
+        "ContainerId": "id", "DockerEventTimeNano": 10, "ExitCode": 137,
+        "StartedAt": "1970-01-01T00:00:00.000000001Z",
+        "FinishedAt": "1970-01-01T00:00:00.000000009Z",
+      })
+    );
+    exit.oom_killed = Some(true);
+    let (note, metadata) =
+      vm_exit_diagnostic("demo", "guest", "id", Some(10), &exit);
+    assert_eq!(
+      note,
+      "VM demo stopped unexpectedly when process guest ran out of memory (exit code 137)"
+    );
+    assert_eq!(metadata["OOMKilled"], true);
   }
 
   #[test]

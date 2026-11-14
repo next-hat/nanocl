@@ -8770,7 +8770,7 @@ components:
         Reason:
           type: string
           description: |-
-            Reason is why the action was taken. It is human-readable.
+            Stable reason for the action, used by consumers (e.g. `state_sync`).
             This field cannot be empty for new Events and it can have at most 128 characters.
         Note:
           type:
@@ -8791,7 +8791,11 @@ components:
           - type: 'null'
         Metadata:
           type: object
-          description: Standard metadata.
+          description: |-
+            Event-specific details. Operation notifications may include `Operation`
+            and `SpecKey`. Process health updates may include `HealthStatus`
+            (`starting`, `healthy`, or `unhealthy`). Job and VM exit events may
+            include `ContainerId`, `ExitCode`, and `OOMKilled` when confirmed.
           additionalProperties:
             $ref: '#/components/schemas/Any'
           propertyNames:
@@ -8828,7 +8832,10 @@ components:
       - ContainerImage
     EventCondition:
       type: object
-      description: Condition to stop watching for events if their are meet
+      description: |-
+        A watch ends after every supplied condition has matched a delivered event.
+        Kind and action each match any value in their list. Omitted actor and
+        related fields impose no restriction.
       required:
       - Kind
       - Action
