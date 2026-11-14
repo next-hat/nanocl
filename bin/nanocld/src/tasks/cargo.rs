@@ -884,10 +884,14 @@ fn operation_failure_diagnostic(
   if let Some(detail) = missing_reference {
     return detail.to_owned();
   }
-  if let Some(exit @ CargoRuntimeError::InitExit { .. }) =
-    CargoRuntimeError::get(error)
+  if let Some(
+    failure @ (CargoRuntimeError::InitExit { .. }
+    | CargoRuntimeError::ReadinessExit { .. }
+    | CargoRuntimeError::ReadinessUnhealthy { .. }
+    | CargoRuntimeError::ReadinessTimeout { .. }),
+  ) = CargoRuntimeError::get(error)
   {
-    return exit.to_string();
+    return failure.to_string();
   }
   if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
   {
@@ -1549,6 +1553,91 @@ mod tests {
       operation_failure_diagnostic(&lookalike, None),
       "Accepted Cargo operation failed; inspect the observed runtime before retrying"
     );
+  }
+
+  #[test]
+  fn cargo_rollout_diagnostics_preserve_failure_category_and_identity() {
+    let cases = [
+      (
+        CargoRuntimeError::readiness_exit("web", "candidate-web"),
+        "Cargo container \"web\" (process \"candidate-web\") exited before becoming ready",
+      ),
+      (
+        CargoRuntimeError::readiness_unhealthy("web", "candidate-web"),
+        "Cargo container \"web\" (process \"candidate-web\") became unhealthy",
+      ),
+      (
+        CargoRuntimeError::readiness_timeout(vec![
+          ("web".to_owned(), "candidate-web".to_owned()),
+          ("worker".to_owned(), "candidate-worker".to_owned()),
+        ]),
+        "Timed out waiting for essential Cargo containers: \"web\" (process \"candidate-web\"), \"worker\" (process \"candidate-worker\")",
+      ),
+    ];
+    for (mut error, expected) in cases {
+      // Diagnostics use typed evidence, even when an outer layer adds context.
+      error.context = Some("Cargo update rolled back".to_owned());
+      assert!(!RuntimeError::is_uncertain(&error));
+      let diagnostic = operation_failure_diagnostic(&error, None);
+      assert_eq!(diagnostic, expected);
+      let operation = uuid::Uuid::from_u128(1);
+      let note = operation_failure_note(
+        operation,
+        "global.api",
+        "update",
+        true,
+        Some(&diagnostic),
+        None,
+      );
+      assert_eq!(
+        note,
+        format!(
+          "Cargo global.api update failed (operation {operation}). {expected}"
+        ),
+      );
+      let pending = operation_failure_note(
+        operation,
+        "global.api",
+        "update",
+        false,
+        Some(&diagnostic),
+        None,
+      );
+      assert!(pending.contains("outcome is unknown"));
+      assert!(!pending.contains(expected));
+    }
+  }
+
+  #[test]
+  fn cargo_rollout_diagnostics_escape_identity_and_reject_untrusted_errors() {
+    let name = "web\n\u{1b}[31m\"";
+    let id = "candidate\t\\id";
+    for error in [
+      CargoRuntimeError::readiness_exit(name, id),
+      CargoRuntimeError::readiness_unhealthy(name, id),
+      CargoRuntimeError::readiness_timeout(vec![(
+        name.to_owned(),
+        id.to_owned(),
+      )]),
+    ] {
+      let diagnostic = operation_failure_diagnostic(&error, None);
+      assert!(diagnostic.contains(r#""web\n\u{1b}[31m\"""#));
+      assert!(diagnostic.contains(r#""candidate\t\\id""#));
+      assert!(!diagnostic.chars().any(char::is_control));
+    }
+    for error in [
+      IoError::interrupted("CargoReadiness", "private healthcheck output"),
+      IoError::interrupted("Cargo update rolled back", "private Docker error"),
+      CargoRuntimeError::candidate(IoError::interrupted(
+        "CargoReadiness",
+        "private Docker error",
+      )),
+    ] {
+      assert_eq!(
+        operation_failure_diagnostic(&error, None),
+        "Accepted Cargo operation failed; inspect the observed runtime before retrying",
+      );
+    }
   }
 
   #[test]
