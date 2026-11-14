@@ -169,7 +169,7 @@ pub(super) async fn state_remove(
     output.as_ref(),
   )?;
   result?;
-  if json && failures > 0 {
+  if failures > 0 {
     return Err(IoError::other(
       "StateRemove",
       &format!("{failures} item(s) could not be removed"),
