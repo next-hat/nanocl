@@ -153,32 +153,38 @@ pub async fn exec_backup(
     let pg_style = utils::progress::create_spinner_style(&token, "green");
     let pg = utils::progress::create_progress("(processing)", &pg_style);
     pg.set_message("(processing: cargoes)");
-    let cargoes = collect_pages("key asc", |filter| {
+    let mut cargoes = collect_pages("key asc", |filter| {
       let query = GenericFilterNsp {
         namespace: Some(namespace.name.clone()),
         filter: Some(filter),
       };
       async move { Ok(cli_conf.client.list_cargo(Some(&query)).await?) }
     })
-    .await?
-    .iter()
-    .map(|cargo| {
-      let cargo = cargo_spec_from_revision(&cargo.spec);
-      clean_cargo_binds(&cargo)
-    })
-    .collect::<Vec<CargoSpec>>();
+    .await?;
+    // Keep pagination keyed, then restore original creation order. Stable
+    // sorting preserves key order when multiple cargoes share a timestamp.
+    cargoes.sort_by_key(|cargo| cargo.created_at);
+    let cargoes = cargoes
+      .iter()
+      .map(|cargo| {
+        let cargo = cargo_spec_from_revision(&cargo.spec);
+        clean_cargo_binds(&cargo)
+      })
+      .collect::<Vec<CargoSpec>>();
     pg.set_message("(processing: virtual machines)");
-    let vms = collect_pages("key asc", |filter| {
+    let mut vms = collect_pages("key asc", |filter| {
       let query = GenericFilterNsp {
         namespace: Some(namespace.name.clone()),
         filter: Some(filter),
       };
       async move { Ok(cli_conf.client.list_vm(Some(&query)).await?) }
     })
-    .await?
-    .iter()
-    .map(|vm| vm.spec.clone().into())
-    .collect::<Vec<VmSpecPartial>>();
+    .await?;
+    vms.sort_by_key(|vm| vm.created_at);
+    let vms = vms
+      .iter()
+      .map(|vm| vm.spec.clone().into())
+      .collect::<Vec<VmSpecPartial>>();
     pg.set_message(format!("(writing statefile: {})", relative_path.display()));
     let state_file = Statefile {
       metadata: None,
@@ -546,11 +552,15 @@ mod export_tests {
     let items: Vec<_> = (offset..101.min(offset + 100))
       .map(|index| {
         let name = format!("item-{index:03}");
+        // Creation order differs from key order across pages, with ties to
+        // verify deterministic ordering. Spec revision dates remain unchanged.
+        let created_at =
+          time + chrono::Duration::seconds((100 - index / 2) as i64);
         match collection {
           "cargoes" => serde_json::to_value(CargoSummary {
             namespace_name: namespace.into(),
             status: Default::default(),
-            created_at: time,
+            created_at,
             instance_total: 0,
             instance_running: 0,
             spec: CargoSpecRevision {
@@ -564,7 +574,7 @@ mod export_tests {
           "vms" => serde_json::to_value(VmSummary {
             namespace_name: namespace.into(),
             status: Default::default(),
-            created_at: time,
+            created_at,
             instance_total: 0,
             instance_running: 0,
             spec: VmSpec {
@@ -679,10 +689,24 @@ mod export_tests {
         let state = read(&format!("namespaces/{namespace}.yml"));
         assert_eq!(state.namespace.as_deref(), Some(namespace));
         let cargoes = state.cargoes.unwrap();
-        assert_eq!(cargoes.len(), 101);
-        assert_eq!(cargoes.last().unwrap().name, "item-100");
+        let expected_names: Vec<_> = std::iter::once(100)
+          .chain((0..50).rev().flat_map(|pair| [pair * 2, pair * 2 + 1]))
+          .map(|index| format!("item-{index:03}"))
+          .collect();
+        assert_eq!(
+          cargoes.iter().map(|cargo| &cargo.name).collect::<Vec<_>>(),
+          expected_names.iter().collect::<Vec<_>>()
+        );
         assert_eq!(cargoes[0].secrets, vec!["item-100"]);
-        assert_eq!(state.virtual_machines.unwrap().len(), 101);
+        assert_eq!(
+          state
+            .virtual_machines
+            .unwrap()
+            .iter()
+            .map(|vm| vm.name.clone())
+            .collect::<Vec<_>>(),
+          expected_names
+        );
       }
       let jobs = read("jobs.yml");
       assert!(jobs.namespace.is_none());
