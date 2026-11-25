@@ -576,6 +576,36 @@ mod tests {
   }
 
   #[test]
+  fn restart_preflight_rejects_paused_sandbox_even_when_docker_reports_running()
+  {
+    use bollard_next::models::ContainerStateStatusEnum::{PAUSED, RUNNING};
+
+    let mut sandbox = restart_process(
+      uuid::Uuid::new_v4(),
+      0,
+      "sandbox-id",
+      CargoReplicaProcessRole::Sandbox,
+      SANDBOX_LOGICAL_NAME,
+      true,
+    );
+    for (paused, status) in [(Some(true), Some(RUNNING)), (None, Some(PAUSED))]
+    {
+      let state = sandbox.data.state.as_mut().unwrap();
+      state.paused = paused;
+      state.status = status;
+      let error = super::super::validate_restart_sandbox(&sandbox).unwrap_err();
+      assert_eq!(error.context(), Some("CargoRestartTopology"));
+      assert!(error.inner.to_string().contains("sandbox-id is paused"));
+    }
+    let state = sandbox.data.state.as_mut().unwrap();
+    state.paused = Some(false);
+    state.status = Some(RUNNING);
+    assert!(super::super::validate_restart_sandbox(&sandbox).is_ok());
+    sandbox.data.state = None;
+    assert!(super::super::validate_restart_sandbox(&sandbox).is_err());
+  }
+
+  #[test]
   fn cargo_restart_targets_only_apps_in_replica_and_declaration_order() {
     let (cargo, replicas, mappings, processes) = restart_fixture(2);
     let plan =

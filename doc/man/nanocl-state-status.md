@@ -38,10 +38,11 @@ Health reflects the daemon's last report, including unknown or not reported
 values. A resource's existence alone does not mean it is healthy. Recent
 failure shows the latest reported error, failure, or unhealthy event matching
 the element's kind and key, or an observed process failure, within the last
-24 hours and no earlier than the current element's creation. Resource
-synchronization failure reasons are unavailable if the daemon did not record
-an event. Generic failure notifications use the available process exit or
-health-check reason when it is more informative.
+24 hours and no earlier than the current element's creation. For a Job that
+exists, status includes failures from its current run and events with no run
+ID. Resource synchronization failure reasons are unavailable if the daemon
+did not record an event. Generic failure notifications use the available
+process exit or health-check reason when it is more informative.
 The compact overview shows failure age separately from current state and
 health, so a recovered object can still have a recent failure.
 

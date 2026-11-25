@@ -12,9 +12,7 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::resource_kind::{
   ResourceKindPartial, ResourceKindSpec,
 };
-use nanocld_client::stubs::system::{
-  Event, EventActorKind, EventKind, NativeEventAction,
-};
+use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::{
   dns::ResourceDnsRule,
   generic::{GenericClause, GenericFilter},
@@ -150,15 +148,6 @@ fn resolution_needs_retry(error: &IoError) -> bool {
   )
 }
 
-fn is_state_sync(event: &Event) -> bool {
-  event.kind == EventKind::Normal
-    && event.action == NativeEventAction::Update.to_string()
-    && event.reason == "state_sync"
-    && event.actor.as_ref().is_some_and(|actor| {
-      actor.kind == EventActorKind::Process && actor.key.is_none()
-    })
-}
-
 /// Retry operational failures without abandoning the subscribed event stream.
 /// The timer remains local to this subscription and is cancelled on EOF/error.
 async fn consume_events<S, E, R, RF>(
@@ -181,7 +170,8 @@ async fn consume_events<S, E, R, RF>(
     // stream cannot postpone recovery indefinitely.
     match select(&mut retry, stream.next()).await {
       Either::Left(_) => {}
-      Either::Right((Some(Ok(event)), _)) if is_state_sync(&event) => {}
+      Either::Right((Some(Ok(event)), _))
+        if event.is_process_inventory_sync() => {}
       Either::Right((Some(Ok(_)), _)) => continue,
       Either::Right((Some(Err(error)), _)) => {
         log::warn!("event::loop: {error}");
@@ -248,6 +238,10 @@ pub(crate) fn spawn(state: &SystemState) {
 
 #[cfg(test)]
 mod tests {
+  use nanocld_client::stubs::system::{
+    EventActorKind, EventKind, NativeEventAction,
+  };
+
   use super::*;
 
   fn state_sync_event() -> Event {
@@ -268,18 +262,18 @@ mod tests {
   #[test]
   fn only_completed_generic_process_sync_triggers_recovery() {
     let mut event = state_sync_event();
-    assert!(is_state_sync(&event));
+    assert!(event.is_process_inventory_sync());
     event.kind = EventKind::Error;
-    assert!(!is_state_sync(&event));
+    assert!(!event.is_process_inventory_sync());
     event.kind = EventKind::Normal;
     event.actor.as_mut().unwrap().key = Some("container-id".into());
-    assert!(!is_state_sync(&event));
+    assert!(!event.is_process_inventory_sync());
     event.actor.as_mut().unwrap().key = None;
     event.reason = "another_update".into();
-    assert!(!is_state_sync(&event));
+    assert!(!event.is_process_inventory_sync());
     event.reason = "state_sync".into();
     event.action = NativeEventAction::Start.to_string();
-    assert!(!is_state_sync(&event));
+    assert!(!event.is_process_inventory_sync());
   }
 
   #[test]

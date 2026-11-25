@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use bollard_next::models::{ContainerInspectResponse, HealthConfig};
+use bollard_next::models::{
+  ContainerInspectResponse, ContainerStateStatusEnum, HealthConfig,
+};
 use nanocl_stubs::{cargo::Cargo, process::Process, system::NativeEventAction};
 
 use crate::models::CargoReplicaProcessRole;
@@ -43,7 +45,7 @@ pub(super) fn required_slots_ready(slots: &[RuntimeSlot]) -> bool {
     .filter(|slot| requires_steady_state_readiness(slot.role, slot.essential))
     .all(|slot| {
       if slot.role == CargoReplicaProcessRole::Sandbox {
-        observed_container_running(&slot.process.data)
+        running_for_readiness(&slot.process.data)
       } else {
         observed_container_ready(&slot.process.data)
       }
@@ -125,16 +127,25 @@ pub fn has_container_healthcheck(cargo: &Cargo, instances: &[Process]) -> bool {
   })
 }
 
-pub(super) fn observed_container_running(
+pub(super) fn container_is_paused(observed: &ContainerInspectResponse) -> bool {
+  // Docker can keep Running and the previous healthcheck result while paused.
+  observed.state.as_ref().is_some_and(|state| {
+    state.paused == Some(true)
+      || state.status == Some(ContainerStateStatusEnum::PAUSED)
+  })
+}
+
+pub(super) fn running_for_readiness(
   observed: &ContainerInspectResponse,
 ) -> bool {
   observed.state.as_ref().and_then(|state| state.running) == Some(true)
+    && !container_is_paused(observed)
 }
 
 pub(super) fn observed_container_ready(
   observed: &ContainerInspectResponse,
 ) -> bool {
-  if !observed_container_running(observed) {
+  if !running_for_readiness(observed) {
     return false;
   }
   let healthcheck = observed
@@ -203,7 +214,7 @@ pub(crate) fn all_desired_replicas_ready(
       Some("sandbox") => {
         observation
           .sandboxes
-          .push(observed_container_running(&process.data));
+          .push(running_for_readiness(&process.data));
       }
       Some("app") => {
         let essential = match labels.get(LABEL_ESSENTIAL).map(String::as_str) {
@@ -477,6 +488,37 @@ mod tests {
       ..Default::default()
     });
     assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+  }
+
+  #[test]
+  fn paused_required_app_or_sandbox_is_unready_even_with_previous_health() {
+    let replica = uuid::Uuid::new_v4();
+    let cargo = readiness_cargo(1);
+    let desired = HashSet::from([replica]);
+    for (index, role, name) in
+      [(0, "sandbox", SANDBOX_LOGICAL_NAME), (1, "app", "api")]
+    {
+      for health in [None, Some(HealthStatusEnum::HEALTHY)] {
+        let mut processes = ready_replica_processes(replica);
+        processes[index] =
+          readiness_process(replica, name, role, name, true, true, health);
+        assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+        for (paused, status) in [
+          (Some(true), None),
+          (None, Some(ContainerStateStatusEnum::PAUSED)),
+          (Some(true), Some(ContainerStateStatusEnum::PAUSED)),
+        ] {
+          let state = processes[index].data.state.as_mut().unwrap();
+          state.paused = paused;
+          state.status = status;
+          assert!(!all_desired_replicas_ready(&cargo, &desired, &processes));
+          let state = processes[index].data.state.as_mut().unwrap();
+          state.paused = Some(false);
+          state.status = Some(ContainerStateStatusEnum::RUNNING);
+          assert!(all_desired_replicas_ready(&cargo, &desired, &processes));
+        }
+      }
+    }
   }
 
   #[test]

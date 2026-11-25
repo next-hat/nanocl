@@ -8,7 +8,7 @@ use crate::{
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   process::ProcessKind,
-  system::{NativeEventAction, ObjPsStatusKind},
+  system::{EventKind, NativeEventAction, ObjPsStatusKind},
   vm::Vm,
 };
 use serde_json::{Value, json};
@@ -279,8 +279,18 @@ pub(crate) async fn recover_one(
     log::warn!("VM owner cleanup deferred after recovery: {error}");
   }
   if finished {
-    state.emit_error_native_action(&vm, action,
-      Some(format!("VM operation {} ({}) was interrupted; observed runtime reconciled without replay. Inspect the VM and explicitly retry the request", candidate.key, candidate.action)));
+    let note = format!(
+      "VM {} {} was interrupted. Recovery inspected the local runtime without repeating operation {}. Inspect the VM before retrying.",
+      candidate.resource_key, candidate.action, candidate.key,
+    );
+    state.emit_action(
+      &vm.into(),
+      action,
+      EventKind::Error,
+      "state_sync",
+      Some(note),
+      Some(json!({"Operation": candidate.key, "SpecKey": candidate.spec_key})),
+    );
   }
   Ok(finished)
 }
@@ -807,14 +817,15 @@ mod tests {
         let primary =
           IoError::interrupted("VM test operation", "injected primary failure");
         let primary_message = primary.to_string();
-        let (result, settled) = super::super::record_task_outcome(
+        let error = super::super::record_task_outcome(
           &key,
           Err(primary),
           &unavailable_docker,
         )
-        .await;
-        assert!(!settled);
-        assert_eq!(result.unwrap_err().to_string(), primary_message);
+        .await
+        .unwrap_err();
+        assert!(crate::models::RuntimeError::is_uncertain(&error));
+        assert_eq!(error.to_string(), primary_message);
         assert_eq!(
           OperationDb::current("Vm", &key, &state.inner.pool)
             .await

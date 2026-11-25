@@ -1,4 +1,3 @@
-use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 use tabled::Tabled;
 
@@ -19,7 +18,11 @@ pub enum EventCommand {
   #[clap(alias("ls"))]
   List(GenericListOpts),
   /// Watch for new events in real time
-  Watch,
+  Watch {
+    /// Print one readable line per event
+    #[arg(long)]
+    plain: bool,
+  },
   /// Inspect a specific event
   Inspect(GenericInspectOpts),
 }
@@ -33,6 +36,8 @@ pub struct EventRow {
   pub node: String,
   pub kind: String,
   pub action: String,
+  pub actor: String,
+  pub reason: String,
   pub note: String,
   #[tabled(skip)]
   pub age: String,
@@ -60,6 +65,25 @@ impl From<EventRow> for EventCompactRow {
   }
 }
 
+impl std::fmt::Display for EventRow {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}  {}  {}  {}  ",
+      self.created_at, self.node, self.kind, self.action
+    )?;
+    if self.actor != "<none>"
+      && !self
+        .note
+        .strip_prefix(&self.actor)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+    {
+      write!(f, "{} — ", self.actor)?;
+    }
+    f.write_str(&self.note)
+  }
+}
+
 impl From<Event> for EventRow {
   fn from(event: Event) -> Self {
     let binding = chrono::Local::now();
@@ -67,28 +91,38 @@ impl From<Event> for EventRow {
       Some(&event.created_at.and_utc()),
       binding.with_timezone(&chrono::Utc),
     );
-    let tz = binding.offset();
-    // Convert the created_at and updated_at to the current timezone
-    let created_at = tz
-      .timestamp_opt(event.created_at.and_utc().timestamp(), 0)
-      .unwrap()
-      .format("%Y-%m-%d %H:%M:%S");
+    let created_at = event.created_at.and_utc().with_timezone(&chrono::Local);
+    let actor_name = event
+      .actor
+      .as_ref()
+      .map(ToString::to_string)
+      .unwrap_or_else(|| "<none>".into());
     Self {
       key: event.key.to_string(),
-      created_at: created_at.to_string(),
+      created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
       kind: event.kind.to_string(),
-      action: event.action,
-      node: event.reporting_node,
-      note: event.note.unwrap_or("<none>".to_owned()),
+      action: single_line(event.action),
+      actor: single_line(actor_name),
+      reason: single_line(event.reason),
+      node: single_line(event.reporting_node),
+      note: single_line(event.note.unwrap_or_else(|| "<none>".into())),
       age,
     }
+  }
+}
+
+fn single_line(value: String) -> String {
+  if value.contains(char::is_control) {
+    value.replace(char::is_control, " ")
+  } else {
+    value
   }
 }
 
 #[cfg(test)]
 mod tests {
   use chrono::{Duration, Utc};
-  use nanocld_client::stubs::system::EventKind;
+  use nanocld_client::stubs::system::{EventActor, EventActorKind, EventKind};
 
   use crate::commands::GenericCommandLs;
 
@@ -142,6 +176,9 @@ mod tests {
     opts.wide = true;
     let wide = EventArg::render_list(&opts, vec![row.clone()]);
     assert!(wide.contains("NODE"));
+    assert!(wide.contains("ACTOR"));
+    assert!(wide.contains("REASON"));
+    assert!(wide.contains(&row.reason));
     assert!(wide.contains("CREATED AT"));
     assert!(!wide.contains("AGE"));
     assert!(wide.contains(&row.node));
@@ -151,5 +188,28 @@ mod tests {
 
     opts.quiet = true;
     assert_eq!(EventArg::render_list(&opts, vec![row.clone()]), row.key);
+  }
+
+  #[test]
+  fn displays_daemon_notes_and_keeps_plain_output_on_one_line() {
+    let mut ev = event();
+    ev.actor = Some(EventActor {
+      key: Some("global.api".into()),
+      kind: EventActorKind::Cargo,
+      attributes: None,
+    });
+    ev.action = "starting".into();
+    ev.reason = "state_sync".into();
+    ev.note = Some("Cargo global.api start requested".into());
+    let row = EventRow::from(ev.clone());
+    assert_eq!(row.note, "Cargo global.api start requested");
+    assert_eq!(row.to_string().matches("Cargo global.api").count(), 1);
+    ev.kind = EventKind::Error;
+    ev.note = Some("Registry\nrequest timed out".into());
+    assert!(
+      EventRow::from(ev)
+        .to_string()
+        .ends_with("Cargo global.api — Registry request timed out")
+    );
   }
 }
