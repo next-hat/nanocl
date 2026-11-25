@@ -114,13 +114,7 @@ fn rollout_phase(
       Some("observed candidate out of memory")
     }
     ("app", "update") => {
-      // Docker health transitions are emitted as update events. Accept only
-      // the daemon's exact note format; never render arbitrary event notes.
-      match event
-        .note
-        .as_deref()?
-        .strip_prefix(&format!("process {name} health_status: "))?
-      {
+      match event.metadata.as_ref()?.get("HealthStatus")?.as_str()? {
         "starting" => Some("observed candidate health starting"),
         "healthy" => Some("observed candidate healthy"),
         "unhealthy" => Some("observed candidate health unhealthy"),
@@ -655,20 +649,12 @@ mod tests {
   fn rollout_observations_suppress_only_consecutive_identical_phases() {
     let mut previous = None;
     let mut event = candidate_event("app", "update");
-    let name = event
-      .actor
-      .as_ref()
-      .unwrap()
-      .key
-      .as_deref()
-      .unwrap()
-      .to_owned();
     for (health, expected) in [
       ("healthy", "observed candidate healthy"),
       ("unhealthy", "observed candidate health unhealthy"),
       ("healthy", "observed candidate healthy"),
     ] {
-      event.note = Some(format!("process {name} health_status: {health}"));
+      event.metadata = Some(json!({"HealthStatus": health}));
       assert_eq!(
         next_rollout_phase(
           &event,
@@ -812,27 +798,26 @@ mod tests {
     );
     event.action = "update".to_owned();
     let name = event.actor.as_ref().unwrap().key.as_ref().unwrap().clone();
+    event.note = Some(format!("process {name} health_status: healthy"));
+    assert!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+    );
+    // Health comes from the observation even if its note describes something else.
     for (health, phase) in [
       ("starting", "observed candidate health starting"),
       ("healthy", "observed candidate healthy"),
       ("unhealthy", "observed candidate health unhealthy"),
     ] {
-      event.note = Some(format!("process {name} health_status: {health}"));
+      event.metadata = Some(json!({"HealthStatus": health}));
       assert_eq!(
         rollout_phase(&event, "global.app", &EventActorKind::Cargo),
         Some(phase)
       );
     }
-    for note in [
-      "health_status: healthy".to_owned(),
-      "process old-process health_status: healthy".to_owned(),
-      format!("process {name} health_status: healthy\nprivate"),
-    ] {
-      event.note = Some(note);
-      assert!(
-        rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
-      );
-    }
+    event.metadata = Some(json!({"HealthStatus": "unknown"}));
+    assert!(
+      rollout_phase(&event, "global.app", &EventActorKind::Cargo).is_none()
+    );
     let mut init = candidate_event("init", "start");
     assert_eq!(
       rollout_phase(&init, "global.app", &EventActorKind::Cargo),
