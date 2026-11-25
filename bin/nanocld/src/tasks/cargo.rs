@@ -16,9 +16,9 @@ use nanocl_stubs::{
 use crate::{
   models::{
     AcceptedCargoOperation, CargoDb, CargoOperationLease,
-    CargoReplicaAssignment, CargoReplicaDb, CargoRuntimeContext, EventDb,
-    NodeDb, ObjPsStatusDb, ObjPsStatusUpdate, OperationDb, OperationOwner,
-    ProcessDb, SystemState,
+    CargoReplicaAssignment, CargoReplicaDb, CargoRuntimeContext,
+    CargoRuntimeError, EventDb, NodeDb, ObjPsStatusDb, ObjPsStatusUpdate,
+    OperationDb, OperationOwner, ProcessDb, RuntimeError, SystemState,
   },
   repositories::generic::*,
   utils::{self, container::generic::SelectionPlan},
@@ -220,6 +220,28 @@ where
         return;
       }
     };
+    if allow_unchanged
+      && let Some(unchanged) =
+        unchanged_current(&key, phase, incarnation, &state)
+          .await
+          .transpose()
+    {
+      let cleanup = CargoDb::delete_mutex(&mutex.key, &state).await;
+      drop(guard);
+      let result = match unchanged {
+        Ok(cargo) => cleanup.map(|()| (cargo, None)).map_err(http_error),
+        Err(error) => {
+          if let Err(cleanup) = cleanup {
+            log::warn!(
+              "Cargo unchanged admission cleanup failed: {key}: {cleanup}"
+            );
+          }
+          Err(error)
+        }
+      };
+      let _ = reply.send(result);
+      return;
+    }
     let (owner, owner_guard) = match utils::operation::create_owner(
       mutex.key,
       "Cargo",
@@ -241,18 +263,7 @@ where
       }
     };
     let lease = (std::sync::Arc::new(guard), owner_guard);
-    let prepared: HttpResult<(Cargo, Option<OperationDb>)> = async {
-      if allow_unchanged
-        && let Some(cargo) =
-          unchanged_current(&key, phase, incarnation, &state).await?
-      {
-        return Ok((cargo, None));
-      }
-      let accepted = prepare(owner, lease.clone()).await?;
-      Ok((accepted.cargo, Some(accepted.operation)))
-    }
-    .await;
-    let (cargo, operation) = match prepared {
+    let accepted = match prepare(owner, lease.clone()).await {
       Ok(value) => value,
       Err(error) => {
         match utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await
@@ -277,30 +288,12 @@ where
         return;
       }
     };
-    let Some(operation) = operation else {
-      let released = async {
-        if !utils::operation::cleanup_owner(&lease.1, &state.inner.pool).await?
-        {
-          return Err(IoError::interrupted(
-            "Cargo unchanged",
-            "No-op ownership could not be released",
-          ));
-        }
-        CargoDb::delete_mutex(&mutex.key, &state).await
-      }
-      .await;
-      drop(lease);
-      let _ = reply.send(released.map(|()| (cargo, None)).map_err(http_error));
-      return;
-    };
-    let accepted = AcceptedCargoOperation {
-      cargo: cargo.clone(),
-      operation,
-    };
+    let cargo = accepted.cargo.clone();
     let operation = accepted.operation.key;
     let revision = accepted.operation.spec_key;
     let error_state = state.clone();
     let error_actor = cargo.clone().into();
+    let error_key = cargo.spec.cargo_key.clone();
     let context = CargoRuntimeContext {
       operation: accepted.operation.clone(),
       lease: (lease.0, Some(lease.1)),
@@ -327,9 +320,15 @@ where
             let (actions, kind, reason) =
               operation_events(phase, false, true, false);
             for action in actions {
+              let note = operation_failure_note(
+                operation, &error_key, phase, false, None, None,
+              );
               error_state.emit_action(
-                &error_actor, action, kind.clone(), reason,
-                Some(format!("Cargo operation {operation} ({phase}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying")),
+                &error_actor,
+                action,
+                kind.clone(),
+                reason,
+                Some(note),
                 Some(serde_json::json!({"Operation": operation, "SpecKey": revision})),
               );
             }
@@ -397,6 +396,7 @@ async fn publish_acceptance(
   operation: uuid::Uuid,
   state: &SystemState,
 ) -> IoResult<()> {
+  let actor = cargo.clone().into();
   let event: Event = EventDb::create_try_from(
     EventPartial {
       reporting_controller: crate::vars::CONTROLLER_NAME.to_owned(),
@@ -404,8 +404,8 @@ async fn publish_acceptance(
       kind: EventKind::Normal,
       action: action.to_string(),
       reason: "state_sync".to_owned(),
-      note: Some(format!("Cargo {}", cargo.spec.cargo_key)),
-      actor: Some(cargo.clone().into()),
+      note: Some(action.lifecycle_note(&actor)),
+      actor: Some(actor),
       related: None,
       metadata: Some(
         serde_json::json!({"Operation": operation, "SpecKey": cargo.spec.key}),
@@ -469,8 +469,7 @@ async fn unchanged_current(
   if !matches!(observed, Ok(Ok(true))) {
     return Ok(None);
   }
-  // Keep the same owner while checking that observation still belongs to the
-  // same settled definition. A no-op never creates or settles an operation.
+  // Recheck the observed definition while both admission locks are held.
   let current = CargoDb::transform_read_by_pk(key, &state.inner.pool).await?;
   if CargoDb::incarnation(key, &state.inner.pool).await? != incarnation
     || current.spec.key != cargo.spec.key
@@ -695,15 +694,12 @@ async fn dispatch_start(
       if let Some(name) =
         remote_missing_reference(&error, &cargo, &context.operation)
       {
-        IoError::interrupted(
-          "Cargo remote missing secret",
-          &format!("A node reported that secret {name:?} does not exist"),
-        )
+        CargoRuntimeError::remote_missing_secret(name)
       } else {
-        IoError::interrupted(
+        RuntimeError::unconfirmed(IoError::interrupted(
           "Cargo remote execution",
           "Node did not confirm completion of the accepted Cargo operation",
-        )
+        ))
       }
     })?;
   Ok(())
@@ -853,54 +849,30 @@ fn operation_events(
   )
 }
 
-fn uncertain_runtime_error(error: &IoError) -> bool {
-  matches!(
-    error.context(),
-    Some(
-      "CreateProcess"
-        | "DeleteProcess"
-        | "StartCargoProcess"
-        | "StopCargoProcess"
-        | "RestartCargoProcess"
-        | "RenameCargoProcess"
-        | "MarkCargoCandidate"
-        | "InspectCargoProcess"
-        | "CargoInitContainer"
-        | "Cargo remote execution"
-        | "Cargo remote missing secret"
-        | "Cargo remote observation"
-        | "Cargo process restart"
-        | "Cargo process signal"
-        | "Cargo rollback"
-    )
-  )
-}
-
-fn operation_note(
+fn operation_failure_note(
   operation: uuid::Uuid,
   resource_key: &str,
   action: &str,
   settled: bool,
-  failed: bool,
   failure_detail: Option<&str>,
   remote_reference: Option<&str>,
 ) -> String {
   if !settled {
     let mut note = format!(
-      "Cargo operation {operation} ({action}) outcome is unknown and may remain pending for recovery; inspect its runtime and operation before retrying"
+      "Cargo {resource_key} {action} outcome is unknown. Inspect its runtime and operation {operation} before retrying."
     );
     if let Some(detail) = remote_reference {
-      note.push_str("; ");
+      note.push(' ');
       note.push_str(detail);
     }
     note
-  } else if !failed {
-    format!("Cargo {resource_key}")
   } else if let Some(detail) = failure_detail {
-    format!("Cargo operation {operation} ({action}) failed: {detail}")
+    format!(
+      "Cargo {resource_key} {action} failed (operation {operation}). {detail}"
+    )
   } else {
     format!(
-      "Cargo operation {operation} ({action}) failed; inspect its runtime and operation before retrying"
+      "Cargo {resource_key} {action} failed. Inspect its runtime and operation {operation} before retrying."
     )
   }
 }
@@ -912,15 +884,14 @@ fn operation_failure_diagnostic(
   if let Some(detail) = missing_reference {
     return detail.to_owned();
   }
-  if error.context() == Some("CargoInitContainerExit") {
-    let message = error.inner.to_string();
-    if let Some(code) = message
-      .strip_prefix("Init container exited with code ")
-      .and_then(|code| code.parse::<i64>().ok())
-      .filter(|code| *code > 0)
-    {
-      return format!("Init container exited with code {code}");
-    }
+  if let Some(
+    failure @ (CargoRuntimeError::InitExit { .. }
+    | CargoRuntimeError::ReadinessExit { .. }
+    | CargoRuntimeError::ReadinessUnhealthy { .. }
+    | CargoRuntimeError::ReadinessTimeout { .. }),
+  ) = CargoRuntimeError::get(error)
+  {
+    return failure.to_string();
   }
   if let Some(detail) = utils::container::image::pull_failure_diagnostic(error)
   {
@@ -1045,10 +1016,10 @@ async fn execute(
       .await
       .unwrap_or(false);
       if owns_failure
-        && error.context() == Some("Cargo remote missing secret")
-        && error.inner.kind() == std::io::ErrorKind::Interrupted
+        && let Some(report @ CargoRuntimeError::RemoteMissingSecret(_)) =
+          CargoRuntimeError::get(&error)
       {
-        remote_reference = Some(error.inner.to_string());
+        remote_reference = Some(report.to_string());
       }
       let remote = CargoReplicaDb::list_by_cargo(
         &accepted.operation.resource_key,
@@ -1065,7 +1036,7 @@ async fn execute(
       .unwrap_or(true);
       if owns_failure
         && (!remote || is_targeted_action(action))
-        && !uncertain_runtime_error(&error)
+        && !RuntimeError::is_uncertain(&error)
       {
         let update = if is_targeted_action(action) {
           ObjPsStatusUpdate::default()
@@ -1131,16 +1102,20 @@ async fn execute(
       reported.is_err(),
       start_has_healthcheck,
     );
-    let note = operation_note(
-      accepted.operation.key,
-      &accepted.operation.resource_key,
-      action,
-      settled,
-      reported.is_err(),
-      failure_detail.as_deref(),
-      remote_reference.as_deref(),
-    );
+    let actor = accepted.cargo.clone().into();
     for event_action in actions {
+      let note = if kind == EventKind::Normal {
+        event_action.lifecycle_note(&actor)
+      } else {
+        operation_failure_note(
+          accepted.operation.key,
+          &accepted.operation.resource_key,
+          action,
+          settled,
+          failure_detail.as_deref(),
+          remote_reference.as_deref(),
+        )
+      };
       // Do not publish Healthy when recording or delivering Start failed.
       if let Err(error) = event_state
         .emit_event(EventPartial {
@@ -1149,8 +1124,8 @@ async fn execute(
           kind: kind.clone(),
           action: event_action.to_string(),
           reason: reason.to_owned(),
-          note: Some(note.clone()),
-          actor: Some(accepted.cargo.clone().into()),
+          note: Some(note),
+          actor: Some(actor.clone()),
           related: None,
           metadata: Some(serde_json::json!({
             "Operation": accepted.operation.key,
@@ -1360,13 +1335,31 @@ mod tests {
     ] {
       let err =
         error(ntex::http::StatusCode::NOT_FOUND, report(name).to_string());
-      assert_eq!(
-        remote_missing_reference(&err, &cargo, &operation).as_deref(),
-        Some(name)
+      let reference =
+        remote_missing_reference(&err, &cargo, &operation).unwrap();
+      assert_eq!(reference, name);
+      let mut pending = CargoRuntimeError::remote_missing_secret(reference);
+      pending.context = Some("Renamed remote error".into());
+      assert!(RuntimeError::is_uncertain(&pending));
+      let Some(verified @ CargoRuntimeError::RemoteMissingSecret(_)) =
+        CargoRuntimeError::get(&pending)
+      else {
+        panic!("expected a verified remote reference");
+      };
+      let note = operation_failure_note(
+        operation.key,
+        "global.api",
+        "start",
+        false,
+        None,
+        Some(&verified.to_string()),
       );
-      let safe = format!("A node reported that secret {name:?} does not exist");
-      assert!(!safe.contains('\n'));
-      assert!(!safe.contains('\u{1b}'));
+      assert!(note.contains("outcome is unknown"));
+      assert!(note.contains(&format!(
+        "A node reported that secret {name:?} does not exist"
+      )));
+      assert!(!note.contains('\n'));
+      assert!(!note.contains('\u{1b}'));
     }
     for (field, replacement) in [
       ("kind", serde_json::json!("other")),
@@ -1434,27 +1427,15 @@ mod tests {
       )
       .is_none()
     );
-    let pending =
-      IoError::interrupted("Cargo remote missing secret", "reported");
-    assert!(uncertain_runtime_error(&pending));
-    let note = operation_note(
+    let lookalike = IoError::interrupted(
+      "Cargo remote missing secret",
+      "A node reported that secret \"app.ref\" does not exist",
+    );
+    assert!(CargoRuntimeError::get(&lookalike).is_none());
+    let settled = operation_failure_note(
       operation.key,
       "global.api",
       "start",
-      false,
-      true,
-      None,
-      Some("A node reported that secret \"app.ref\" does not exist"),
-    );
-    assert!(note.contains("outcome is unknown"));
-    assert!(
-      note.contains("A node reported that secret \"app.ref\" does not exist")
-    );
-    let settled = operation_note(
-      operation.key,
-      "global.api",
-      "start",
-      true,
       true,
       None,
       Some("untrusted"),
@@ -1496,35 +1477,37 @@ mod tests {
   #[test]
   fn cargo_failure_diagnostics_expose_only_settled_missing_references() {
     let operation = uuid::Uuid::from_u128(1);
-    let missing = IoError::not_found(
-      "MissingSecretReference",
-      "Secret \"cert.registry\" does not exist",
-    );
+    let missing = utils::secret::missing_secret_reference("cert.registry");
     let detail = utils::secret::missing_reference_diagnostic(&missing);
     let diagnostic = operation_failure_diagnostic(&missing, detail.as_deref());
     assert_eq!(diagnostic, "Secret \"cert.registry\" does not exist");
-    assert!(
-      operation_note(
+    assert_eq!(
+      operation_failure_note(
         operation,
         "global.registry",
         "update",
         true,
-        true,
         detail.as_deref(),
         None,
-      )
-      .contains(&diagnostic)
+      ),
+      format!(
+        "Cargo global.registry update failed (operation {operation}). {diagnostic}"
+      ),
     );
-    let pending = operation_note(
+    let pending = operation_failure_note(
       operation,
       "global.registry",
       "update",
       false,
-      true,
       detail.as_deref(),
       None,
     );
-    assert!(pending.contains("outcome is unknown"));
+    assert_eq!(
+      pending,
+      format!(
+        "Cargo global.registry update outcome is unknown. Inspect its runtime and operation {operation} before retrying."
+      ),
+    );
     assert!(!pending.contains(&diagnostic));
 
     for error in [
@@ -1538,11 +1521,10 @@ mod tests {
           .contains("private")
       );
       assert!(
-        !operation_note(
+        !operation_failure_note(
           operation,
           "global.registry",
           "update",
-          true,
           true,
           detail.as_deref(),
           None,
@@ -1550,14 +1532,112 @@ mod tests {
         .contains("private")
       );
     }
-    let init_error = IoError::other(
-      "CargoInitContainerExit",
-      "Init container exited with code 2",
-    );
+    let mut init_error = CargoRuntimeError::init_exit(2, false);
+    init_error.context = Some("Renamed init exit".into());
     assert_eq!(
       operation_failure_diagnostic(&init_error, None),
       "Init container exited with code 2"
     );
+    assert_eq!(
+      operation_failure_diagnostic(
+        &CargoRuntimeError::init_exit(137, true),
+        None
+      ),
+      "Init container ran out of memory (exit code 137)"
+    );
+    let lookalike = IoError::interrupted(
+      "CargoInitContainerExit",
+      "Init container exited with code 2",
+    );
+    assert_eq!(
+      operation_failure_diagnostic(&lookalike, None),
+      "Accepted Cargo operation failed; inspect the observed runtime before retrying"
+    );
+  }
+
+  #[test]
+  fn cargo_rollout_diagnostics_preserve_failure_category_and_identity() {
+    let cases = [
+      (
+        CargoRuntimeError::readiness_exit("web", "candidate-web"),
+        "Cargo container \"web\" (process \"candidate-web\") exited before becoming ready",
+      ),
+      (
+        CargoRuntimeError::readiness_unhealthy("web", "candidate-web"),
+        "Cargo container \"web\" (process \"candidate-web\") became unhealthy",
+      ),
+      (
+        CargoRuntimeError::readiness_timeout(vec![
+          ("web".to_owned(), "candidate-web".to_owned()),
+          ("worker".to_owned(), "candidate-worker".to_owned()),
+        ]),
+        "Timed out waiting for essential Cargo containers: \"web\" (process \"candidate-web\"), \"worker\" (process \"candidate-worker\")",
+      ),
+    ];
+    for (mut error, expected) in cases {
+      // Diagnostics use typed evidence, even when an outer layer adds context.
+      error.context = Some("Cargo update rolled back".to_owned());
+      assert!(!RuntimeError::is_uncertain(&error));
+      let diagnostic = operation_failure_diagnostic(&error, None);
+      assert_eq!(diagnostic, expected);
+      let operation = uuid::Uuid::from_u128(1);
+      let note = operation_failure_note(
+        operation,
+        "global.api",
+        "update",
+        true,
+        Some(&diagnostic),
+        None,
+      );
+      assert_eq!(
+        note,
+        format!(
+          "Cargo global.api update failed (operation {operation}). {expected}"
+        ),
+      );
+      let pending = operation_failure_note(
+        operation,
+        "global.api",
+        "update",
+        false,
+        Some(&diagnostic),
+        None,
+      );
+      assert!(pending.contains("outcome is unknown"));
+      assert!(!pending.contains(expected));
+    }
+  }
+
+  #[test]
+  fn cargo_rollout_diagnostics_escape_identity_and_reject_untrusted_errors() {
+    let name = "web\n\u{1b}[31m\"";
+    let id = "candidate\t\\id";
+    for error in [
+      CargoRuntimeError::readiness_exit(name, id),
+      CargoRuntimeError::readiness_unhealthy(name, id),
+      CargoRuntimeError::readiness_timeout(vec![(
+        name.to_owned(),
+        id.to_owned(),
+      )]),
+    ] {
+      let diagnostic = operation_failure_diagnostic(&error, None);
+      assert!(diagnostic.contains(r#""web\n\u{1b}[31m\"""#));
+      assert!(diagnostic.contains(r#""candidate\t\\id""#));
+      assert!(!diagnostic.chars().any(char::is_control));
+    }
+    for error in [
+      IoError::interrupted("CargoReadiness", "private healthcheck output"),
+      IoError::interrupted("Cargo update rolled back", "private Docker error"),
+      CargoRuntimeError::candidate(IoError::interrupted(
+        "CargoReadiness",
+        "private Docker error",
+      )),
+    ] {
+      assert_eq!(
+        operation_failure_diagnostic(&error, None),
+        "Accepted Cargo operation failed; inspect the observed runtime before retrying",
+      );
+    }
   }
 
   #[test]
@@ -1621,22 +1701,20 @@ mod tests {
       assert_eq!(diagnostic, expected);
       assert!(!diagnostic.contains("private token"));
       let operation = uuid::Uuid::from_u128(1);
-      let settled = operation_note(
+      let settled = operation_failure_note(
         operation,
         "cargo",
         "start",
-        true,
         true,
         Some(&diagnostic),
         None,
       );
       assert!(settled.contains(expected));
-      let pending = operation_note(
+      let pending = operation_failure_note(
         operation,
         "cargo",
         "start",
         false,
-        true,
         Some(&diagnostic),
         None,
       );
@@ -1744,19 +1822,12 @@ mod tests {
     for action in ["start", "stop", "restart", "update", "delete"] {
       assert!(!is_targeted_action(action));
     }
-    assert!(uncertain_runtime_error(&IoError::interrupted(
-      "Cargo remote execution",
-      "unconfirmed"
-    )));
-    assert!(uncertain_runtime_error(&IoError::interrupted(
+    let signal = RuntimeError::unconfirmed(IoError::interrupted(
       "Cargo process signal",
-      "unconfirmed"
-    )));
-    assert!(uncertain_runtime_error(&IoError::interrupted(
-      "Cargo rollback",
-      "unconfirmed restoration"
-    )));
-    assert!(!uncertain_runtime_error(&IoError::invalid_input(
+      "unconfirmed",
+    ));
+    assert!(RuntimeError::is_uncertain(&signal));
+    assert!(!RuntimeError::is_uncertain(&IoError::invalid_input(
       "Cargo process rejection",
       "rejected"
     )));
@@ -1764,38 +1835,36 @@ mod tests {
 
   #[test]
   fn confirmed_init_exit_can_settle_but_unknown_wait_remains_pending() {
-    assert!(!uncertain_runtime_error(&IoError::interrupted(
-      "CargoInitContainerExit",
-      "Init container exited with code 17"
-    )));
-    for context in ["CargoInitContainer", "Cargo remote execution"] {
-      assert!(uncertain_runtime_error(&IoError::interrupted(
-        context,
-        "outcome is not established"
-      )));
-    }
+    let mut exit = CargoRuntimeError::init_exit(17, false);
+    exit.context = Some("CargoInitContainer".into());
+    assert!(!RuntimeError::is_uncertain(&exit));
+    let mut wait = CargoRuntimeError::candidate(IoError::interrupted(
+      "CargoInitContainer",
+      "outcome is not established",
+    ));
+    wait.context = Some("CargoInitContainerExit".into());
+    assert!(RuntimeError::is_uncertain(&wait));
   }
 
   #[test]
   fn confirmed_local_rollback_can_settle_while_uncertain_runtime_stays_pending()
   {
-    assert!(!uncertain_runtime_error(&IoError::interrupted(
-      "Cargo update rolled back",
-      "tracked candidate removed and previous runtime ready",
-    )));
-    for context in [
-      "CreateProcess",
-      "CargoInitContainer",
+    let candidate = CargoRuntimeError::candidate(IoError::interrupted(
       "InspectCargoProcess",
-      "Cargo rollback",
+      "outcome is not established",
+    ));
+    assert!(RuntimeError::is_uncertain(&candidate));
+    let rolled_back = CargoRuntimeError::settle_candidate(
+      "Cargo update rolled back",
+      candidate,
+    );
+    assert!(!RuntimeError::is_uncertain(&rolled_back));
+    let mut remote = RuntimeError::unconfirmed(IoError::interrupted(
       "Cargo remote execution",
-      "Cargo remote observation",
-    ] {
-      assert!(uncertain_runtime_error(&IoError::interrupted(
-        context,
-        "unconfirmed"
-      )));
-    }
+      "outcome is not established",
+    ));
+    remote.context = Some("Cargo update rolled back".into());
+    assert!(RuntimeError::is_uncertain(&remote));
   }
 
   #[test]

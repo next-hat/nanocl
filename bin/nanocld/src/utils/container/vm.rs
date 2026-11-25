@@ -22,8 +22,8 @@ use nanocl_stubs::{
 
 use crate::{
   models::{
-    ObjPsStatusDb, OperationDb, OperationOwner, ProcessDb, SpecDb, SystemState,
-    VmDb, VmOperationLease,
+    ObjPsStatusDb, OperationDb, OperationOwner, ProcessDb, RuntimeError,
+    SpecDb, SystemState, VmDb, VmOperationLease,
   },
   repositories::generic::*,
   utils, vars,
@@ -1228,9 +1228,7 @@ async fn create_instance_owned<G: Clone + Send + 'static>(
 pub async fn start(key: &str, state: &SystemState) -> IoResult<()> {
   let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
   let result = start_unlocked_owned(key, None, guard.clone(), state).await;
-  record_task_outcome_owned(key, result, None, guard, state)
-    .await
-    .0
+  record_task_outcome_owned(key, result, None, guard, state).await
 }
 
 // Acceptance hands both lifecycle and distributed ownership to the task.
@@ -1241,7 +1239,7 @@ pub(crate) async fn run_task_unlocked(
   operation: &OperationDb,
   lease: &VmOperationLease,
   state: &SystemState,
-) -> (IoResult<()>, bool) {
+) -> IoResult<()> {
   let result = match action {
     NativeEventAction::Starting => {
       start_unlocked_owned(key, Some(operation.owner()), lease.clone(), state)
@@ -1274,7 +1272,7 @@ pub(crate) async fn record_task_outcome(
   key: &str,
   result: IoResult<()>,
   state: &SystemState,
-) -> (IoResult<()>, bool) {
+) -> IoResult<()> {
   record_task_outcome_owned(key, result, None, (), state).await
 }
 
@@ -1284,8 +1282,8 @@ async fn record_task_outcome_owned<G: Send + 'static>(
   owner: Option<OperationOwner>,
   keepalive: G,
   state: &SystemState,
-) -> (IoResult<()>, bool) {
-  if let Err(operation_error) = &result {
+) -> IoResult<()> {
+  if let Err(operation_error) = result {
     // The requested operation failed, but its old guest may still be running
     // after preflight or an ACPI timeout. Observe the owned runtime under the
     // same guard; task error events retain the operation's failure explanation.
@@ -1306,7 +1304,7 @@ async fn record_task_outcome_owned<G: Send + 'static>(
       log::warn!(
         "VM {key} operation failed: {operation_error}; runtime observation unavailable, retaining pending recovery"
       );
-      return (result, false);
+      return Err(RuntimeError::unconfirmed(operation_error));
     }
     log::warn!(
       "VM {key} operation failed: {operation_error}; observed status: {actual}"
@@ -1321,10 +1319,12 @@ async fn record_task_outcome_owned<G: Send + 'static>(
     .await
     {
       log::warn!("Unable to record failed VM lifecycle status: {error}");
-      return (result, false);
+      return Err(RuntimeError::unconfirmed(operation_error));
     }
+    // This observation supersedes any uncertainty reported by the runtime call.
+    return Err(RuntimeError::into_cause(operation_error));
   }
-  (result, true)
+  Ok(())
 }
 
 fn task_failure_actual(
@@ -1389,9 +1389,7 @@ async fn start_unlocked_owned<G: Clone + Send + 'static>(
 pub async fn delete(key: &str, state: &SystemState) -> IoResult<()> {
   let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
   let result = delete_unlocked(key, None, guard.clone(), state).await;
-  record_task_outcome_owned(key, result, None, guard, state)
-    .await
-    .0
+  record_task_outcome_owned(key, result, None, guard, state).await
 }
 
 async fn delete_unlocked<G: Clone + Send + 'static>(
@@ -1454,9 +1452,7 @@ async fn delete_unlocked<G: Clone + Send + 'static>(
 pub async fn update(key: &str, state: &SystemState) -> IoResult<()> {
   let guard = std::sync::Arc::new(lifecycle_lock(key).lock_owned().await);
   let result = update_unlocked_owned(key, None, guard.clone(), state).await;
-  record_task_outcome_owned(key, result, None, guard, state)
-    .await
-    .0
+  record_task_outcome_owned(key, result, None, guard, state).await
 }
 
 async fn update_unlocked_owned<G: Clone + Send + 'static>(
@@ -1745,17 +1741,18 @@ mod tests {
       );
       for running in [Some(true), None] {
         *fixture.running.lock().unwrap() = running;
-        let (result, settled) = record_task_outcome_owned(
+        let error = record_task_outcome_owned(
           &key,
           Err(IoError::interrupted("InitContainer", &original)),
           Some(operation.owner()),
           lease.clone(),
           &state,
         )
-        .await;
-        assert!(result.unwrap_err().to_string().contains(&original));
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains(&original));
         assert!(
-          !settled,
+          RuntimeError::is_uncertain(&error),
           "active or unknown init must retain pending admission"
         );
         assert_eq!(

@@ -318,6 +318,33 @@ impl std::fmt::Display for NativeEventAction {
   }
 }
 
+impl NativeEventAction {
+  /// Describe a normal lifecycle notification in operator-facing output.
+  pub fn lifecycle_note(&self, actor: &EventActor) -> String {
+    let phase = match self {
+      Self::Create => "created",
+      Self::Starting => "start requested",
+      Self::Start => "started",
+      Self::Updating => "update requested",
+      Self::Update => "updated",
+      Self::Destroying => "deletion requested",
+      Self::Destroy => "deleted",
+      Self::Stopping => "stop requested",
+      Self::Stop => "stopped",
+      Self::Restart => "restarted",
+      Self::Healthy => "is healthy",
+      Self::Unhealthy => "is unhealthy",
+      Self::Finish => "finished",
+      Self::Fail => "failed",
+      Self::Die => "exited",
+      Self::Downloading => "download in progress",
+      Self::Download => "downloaded",
+      Self::Other(action) => action,
+    };
+    format!("{actor} {phase}")
+  }
+}
+
 /// Kind of event (Error, Normal, Warning), new types could be added in the future.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -375,6 +402,19 @@ pub struct EventActor {
   pub attributes: Option<serde_json::Value>,
 }
 
+impl std::fmt::Display for EventActor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self.kind {
+      EventActorKind::Vm => f.write_str("VM")?,
+      _ => write!(f, "{}", self.kind)?,
+    }
+    if let Some(key) = &self.key {
+      write!(f, " {key}")?;
+    }
+    Ok(())
+  }
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -391,7 +431,7 @@ pub struct EventPartial {
   /// It is machine-readable.
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub action: String,
-  /// Reason is why the action was taken. It is human-readable.
+  /// Stable reason for the action, used by consumers (e.g. `state_sync`).
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
   /// Human-readable description of the status of this operation
@@ -413,7 +453,10 @@ pub struct EventPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub related: Option<EventActor>,
-  /// Standard metadata.
+  /// Event-specific details. Operation notifications may include `Operation`
+  /// and `SpecKey`. Process health updates may include `HealthStatus`
+  /// (`starting`, `healthy`, or `unhealthy`). Job and VM exit events may
+  /// include `ContainerId`, `ExitCode`, and `OOMKilled` when confirmed.
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -445,7 +488,7 @@ pub struct Event {
   /// It is machine-readable.
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub action: String,
-  /// Reason is why the action was taken. It is human-readable.
+  /// Stable reason for the action, used by consumers (e.g. `state_sync`).
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
   /// Human-readable description of the status of this operation
@@ -467,7 +510,10 @@ pub struct Event {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub related: Option<EventActor>,
-  /// Standard metadata.
+  /// Event-specific details. Operation notifications may include `Operation`
+  /// and `SpecKey`. Process health updates may include `HealthStatus`
+  /// (`starting`, `healthy`, or `unhealthy`). Job and VM exit events may
+  /// include `ContainerId`, `ExitCode`, and `OOMKilled` when confirmed.
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
     feature = "serde",
@@ -476,7 +522,42 @@ pub struct Event {
   pub metadata: Option<serde_json::Value>,
 }
 
-/// Condition to stop watching for events if their are meet
+impl EventPartial {
+  /// Notify controllers that local process observations are ready to re-read.
+  pub fn process_inventory_sync(node: String, controller: String) -> Self {
+    Self {
+      reporting_node: node,
+      reporting_controller: controller,
+      kind: EventKind::Normal,
+      action: NativeEventAction::Update.to_string(),
+      reason: "state_sync".into(),
+      note: Some("Local process inventory scan completed".into()),
+      actor: Some(EventActor {
+        key: None,
+        kind: EventActorKind::Process,
+        attributes: None,
+      }),
+      related: None,
+      metadata: None,
+    }
+  }
+}
+
+impl Event {
+  /// Recognize a notification that local process observations are ready to re-read.
+  pub fn is_process_inventory_sync(&self) -> bool {
+    self.kind == EventKind::Normal
+      && self.action == "update"
+      && self.reason == "state_sync"
+      && self.actor.as_ref().is_some_and(|actor| {
+        actor.kind == EventActorKind::Process && actor.key.is_none()
+      })
+  }
+}
+
+/// A watch ends after every supplied condition has matched a delivered event.
+/// Kind and action each match any value in their list. Omitted actor and
+/// related fields impose no restriction.
 #[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -508,27 +589,84 @@ pub struct EventCondition {
 
 impl std::cmp::PartialEq<Event> for EventCondition {
   fn eq(&self, other: &Event) -> bool {
-    let actor = match &other.actor {
-      Some(actor) => actor,
-      None => return false,
+    fn matches_actor(
+      actor: Option<&EventActor>,
+      key: Option<&str>,
+      kind: Option<&EventActorKind>,
+    ) -> bool {
+      let actual_key = actor.and_then(|actor| actor.key.as_deref());
+      let actual_kind = actor.map(|actor| &actor.kind);
+      key.is_none_or(|key| Some(key) == actual_key)
+        && kind.is_none_or(|kind| Some(kind) == actual_kind)
+    }
+    self.kind.contains(&other.kind)
+      && matches_actor(
+        other.actor.as_ref(),
+        self.actor_key.as_deref(),
+        self.actor_kind.as_ref(),
+      )
+      && matches_actor(
+        other.related.as_ref(),
+        self.related_key.as_deref(),
+        self.related_kind.as_ref(),
+      )
+      && NativeEventAction::from_str(&other.action)
+        .is_ok_and(|action| self.action.contains(&action))
+  }
+}
+
+#[cfg(test)]
+mod event_condition_tests {
+  use super::*;
+
+  #[test]
+  fn matches_optional_actor_and_related_fields_independently() {
+    let mut event = Event {
+      key: uuid::Uuid::nil(),
+      created_at: Default::default(),
+      expires_at: Default::default(),
+      reporting_node: "test".into(),
+      reporting_controller: "nanocl.io/core".into(),
+      kind: EventKind::Normal,
+      action: "start".into(),
+      reason: "state_sync".into(),
+      note: None,
+      actor: None,
+      related: None,
+      metadata: None,
     };
-    let Some(key) = &actor.key else {
-      return false;
+    let mut condition = EventCondition {
+      kind: vec![EventKind::Normal],
+      action: vec![NativeEventAction::Start],
+      ..Default::default()
     };
-    let Ok(action) = NativeEventAction::from_str(&other.action) else {
-      return false;
-    };
-    self
-      .actor_kind
-      .clone()
-      .map(|a| a == actor.kind)
-      .unwrap_or_default()
-      && self
-        .actor_key
-        .clone()
-        .map(|a| &a == key)
-        .unwrap_or_default()
-      && self.kind.clone().into_iter().any(|k| k == other.kind)
-      && self.action.clone().into_iter().any(|a| a == action)
+    assert_eq!(condition, event);
+    condition.related_key = Some("global.app".into());
+    assert_ne!(condition, event);
+    event.related = Some(EventActor {
+      key: Some("global.app".into()),
+      kind: EventActorKind::Cargo,
+      attributes: None,
+    });
+    assert_eq!(condition, event);
+    condition.related_kind = Some(EventActorKind::Job);
+    assert_ne!(condition, event);
+    condition.related_kind = Some(EventActorKind::Cargo);
+    condition.actor_key = Some("web".into());
+    assert_ne!(condition, event);
+    event.actor = Some(EventActor {
+      key: Some("web".into()),
+      kind: EventActorKind::Process,
+      attributes: None,
+    });
+    assert_eq!(condition, event);
+    condition.actor_kind = Some(EventActorKind::Vm);
+    assert_ne!(condition, event);
+    condition.actor_kind = Some(EventActorKind::Process);
+    condition.kind.clear();
+    assert_ne!(condition, event);
+    condition.kind.push(EventKind::Normal);
+    condition.action.clear();
+    assert_ne!(condition, event);
   }
 }

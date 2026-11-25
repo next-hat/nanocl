@@ -221,7 +221,7 @@ where
         emit_download_status(
           event_actor.clone(),
           event_related_actor.clone(),
-          &note,
+          &format!("Failed to pull image {name}:{tag}: {note}"),
           NativeEventAction::Downloading,
           EventKind::Error,
           None,
@@ -234,7 +234,7 @@ where
     emit_download_status(
       event_actor.clone(),
       event_related_actor.clone(),
-      &format!("{name}:{tag}"),
+      &format!("Pulling image {name}:{tag}"),
       NativeEventAction::Downloading,
       EventKind::Normal,
       Some(serde_json::json!({
@@ -246,7 +246,7 @@ where
   emit_download_status(
     event_actor.clone(),
     event_related_actor.clone(),
-    &format!("{name}:{tag}"),
+    &format!("Pulled image {name}:{tag}"),
     NativeEventAction::Download,
     EventKind::Normal,
     None,
