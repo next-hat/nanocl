@@ -50,6 +50,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "Uninstalling",
     output.as_ref(),
   )?;
+  let mut items = Vec::new();
   let result = async {
     let progress = &progress;
     let summary = &summary;
@@ -60,6 +61,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
       utils::progress::run_state_step(
         progress,
         summary,
+        &mut items,
         &token,
         output,
         None,

@@ -7,7 +7,10 @@ use std::{
 use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::process::Process;
 
-use crate::models::{CargoReplicaProcessDb, CargoRuntimeContext, ProcessDb};
+use crate::models::{
+  CargoReplicaProcessDb, CargoRuntimeContext, CargoRuntimeError, ProcessDb,
+  RuntimeError,
+};
 
 use super::is_candidate_process_name;
 
@@ -140,10 +143,10 @@ pub(super) fn before_previous_snapshot(key: &str) -> IoResult<()> {
     *remaining -= 1;
     if *remaining == 0 {
       faults.remove(key);
-      return Err(IoError::interrupted(
+      return Err(CargoRuntimeError::candidate(IoError::interrupted(
         "InspectCargoProcess",
         "previous runtime inspection unavailable",
-      ));
+      )));
     }
   }
   Ok(())
@@ -155,10 +158,10 @@ pub(super) fn before_revalidation(key: &str) -> IoResult<()> {
     *remaining -= 1;
     if *remaining == 0 {
       faults.remove(key);
-      return Err(IoError::interrupted(
+      return Err(CargoRuntimeError::candidate(IoError::interrupted(
         "InspectCargoProcess",
         "candidate revalidation unavailable",
-      ));
+      )));
     }
   }
   Ok(())
@@ -173,10 +176,10 @@ pub(super) fn after_create(process: &Process) -> IoResult<()> {
       faults.remove(&process.kind_key);
       // The caller never receives this ID and therefore cannot add it to its
       // tracked candidate slots, just as with an uncertain Docker create reply.
-      return Err(IoError::interrupted(
+      return Err(RuntimeError::unconfirmed(IoError::interrupted(
         "CreateProcess",
         "candidate create response lost",
-      ));
+      )));
     }
   }
   Ok(())
@@ -188,10 +191,10 @@ pub(super) fn before_cleanup(process: &Process) -> IoResult<()> {
     && matches!(faults.get(&process.kind_key), Some(Fault::Cleanup))
   {
     faults.remove(&process.kind_key);
-    return Err(IoError::interrupted(
+    return Err(RuntimeError::unconfirmed(IoError::interrupted(
       "DeleteProcess",
       "candidate removal not confirmed",
-    ));
+    )));
   }
   Ok(())
 }
